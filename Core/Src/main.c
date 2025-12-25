@@ -78,6 +78,20 @@ uint16_t mux_channel = 0;
  * Format: [MUX0_CH0, MUX0_CH1, ..., MUX0_CH5, MUX1_CH0, ..., MUX1_CH5]
  */
 uint16_t adc_values[NUM_MUX * NUM_MUX_CHANNELS];
+
+/**
+ * Timings measurement variables
+ */
+// Temps de scan total
+uint32_t adc_total_scan_us = 0;
+uint32_t adc_total_scan_start_cycles = 0;
+uint32_t adc_total_scan_end_cycles = 0;
+// Temps de conversion ADC
+uint32_t adc_callback_us = 0;
+uint32_t adc_callback_start_cycles = 0;
+uint32_t adc_callback_end_cycles = 0;
+// Temps de commutation GPIO
+uint32_t gpio_switching_us = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -96,6 +110,20 @@ static void MX_TIM4_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+#if defined(__GNUC__) || defined(__clang__)
+#define KBHE_ALWAYS_INLINE __attribute__((always_inline)) static inline
+#else
+#define KBHE_ALWAYS_INLINE static inline
+#endif
+
+KBHE_ALWAYS_INLINE void GPIO_WriteMasked_BSRR(GPIO_TypeDef *port,
+                                              uint16_t pins_mask,
+                                              uint16_t pins_set) {
+  const uint32_t set = (uint32_t)(pins_set & pins_mask);
+  const uint32_t reset = (uint32_t)((pins_mask & (uint16_t)~pins_set) << 16);
+  port->BSRR = set | reset;
+}
+
 static void DWT_CycleCounter_Init(void) {
   /* Active le compteur de cycles (Cortex-M7) */
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
@@ -103,34 +131,68 @@ static void DWT_CycleCounter_Init(void) {
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
-static inline uint32_t CyclesToUs(uint32_t cycles) {
-  /* Conversion cycles -> µs (arrondi vers le bas) */
+static uint32_t cycles_to_us(uint32_t cycles) {
   if (SystemCoreClock == 0U) {
     return 0U;
   }
+  // Calcul en 64 bits pour éviter l'overflow lors de la multiplication
   return (uint32_t)(((uint64_t)cycles * 1000000ULL) /
                     (uint64_t)SystemCoreClock);
+}
+
+static void TIM4_StartOneShot_TRGO(void) {
+  TIM4->SR = ~TIM_SR_UIF;
+  TIM4->CNT = 0;
+  TIM4->CR1 |= TIM_CR1_CEN;
 }
 
 /**
  * Selects the current channel on the multiplexer.
  */
 static void MUX_SelectChannel(uint8_t channel) {
+  // uint32_t start_cycles = DWT->CYCCNT;
   /* M0..M3 = bus d'adresse (0..15). On utilise ici 0..NUM_MUX_CHANNELS-1. */
   if (channel >= (uint8_t)NUM_MUX_CHANNELS) {
     channel = 0U;
   }
 
-  HAL_GPIO_WritePin(M0_GPIO_Port, M0_Pin,
-                    (channel & 0x01U) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(M1_GPIO_Port, M1_Pin,
-                    (channel & 0x02U) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(M2_GPIO_Port, M2_Pin,
-                    (channel & 0x04U) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(M3_GPIO_Port, M3_Pin,
-                    (channel & 0x08U) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  /* Chemin critique: évite HAL_GPIO_WritePin (très coûteux) */
+  if (M0_GPIO_Port == M1_GPIO_Port) {
+    uint16_t pins_set = 0U;
+    if ((channel & 0x01U) != 0U) {
+      pins_set |= M0_Pin;
+    }
+    if ((channel & 0x02U) != 0U) {
+      pins_set |= M1_Pin;
+    }
+    GPIO_WriteMasked_BSRR(M0_GPIO_Port, (uint16_t)(M0_Pin | M1_Pin), pins_set);
+  } else {
+    GPIO_WriteMasked_BSRR(M0_GPIO_Port, M0_Pin,
+                          ((channel & 0x01U) != 0U) ? M0_Pin : 0U);
+    GPIO_WriteMasked_BSRR(M1_GPIO_Port, M1_Pin,
+                          ((channel & 0x02U) != 0U) ? M1_Pin : 0U);
+  }
+
+  if (M2_GPIO_Port == M3_GPIO_Port) {
+    uint16_t pins_set = 0U;
+    if ((channel & 0x04U) != 0U) {
+      pins_set |= M2_Pin;
+    }
+    if ((channel & 0x08U) != 0U) {
+      pins_set |= M3_Pin;
+    }
+    GPIO_WriteMasked_BSRR(M2_GPIO_Port, (uint16_t)(M2_Pin | M3_Pin), pins_set);
+  } else {
+    GPIO_WriteMasked_BSRR(M2_GPIO_Port, M2_Pin,
+                          ((channel & 0x04U) != 0U) ? M2_Pin : 0U);
+    GPIO_WriteMasked_BSRR(M3_GPIO_Port, M3_Pin,
+                          ((channel & 0x08U) != 0U) ? M3_Pin : 0U);
+  }
 
   mux_channel = channel;
+
+  // uint32_t end_cycles = DWT->CYCCNT;
+  // gpio_switching_us = cycles_to_us(end_cycles - start_cycles);
 }
 
 /* USER CODE END 0 */
@@ -182,7 +244,11 @@ int main(void) {
 
   MUX_SelectChannel(0);
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, 2);
+  adc_total_scan_start_cycles = DWT->CYCCNT;
+  if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, 2) != HAL_OK) {
+    Error_Handler();
+  }
+  TIM4_StartOneShot_TRGO();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -269,8 +335,8 @@ static void MX_ADC1_Init(void) {
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
+  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T4_TRGO;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 2;
   hadc1.Init.DMAContinuousRequests = ENABLE;
@@ -362,9 +428,9 @@ static void MX_TIM4_Init(void) {
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 107;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 2;
+  htim4.Init.Period = 1;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK) {
     Error_Handler();
   }
@@ -372,7 +438,10 @@ static void MX_TIM4_Init(void) {
   if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK) {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  if (HAL_TIM_OnePulse_Init(&htim4, TIM_OPMODE_SINGLE) != HAL_OK) {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK) {
     Error_Handler();
@@ -474,9 +543,12 @@ static void MX_GPIO_Init(void) {
 /* USER CODE BEGIN 4 */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
   /**
-   * When an ADC burst is complete, store the values and switch to the next MUX channel
+   * When an ADC burst is complete, store the values and switch to the next MUX
+   * channel
    */
   if (hadc->Instance == ADC1) {
+    adc_callback_start_cycles = DWT->CYCCNT;
+
     // Increment number of conversions completed
     num_conv++;
 
@@ -490,24 +562,40 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     // If all channels have been read, reset to channel 0
     if (mux_channel >= NUM_MUX_CHANNELS) {
       mux_channel = 0U;
+
+      adc_total_scan_end_cycles = DWT->CYCCNT;
+      adc_total_scan_us =
+          cycles_to_us(adc_total_scan_end_cycles - adc_total_scan_start_cycles);
+
+      adc_total_scan_start_cycles = DWT->CYCCNT;
     }
 
     // Select next MUX channel
     MUX_SelectChannel(mux_channel);
 
     // Start 2us timer to wait for MUX settling time
-    HAL_TIM_Base_Start_IT(&htim4);
+    TIM4_StartOneShot_TRGO();
+
+    adc_callback_end_cycles = DWT->CYCCNT;
+    adc_callback_us =
+        cycles_to_us(adc_callback_end_cycles - adc_callback_start_cycles);
   }
 }
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-  if (htim->Instance == TIM4) {
-    // Stop the timer (one-shot)
-    HAL_TIM_Base_Stop_IT(&htim4);
-    // Restart ADC conversion (DMA is already configured in circular mode)
-    HAL_ADC_Start(&hadc1);
-  }
-}
+/**
+ * Old restart timer with interuption
+ */
+// void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+//   if (htim->Instance == TIM4) {
+//     // Stop the timer (one-shot)
+//     HAL_TIM_Base_Stop_IT(&htim4);
+
+//     adc_callback_start_cycles = DWT->CYCCNT;
+
+//     // Restart ADC conversion (DMA is already configured in circular mode)
+//     HAL_ADC_Start(&hadc1);
+//   }
+// }
 /* USER CODE END 4 */
 
 /* MPU Configuration */
