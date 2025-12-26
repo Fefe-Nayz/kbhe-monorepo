@@ -37,6 +37,32 @@ add_executable(${CMAKE_PROJECT_NAME})
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
+#--------------------------------------------------------------------+
+# TinyUSB Configuration
+#--------------------------------------------------------------------+
+set(TINYUSB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/tinyusb)
+
+# TinyUSB source files
+set(TINYUSB_SRC
+    # Core
+    ${TINYUSB_DIR}/src/tusb.c
+    ${TINYUSB_DIR}/src/common/tusb_fifo.c
+    # Device stack
+    ${TINYUSB_DIR}/src/device/usbd.c
+    ${TINYUSB_DIR}/src/device/usbd_control.c
+    # HID class
+    ${TINYUSB_DIR}/src/class/hid/hid_device.c
+    # DWC2 driver (Synopsys pour STM32)
+    ${TINYUSB_DIR}/src/portable/synopsys/dwc2/dcd_dwc2.c
+    ${TINYUSB_DIR}/src/portable/synopsys/dwc2/dwc2_common.c
+)
+
+# TinyUSB include directories
+set(TINYUSB_INC
+    ${TINYUSB_DIR}/src
+    ${TINYUSB_DIR}/src/common
+)
+
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
@@ -44,17 +70,25 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
+    # TinyUSB sources
+    ${TINYUSB_SRC}
+    # USB application sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_descriptors.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_hid.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
+    # TinyUSB includes
+    ${TINYUSB_INC}
+    # Project includes (pour tusb_config.h)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
 )
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined symbols
+    # HSE value for USB HS PHY PLL configuration
+    HSE_VALUE=16000000U
 )
 
 # Remove wrong libob.a library dependency when using cpp files

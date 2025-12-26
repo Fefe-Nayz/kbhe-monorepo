@@ -22,6 +22,7 @@
 #include "stm32f7xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "tusb.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -261,16 +262,19 @@ void DMA2_Stream0_IRQHandler(void)
 /**
   * @brief This function handles USB On The Go HS global interrupt.
   */
-void OTG_HS_IRQHandler(void)
-{
-  /* USER CODE BEGIN OTG_HS_IRQn 0 */
+  void OTG_HS_IRQHandler(void)
+  {
+    /* USER CODE BEGIN OTG_HS_IRQn 0 */
+    // TinyUSB gère l'interruption USB
+    // Port 1 = USB OTG HS sur STM32F7
+    tud_int_handler(1);
+    return;  // Ne pas appeler HAL_PCD_IRQHandler
+    /* USER CODE END OTG_HS_IRQn 0 */
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
+    /* USER CODE BEGIN OTG_HS_IRQn 1 */
 
-  /* USER CODE END OTG_HS_IRQn 0 */
-  HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
-  /* USER CODE BEGIN OTG_HS_IRQn 1 */
-
-  /* USER CODE END OTG_HS_IRQn 1 */
-}
+    /* USER CODE END OTG_HS_IRQn 1 */
+  }
 
 /* USER CODE BEGIN 1 */
 

@@ -24,6 +24,8 @@
 #include "stm32f7xx_hal_adc.h"
 #include <stdint.h>
 #include <stdio.h>
+#include "tusb.h"
+#include "usb_hid.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -292,7 +294,17 @@ int main(void)
   MX_USB_OTG_HS_PCD_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
+
   /* USER CODE BEGIN 2 */
+
+  // Initialisation TinyUSB - RHPORT 1 = USB HS avec PHY intégré
+  const tusb_rhport_init_t rhport_init = {
+    .role = TUSB_ROLE_DEVICE,
+    .speed = TUSB_SPEED_HIGH
+  };
+  tusb_init(1, &rhport_init);
+  // tusb_init();
+
   DWT_CycleCounter_Init();
 
   MUX_SelectChannel(0);
@@ -302,11 +314,17 @@ int main(void)
     Error_Handler();
   }
   TIM4_StartOneShot_TRGO();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+    // TinyUSB device task - DOIT être appelé régulièrement
+    tud_task();
+    
+    // Optionnel: tâche HID pour gérer les envois de rapport
+    usb_hid_task();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -584,179 +602,43 @@ static void MX_USB_OTG_HS_PCD_Init(void)
 {
 
   /* USER CODE BEGIN USB_OTG_HS_Init 0 */
-  /* 
-   * TinyUSB gère l'initialisation USB bas niveau.
-   * Ici on configure uniquement:
-   *   1. Les clocks USB
-   *   2. Les GPIOs
-   *   3. Le NVIC (interruptions)
-   */
+
   /* USER CODE END USB_OTG_HS_Init 0 */
 
   /* USER CODE BEGIN USB_OTG_HS_Init 1 */
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
   /*
    * ==========================================================================
-   * ÉTAPE 1: Configuration de l'horloge 48 MHz pour USB
+   * Configuration minimale pour TinyUSB - il fait le reste!
    * ==========================================================================
-   * 
-   * Le PHY USB HS intégré nécessite une clock de 48 MHz.
-   * On la dérive du PLL principal qui est déjà configuré à 216 MHz.
-   * 
-   * Avec PLLQ = 9: 216 MHz / 9 = 24 MHz... non c'est faux
-   * En fait avec votre config: HSE=8MHz, PLLN=216, PLLM=8, PLLQ=9
-   *   PLL VCO = 8 * 216 / 8 = 216 MHz
-   *   PLLQ output = 216 / 9 = 24 MHz
-   * 
-   * Hmm, il faut vérifier la clock USB. Le PHY HS utilise le PHYC interne
-   * qui a son propre PLL dérivé de HSE.
    */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CLK48;
-  PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48SOURCE_PLL;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
-    Error_Handler();
-  }
 
-  /*
-   * ==========================================================================
-   * ÉTAPE 2: Configuration des GPIOs USB HS
-   * ==========================================================================
-   * 
-   * Sur STM32F723, le PHY HS intégré utilise:
-   *   - PB14 = USB_HS_DM (Data Minus)
-   *   - PB15 = USB_HS_DP (Data Plus)
-   * 
-   * Alternate Function: AF12 (OTG_HS en mode FS-like avec PHY interne)
-   * 
-   * Note: Ne pas confondre avec le mode ULPI qui utilise beaucoup plus de pins
-   * (CLK, STP, DIR, NXT, D0-D7) pour un PHY externe.
-   */
+  // 1. Activer les clocks
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_OTGPHYC_CLK_ENABLE();  // Clock du PHY HS intégré
+  __HAL_RCC_USB_OTG_HS_CLK_ENABLE();
+  __HAL_RCC_USB_OTG_HS_ULPI_CLK_ENABLE(); // Requis pour core reset même avec PHY intégré!
   
-  GPIO_InitStruct.Pin = GPIO_PIN_14 | GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;  // 100 MHz - nécessaire pour HS
-  GPIO_InitStruct.Alternate = GPIO_AF12_OTG_HS_FS;    // Mode HS avec PHY interne
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*
-   * ==========================================================================
-   * ÉTAPE 3: Activation des clocks USB dans le bon ordre
-   * ==========================================================================
-   * 
-   * IMPORTANT: L'ordre d'activation des clocks est critique!
-   * 
-   * 1. D'abord USB_OTG_HS_CLK (périphérique principal)
-   * 2. Ensuite OTGPHYC_CLK (contrôleur du PHY intégré)
-   * 3. Désactiver ULPI car on n'utilise PAS de PHY externe
-   */
-  // CubeMX (et le HAL) activent ces 3 clocks sur F723.
-  // Même avec le PHY HS intégré, le bit "ULPI" de RCC sert de gate clock
-  // pour l'interface HS (ULPI/UTMI). Si elle est coupée, le core DWC2 peut
-  // rester bloqué pendant le reset (GRSTCTL.CSRST ne se clear jamais).
-  __HAL_RCC_OTGPHYC_CLK_ENABLE();        // Clock du contrôleur PHY HS intégré (F723 spécifique!)
-  __HAL_RCC_USB_OTG_HS_CLK_ENABLE();     // Clock du périphérique USB OTG HS
-  __HAL_RCC_USB_OTG_HS_ULPI_CLK_ENABLE(); // Gate clock interface HS (ULPI/UTMI)
-
-  /*
-   * ==========================================================================
-   * ÉTAPE CRITIQUE: Activer le PHY HS dans GCCFG
-   * ==========================================================================
-   * 
-   * Le bit PHYHSEN (bit 23 du registre GCCFG) DOIT être activé AVANT
-   * toute initialisation du PHY ou reset du core USB!
-   * 
-   * Sans ce bit, le PHY interne n'est pas connecté au contrôleur USB
-   * et le core reset restera bloqué indéfiniment car la clock PHY
-   * n'est pas disponible.
-   */
-  USB_OTG_HS->GCCFG |= USB_OTG_GCCFG_PHYHSEN;
-
-  /*
-   * ==========================================================================
-   * ÉTAPE 4: Désactivation ULPI en mode Low-Power
-   * ==========================================================================
-   * 
-   * Ce bit doit aussi être désactivé sinon l'USB ne fonctionne pas
-   * quand le MCU exécute WFI/WFE (mode sleep, tick-less RTOS, etc.)
-   */
+  // Désactiver ULPI en mode Low-Power
 #if defined(RCC_AHB1LPENR_OTGHSULPILPEN)
   RCC->AHB1LPENR &= ~RCC_AHB1LPENR_OTGHSULPILPEN;
 #endif
 
-  /*
-   * ==========================================================================
-   * ÉTAPE 5: Initialisation du PHY HS intégré (USB_HS_PHYC)
-   * ==========================================================================
-   * 
-   * C'est l'étape CRITIQUE qui manquait! Le PHY HS du STM32F723 a:
-   *   - Un LDO (régulateur de tension interne)
-   *   - Un PLL qui génère les clocks USB à partir du HSE
-   * 
-   * Le PLL doit être configuré selon la fréquence du HSE et verrouillé
-   * AVANT que TinyUSB ne fasse le reset du core USB, sinon on reste
-   * bloqué dans la boucle d'attente du reset.
-   * 
-   * Fréquences HSE supportées: 12, 12.5, 16, 24, 25, 32 MHz
-   */
-  
-  // 5.1: Activer le LDO du PHY
-  USB_HS_PHYC->USB_HS_PHYC_LDO |= USB_HS_PHYC_LDO_ENABLE;
-  
-  // 5.2: Attendre que le LDO soit prêt (status bit)
-  while (!(USB_HS_PHYC->USB_HS_PHYC_LDO & USB_HS_PHYC_LDO_STATUS)) {
-    // Attente active - le LDO met quelques µs à se stabiliser
-  }
-  
-  // 5.3: Configurer le PLL selon la fréquence HSE (16 MHz)
-  // Les valeurs possibles sont définies dans stm32f7xx_ll_usb.h
-  uint32_t phyc_pll = 0;
-  switch (HSE_VALUE) {
-    case 12000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_12MHZ;   break;
-    case 12500000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_12_5MHZ; break;
-    case 16000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_16MHZ;   break;  // <- Notre cas
-    case 24000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_24MHZ;   break;
-    case 25000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_25MHZ;   break;
-    case 32000000:  phyc_pll = (7U << 1);                        break;  // Non défini dans header
-    default:
-      // Fréquence HSE non supportée!
-      Error_Handler();
-      break;
-  }
-  USB_HS_PHYC->USB_HS_PHYC_PLL = phyc_pll;
-  
-  // 5.4: Configurer le tuning du PHY (valeur magique de ST)
-  // Cette valeur optimise les caractéristiques électriques du PHY
-  USB_HS_PHYC->USB_HS_PHYC_TUNE |= 0x00000F13U;
-  
-  // 5.5: Activer le PLL du PHY
-  USB_HS_PHYC->USB_HS_PHYC_PLL |= USB_HS_PHYC_PLL_PLLEN;
-  
-  // 5.6: Attendre que le PLL soit verrouillé (~2ms)
-  // Note: Il n'y a pas de bit "PLL ready" sur le F723, on doit attendre
-  HAL_Delay(2);
+  // 2. Configurer les GPIOs USB HS (PB14=DM, PB15=DP)
+  GPIO_InitStruct.Pin = GPIO_PIN_14 | GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF12_OTG_HS_FS;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*
-   * ==========================================================================
-   * ÉTAPE 6: Configuration des interruptions USB
-   * ==========================================================================
-   * 
-   * L'interruption OTG_HS_IRQn gère tous les événements USB:
-   *   - Connexion/déconnexion
-   *   - Réception de paquets
-   *   - Complétion de transferts
-   *   - Erreurs de bus
-   * 
-   * Priorité 0 (plus haute) pour garantir une latence minimale.
-   * C'est important pour le 8kHz polling rate!
-   */
+  // 3. Configurer les interruptions
   HAL_NVIC_SetPriority(OTG_HS_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
 
-  return;  // TinyUSB gère le reste de l'initialisation via tusb_init()
+  // TinyUSB fera le reste via tusb_init() et dwc2_phy_init()
+  return;
   /* USER CODE END USB_OTG_HS_Init 1 */
   hpcd_USB_OTG_HS.Instance = USB_OTG_HS;
   hpcd_USB_OTG_HS.Init.dev_endpoints = 9;
