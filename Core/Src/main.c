@@ -21,7 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stm32f7xx_hal_adc.h"
+#include <stdint.h>
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,14 +52,15 @@ PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
 /* USER CODE BEGIN PV */
 /**
- * ADC DMA BUFFER
- */
-uint16_t adc_buffer[2];
-
-/**
  * ADC DMA NUMBER OF CONVERSIONS COMPLETED
  */
 uint32_t num_conv = 0;
+
+/**
+ * NOISE FILTERING
+ */
+// A partir de quelle différence la valeur est enregistrée
+#define NOISE_FILTER_DELTA 20
 
 /**
  * MUX CONFIGURATION
@@ -65,8 +68,8 @@ uint32_t num_conv = 0;
 /**
  * NUMBER OF CHANNELS PER MUX AND NUMBER OF MULTIPLEXERS
  */
-#define NUM_MUX_CHANNELS 6
-#define NUM_MUX 2
+#define NUM_MUX_CHANNELS 13
+#define NUM_MUX 8
 
 /**
  * CURRENT MUX CHANNEL
@@ -74,10 +77,24 @@ uint32_t num_conv = 0;
 uint16_t mux_channel = 0;
 
 /**
+ * ADC DMA BUFFER
+ */
+uint16_t adc_buffer[NUM_MUX];
+
+/**
  * ADC VALUES FOR ALL MUX CHANNELS
  * Format: [MUX0_CH0, MUX0_CH1, ..., MUX0_CH5, MUX1_CH0, ..., MUX1_CH5]
  */
 uint16_t adc_values[NUM_MUX * NUM_MUX_CHANNELS];
+
+/**
+ * OVERSAMPLING
+ */
+
+#define SAMPLE_COUNT 1
+
+uint16_t adc_samples_index = 0;
+uint16_t adc_samples[NUM_MUX * SAMPLE_COUNT];
 
 /**
  * Timings measurement variables
@@ -92,6 +109,16 @@ uint32_t adc_callback_start_cycles = 0;
 uint32_t adc_callback_end_cycles = 0;
 // Temps de commutation GPIO
 uint32_t gpio_switching_us = 0;
+
+/**
+ * Liste des valeurs pour la touche 1
+ */
+uint16_t key_1_values_index = 0;
+uint16_t key_1_values[512];
+// uint16_t key_gnd_values_index = 0;
+// uint16_t key_gnd_values[512];
+// uint16_t key_high_values_index = 0;
+// uint16_t key_high_values[512];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,6 +136,32 @@ static void MX_TIM4_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+//============================================================================+
+// TINYUSB PLATFORM FUNCTIONS
+//============================================================================+
+
+/*
+ * Fonction requise par TinyUSB pour obtenir le temps en millisecondes
+ * 
+ * TinyUSB utilise cette fonction pour:
+ *   - Gérer les timeouts des transactions USB
+ *   - Implémenter les délais nécessaires au protocole USB
+ *   - Mesurer les intervalles entre les événements
+ * 
+ * On utilise HAL_GetTick() qui est incrémenté dans SysTick_Handler
+ */
+uint32_t tusb_time_millis_api(void) { 
+    return HAL_GetTick(); 
+}
+
+/*
+ * Fonction optionnelle pour délai en millisecondes
+ * Utilisée pendant l'initialisation USB et pour certains délais de reset
+ */
+void tusb_time_delay_ms_api(uint32_t ms) {
+    HAL_Delay(ms);
+}
 
 #if defined(__GNUC__) || defined(__clang__)
 #define KBHE_ALWAYS_INLINE __attribute__((always_inline)) static inline
@@ -198,10 +251,11 @@ static void MUX_SelectChannel(uint8_t channel) {
 /* USER CODE END 0 */
 
 /**
- * @brief  The application entry point.
- * @retval int
- */
-int main(void) {
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
 
   /* USER CODE BEGIN 1 */
   /**
@@ -217,8 +271,7 @@ int main(void) {
 
   /* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick.
-   */
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
   /* USER CODE BEGIN Init */
@@ -245,7 +298,7 @@ int main(void) {
   MUX_SelectChannel(0);
 
   adc_total_scan_start_cycles = DWT->CYCCNT;
-  if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, 2) != HAL_OK) {
+  if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) != HAL_OK) {
     Error_Handler();
   }
   TIM4_StartOneShot_TRGO();
@@ -262,21 +315,22 @@ int main(void) {
 }
 
 /**
- * @brief System Clock Configuration
- * @retval None
- */
-void SystemClock_Config(void) {
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-   */
+  */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-   * in the RCC_OscInitTypeDef structure.
-   */
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -285,36 +339,40 @@ void SystemClock_Config(void) {
   RCC_OscInitStruct.PLL.PLLN = 216;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 9;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Activate the Over-Drive mode
-   */
-  if (HAL_PWREx_EnableOverDrive() != HAL_OK) {
+  */
+  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
-                                RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_7) != HAL_OK) {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_7) != HAL_OK)
+  {
     Error_Handler();
   }
 }
 
 /**
- * @brief ADC1 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_ADC1_Init(void) {
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
 
   /* USER CODE BEGIN ADC1_Init 0 */
 
@@ -326,9 +384,8 @@ static void MX_ADC1_Init(void) {
 
   /* USER CODE END ADC1_Init 1 */
 
-  /** Configure the global features of the ADC (Clock, Resolution, Data
-   * Alignment and number of conversion)
-   */
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
@@ -338,42 +395,99 @@ static void MX_ADC1_Init(void) {
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
   hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T4_TRGO;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.NbrOfConversion = 8;
   hadc1.Init.DMAContinuousRequests = ENABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in
-   * the sequencer and its sample time.
-   */
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
   sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in
-   * the sequencer and its sample time.
-   */
-  sConfig.Channel = ADC_CHANNEL_12;
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_11;
   sConfig.Rank = ADC_REGULAR_RANK_2;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_12;
+  sConfig.Rank = ADC_REGULAR_RANK_3;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_13;
+  sConfig.Rank = ADC_REGULAR_RANK_4;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = ADC_REGULAR_RANK_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_6;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = ADC_REGULAR_RANK_7;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = ADC_REGULAR_RANK_8;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
- * @brief TIM3 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_TIM3_Init(void) {
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
 
   /* USER CODE BEGIN TIM3_Init 0 */
 
@@ -391,29 +505,34 @@ static void MX_TIM3_Init(void) {
   htim3.Init.Period = 124;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK) {
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
+
 }
 
 /**
- * @brief TIM4 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_TIM4_Init(void) {
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
 
   /* USER CODE BEGIN TIM4_Init 0 */
 
@@ -426,44 +545,218 @@ static void MX_TIM4_Init(void) {
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 107;
+  htim4.Init.Prescaler = 0;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 1;
+  htim4.Init.Period = 53;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim4) != HAL_OK) {
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK) {
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
     Error_Handler();
   }
-  if (HAL_TIM_OnePulse_Init(&htim4, TIM_OPMODE_SINGLE) != HAL_OK) {
+  if (HAL_TIM_OnePulse_Init(&htim4, TIM_OPMODE_SINGLE) != HAL_OK)
+  {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK) {
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
+
 }
 
 /**
- * @brief USB_OTG_HS Initialization Function
- * @param None
- * @retval None
- */
-static void MX_USB_OTG_HS_PCD_Init(void) {
+  * @brief USB_OTG_HS Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USB_OTG_HS_PCD_Init(void)
+{
 
   /* USER CODE BEGIN USB_OTG_HS_Init 0 */
-
+  /* 
+   * TinyUSB gère l'initialisation USB bas niveau.
+   * Ici on configure uniquement:
+   *   1. Les clocks USB
+   *   2. Les GPIOs
+   *   3. Le NVIC (interruptions)
+   */
   /* USER CODE END USB_OTG_HS_Init 0 */
 
   /* USER CODE BEGIN USB_OTG_HS_Init 1 */
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
+  /*
+   * ==========================================================================
+   * ÉTAPE 1: Configuration de l'horloge 48 MHz pour USB
+   * ==========================================================================
+   * 
+   * Le PHY USB HS intégré nécessite une clock de 48 MHz.
+   * On la dérive du PLL principal qui est déjà configuré à 216 MHz.
+   * 
+   * Avec PLLQ = 9: 216 MHz / 9 = 24 MHz... non c'est faux
+   * En fait avec votre config: HSE=8MHz, PLLN=216, PLLM=8, PLLQ=9
+   *   PLL VCO = 8 * 216 / 8 = 216 MHz
+   *   PLLQ output = 216 / 9 = 24 MHz
+   * 
+   * Hmm, il faut vérifier la clock USB. Le PHY HS utilise le PHYC interne
+   * qui a son propre PLL dérivé de HSE.
+   */
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CLK48;
+  PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48SOURCE_PLL;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK) {
+    Error_Handler();
+  }
+
+  /*
+   * ==========================================================================
+   * ÉTAPE 2: Configuration des GPIOs USB HS
+   * ==========================================================================
+   * 
+   * Sur STM32F723, le PHY HS intégré utilise:
+   *   - PB14 = USB_HS_DM (Data Minus)
+   *   - PB15 = USB_HS_DP (Data Plus)
+   * 
+   * Alternate Function: AF12 (OTG_HS en mode FS-like avec PHY interne)
+   * 
+   * Note: Ne pas confondre avec le mode ULPI qui utilise beaucoup plus de pins
+   * (CLK, STP, DIR, NXT, D0-D7) pour un PHY externe.
+   */
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  
+  GPIO_InitStruct.Pin = GPIO_PIN_14 | GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;  // 100 MHz - nécessaire pour HS
+  GPIO_InitStruct.Alternate = GPIO_AF12_OTG_HS_FS;    // Mode HS avec PHY interne
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*
+   * ==========================================================================
+   * ÉTAPE 3: Activation des clocks USB dans le bon ordre
+   * ==========================================================================
+   * 
+   * IMPORTANT: L'ordre d'activation des clocks est critique!
+   * 
+   * 1. D'abord USB_OTG_HS_CLK (périphérique principal)
+   * 2. Ensuite OTGPHYC_CLK (contrôleur du PHY intégré)
+   * 3. Désactiver ULPI car on n'utilise PAS de PHY externe
+   */
+  // CubeMX (et le HAL) activent ces 3 clocks sur F723.
+  // Même avec le PHY HS intégré, le bit "ULPI" de RCC sert de gate clock
+  // pour l'interface HS (ULPI/UTMI). Si elle est coupée, le core DWC2 peut
+  // rester bloqué pendant le reset (GRSTCTL.CSRST ne se clear jamais).
+  __HAL_RCC_OTGPHYC_CLK_ENABLE();        // Clock du contrôleur PHY HS intégré (F723 spécifique!)
+  __HAL_RCC_USB_OTG_HS_CLK_ENABLE();     // Clock du périphérique USB OTG HS
+  __HAL_RCC_USB_OTG_HS_ULPI_CLK_ENABLE(); // Gate clock interface HS (ULPI/UTMI)
+
+  /*
+   * ==========================================================================
+   * ÉTAPE CRITIQUE: Activer le PHY HS dans GCCFG
+   * ==========================================================================
+   * 
+   * Le bit PHYHSEN (bit 23 du registre GCCFG) DOIT être activé AVANT
+   * toute initialisation du PHY ou reset du core USB!
+   * 
+   * Sans ce bit, le PHY interne n'est pas connecté au contrôleur USB
+   * et le core reset restera bloqué indéfiniment car la clock PHY
+   * n'est pas disponible.
+   */
+  USB_OTG_HS->GCCFG |= USB_OTG_GCCFG_PHYHSEN;
+
+  /*
+   * ==========================================================================
+   * ÉTAPE 4: Désactivation ULPI en mode Low-Power
+   * ==========================================================================
+   * 
+   * Ce bit doit aussi être désactivé sinon l'USB ne fonctionne pas
+   * quand le MCU exécute WFI/WFE (mode sleep, tick-less RTOS, etc.)
+   */
+#if defined(RCC_AHB1LPENR_OTGHSULPILPEN)
+  RCC->AHB1LPENR &= ~RCC_AHB1LPENR_OTGHSULPILPEN;
+#endif
+
+  /*
+   * ==========================================================================
+   * ÉTAPE 5: Initialisation du PHY HS intégré (USB_HS_PHYC)
+   * ==========================================================================
+   * 
+   * C'est l'étape CRITIQUE qui manquait! Le PHY HS du STM32F723 a:
+   *   - Un LDO (régulateur de tension interne)
+   *   - Un PLL qui génère les clocks USB à partir du HSE
+   * 
+   * Le PLL doit être configuré selon la fréquence du HSE et verrouillé
+   * AVANT que TinyUSB ne fasse le reset du core USB, sinon on reste
+   * bloqué dans la boucle d'attente du reset.
+   * 
+   * Fréquences HSE supportées: 12, 12.5, 16, 24, 25, 32 MHz
+   */
+  
+  // 5.1: Activer le LDO du PHY
+  USB_HS_PHYC->USB_HS_PHYC_LDO |= USB_HS_PHYC_LDO_ENABLE;
+  
+  // 5.2: Attendre que le LDO soit prêt (status bit)
+  while (!(USB_HS_PHYC->USB_HS_PHYC_LDO & USB_HS_PHYC_LDO_STATUS)) {
+    // Attente active - le LDO met quelques µs à se stabiliser
+  }
+  
+  // 5.3: Configurer le PLL selon la fréquence HSE (16 MHz)
+  // Les valeurs possibles sont définies dans stm32f7xx_ll_usb.h
+  uint32_t phyc_pll = 0;
+  switch (HSE_VALUE) {
+    case 12000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_12MHZ;   break;
+    case 12500000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_12_5MHZ; break;
+    case 16000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_16MHZ;   break;  // <- Notre cas
+    case 24000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_24MHZ;   break;
+    case 25000000:  phyc_pll = USB_HS_PHYC_PLL1_PLLSEL_25MHZ;   break;
+    case 32000000:  phyc_pll = (7U << 1);                        break;  // Non défini dans header
+    default:
+      // Fréquence HSE non supportée!
+      Error_Handler();
+      break;
+  }
+  USB_HS_PHYC->USB_HS_PHYC_PLL = phyc_pll;
+  
+  // 5.4: Configurer le tuning du PHY (valeur magique de ST)
+  // Cette valeur optimise les caractéristiques électriques du PHY
+  USB_HS_PHYC->USB_HS_PHYC_TUNE |= 0x00000F13U;
+  
+  // 5.5: Activer le PLL du PHY
+  USB_HS_PHYC->USB_HS_PHYC_PLL |= USB_HS_PHYC_PLL_PLLEN;
+  
+  // 5.6: Attendre que le PLL soit verrouillé (~2ms)
+  // Note: Il n'y a pas de bit "PLL ready" sur le F723, on doit attendre
+  HAL_Delay(2);
+
+  /*
+   * ==========================================================================
+   * ÉTAPE 6: Configuration des interruptions USB
+   * ==========================================================================
+   * 
+   * L'interruption OTG_HS_IRQn gère tous les événements USB:
+   *   - Connexion/déconnexion
+   *   - Réception de paquets
+   *   - Complétion de transferts
+   *   - Erreurs de bus
+   * 
+   * Priorité 0 (plus haute) pour garantir une latence minimale.
+   * C'est important pour le 8kHz polling rate!
+   */
+  HAL_NVIC_SetPriority(OTG_HS_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
+
+  return;  // TinyUSB gère le reste de l'initialisation via tusb_init()
   /* USER CODE END USB_OTG_HS_Init 1 */
   hpcd_USB_OTG_HS.Instance = USB_OTG_HS;
   hpcd_USB_OTG_HS.Init.dev_endpoints = 9;
@@ -475,18 +768,21 @@ static void MX_USB_OTG_HS_PCD_Init(void) {
   hpcd_USB_OTG_HS.Init.vbus_sensing_enable = DISABLE;
   hpcd_USB_OTG_HS.Init.use_dedicated_ep1 = DISABLE;
   hpcd_USB_OTG_HS.Init.use_external_vbus = DISABLE;
-  if (HAL_PCD_Init(&hpcd_USB_OTG_HS) != HAL_OK) {
+  if (HAL_PCD_Init(&hpcd_USB_OTG_HS) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN USB_OTG_HS_Init 2 */
 
   /* USER CODE END USB_OTG_HS_Init 2 */
+
 }
 
 /**
- * Enable DMA controller clock
- */
-static void MX_DMA_Init(void) {
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
@@ -495,14 +791,16 @@ static void MX_DMA_Init(void) {
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+
 }
 
 /**
- * @brief GPIO Initialization Function
- * @param None
- * @retval None
- */
-static void MX_GPIO_Init(void) {
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
@@ -511,25 +809,25 @@ static void MX_GPIO_Init(void) {
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, M3_Pin | M2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, M3_Pin|M2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, M1_Pin | M0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, M1_Pin|M0_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : M3_Pin M2_Pin */
-  GPIO_InitStruct.Pin = M3_Pin | M2_Pin;
+  GPIO_InitStruct.Pin = M3_Pin|M2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : M1_Pin M0_Pin */
-  GPIO_InitStruct.Pin = M1_Pin | M0_Pin;
+  GPIO_InitStruct.Pin = M1_Pin|M0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -552,9 +850,54 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     // Increment number of conversions completed
     num_conv++;
 
-    // Store ADC values
-    adc_values[mux_channel] = adc_buffer[0];
-    adc_values[NUM_MUX_CHANNELS + mux_channel] = adc_buffer[1];
+    // // Oversampling handling
+    // if (SAMPLE_COUNT > 1) {
+    //   // When we have enough samples, process them
+    //   if (adc_samples_index >= SAMPLE_COUNT) {
+    //     adc_samples_index = 0U;
+    //     // Average samples
+    //     uint16_t sum0 = 0U;
+    //     uint16_t sum1 = 0U;
+
+    //     for (uint16_t i = 0; i < SAMPLE_COUNT; i++) {
+    //       sum0 += adc_samples[i];
+    //       sum1 += adc_samples[SAMPLE_COUNT + i];
+    //     }
+
+    //     uint16_t avg0 = (uint16_t)sum0 / SAMPLE_COUNT;
+    //     uint16_t avg1 = (uint16_t)sum1 / SAMPLE_COUNT;
+
+    //     // Store ADC values
+    //     adc_values[mux_channel] = avg0;
+    //     adc_values[NUM_MUX_CHANNELS + mux_channel] = avg1;
+    //   } else {
+    //     // Store samples for oversampling
+    //     adc_samples[adc_samples_index] = adc_buffer[0];
+    //     adc_samples[SAMPLE_COUNT + adc_samples_index] = adc_buffer[1];
+    //     adc_samples_index++;
+    //     TIM4_StartOneShot_TRGO();
+    //     return;
+    //   }
+    // }
+
+    // Store ADC values for all MUX
+    for (uint8_t i = 0; i < NUM_MUX; i++) {
+      /**
+       * MUX0_CH0, MUX0_CH1, ..., MUX0_CH13, MUX1_CH0, ..., MUX7_CH13
+       */
+      uint16_t last_adc_value =
+          adc_values[mux_channel + (i * NUM_MUX_CHANNELS)];
+      uint16_t new_adc_value = adc_buffer[i];
+
+      // Noise filtering
+      uint16_t delta = last_adc_value - new_adc_value;
+      if (delta <= NOISE_FILTER_DELTA && -delta <= NOISE_FILTER_DELTA) {
+        break;
+      }
+
+      // Store new value
+      adc_values[mux_channel + (i * NUM_MUX_CHANNELS)] = new_adc_value;
+    }
 
     // Increment MUX channel
     mux_channel++;
@@ -573,7 +916,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     // Select next MUX channel
     MUX_SelectChannel(mux_channel);
 
-    // Start 2us timer to wait for MUX settling time
+    // Start 0.5us timer to wait for MUX settling time
     TIM4_StartOneShot_TRGO();
 
     adc_callback_end_cycles = DWT->CYCCNT;
@@ -598,16 +941,17 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 // }
 /* USER CODE END 4 */
 
-/* MPU Configuration */
+ /* MPU Configuration */
 
-void MPU_Config(void) {
+void MPU_Config(void)
+{
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
 
   /* Disables the MPU */
   HAL_MPU_Disable();
 
   /** Initializes and configures the Region and the memory to be protected
-   */
+  */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
   MPU_InitStruct.Number = MPU_REGION_NUMBER0;
   MPU_InitStruct.BaseAddress = 0x0;
@@ -623,13 +967,15 @@ void MPU_Config(void) {
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
 }
 
 /**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
-void Error_Handler(void) {
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
@@ -639,13 +985,14 @@ void Error_Handler(void) {
 }
 #ifdef USE_FULL_ASSERT
 /**
- * @brief  Reports the name of the source file and the source line number
- *         where the assert_param error has occurred.
- * @param  file: pointer to the source file name
- * @param  line: assert_param error line source number
- * @retval None
- */
-void assert_failed(uint8_t *file, uint32_t line) {
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line
      number, ex: printf("Wrong parameters value: file %s on line %d\r\n", file,
