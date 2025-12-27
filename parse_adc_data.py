@@ -2,8 +2,8 @@ import csv
 import re
 import os
 
-input_file = 'adc_key_GND_3cycle_12bit_500ns.txt'
-output_file = 'adc_key_GND_3cycle_12bit_500ns.csv'
+input_file = 'adc_key_1_teensy.txt'
+output_file = 'adc_key_1_teensy.csv'
 
 def parse_and_convert():
     # Check if input file exists

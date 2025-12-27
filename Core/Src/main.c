@@ -117,6 +117,11 @@ uint32_t gpio_switching_us = 0;
  */
 uint16_t key_1_values_index = 0;
 uint16_t key_1_values[512];
+uint16_t key_1_values_filtered[512];
+uint32_t key_2_values_index = 0;
+uint16_t key_2_values[512];
+uint32_t key_5_values_index = 0;
+uint16_t key_5_values[512];
 // uint16_t key_gnd_values_index = 0;
 // uint16_t key_gnd_values[512];
 // uint16_t key_high_values_index = 0;
@@ -771,10 +776,54 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
           adc_values[mux_channel + (i * NUM_MUX_CHANNELS)];
       uint16_t new_adc_value = adc_buffer[i];
 
+      /* Store key 1 and key 2 values for analysis */
+      if (mux_channel == 0 && i == 0) {
+        if (key_1_values_index >= 512) {
+          key_1_values_index = 0;
+        }
+
+        key_1_values[key_1_values_index] = new_adc_value;
+
+        key_1_values_index++;
+      }
+
+      if (mux_channel == 1 && i == 0) {
+        if (key_2_values_index >= 512) {
+          key_2_values_index = 0;
+        }
+
+        key_2_values[key_2_values_index] = new_adc_value;
+
+        key_2_values_index++;
+      }
+
+      if (mux_channel == 4 && i == 0) {
+        if (key_5_values_index >= 512) {
+          key_5_values_index = 0;
+        }
+
+        key_5_values[key_5_values_index] = new_adc_value;
+
+        key_5_values_index++;
+      }
+
+      /* END ANALYSIS */
+
       // Noise filtering
       uint16_t delta = last_adc_value - new_adc_value;
       if (delta <= NOISE_FILTER_DELTA && -delta <= NOISE_FILTER_DELTA) {
         break;
+      }
+
+      // Filtering for key 1
+      if (mux_channel == 0 && i == 0) {
+        if (key_1_values_index >= 512) {
+          key_1_values_index = 0;
+        }
+
+        key_1_values_filtered[key_1_values_index] = new_adc_value;
+
+        key_1_values_index++;
       }
 
       // Store new value
