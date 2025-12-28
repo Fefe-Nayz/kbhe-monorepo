@@ -151,26 +151,32 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
             
         case STRID_SERIAL: {
             // Use STM32 Unique ID as serial number
-            // UID is at address 0x1FF0F420 (96 bits = 12 bytes)
-            volatile uint32_t* uid = (volatile uint32_t*)0x1FF0F420;
-            char serial[25];
-            snprintf(serial, sizeof(serial), "%08X%08X%08X", 
-                     (unsigned int)uid[0], (unsigned int)uid[1], (unsigned int)uid[2]);
-            chr_count = strlen(serial);
-            if (chr_count > 32) chr_count = 32;
-            for (size_t i = 0; i < chr_count; i++) {
-                _desc_str[1 + i] = serial[i];
+            // UID base address for STM32F72x/F73x is 0x1FF07A10 (96 bits = 12 bytes)
+            static const char hex_chars[] = "0123456789ABCDEF";
+            volatile uint32_t* uid = (volatile uint32_t*)0x1FF07A10;
+            
+            // Convert 3x 32-bit words to 24 hex characters
+            chr_count = 24;
+            for (uint8_t w = 0; w < 3; w++) {
+                uint32_t val = uid[w];
+                for (int8_t n = 7; n >= 0; n--) {
+                    _desc_str[1 + w * 8 + (7 - n)] = hex_chars[(val >> (n * 4)) & 0x0F];
+                }
             }
             break;
         }
         
-        default:
+        default: {
             // Check bounds
             if (index >= sizeof(string_desc_arr) / sizeof(string_desc_arr[0])) {
                 return NULL;
             }
             
             const char* str = string_desc_arr[index];
+            // NULL entries (like serial placeholder) should not reach here
+            if (str == NULL) {
+                return NULL;
+            }
             chr_count = strlen(str);
             if (chr_count > 32) chr_count = 32;
             
@@ -179,6 +185,7 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
                 _desc_str[1 + i] = str[i];
             }
             break;
+        }
     }
     
     // First byte is length (including header), second byte is string type

@@ -1,0 +1,176 @@
+
+    =========================== USB Port9 ===========================
+
+Connection Status        : 0x01 (Device is connected)
+Port Chain               : 4-9
+Properties               : 0x09
+ IsUserConnectable       : yes
+ PortIsDebugCapable      : no
+ PortHasMultiCompanions  : no
+ PortConnectorIsTypeC    : yes
+ConnectionIndex          : 0x09 (Port 9)
+CompanionIndex           : 0
+ CompanionHubSymLnk      : USB#ROOT_HUB30#7&32fcecfc&0&0#{f18a0e88-c30c-11d0-8815-00a0c906bed8}
+ CompanionPortNumber     : 0x04 (Port 4)
+ -> CompanionPortChain   : 4-4
+
+      ========================== Summary =========================
+Vendor ID                : 0x1209 (Unknown Vendor)
+Product ID               : 0x0001
+USB Version              : 2.0 (480 Mbit/s)
+Port maximum Speed       : High-Speed (Companion Port 4-4 is doing the SuperSpeed)
+Device maximum Speed     : High-Speed
+Device Connection Speed  : High-Speed
+Self powered             : no
+Demanded Current         : 100 mA
+Device Manager Problem   : 10 (CM_PROB_FAILED_START)
+Used Endpoints           : 1
+
+      ======================== USB Device ========================
+
+        +++++++++++++++++ Device Information ++++++++++++++++++
+Device Description       : Périphérique d’entrée USB
+Kernel Name (PDO)        : \Device\USBPDO-20
+Device ID                : USB\VID_1209&PID_0001\8&1DC14B6F&0&9
+Hardware IDs             : USB\VID_1209&PID_0001&REV_0100 USB\VID_1209&PID_0001
+Driver KeyName           : {745a17a0-74d3-11d0-b6fe-00a0c90f57da}\0080 (GUID_DEVCLASS_HIDCLASS)
+Driver                   : \SystemRoot\System32\drivers\hidusb.sys (Version: 10.0.26100.7309  Date: 2025-12-09  Company: Microsoft Corporation)
+Driver Inf               : C:\Windows\inf\input.inf
+Legacy BusType           : PNPBus
+Class                    : HIDClass
+Class GUID               : {745a17a0-74d3-11d0-b6fe-00a0c90f57da} (GUID_DEVCLASS_HIDCLASS)
+Service                  : HidUsb
+Enumerator               : USB
+Location Info            : Port_#0009.Hub_#0004
+Address                  : 9
+Location IDs             : PCIROOT(0)#PCI(0201)#PCI(0000)#PCI(0C00)#PCI(0000)#USBROOT(0)#USB(9), ACPI(_SB_)#ACPI(PCI0)#ACPI(GPP7)#ACPI(UP00)#ACPI(DP60)#ACPI(XH00)#ACPI(RHUB)#ACPI(POTB)
+Container ID             : {32dbf71c-e402-11f0-9d26-d880839cc330}
+Manufacturer Info        : (Périphériques système standard)
+Capabilities             : 0x04 (Removable)
+Status                   : 0x01806400 (DN_HAS_PROBLEM, DN_DISABLEABLE, DN_REMOVABLE, DN_NT_ENUMERATOR, DN_NT_DRIVER)
+Problem Code             : 10 (CM_PROB_FAILED_START)
+First Install Date       : 2025-12-28 16:47:48
+Last Arrival Date        : 2025-12-28 16:57:48
+SelectiveSuspendEnabled  : 0
+EnhancedPowerMgmtEnabled : 1
+Power State              : D3 (supported: D0, D1, D2, D3, wake from D0, wake from D1, wake from D2)
+
+        +++++++++++++++++ Registry USB Flags +++++++++++++++++
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\usbflags\120900010100
+ osvc                    : REG_BINARY 00 00
+
+        ---------------- Connection Information ---------------
+Connection Index         : 0x09 (Port 9)
+Connection Status        : 0x01 (DeviceConnected)
+Current Config Value     : 0x00 (Configuration 0)
+Device Address           : 0x1A (26)
+Is Hub                   : 0x00 (no)
+Device Bus Speed         : 0x02 (High-Speed)
+Number of open Pipes     : 0x00 (0 pipes to data endpoints)
+Data (HexDump)           : 09 00 00 00 12 01 00 02 00 00 00 40 09 12 01 00   ...........@....
+                           00 01 01 02 03 01 00 02 00 1A 00 00 00 00 00 01   ................
+                           00 00 00                                          ...
+
+        --------------- Connection Information V2 -------------
+Connection Index         : 0x09 (9)
+Length                   : 0x10 (16 bytes)
+SupportedUsbProtocols    : 0x03
+ Usb110                  : 1 (yes, port supports USB 1.1)
+ Usb200                  : 1 (yes, port supports USB 2.0)
+ Usb300                  : 0 (no, port not supports USB 3.0) -> but Companion Port 4-4 does
+ ReservedMBZ             : 0x00
+Flags                    : 0x00
+ DevIsOpAtSsOrHigher     : 0 (Device is not operating at SuperSpeed or higher)
+ DevIsSsCapOrHigher      : 0 (Device is not SuperSpeed capable or higher)
+ DevIsOpAtSsPlusOrHigher : 0 (Device is not operating at SuperSpeedPlus or higher)
+ DevIsSsPlusCapOrHigher  : 0 (Device is not SuperSpeedPlus capable or higher)
+ ReservedMBZ             : 0x00
+Data (HexDump)           : 09 00 00 00 10 00 00 00 03 00 00 00 00 00 00 00   ................
+
+    ---------------------- Device Descriptor ----------------------
+bLength                  : 0x12 (18 bytes)
+bDescriptorType          : 0x01 (Device Descriptor)
+bcdUSB                   : 0x200 (USB Version 2.0)
+bDeviceClass             : 0x00 (defined by the interface descriptors)
+bDeviceSubClass          : 0x00
+bDeviceProtocol          : 0x00
+bMaxPacketSize0          : 0x40 (64 bytes)
+idVendor                 : 0x1209 (Unknown Vendor)
+idProduct                : 0x0001
+bcdDevice                : 0x0100
+iManufacturer            : 0x01 (String Descriptor 1)
+iProduct                 : 0x02 (String Descriptor 2)
+iSerialNumber            : 0x03 (String Descriptor 3)
+bNumConfigurations       : 0x01 (1 Configuration)
+Data (HexDump)           : 12 01 00 02 00 00 00 40 09 12 01 00 00 01 01 02   .......@........
+                           03 01                                             ..
+
+    ------------------ Configuration Descriptor -------------------
+bLength                  : 0x09 (9 bytes)
+bDescriptorType          : 0x02 (Configuration Descriptor)
+wTotalLength             : 0x0022 (34 bytes)
+bNumInterfaces           : 0x01 (1 Interface)
+bConfigurationValue      : 0x01 (Configuration 1)
+iConfiguration           : 0x00 (No String Descriptor)
+bmAttributes             : 0xA0
+ D7: Reserved, set 1     : 0x01
+ D6: Self Powered        : 0x00 (no)
+ D5: Remote Wakeup       : 0x01 (yes)
+ D4..0: Reserved, set 0  : 0x00
+MaxPower                 : 0x32 (100 mA)
+Data (HexDump)           : 09 02 22 00 01 01 00 A0 32 09 04 00 00 01 03 01   ..".....2.......
+                           01 00 09 21 11 01 00 01 22 41 00 07 05 81 03 40   ...!...."A.....@
+                           00 01                                             ..
+
+        ---------------- Interface Descriptor -----------------
+bLength                  : 0x09 (9 bytes)
+bDescriptorType          : 0x04 (Interface Descriptor)
+bInterfaceNumber         : 0x00 (Interface 0)
+bAlternateSetting        : 0x00
+bNumEndpoints            : 0x01 (1 Endpoint)
+bInterfaceClass          : 0x03 (HID - Human Interface Device)
+bInterfaceSubClass       : 0x01 (Boot Interface)
+bInterfaceProtocol       : 0x01 (Keyboard)
+iInterface               : 0x00 (No String Descriptor)
+Data (HexDump)           : 09 04 00 00 01 03 01 01 00                        .........
+
+        ------------------- HID Descriptor --------------------
+bLength                  : 0x09 (9 bytes)
+bDescriptorType          : 0x21 (HID Descriptor)
+bcdHID                   : 0x0111 (HID Version 1.11)
+bCountryCode             : 0x00 (00 = not localized)
+bNumDescriptors          : 0x01
+Data (HexDump)           : 09 21 11 01 00 01 22 41 00                        .!...."A.
+Descriptor 1:
+bDescriptorType          : 0x22 (Class=Report)
+wDescriptorLength        : 0x0041 (65 bytes)
+Error reading descriptor : ERROR_GEN_FAILURE (due to a obscure limitation of the Win32 USB API, see F1 Help)
+
+        ----------------- Endpoint Descriptor -----------------
+bLength                  : 0x07 (7 bytes)
+bDescriptorType          : 0x05 (Endpoint Descriptor)
+bEndpointAddress         : 0x81 (Direction=IN EndpointID=1)
+bmAttributes             : 0x03 (TransferType=Interrupt)
+wMaxPacketSize           : 0x0040
+ Bits 15..13             : 0x00 (reserved, must be zero)
+ Bits 12..11             : 0x00 (0 additional transactions per microframe -> allows 1..1024 bytes per packet)
+ Bits 10..0              : 0x40 (64 bytes per packet)
+bInterval                : 0x01 (1 microframe -> 0.125 ms)
+Data (HexDump)           : 07 05 81 03 40 00 01                              ....@..
+
+    ----------------- Device Qualifier Descriptor -----------------
+Error                    : ERROR_GEN_FAILURE  (because the device has problem code CM_PROB_FAILED_START)
+
+      -------------------- String Descriptors -------------------
+String descriptors are not available  (because the device has problem code CM_PROB_FAILED_START)
+
+CALLSTACK:
+
+HardFault_Handler (c:\Users\ninob\Documents\Code\kbhe\Core\Src\stm32f7xx_it.c:94)
+<signal handler called> (Unknown Source:0)
+tud_descriptor_string_cb (c:\Users\ninob\Documents\Code\kbhe\Core\Src\usb_descriptors.c:157)
+process_get_descriptor (c:\Users\ninob\Documents\Code\kbhe\lib\tinyusb\src\device\usbd.c:1178)
+process_control_request (c:\Users\ninob\Documents\Code\kbhe\lib\tinyusb\src\device\usbd.c:899)
+tud_task_ext (c:\Users\ninob\Documents\Code\kbhe\lib\tinyusb\src\device\usbd.c:716)
+tud_task (c:\Users\ninob\Documents\Code\kbhe\lib\tinyusb\src\device\usbd.h:91)
+main (c:\Users\ninob\Documents\Code\kbhe\Core\Src\main.c:342)
