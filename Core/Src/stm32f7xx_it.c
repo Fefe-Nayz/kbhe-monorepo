@@ -58,8 +58,6 @@
 /* External variables --------------------------------------------------------*/
 extern DMA_HandleTypeDef hdma_adc1;
 extern ADC_HandleTypeDef hadc1;
-extern TIM_HandleTypeDef htim3;
-extern TIM_HandleTypeDef htim4;
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 /* USER CODE BEGIN EV */
 
@@ -218,34 +216,6 @@ void ADC_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles TIM3 global interrupt.
-  */
-void TIM3_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM3_IRQn 0 */
-
-  /* USER CODE END TIM3_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim3);
-  /* USER CODE BEGIN TIM3_IRQn 1 */
-
-  /* USER CODE END TIM3_IRQn 1 */
-}
-
-/**
-  * @brief This function handles TIM4 global interrupt.
-  */
-void TIM4_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM4_IRQn 0 */
-
-  /* USER CODE END TIM4_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim4);
-  /* USER CODE BEGIN TIM4_IRQn 1 */
-
-  /* USER CODE END TIM4_IRQn 1 */
-}
-
-/**
   * @brief This function handles DMA2 stream0 global interrupt.
   */
 void DMA2_Stream0_IRQHandler(void)
@@ -262,19 +232,19 @@ void DMA2_Stream0_IRQHandler(void)
 /**
   * @brief This function handles USB On The Go HS global interrupt.
   */
-  void OTG_HS_IRQHandler(void)
-  {
-    /* USER CODE BEGIN OTG_HS_IRQn 0 */
+void OTG_HS_IRQHandler(void)
+{
+  /* USER CODE BEGIN OTG_HS_IRQn 0 */
     // TinyUSB gère l'interruption USB
     // Port 1 = USB OTG HS sur STM32F7
     tud_int_handler(1);
     return;  // Ne pas appeler HAL_PCD_IRQHandler
-    /* USER CODE END OTG_HS_IRQn 0 */
-    HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
-    /* USER CODE BEGIN OTG_HS_IRQn 1 */
+  /* USER CODE END OTG_HS_IRQn 0 */
+  HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS);
+  /* USER CODE BEGIN OTG_HS_IRQn 1 */
 
-    /* USER CODE END OTG_HS_IRQn 1 */
-  }
+  /* USER CODE END OTG_HS_IRQn 1 */
+}
 
 /* USER CODE BEGIN 1 */
 
