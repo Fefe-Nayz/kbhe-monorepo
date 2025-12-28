@@ -77,6 +77,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_hid.c
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
+    # Key trigger logic
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/trigger.c
 )
 
 # Add include paths

@@ -23,12 +23,11 @@
 /* USER CODE BEGIN Includes */
 #include "adc_ema.h"
 #include "stm32f7xx_hal_adc.h"
-#include "trigger.c"
+#include "trigger.h"
 #include "tusb.h"
 #include "usb_hid.h"
 #include <stdint.h>
 #include <stdio.h>
-
 
 /* USER CODE END Includes */
 
@@ -111,10 +110,13 @@ uint16_t adc_samples[NUM_MUX * SAMPLE_COUNT];
 /**
  * Timings measurement variables
  */
-// Temps de scan total
+// Temps de scan total (conversions ADC seulement)
 uint32_t adc_total_scan_us = 0;
 uint32_t adc_total_scan_start_cycles = 0;
 uint32_t adc_total_scan_end_cycles = 0;
+// Temps entre deux scans complets (incluant loop principale)
+uint32_t adc_full_cycle_us = 0;
+uint32_t adc_full_cycle_start_cycles = 0;
 // Temps de conversion ADC
 uint32_t adc_callback_us = 0;
 uint32_t adc_callback_start_cycles = 0;
@@ -138,6 +140,11 @@ uint16_t key_1_values_filtered = 0;
 // uint16_t key_gnd_values[512];
 // uint16_t key_high_values_index = 0;
 // uint16_t key_high_values[512];
+/**
+ * Flag to indicate a full scan is complete and main loop can process
+ */
+static volatile uint8_t adc_scan_complete = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -327,11 +334,12 @@ int main(void) {
 
   MUX_SelectChannel(0);
 
-  // adc_total_scan_start_cycles = DWT->CYCCNT;
-  // if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) != HAL_OK) {
-  //   Error_Handler();
-  // }
-  // TIM4_StartOneShot_TRGO();
+  adc_total_scan_start_cycles = DWT->CYCCNT;
+  adc_full_cycle_start_cycles = DWT->CYCCNT;
+  if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) != HAL_OK) {
+    Error_Handler();
+  }
+  TIM4_StartOneShot_TRGO();
 
   /* USER CODE END 2 */
 
@@ -342,10 +350,20 @@ int main(void) {
     tud_task();
 
     // Optionnel: tâche HID pour gérer les envois de rapport
-    // usb_hid_task();
+    usb_hid_task();
 
-    // uint16_t key_1_value = adc_values[0];
-    // handleTrigger(0, key_1_value);
+    // If a full ADC scan is complete, restart it
+    if (adc_scan_complete) {
+      adc_scan_complete = 0;
+
+      // Measure time since last scan start (full cycle time)
+      uint32_t now = DWT->CYCCNT;
+      adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
+      adc_full_cycle_start_cycles = now;
+
+      MUX_SelectChannel(0);
+      TIM4_StartOneShot_TRGO();
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -672,7 +690,8 @@ static void MX_DMA_Init(void) {
 
   /* DMA interrupt init */
   /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  /* Priority 2 (lower than USB at 0) so USB can preempt ADC DMA */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 }
 
@@ -805,12 +824,18 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
           cycles_to_us(adc_total_scan_end_cycles - adc_total_scan_start_cycles);
 
       adc_total_scan_start_cycles = DWT->CYCCNT;
+
+      // Signal that a full scan is complete - let main loop restart
+      adc_scan_complete = 1;
+      return; // Don't restart timer here, let main loop do it
     }
 
     // Select next MUX channel
     MUX_SelectChannel(mux_channel);
 
-    // Start 0.5us timer to wait for MUX settling time
+    // Start 0.5us timer to wait for MUX settling time then trigger ADC
+    // Only restart immediately - the main loop will have time between full
+    // scans because the DMA priority is lower than USB
     TIM4_StartOneShot_TRGO();
 
     adc_callback_end_cycles = DWT->CYCCNT;
