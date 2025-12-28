@@ -1,11 +1,13 @@
+#include "trigger.h"
 #include "lut.c"
 #include "offset.c"
 #include "usb_hid.h"
-#include "trigger.h"
+#include <stdint.h>
+
 
 /**
-* DISABLE KEYBOARD TYPING
-*/
+ * DISABLE KEYBOARD TYPING
+ */
 #define DISABLE_KEYBOARD_TYPING 1
 
 // Mapping des touches vers les keycodes HID
@@ -39,9 +41,9 @@ float distances[6] = {0, 0, 0, 0, 0, 0};
 // Dernier état de la touche (0 = relachée, 1 = appuyée)
 int states[6] = {0, 0, 0, 0, 0, 0};
 
-void triggerInit() {
-  offsetInit();
-}
+uint16_t key_2_distance = 0;
+
+void triggerInit() { offsetInit(); }
 
 int getKeyState(int keyIndex) {
   if (keyIndex < 0 || keyIndex >= 6)
@@ -69,6 +71,10 @@ void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
 
   // Mise à jour de la dernière distance (à la fin!)
   distances[keyIndex] = currentDistance;
+
+  if (keyIndex == 2) {
+    key_2_distance = (uint16_t)(currentDistance * 1000);
+  }
 }
 
 void press(int keyIndex, int rapid) {

@@ -22,8 +22,8 @@ static inline uint16_t adc_ema_alpha_for_error(const adc_ema_t *s,
     return s->alpha_min_q15;
   }
 
-  // Requirement: no filtering when variation is >= 35 ADC counts.
-  if (error >= 35u) {
+  // Requirement: no filtering when variation is >= 60 ADC counts.
+  if (error >= 60u) {
     return ADC_EMA_Q15_ONE;
   }
 
