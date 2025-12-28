@@ -137,6 +137,24 @@ bool usb_hid_keyboard_press_key(uint8_t modifier, uint8_t keycode);
 bool usb_hid_keyboard_release_all(void);
 
 /**
+ * @brief Register a key as pressed (add to report buffer)
+ * @param keycode HID keycode to add
+ */
+void usb_hid_key_press(uint8_t keycode);
+
+/**
+ * @brief Register a key as released (remove from report buffer)
+ * @param keycode HID keycode to remove
+ */
+void usb_hid_key_release(uint8_t keycode);
+
+/**
+ * @brief Send the current key state report if USB is ready
+ * @return true if report was sent
+ */
+bool usb_hid_send_report_if_changed(void);
+
+/**
  * @brief HID task to be called in main loop
  *        Handles pending HID operations
  */

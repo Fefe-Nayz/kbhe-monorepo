@@ -325,10 +325,11 @@ int main(void) {
   /* USER CODE BEGIN 2 */
 
   // Initialisation TinyUSB - RHPORT 1 = USB HS avec PHY intégré
-  const tusb_rhport_init_t rhport_init = {.role = TUSB_ROLE_DEVICE,
-                                          .speed = TUSB_SPEED_HIGH};
-  tusb_init(1, &rhport_init);
-  // tusb_init();
+  // const tusb_rhport_init_t rhport_init = {.role = TUSB_ROLE_DEVICE,
+  //                                         .speed = TUSB_SPEED_HIGH};
+  // tusb_init(1, &rhport_init);
+
+  triggerInit();
 
   DWT_CycleCounter_Init();
 
@@ -346,13 +347,9 @@ int main(void) {
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-    // TinyUSB device task - DOIT être appelé régulièrement
-    tud_task();
+    // tud_task(); // TinyUSB device task
 
-    // Optionnel: tâche HID pour gérer les envois de rapport
-    usb_hid_task();
-
-    // If a full ADC scan is complete, restart it
+    // If a full ADC scan is complete, process keys and restart
     if (adc_scan_complete) {
       adc_scan_complete = 0;
 
@@ -360,6 +357,13 @@ int main(void) {
       uint32_t now = DWT->CYCCNT;
       adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
       adc_full_cycle_start_cycles = now;
+
+      // Process all 6 keys with trigger logic
+      for (int key = 0; key < 6; key++) {
+        handleTrigger(key, adc_values[key]);
+      }
+
+      // usb_hid_task();
 
       MUX_SelectChannel(0);
       TIM4_StartOneShot_TRGO();

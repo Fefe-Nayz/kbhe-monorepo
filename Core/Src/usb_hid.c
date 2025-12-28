@@ -15,6 +15,13 @@
 // Rapport clavier courant
 static hid_keyboard_report_t keyboard_report = {0};
 
+// Buffer des touches actuellement pressées (max 6 comme HID standard)
+static uint8_t pressed_keys[6] = {0};
+static uint8_t num_pressed_keys = 0;
+
+// Flag pour indiquer qu'un rapport a changé et doit être envoyé
+static volatile bool report_changed = false;
+
 // Flag pour indiquer qu'un rapport est prêt à être envoyé
 static volatile bool report_pending = false;
 
@@ -53,12 +60,66 @@ bool usb_hid_keyboard_release_all(void) {
     return usb_hid_keyboard_send_report(0, NULL);
 }
 
-void usb_hid_task(void) {
-    // Cette fonction peut être appelée dans la boucle principale
-    // pour gérer des envois de rapport périodiques si nécessaire
+void usb_hid_key_press(uint8_t keycode) {
+    if (keycode == 0) return;
     
-    // Pour l'instant, les rapports sont envoyés directement
-    // via usb_hid_keyboard_send_report()
+    // Check if key is already pressed
+    for (uint8_t i = 0; i < num_pressed_keys; i++) {
+        if (pressed_keys[i] == keycode) {
+            return;  // Already pressed
+        }
+    }
+    
+    // Add key if space available
+    if (num_pressed_keys < 6) {
+        pressed_keys[num_pressed_keys++] = keycode;
+        report_changed = true;
+    }
+}
+
+void usb_hid_key_release(uint8_t keycode) {
+    if (keycode == 0) return;
+    
+    // Find and remove key
+    for (uint8_t i = 0; i < num_pressed_keys; i++) {
+        if (pressed_keys[i] == keycode) {
+            // Shift remaining keys
+            for (uint8_t j = i; j < num_pressed_keys - 1; j++) {
+                pressed_keys[j] = pressed_keys[j + 1];
+            }
+            num_pressed_keys--;
+            pressed_keys[num_pressed_keys] = 0;
+            report_changed = true;
+            return;
+        }
+    }
+}
+
+bool usb_hid_send_report_if_changed(void) {
+    if (!report_changed) {
+        return false;
+    }
+    
+    if (!tud_mounted() || !tud_hid_ready()) {
+        return false;
+    }
+    
+    // Build keycodes array
+    uint8_t keycodes[6] = {0};
+    for (uint8_t i = 0; i < num_pressed_keys && i < 6; i++) {
+        keycodes[i] = pressed_keys[i];
+    }
+    
+    if (usb_hid_keyboard_send_report(0, keycodes)) {
+        report_changed = false;
+        return true;
+    }
+    return false;
+}
+
+void usb_hid_task(void) {
+    // Send pending report if any
+    usb_hid_send_report_if_changed();
 }
 
 //--------------------------------------------------------------------+

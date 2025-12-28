@@ -26,6 +26,8 @@ void handleTrigger(int keyIndex, int currentVoltage);
  */
 int getKeyState(int keyIndex);
 
+void triggerInit();
+
 #ifdef __cplusplus
 }
 #endif

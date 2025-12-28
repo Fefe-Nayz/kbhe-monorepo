@@ -1,10 +1,22 @@
 #include "lut.c"
 #include "offset.c"
-#include <sys/_intsup.h>
+#include "usb_hid.h"
+#include "trigger.h"
 
-#ifdef DEBUG
-#include "stdio.h"
-#endif
+/**
+* DISABLE KEYBOARD TYPING
+*/
+#define DISABLE_KEYBOARD_TYPING 1
+
+// Mapping des touches vers les keycodes HID
+static const uint8_t KEY_HID_CODES[6] = {
+    HID_KEY_Q, // Key 0
+    HID_KEY_W, // Key 1
+    HID_KEY_E, // Key 2
+    HID_KEY_A, // Key 3
+    HID_KEY_S, // Key 4
+    HID_KEY_D, // Key 5
+};
 
 // Lorsque l'appuie est sous le point d'activation et que la variation est
 // supérieure au delta alors on déclenche un trigger rapide si la touche
@@ -22,10 +34,20 @@ float maxBottomDistances[6] = {0, 0, 0, 0, 0, 0};
 float minTopDistances[6] = {0, 0, 0, 0, 0, 0};
 
 // Dernière valeur d'appuie lue
-float lastDistances[6] = {0, 0, 0, 0, 0, 0};
+float distances[6] = {0, 0, 0, 0, 0, 0};
 
 // Dernier état de la touche (0 = relachée, 1 = appuyée)
-int lastStates[6] = {0, 0, 0, 0, 0, 0};
+int states[6] = {0, 0, 0, 0, 0, 0};
+
+void triggerInit() {
+  offsetInit();
+}
+
+int getKeyState(int keyIndex) {
+  if (keyIndex < 0 || keyIndex >= 6)
+    return 0;
+  return states[keyIndex];
+}
 
 void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
   if (resetExtremums) {
@@ -46,53 +68,58 @@ void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
   }
 
   // Mise à jour de la dernière distance (à la fin!)
-  lastDistances[keyIndex] = currentDistance;
+  distances[keyIndex] = currentDistance;
 }
 
 void press(int keyIndex, int rapid) {
-  if (lastStates[keyIndex] == 1) {
+  if (keyIndex < 0 || keyIndex >= 6)
+    return;
+
+  if (states[keyIndex] == 1) {
     return;
   }
 
-  lastStates[keyIndex] = 1;
+  states[keyIndex] = 1;
 
-#ifdef DEBUG
-  if (rapid == 1) {
-    printf("Key %d rapid pressed\n", keyIndex);
-  } else {
-    printf("Key %d pressed\n", keyIndex);
+  if (DISABLE_KEYBOARD_TYPING) {
+    return;
   }
-#endif
+
+  usb_hid_key_press(KEY_HID_CODES[keyIndex]);
 }
 
 void release(int keyIndex, int rapid) {
-  if (lastStates[keyIndex] == 0) {
+  if (keyIndex < 0 || keyIndex >= 6)
+    return;
+
+  if (states[keyIndex] == 0) {
     return;
   }
 
-  lastStates[keyIndex] = 0;
+  states[keyIndex] = 0;
 
-#ifdef DEBUG
-  if (rapid == 1) {
-    printf("Key %d rapid released\n", keyIndex);
-  } else {
-    printf("Key %d released\n", keyIndex);
+  if (DISABLE_KEYBOARD_TYPING) {
+    return;
   }
-#endif
+
+  usb_hid_key_release(KEY_HID_CODES[keyIndex]);
 }
 
 void handleTrigger(int keyIndex, int currentVoltage) {
+  if (keyIndex < 0 || keyIndex >= 6)
+    return;
+
   float correctedCurrentVoltage = getCorrectedValue(keyIndex, currentVoltage);
   float currentDistance = getValueFromLUT(correctedCurrentVoltage);
 
-  float lastDistance = lastDistances[keyIndex];
+  float lastDistance = distances[keyIndex];
 
   if (lastDistance == currentDistance) {
     return;
   }
 
   float actuationPoint = ACTUATION_POINT[keyIndex];
-  int lastState = lastStates[keyIndex];
+  int lastState = states[keyIndex];
 
   /**
    * NORMAL RELEASE DETECTION
