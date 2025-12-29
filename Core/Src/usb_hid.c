@@ -4,10 +4,13 @@
  * et fonctions d'envoi de rapport clavier
  */
 
+#include "usb_hid.h"
+#include "led_indicator.h"
 #include "raw_hid.h"
 #include "tusb.h"
-#include "usb_hid.h"
+#include "usb_descriptors.h"
 #include <string.h>
+
 
 //--------------------------------------------------------------------+
 // Variables internes
@@ -31,96 +34,99 @@ static volatile bool report_pending = false;
 //--------------------------------------------------------------------+
 
 bool usb_hid_keyboard_is_ready(void) {
-    return tud_hid_ready();
+  return tud_hid_n_ready(HID_ITF_KEYBOARD);
 }
 
 bool usb_hid_keyboard_send_report(uint8_t modifier, const uint8_t keycodes[6]) {
-    if (!tud_hid_ready()) {
-        return false;
-    }
-    
-    keyboard_report.modifier = modifier;
-    keyboard_report.reserved = 0;
-    
-    if (keycodes != NULL) {
-        memcpy(keyboard_report.keycode, keycodes, 6);
-    } else {
-        memset(keyboard_report.keycode, 0, 6);
-    }
-    
-    // Pas de Report ID (0)
-    return tud_hid_keyboard_report(0, keyboard_report.modifier, keyboard_report.keycode);
+  if (!tud_hid_n_ready(HID_ITF_KEYBOARD)) {
+    return false;
+  }
+
+  keyboard_report.modifier = modifier;
+  keyboard_report.reserved = 0;
+
+  if (keycodes != NULL) {
+    memcpy(keyboard_report.keycode, keycodes, 6);
+  } else {
+    memset(keyboard_report.keycode, 0, 6);
+  }
+
+  // Use instance-specific function for keyboard (instance 0)
+  return tud_hid_n_keyboard_report(
+      HID_ITF_KEYBOARD, 0, keyboard_report.modifier, keyboard_report.keycode);
 }
 
 bool usb_hid_keyboard_press_key(uint8_t modifier, uint8_t keycode) {
-    uint8_t keycodes[6] = {keycode, 0, 0, 0, 0, 0};
-    return usb_hid_keyboard_send_report(modifier, keycodes);
+  uint8_t keycodes[6] = {keycode, 0, 0, 0, 0, 0};
+  return usb_hid_keyboard_send_report(modifier, keycodes);
 }
 
 bool usb_hid_keyboard_release_all(void) {
-    return usb_hid_keyboard_send_report(0, NULL);
+  return usb_hid_keyboard_send_report(0, NULL);
 }
 
 void usb_hid_key_press(uint8_t keycode) {
-    if (keycode == 0) return;
-    
-    // Check if key is already pressed
-    for (uint8_t i = 0; i < num_pressed_keys; i++) {
-        if (pressed_keys[i] == keycode) {
-            return;  // Already pressed
-        }
+  if (keycode == 0)
+    return;
+
+  // Check if key is already pressed
+  for (uint8_t i = 0; i < num_pressed_keys; i++) {
+    if (pressed_keys[i] == keycode) {
+      return; // Already pressed
     }
-    
-    // Add key if space available
-    if (num_pressed_keys < 6) {
-        pressed_keys[num_pressed_keys++] = keycode;
-        report_changed = true;
-    }
+  }
+
+  // Add key if space available
+  if (num_pressed_keys < 6) {
+    pressed_keys[num_pressed_keys++] = keycode;
+    report_changed = true;
+  }
 }
 
 void usb_hid_key_release(uint8_t keycode) {
-    if (keycode == 0) return;
-    
-    // Find and remove key
-    for (uint8_t i = 0; i < num_pressed_keys; i++) {
-        if (pressed_keys[i] == keycode) {
-            // Shift remaining keys
-            for (uint8_t j = i; j < num_pressed_keys - 1; j++) {
-                pressed_keys[j] = pressed_keys[j + 1];
-            }
-            num_pressed_keys--;
-            pressed_keys[num_pressed_keys] = 0;
-            report_changed = true;
-            return;
-        }
+  if (keycode == 0)
+    return;
+
+  // Find and remove key
+  for (uint8_t i = 0; i < num_pressed_keys; i++) {
+    if (pressed_keys[i] == keycode) {
+      // Shift remaining keys
+      for (uint8_t j = i; j < num_pressed_keys - 1; j++) {
+        pressed_keys[j] = pressed_keys[j + 1];
+      }
+      num_pressed_keys--;
+      pressed_keys[num_pressed_keys] = 0;
+      report_changed = true;
+      return;
     }
+  }
 }
 
 bool usb_hid_send_report_if_changed(void) {
-    if (!report_changed) {
-        return false;
-    }
-    
-    if (!tud_mounted() || !tud_hid_ready()) {
-        return false;
-    }
-    
-    // Build keycodes array
-    uint8_t keycodes[6] = {0};
-    for (uint8_t i = 0; i < num_pressed_keys && i < 6; i++) {
-        keycodes[i] = pressed_keys[i];
-    }
-    
-    if (usb_hid_keyboard_send_report(0, keycodes)) {
-        report_changed = false;
-        return true;
-    }
+  if (!report_changed) {
     return false;
+  }
+
+  if (!tud_mounted() || !tud_hid_n_ready(HID_ITF_KEYBOARD)) {
+    return false;
+  }
+
+  // Build keycodes array
+  uint8_t keycodes[6] = {0};
+  for (uint8_t i = 0; i < num_pressed_keys && i < 6; i++) {
+    keycodes[i] = pressed_keys[i];
+  }
+
+  if (usb_hid_keyboard_send_report(0, keycodes)) {
+    report_changed = false;
+    return true;
+  }
+  return false;
 }
 
 void usb_hid_task(void) {
-    // Send pending report if any
-    usb_hid_send_report_if_changed();
+  // Send pending report if any
+  usb_hid_send_report_if_changed();
 }
 
 //--------------------------------------------------------------------+
@@ -133,62 +139,63 @@ void usb_hid_task(void) {
  * Return zero will cause the stack to STALL request
  */
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
-                                hid_report_type_t report_type, uint8_t* buffer,
-                                uint16_t reqlen) {
-    (void)instance;
-    (void)report_id;
-    (void)reqlen;
-    
-    if (report_type == HID_REPORT_TYPE_INPUT) {
-        // Retourner le rapport clavier courant
-        memcpy(buffer, &keyboard_report, sizeof(keyboard_report));
-        return sizeof(keyboard_report);
-    }
-    
-    return 0;
+                               hid_report_type_t report_type, uint8_t *buffer,
+                               uint16_t reqlen) {
+  (void)instance;
+  (void)report_id;
+  (void)reqlen;
+
+  if (report_type == HID_REPORT_TYPE_INPUT) {
+    // Retourner le rapport clavier courant
+    memcpy(buffer, &keyboard_report, sizeof(keyboard_report));
+    return sizeof(keyboard_report);
+  }
+
+  return 0;
 }
 
 /*
  * Invoked when received SET_REPORT control request or
  * received data on OUT endpoint (Report ID = 0, Type = OUTPUT)
- * 
+ *
  * Pour un clavier, cela correspond aux LEDs (Caps Lock, Num Lock, etc.)
  */
 void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
-                           hid_report_type_t report_type, uint8_t const* buffer,
+                           hid_report_type_t report_type, uint8_t const *buffer,
                            uint16_t bufsize) {
-    (void)instance;
-    (void)report_id;
-    
-    switch (instance) {
-        // case 0: // Keyboard
-        //     if (report_type == HID_REPORT_TYPE_OUTPUT && bufsize >= 1) {
-        //         // uint8_t led_state = buffer[0];
-        //         // Gérer l'état des LEDs si nécessaire
-        //         // Par exemple, allumer une LED physique pour Caps Lock
-        //     }
-        //     break;
-        
-        case 1:
-            raw_hid_on_receive(buffer, bufsize);
-            break;
-        
-        default:
-            // Autres instances si nécessaire
-            break;
+  (void)instance;
+  (void)report_id;
+
+  switch (instance) {
+  case HID_ITF_KEYBOARD: // Keyboard
+    if (report_type == HID_REPORT_TYPE_OUTPUT && bufsize >= 1) {
+      uint8_t led_state = buffer[0];
+      // Update PE0 LED indicator for Caps Lock / Num Lock
+      led_indicator_set_state(led_state);
     }
+    break;
+
+  case HID_ITF_RAW_HID:
+    raw_hid_on_receive(buffer, bufsize);
+    break;
+
+  default:
+    // Other instances if needed
+    break;
+  }
 }
 
 /*
  * Invoked when sent REPORT successfully to host
  * Application can use this to send the next report
  */
-void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, uint16_t len) {
-    (void)instance;
-    (void)report;
-    (void)len;
-    
-    // Rapport envoyé avec succès
-    // Peut être utilisé pour déclencher l'envoi du prochain rapport
-    report_pending = false;
+void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
+                                uint16_t len) {
+  (void)instance;
+  (void)report;
+  (void)len;
+
+  // Rapport envoyé avec succès
+  // Peut être utilisé pour déclencher l'envoi du prochain rapport
+  report_pending = false;
 }

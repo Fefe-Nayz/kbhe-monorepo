@@ -1,16 +1,36 @@
-// Décalage par rapport au zéro de la LUT
-int LUT_ZERO_VALUE = 2118;
-int KEY_ZERO_VALUES[6] = { 2100, 2110, 2118, 2130, 2114, 2094 };
-int OFFSET[6] = {0,0,0,0,0,0};
+/*
+ * offset.c
+ * ADC offset calibration for hall effect sensors
+ * Uses values from settings for per-key calibration
+ */
 
-// Calcule dynamiquement les offsets à partir des valeurs zéro mesurées
-void offsetInit() {
-    for (int i = 0; i < 6; ++i) {
-        OFFSET[i] = KEY_ZERO_VALUES[i] - LUT_ZERO_VALUE;
-    }
+#include "settings.h"
+#include <stddef.h>
+
+// Calculated offsets (computed from settings calibration)
+static int OFFSET[6] = {0, 0, 0, 0, 0, 0};
+
+// Initialize offsets from settings calibration values
+void offsetInit(void) {
+  const settings_calibration_t *cal = settings_get_calibration();
+  if (cal == NULL) {
+    return;
+  }
+  
+  for (int i = 0; i < 6; ++i) {
+    OFFSET[i] = cal->key_zero_values[i] - cal->lut_zero_value;
+  }
 }
 
+// Get corrected ADC value with offset applied
 int getCorrectedValue(int sensor_index, int voltage) {
-    if (sensor_index < 0 || sensor_index >= 6) return voltage;
-    return voltage - OFFSET[sensor_index];
+  if (sensor_index < 0 || sensor_index >= 6) {
+    return voltage;
+  }
+  return voltage - OFFSET[sensor_index];
+}
+
+// Recalculate offsets (call after settings calibration is updated)
+void offsetRecalculate(void) {
+  offsetInit();
 }

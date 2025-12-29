@@ -75,11 +75,23 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # USB application sources
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_descriptors.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_hid_nkro.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_gamepad.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/raw_hid.c
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
     # Key trigger logic
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/trigger.c
+    # Settings and flash storage
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/flash_storage.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/settings.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid_protocol.c
+    # LED Matrix (WS2812)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/led_matrix.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Src/ws2812.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Src/color_values.c
+    # LED Indicator (PE0)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/led_indicator.c
 )
 
 # Add include paths
@@ -88,6 +100,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${TINYUSB_INC}
     # Project includes (pour tusb_config.h)
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
+    # WS2812 driver includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Inc
 )
 
 # Add project symbols (macros)

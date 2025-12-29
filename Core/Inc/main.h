@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.h
-  * @brief          : Header for main.c file.
-  *                   This file contains the common defines of the application.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.h
+ * @brief          : Header for main.c file.
+ *                   This file contains the common defines of the application.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
@@ -67,7 +67,16 @@ void Error_Handler(void);
 #define M0_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
+// WS2812 LED timing: Timer period for 800kHz PWM (96MHz / 120 = 800kHz)
+#define LED_CNT 120
 
+// WS2812 output pin (TIM3_CH2 = PC7)
+#define WS2812_Pin GPIO_PIN_7
+#define WS2812_GPIO_Port GPIOC
+
+// Timing measurement (accessible from other modules)
+extern uint32_t adc_full_cycle_us;   // Time for full main loop cycle
+extern uint32_t adc_total_scan_us;   // Time for ADC scan only
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

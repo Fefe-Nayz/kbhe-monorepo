@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 //--------------------------------------------------------------------+
 // Device Descriptor
 //--------------------------------------------------------------------+
@@ -38,32 +37,106 @@ uint8_t const *tud_descriptor_device_cb(void) {
 }
 
 //--------------------------------------------------------------------+
-// HID Report Descriptor - Clavier standard
+// HID Report Descriptor - Clavier standard (6KRO)
 //--------------------------------------------------------------------+
 static uint8_t const desc_hid_report[] = {TUD_HID_REPORT_DESC_KEYBOARD()};
 
+//--------------------------------------------------------------------+
+// HID Report Descriptor - NKRO Keyboard (bitmap-based)
+// Supports full N-key rollover via bitmap
+//--------------------------------------------------------------------+
+static uint8_t const desc_nkro_report[] = {
+    HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),
+    HID_USAGE(HID_USAGE_DESKTOP_KEYBOARD),
+    HID_COLLECTION(HID_COLLECTION_APPLICATION),
+    
+    // Modifier keys (8 bits)
+    HID_USAGE_PAGE(HID_USAGE_PAGE_KEYBOARD),
+    HID_USAGE_MIN(224),  // Left Control
+    HID_USAGE_MAX(231),  // Right GUI
+    HID_LOGICAL_MIN(0),
+    HID_LOGICAL_MAX(1),
+    HID_REPORT_COUNT(8),
+    HID_REPORT_SIZE(1),
+    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+    
+    // LED output (5 bits)
+    HID_USAGE_PAGE(HID_USAGE_PAGE_LED),
+    HID_USAGE_MIN(1),   // Num Lock
+    HID_USAGE_MAX(5),   // Kana
+    HID_REPORT_COUNT(5),
+    HID_REPORT_SIZE(1),
+    HID_OUTPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+    // Padding for LED byte alignment
+    HID_REPORT_COUNT(1),
+    HID_REPORT_SIZE(3),
+    HID_OUTPUT(HID_CONSTANT),
+    
+    // Keyboard bitmap (keys 0-127 = 16 bytes)
+    HID_USAGE_PAGE(HID_USAGE_PAGE_KEYBOARD),
+    HID_USAGE_MIN(0),
+    HID_USAGE_MAX(127),  // Supports keys 0-127
+    HID_LOGICAL_MIN(0),
+    HID_LOGICAL_MAX(1),
+    HID_REPORT_COUNT(128),
+    HID_REPORT_SIZE(1),
+    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+    
+    HID_COLLECTION_END
+};
+
 static uint8_t const desc_raw_hid_report[] = {
     TUD_HID_REPORT_DESC_GENERIC_INOUT(64)};
+
+//--------------------------------------------------------------------+
+// HID Report Descriptor - Gamepad with 6 axes (for 6 Hall Effect keys)
+// Each axis represents key travel distance (0-255)
+//--------------------------------------------------------------------+
+static uint8_t const desc_gamepad_report[] = {
+    HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),
+    HID_USAGE(HID_USAGE_DESKTOP_GAMEPAD),
+    HID_COLLECTION(HID_COLLECTION_APPLICATION),
+    // 6 axes for the 6 keys (X, Y, Z, Rx, Ry, Rz)
+    HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),
+
+    // X axis - Key 0
+    HID_USAGE(HID_USAGE_DESKTOP_X),
+    // Y axis - Key 1
+    HID_USAGE(HID_USAGE_DESKTOP_Y),
+    // Z axis - Key 2
+    HID_USAGE(HID_USAGE_DESKTOP_Z),
+    // Rx axis - Key 3
+    HID_USAGE(HID_USAGE_DESKTOP_RX),
+    // Ry axis - Key 4
+    HID_USAGE(HID_USAGE_DESKTOP_RY),
+    // Rz axis - Key 5
+    HID_USAGE(HID_USAGE_DESKTOP_RZ),
+
+    HID_LOGICAL_MIN(0), HID_LOGICAL_MAX_N(255, 2), HID_REPORT_COUNT(6),
+    HID_REPORT_SIZE(8), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+    HID_COLLECTION_END};
 
 //--------------------------------------------------------------------+
 // Configuration Descriptor
 //--------------------------------------------------------------------+
 
 // Interface numbers
-enum { ITF_NUM_HID, ITF_NUM_RAW_HID, ITF_NUM_TOTAL };
+enum { ITF_NUM_HID, ITF_NUM_RAW_HID, ITF_NUM_GAMEPAD, ITF_NUM_NKRO, ITF_NUM_TOTAL };
 
 // Invoked when received GET HID REPORT DESCRIPTOR
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
-  (void)instance;
   switch (instance) {
   case ITF_NUM_HID:
     return desc_hid_report;
   case ITF_NUM_RAW_HID:
     return desc_raw_hid_report;
+  case ITF_NUM_GAMEPAD:
+    return desc_gamepad_report;
+  case ITF_NUM_NKRO:
+    return desc_nkro_report;
   default:
     return NULL;
   }
-  return desc_hid_report;
 }
 
 /*
@@ -73,7 +146,8 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
  * epsize, interval)
  */
 #define CONFIG_TOTAL_LEN                                                       \
-  (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN + TUD_HID_INOUT_DESC_LEN)
+  (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN + TUD_HID_INOUT_DESC_LEN +           \
+   TUD_HID_DESC_LEN + TUD_HID_DESC_LEN)
 
 static uint8_t const desc_configuration[] = {
     // Config number, interface count, string index, total length, attribute,
@@ -81,18 +155,28 @@ static uint8_t const desc_configuration[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN,
                           TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
-    // Interface number, string index, protocol, report descriptor len, EP In
-    // address, size & polling interval
+    // Interface 0: Keyboard HID (6KRO)
     // bInterval = 1 pour 8kHz en High Speed (125µs)
     TUD_HID_DESCRIPTOR(ITF_NUM_HID, 0, HID_ITF_PROTOCOL_KEYBOARD,
                        sizeof(desc_hid_report), EPNUM_HID, HID_EP_SIZE,
                        HID_POLL_INTERVAL_8KHZ),
 
-    // Interface descriptor for RAW HID IN/OUT
+    // Interface 1: Raw HID IN/OUT
     TUD_HID_INOUT_DESCRIPTOR(ITF_NUM_RAW_HID, STRID_RAW_HID,
                              HID_ITF_PROTOCOL_NONE, sizeof(desc_raw_hid_report),
                              EPNUM_RAW_HID_OUT, 0x80 | EPNUM_RAW_HID_IN,
-                             HID_EP_SIZE, RAW_HID_POLL_INTERVAL)};
+                             HID_EP_SIZE, RAW_HID_POLL_INTERVAL),
+
+    // Interface 2: Gamepad HID
+    TUD_HID_DESCRIPTOR(ITF_NUM_GAMEPAD, STRID_GAMEPAD, HID_ITF_PROTOCOL_NONE,
+                       sizeof(desc_gamepad_report), EPNUM_GAMEPAD, HID_EP_SIZE,
+                       GAMEPAD_POLL_INTERVAL),
+
+    // Interface 3: NKRO Keyboard HID
+    // NKRO uses a 17-byte report: 1 modifier + 16 bitmap bytes (128 keys)
+    TUD_HID_DESCRIPTOR(ITF_NUM_NKRO, STRID_NKRO, HID_ITF_PROTOCOL_KEYBOARD,
+                       sizeof(desc_nkro_report), EPNUM_NKRO, HID_EP_SIZE,
+                       HID_POLL_INTERVAL_8KHZ)};
 
 //--------------------------------------------------------------------+
 // High Speed Support - Device Qualifier & Other Speed Configuration
@@ -149,7 +233,9 @@ static char const *string_desc_arr[] = {
     "KBHE",                     // 1: Manufacturer
     "8kHz Keyboard",            // 2: Product
     NULL,                       // 3: Serial (Géré dynamiquement)
-    "Raw HID" // 4: Interface Raw HID (Nom visible dans Windows)
+    "Raw HID",                  // 4: Interface Raw HID
+    "HE Gamepad",               // 5: Interface Gamepad (Hall Effect)
+    "NKRO Keyboard"             // 6: Interface NKRO Keyboard
 };
 
 static uint16_t _desc_str[32 + 1];

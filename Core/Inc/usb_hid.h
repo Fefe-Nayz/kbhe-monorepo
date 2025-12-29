@@ -13,26 +13,8 @@
 extern "C" {
 #endif
 
-//--------------------------------------------------------------------+
-// Keyboard Modifier Keys
-//--------------------------------------------------------------------+
-#define KEYBOARD_MODIFIER_LEFTCTRL   (1 << 0)
-#define KEYBOARD_MODIFIER_LEFTSHIFT  (1 << 1)
-#define KEYBOARD_MODIFIER_LEFTALT    (1 << 2)
-#define KEYBOARD_MODIFIER_LEFTGUI    (1 << 3)
-#define KEYBOARD_MODIFIER_RIGHTCTRL  (1 << 4)
-#define KEYBOARD_MODIFIER_RIGHTSHIFT (1 << 5)
-#define KEYBOARD_MODIFIER_RIGHTALT   (1 << 6)
-#define KEYBOARD_MODIFIER_RIGHTGUI   (1 << 7)
-
-//--------------------------------------------------------------------+
-// Keyboard LED Status
-//--------------------------------------------------------------------+
-#define KEYBOARD_LED_NUMLOCK    (1 << 0)
-#define KEYBOARD_LED_CAPSLOCK   (1 << 1)
-#define KEYBOARD_LED_SCROLLLOCK (1 << 2)
-#define KEYBOARD_LED_COMPOSE    (1 << 3)
-#define KEYBOARD_LED_KANA       (1 << 4)
+// Note: Keyboard modifier keys and LED status are defined by TinyUSB in hid.h
+// Use the hid_keyboard_modifier_bm_t and hid_keyboard_led_bm_t enums instead
 
 //--------------------------------------------------------------------+
 // Common HID Keycodes (USB HID Usage Tables)
