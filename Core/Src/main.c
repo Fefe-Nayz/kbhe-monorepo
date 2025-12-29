@@ -742,9 +742,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 
       uint16_t logical_index =
           (uint16_t)(mux_channel + (i * NUM_MUX_CHANNELS));
-      // const uint16_t filtered_adc_value =
-      //     adc_ema_update(&adc_ema_states[logical_index], new_adc_value);
-      uint16_t filtered_adc_value = 0;
+      uint16_t filtered_adc_value =
+          adc_ema_update(&adc_ema_states[logical_index], new_adc_value);
 
       /* END ANALYSIS */
 
