@@ -31,14 +31,13 @@ static const uint8_t DEFAULT_KEY_HID_CODES[6] = {
 };
 
 // Default rapid trigger settings
-#define DEFAULT_RAPID_TRIGGER_DELTA 0.3f    // 0.3mm default sensitivity
-#define DEFAULT_RAPID_TRIGGER_ACTIVATION 0.5f // 0.5mm initial activation
+#define DEFAULT_RAPID_TRIGGER_DELTA 0.5f // 0.5mm default sensitivity
 
-// Default actuation point (2.0mm)
-#define DEFAULT_ACTUATION_POINT 2.0f
+// Default actuation point (1.2mm)
+#define DEFAULT_ACTUATION_POINT 1.2f
 
-// Default release point (1.8mm)
-#define DEFAULT_RELEASE_POINT 1.8f
+// Default release point (1.2mm)
+#define DEFAULT_RELEASE_POINT 1.2f
 
 // Valeur maximale d'appuie atteinte lorsque la touche est pressée puis en cours
 // de relachement
@@ -73,7 +72,7 @@ static uint8_t getKeyHIDCode(int keyIndex) {
 static float getActuationPoint(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].actuation_point_mm / 10.0f;  // Convert from 0.1mm
+    return s->keys[keyIndex].actuation_point_mm / 10.0f; // Convert from 0.1mm
   }
   return DEFAULT_ACTUATION_POINT;
 }
@@ -84,7 +83,7 @@ static float getActuationPoint(int keyIndex) {
 static float getReleasePoint(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].release_point_mm / 10.0f;  // Convert from 0.1mm
+    return s->keys[keyIndex].release_point_mm / 10.0f; // Convert from 0.1mm
   }
   return DEFAULT_RELEASE_POINT;
 }
@@ -97,38 +96,23 @@ static int isRapidTriggerEnabled(int keyIndex) {
   if (s) {
     return s->keys[keyIndex].rapid_trigger_enabled;
   }
-  return 0;  // Disabled by default
+  return 0; // Disabled by default
 }
 
-/**
- * @brief Get rapid trigger initial activation distance in mm
- */
-static float getRapidTriggerActivation(int keyIndex) {
-  const settings_t *s = settings_get();
-  if (s) {
-    return s->keys[keyIndex].rapid_trigger_activation / 10.0f;  // Convert from 0.1mm
-  }
-  return DEFAULT_RAPID_TRIGGER_ACTIVATION;
-}
-
-/**
- * @brief Get rapid trigger press sensitivity in mm
- */
 static float getRapidTriggerPressSensitivity(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].rapid_trigger_press / 100.0f;  // Convert from 0.01mm
+    return s->keys[keyIndex].rapid_trigger_press /
+           100.0f; // Convert from 0.01mm
   }
   return DEFAULT_RAPID_TRIGGER_DELTA;
 }
 
-/**
- * @brief Get rapid trigger release sensitivity in mm
- */
 static float getRapidTriggerReleaseSensitivity(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].rapid_trigger_release / 100.0f;  // Convert from 0.01mm
+    return s->keys[keyIndex].rapid_trigger_release /
+           100.0f; // Convert from 0.01mm
   }
   return DEFAULT_RAPID_TRIGGER_DELTA;
 }
@@ -141,7 +125,7 @@ static int getSOCDPairedKey(int keyIndex) {
   if (s && s->keys[keyIndex].socd_pair < 6) {
     return s->keys[keyIndex].socd_pair;
   }
-  return -1;  // No SOCD pair
+  return -1; // No SOCD pair
 }
 
 void triggerInit() {
@@ -186,16 +170,16 @@ void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
  */
 static void handleSOCDOnRelease(int keyIndex) {
   int socdMappedKey = getSOCDPairedKey(keyIndex);
-  
+
   // No SOCD mapping for this key
   if (socdMappedKey == -1)
     return;
-  
+
   // If the opposing key was overridden and is still physically pressed,
   // re-send the key press
   int mappedKeyState = states[socdMappedKey];
   int mappedKeyOverrideState = socdOverrideState[socdMappedKey];
-  
+
   if (mappedKeyState == 1 && mappedKeyOverrideState == 1) {
     if (settings_is_keyboard_enabled()) {
       if (settings_is_nkro_enabled()) {
@@ -205,7 +189,7 @@ static void handleSOCDOnRelease(int keyIndex) {
       }
     }
   }
-  
+
   // Clear the override state
   socdOverrideState[socdMappedKey] = 0;
 }
@@ -216,19 +200,19 @@ static void handleSOCDOnRelease(int keyIndex) {
  */
 static void handleSOCDOnPress(int keyIndex) {
   int socdMappedKey = getSOCDPairedKey(keyIndex);
-  
+
   // No SOCD mapping for this key
   if (socdMappedKey == -1)
     return;
-  
+
   // If the opposing key is not pressed, nothing to do
   int mappedKeyState = states[socdMappedKey];
   if (mappedKeyState == 0)
     return;
-  
+
   // Mark the opposing key as overridden by SOCD
   socdOverrideState[socdMappedKey] = 1;
-  
+
   // Release the opposing key
   if (settings_is_keyboard_enabled()) {
     if (settings_is_nkro_enabled()) {
@@ -248,7 +232,7 @@ void press(int keyIndex, int rapid) {
   }
 
   states[keyIndex] = 1;
-  
+
   // Trigger reactive LED effect
   led_matrix_key_event(keyIndex, true);
 
@@ -256,8 +240,8 @@ void press(int keyIndex, int rapid) {
   if (!settings_is_keyboard_enabled()) {
     return;
   }
-  
-  // Check if keyboard output disabled for this key when gamepad active
+
+  // If this key is used for gamepad input with keyboard disabled, skip
   if (settings_is_gamepad_enabled()) {
     const settings_key_t *key_settings = settings_get_key(keyIndex);
     if (key_settings && key_settings->disable_kb_on_gamepad) {
@@ -268,6 +252,7 @@ void press(int keyIndex, int rapid) {
   // Handle SOCD before sending key press
   handleSOCDOnPress(keyIndex);
 
+  // Send key press
   if (settings_is_nkro_enabled()) {
     usb_hid_nkro_key_press(getKeyHIDCode(keyIndex));
   } else {
@@ -284,7 +269,7 @@ void release(int keyIndex, int rapid) {
   }
 
   states[keyIndex] = 0;
-  
+
   // Trigger reactive LED effect
   led_matrix_key_event(keyIndex, false);
 
@@ -292,7 +277,7 @@ void release(int keyIndex, int rapid) {
   if (!settings_is_keyboard_enabled()) {
     return;
   }
-  
+
   // Check if keyboard output disabled for this key when gamepad active
   if (settings_is_gamepad_enabled()) {
     const settings_key_t *key_settings = settings_get_key(keyIndex);
@@ -304,6 +289,7 @@ void release(int keyIndex, int rapid) {
   // Handle SOCD after release (restore opposing key if needed)
   handleSOCDOnRelease(keyIndex);
 
+  // Send key release
   if (settings_is_nkro_enabled()) {
     usb_hid_nkro_key_release(getKeyHIDCode(keyIndex));
   } else {
@@ -315,9 +301,13 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   if (keyIndex < 0 || keyIndex >= 6)
     return;
 
+  int lastState = states[keyIndex];
+  float lastDistance = distances[keyIndex];
+
   float correctedCurrentVoltage = getCorrectedValue(keyIndex, currentVoltage);
   float currentDistance = getValueFromLUT(correctedCurrentVoltage);
 
+  // TODO: Review normalization approach
   // Update gamepad axis with current key distance
   // Distance is 0.0 (released) to ~4.0mm, normalize to 0-1 range
   // Assuming max travel is around 4mm, clamp and normalize
@@ -328,8 +318,7 @@ void handleTrigger(int keyIndex, int currentVoltage) {
     normalizedDistance = 1.0f;
   usb_gamepad_set_axis_from_distance(keyIndex, normalizedDistance);
 
-  float lastDistance = distances[keyIndex];
-
+  // Si aucune variation de distance, on ne fait rien
   if (lastDistance == currentDistance) {
     return;
   }
@@ -338,46 +327,16 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   float actuationPoint = getActuationPoint(keyIndex);
   float releasePoint = getReleasePoint(keyIndex);
   int rapidTriggerEnabled = isRapidTriggerEnabled(keyIndex);
-  int lastState = states[keyIndex];
+  float rapidPressSensitivity = getRapidTriggerPressSensitivity(keyIndex);
+  float rapidReleaseSensitivity = getRapidTriggerReleaseSensitivity(keyIndex);
 
   /**
-   * FIXED ACTUATION MODE (when rapid trigger disabled)
-   * Simple threshold-based actuation and release
-   */
-  if (!rapidTriggerEnabled) {
-    // Press when crossing actuation point going down
-    if (lastState == 0 && currentDistance >= actuationPoint) {
-      updateKeyData(keyIndex, currentDistance, 1);
-      press(keyIndex, 0);
-      return;
-    }
-    
-    // Release when crossing release point going up
-    if (lastState == 1 && currentDistance < releasePoint) {
-      updateKeyData(keyIndex, currentDistance, 1);
-      release(keyIndex, 0);
-      return;
-    }
-    
-    updateKeyData(keyIndex, currentDistance, 0);
-    return;
-  }
-
-  /**
-   * RAPID TRIGGER MODE
-   * Dynamic actuation based on travel distance changes
-   */
-  float rapidActivation = getRapidTriggerActivation(keyIndex);
-  float rapidPressDelta = getRapidTriggerPressSensitivity(keyIndex);
-  float rapidReleaseDelta = getRapidTriggerReleaseSensitivity(keyIndex);
-
-  /**
-   * NORMAL RELEASE DETECTION (above initial activation zone)
+   * NORMAL RELEASE DETECTION
    */
 
-  // Si la touche est au dessus du point d'activation rapide
-  if (currentDistance < rapidActivation) {
-    // Normal release - key is above rapid trigger zone
+  // Si la touche est au dessus du point d'activation
+  if (currentDistance < releasePoint) {
+    // Normal release
     updateKeyData(keyIndex, currentDistance, 1);
     release(keyIndex, 0);
     return;
@@ -386,12 +345,12 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   // Si la touche est en descente
   if (lastDistance < currentDistance) {
     /**
-     * INITIAL ACTIVATION (first press into rapid trigger zone)
+     * NORMAL PRESS DETECTION
      */
 
-    // Si on passe sous le point d'activation rapide
-    if (currentDistance >= rapidActivation && lastDistance < rapidActivation) {
-      // Initial press into rapid trigger zone
+    // Si on passe sous le point d'activation
+    if (currentDistance >= actuationPoint && lastDistance < actuationPoint) {
+      // Normal press
       updateKeyData(keyIndex, currentDistance, 1);
       press(keyIndex, 0);
       return;
@@ -401,14 +360,15 @@ void handleTrigger(int keyIndex, int currentVoltage) {
      * RAPID PRESS DETECTION
      */
 
-    // Si on est déjà sous le point d'activation rapide
+    // Si on est déjà sous le point d'activation
     // Et que la touche est relachée
-    if (lastState == 0) {
+    // Et que le rapid trigger est activé
+    if (lastState == 0 && lastDistance >= actuationPoint && rapidTriggerEnabled) {
       float minTopDistance = minTopDistances[keyIndex];
 
       // Si on est descendu de plus que le delta depuis le point le plus haut
       // atteint
-      if (currentDistance - minTopDistance >= rapidPressDelta) {
+      if (currentDistance - minTopDistance >= rapidPressSensitivity) {
         // Rapid press
         updateKeyData(keyIndex, currentDistance, 1);
         press(keyIndex, 1);
@@ -424,12 +384,13 @@ void handleTrigger(int keyIndex, int currentVoltage) {
      */
 
     // Si la touche est déjà pressée
-    if (lastState == 1) {
+    // Et que le rapid trigger est activé
+    if (lastState == 1 && rapidTriggerEnabled) {
       float maxBottomDistance = maxBottomDistances[keyIndex];
 
       // Si on est remonté de plus que le delta depuis le point le plus bas
       // atteint
-      if (maxBottomDistance - currentDistance >= rapidReleaseDelta) {
+      if (maxBottomDistance - currentDistance >= rapidReleaseSensitivity) {
         // Rapid release
         updateKeyData(keyIndex, currentDistance, 1);
         release(keyIndex, 1);
