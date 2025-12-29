@@ -91,6 +91,7 @@ uint16_t adc_buffer[NUM_MUX];
  * Format: [MUX0_CH0, MUX0_CH1, ..., MUX0_CH5, MUX1_CH0, ..., MUX1_CH5]
  */
 uint16_t adc_values[NUM_MUX * NUM_MUX_CHANNELS];
+uint32_t adc_values_raw[NUM_MUX * NUM_MUX_CHANNELS];
 
 /**
  * EMA state per logical channel (mux input i, mux_channel).
@@ -751,24 +752,12 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
       const uint16_t filtered_adc_value =
           adc_ema_update(&adc_ema_states[logical_index], new_adc_value);
 
-      /* Store key 1 and key 2 values for analysis */
-      if (mux_channel == 1 && i == 0) {
-        // if (key_1_values_index >= 512) {
-        //   key_1_values_index = 0;
-        // }
-
-        // const uint16_t k = key_1_values_index;
-        // key_1_values[k] = new_adc_value;                // raw
-        // key_1_values_filtered[k] = filtered_adc_value;  // filtered
-        // key_1_values_index = (uint16_t)(key_1_values_index + 1u);
-        key_2_values_raw = new_adc_value;
-        key_2_values_filtered = filtered_adc_value;
-      }
-
       /* END ANALYSIS */
 
       // Store filtered value
       adc_values[logical_index] = filtered_adc_value;
+      // Store raw value
+      adc_values_raw[logical_index] = new_adc_value;
     }
 
     // Increment MUX channel

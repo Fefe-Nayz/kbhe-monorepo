@@ -41,8 +41,6 @@ float distances[6] = {0, 0, 0, 0, 0, 0};
 // Dernier état de la touche (0 = relachée, 1 = appuyée)
 int states[6] = {0, 0, 0, 0, 0, 0};
 
-uint16_t key_2_distance = 0;
-
 void triggerInit() { offsetInit(); }
 
 int getKeyState(int keyIndex) {
@@ -71,10 +69,6 @@ void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
 
   // Mise à jour de la dernière distance (à la fin!)
   distances[keyIndex] = currentDistance;
-
-  if (keyIndex == 2) {
-    key_2_distance = (uint16_t)(currentDistance * 1000);
-  }
 }
 
 void press(int keyIndex, int rapid) {
