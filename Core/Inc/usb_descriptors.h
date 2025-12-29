@@ -14,8 +14,8 @@
 
 // VID/PID - Utiliser des valeurs de test
 // IMPORTANT: Pour un produit commercial, obtenir un VID/PID officiel!
-#define USB_VID   0x1209  // pid.codes VID (pour prototypage)
-#define USB_PID   0x0001  // PID arbitraire pour test
+#define USB_VID   0x9172  // VID d'exemple
+#define USB_PID   0x0002  // PID arbitraire pour test
 
 // USB Version - USB 2.0 pour High Speed
 #define USB_BCD   0x0200
@@ -26,6 +26,9 @@
 
 // Endpoint number for HID IN
 #define EPNUM_HID     0x81  // EP1 IN
+// Endpoint for RAW HID IN/OUT
+#define EPNUM_RAW_HID_IN 0x82  // EP2 IN
+#define EPNUM_RAW_HID_OUT 0x02  // EP2 OUT
 
 // Endpoint size for High Speed HID
 // High Speed permet jusqu'à 1024 bytes, mais 64 suffit pour un clavier
@@ -47,6 +50,7 @@
  *   bInterval=4 → 1000µs  = 1000 Hz (1kHz)
  */
 #define HID_POLL_INTERVAL_8KHZ  1  // 125µs = 8kHz
+#define RAW_HID_POLL_INTERVAL 4  // 1000µs = 1kHz
 
 //--------------------------------------------------------------------+
 // String Descriptor Indices
@@ -56,6 +60,7 @@ enum {
     STRID_MANUFACTURER,
     STRID_PRODUCT,
     STRID_SERIAL,
+    STRID_RAW_HID,
 };
 
 //--------------------------------------------------------------------+
