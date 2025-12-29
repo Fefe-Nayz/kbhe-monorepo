@@ -75,8 +75,8 @@ void Error_Handler(void);
 #define WS2812_GPIO_Port GPIOC
 
 // Timing measurement (accessible from other modules)
-extern uint32_t adc_full_cycle_us;   // Time for full main loop cycle
-extern uint32_t adc_total_scan_us;   // Time for ADC scan only
+extern uint32_t adc_full_cycle_us; // Time for full main loop cycle
+extern uint32_t adc_total_scan_us; // Time for ADC scan only
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

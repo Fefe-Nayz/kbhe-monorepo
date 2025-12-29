@@ -307,9 +307,7 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
   effect_offset = 0;
 }
 
-led_effect_mode_t led_matrix_get_effect(void) {
-  return current_effect;
-}
+led_effect_mode_t led_matrix_get_effect(void) { return current_effect; }
 
 void led_matrix_set_effect_color(uint8_t r, uint8_t g, uint8_t b) {
   effect_color_r = r;
@@ -321,12 +319,11 @@ void led_matrix_set_effect_speed(uint8_t speed) {
   effect_speed = speed > 0 ? speed : 1;
 }
 
-uint8_t led_matrix_get_effect_speed(void) {
-  return effect_speed;
-}
+uint8_t led_matrix_get_effect_speed(void) { return effect_speed; }
 
 void led_matrix_key_event(uint8_t key_index, bool pressed) {
-  if (key_index >= 6) return;
+  if (key_index >= 6)
+    return;
   if (pressed) {
     key_brightness[key_index] = 255;
   }
@@ -351,13 +348,14 @@ static void effect_rainbow(void) {
  */
 static void effect_breathing(void) {
   uint8_t breath = (effect_offset % 128);
-  if (breath > 64) breath = 128 - breath;
+  if (breath > 64)
+    breath = 128 - breath;
   uint8_t brightness = (255 * breath) / 64;
-  
+
   uint8_t r = (uint8_t)((uint16_t)effect_color_r * brightness / 255);
   uint8_t g = (uint8_t)((uint16_t)effect_color_g * brightness / 255);
   uint8_t b = (uint8_t)((uint16_t)effect_color_b * brightness / 255);
-  
+
   led_matrix_fill(r, g, b);
 }
 
@@ -410,17 +408,25 @@ static void effect_fire(void) {
       uint8_t r, g, b;
       // Fire rises from bottom, intensity based on y position
       uint8_t heat = (7 - y) * 30 + ((effect_offset + x * 7) % 40);
-      
+
       if (heat > 200) {
-        r = 255; g = 255; b = 128;  // White-yellow tip
+        r = 255;
+        g = 255;
+        b = 128; // White-yellow tip
       } else if (heat > 150) {
-        r = 255; g = 170; b = 0;    // Yellow
+        r = 255;
+        g = 170;
+        b = 0; // Yellow
       } else if (heat > 80) {
-        r = 255; g = 64; b = 0;     // Orange
+        r = 255;
+        g = 64;
+        b = 0; // Orange
       } else if (heat > 40) {
-        r = 128; g = 0; b = 0;      // Red
+        r = 128;
+        g = 0;
+        b = 0; // Red
       } else {
-        r = g = b = 0;              // Dark
+        r = g = b = 0; // Dark
       }
       led_matrix_set_pixel(x, y, r, g, b);
     }
@@ -435,9 +441,10 @@ static void effect_ocean(void) {
     for (uint8_t x = 0; x < LED_MATRIX_WIDTH; x++) {
       uint8_t wave = ((x * 32) + (effect_offset * 3)) % 256;
       uint8_t depth = (y * 20);
-      uint8_t hue = 140 + (wave / 16) + depth / 8;  // Blue-cyan range
+      uint8_t hue = 140 + (wave / 16) + depth / 8; // Blue-cyan range
       uint8_t brightness = 255 - (depth * 255 / 200);
-      if (brightness > 255) brightness = 0;  // Underflow protection
+      if (brightness > 255)
+        brightness = 0; // Underflow protection
       uint8_t r, g, b;
       led_matrix_hsv_to_rgb(hue, 255, brightness, &r, &g, &b);
       led_matrix_set_pixel(x, y, r, g, b);
@@ -453,15 +460,20 @@ static void effect_matrix(void) {
     for (uint8_t x = 0; x < LED_MATRIX_WIDTH; x++) {
       uint8_t r, g, b;
       // Each column has independent "drops"
-      uint8_t col_offset = x * 37;  // Prime for pseudo-random
+      uint8_t col_offset = x * 37; // Prime for pseudo-random
       uint8_t drop_pos = ((effect_offset + col_offset) / 3) % 16;
       int8_t dist = (int8_t)y - (int8_t)(drop_pos % 8);
-      if (dist < 0) dist = -dist;
-      
+      if (dist < 0)
+        dist = -dist;
+
       if (dist == 0) {
-        r = 255; g = 255; b = 255;  // Head (white)
+        r = 255;
+        g = 255;
+        b = 255; // Head (white)
       } else if (dist < 4) {
-        r = 0; g = 255 / dist; b = 0;  // Trail (green fade)
+        r = 0;
+        g = 255 / dist;
+        b = 0; // Trail (green fade)
       } else {
         r = g = b = 0;
       }
@@ -479,9 +491,9 @@ static void effect_sparkle(void) {
       uint8_t r, g, b;
       // Pseudo-random sparkle based on position and frame
       uint8_t seed = (x * 13 + y * 7 + effect_offset) % 32;
-      
+
       if (seed == 0) {
-        r = g = b = 255;  // White sparkle
+        r = g = b = 255; // White sparkle
       } else if (seed < 3) {
         uint8_t hue = effect_offset + x * 32;
         led_matrix_hsv_to_rgb(hue, 255, 128, &r, &g, &b);
@@ -498,9 +510,10 @@ static void effect_sparkle(void) {
  */
 static void effect_breathing_rainbow(void) {
   uint8_t breath = (effect_offset % 128);
-  if (breath > 64) breath = 128 - breath;
+  if (breath > 64)
+    breath = 128 - breath;
   uint8_t brightness = (255 * breath) / 64;
-  uint8_t hue = effect_offset / 2;  // Slowly cycle through colors
+  uint8_t hue = effect_offset / 2; // Slowly cycle through colors
   uint8_t r, g, b;
   led_matrix_hsv_to_rgb(hue, 255, brightness, &r, &g, &b);
   led_matrix_fill(r, g, b);
@@ -515,8 +528,8 @@ static void effect_spiral(void) {
       // Distance from center + angle creates spiral
       int8_t cx = x - 4;
       int8_t cy = y - 4;
-      uint8_t dist = (cx * cx + cy * cy);  // Squared distance
-      uint8_t angle = ((cx + 4) * 32 + (cy + 4) * 32);  // Approximation
+      uint8_t dist = (cx * cx + cy * cy);              // Squared distance
+      uint8_t angle = ((cx + 4) * 32 + (cy + 4) * 32); // Approximation
       uint8_t hue = dist * 8 + angle + effect_offset * 3;
       uint8_t r, g, b;
       led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
@@ -529,7 +542,7 @@ static void effect_spiral(void) {
  * @brief Solid color cycle - all LEDs same color, slowly changing
  */
 static void effect_color_cycle(void) {
-  uint8_t hue = effect_offset / 4;  // Slow color change
+  uint8_t hue = effect_offset / 4; // Slow color change
   uint8_t r, g, b;
   led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
   led_matrix_fill(r, g, b);
@@ -540,18 +553,18 @@ static void effect_color_cycle(void) {
  */
 static void effect_reactive(void) {
   led_matrix_clear();
-  
+
   // Each key maps to a column or area of the matrix
   // Keys 0-5 map to columns (with 2 pixels per key)
   for (uint8_t key = 0; key < 6; key++) {
     if (key_brightness[key] > 0) {
       uint8_t col = key;
       uint8_t brightness = key_brightness[key];
-      
+
       uint8_t r = (uint8_t)((uint16_t)effect_color_r * brightness / 255);
       uint8_t g = (uint8_t)((uint16_t)effect_color_g * brightness / 255);
       uint8_t b = (uint8_t)((uint16_t)effect_color_b * brightness / 255);
-      
+
       // Light up the column for this key
       for (uint8_t y = 0; y < LED_MATRIX_HEIGHT; y++) {
         led_matrix_set_pixel(col, y, r, g, b);
@@ -559,7 +572,7 @@ static void effect_reactive(void) {
           led_matrix_set_pixel(col + 1, y, r, g, b);
         }
       }
-      
+
       // Fade out
       if (key_brightness[key] > 8) {
         key_brightness[key] -= 8;
@@ -574,65 +587,66 @@ void led_matrix_effect_tick(uint32_t tick) {
   if (!initialized || !display_enabled || current_effect == LED_EFFECT_NONE) {
     return;
   }
-  
+
   // Calculate time delta
   uint32_t delta = tick - last_effect_tick;
-  
+
   // Update at rate determined by speed
   // speed 1 = 200ms interval (5 FPS), speed 255 = 5ms interval (200 FPS)
   // Formula: interval = 200 - (speed * 195 / 255)
   // This gives range from 200ms (slow) to 5ms (fast)
   uint32_t update_interval = 200 - (effect_speed * 195 / 255);
-  if (update_interval < 5) update_interval = 5;
-  
+  if (update_interval < 5)
+    update_interval = 5;
+
   if (delta < update_interval) {
     return;
   }
-  
+
   last_effect_tick = tick;
   effect_offset++;
-  
+
   switch (current_effect) {
-    case LED_EFFECT_RAINBOW:
-      effect_rainbow();
-      break;
-    case LED_EFFECT_BREATHING:
-      effect_breathing();
-      break;
-    case LED_EFFECT_STATIC_RAINBOW:
-      effect_static_rainbow();
-      break;
-    case LED_EFFECT_SOLID:
-      effect_solid();
-      break;
-    case LED_EFFECT_PLASMA:
-      effect_plasma();
-      break;
-    case LED_EFFECT_FIRE:
-      effect_fire();
-      break;
-    case LED_EFFECT_OCEAN:
-      effect_ocean();
-      break;
-    case LED_EFFECT_MATRIX:
-      effect_matrix();
-      break;
-    case LED_EFFECT_SPARKLE:
-      effect_sparkle();
-      break;
-    case LED_EFFECT_BREATHING_RAINBOW:
-      effect_breathing_rainbow();
-      break;
-    case LED_EFFECT_SPIRAL:
-      effect_spiral();
-      break;
-    case LED_EFFECT_COLOR_CYCLE:
-      effect_color_cycle();
-      break;
-    case LED_EFFECT_REACTIVE:
-      effect_reactive();
-      break;
-    default:
-      break;
+  case LED_EFFECT_RAINBOW:
+    effect_rainbow();
+    break;
+  case LED_EFFECT_BREATHING:
+    effect_breathing();
+    break;
+  case LED_EFFECT_STATIC_RAINBOW:
+    effect_static_rainbow();
+    break;
+  case LED_EFFECT_SOLID:
+    effect_solid();
+    break;
+  case LED_EFFECT_PLASMA:
+    effect_plasma();
+    break;
+  case LED_EFFECT_FIRE:
+    effect_fire();
+    break;
+  case LED_EFFECT_OCEAN:
+    effect_ocean();
+    break;
+  case LED_EFFECT_MATRIX:
+    effect_matrix();
+    break;
+  case LED_EFFECT_SPARKLE:
+    effect_sparkle();
+    break;
+  case LED_EFFECT_BREATHING_RAINBOW:
+    effect_breathing_rainbow();
+    break;
+  case LED_EFFECT_SPIRAL:
+    effect_spiral();
+    break;
+  case LED_EFFECT_COLOR_CYCLE:
+    effect_color_cycle();
+    break;
+  case LED_EFFECT_REACTIVE:
+    effect_reactive();
+    break;
+  default:
+    break;
   }
 }

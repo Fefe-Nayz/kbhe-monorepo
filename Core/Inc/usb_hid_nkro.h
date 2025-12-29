@@ -23,8 +23,8 @@ extern "C" {
 #define NKRO_KEY_BITMAP_SIZE 16
 
 typedef struct __attribute__((packed)) {
-  uint8_t modifier;                      // Modifier keys
-  uint8_t keys[NKRO_KEY_BITMAP_SIZE];    // Bitmap for keys 0-127
+  uint8_t modifier;                   // Modifier keys
+  uint8_t keys[NKRO_KEY_BITMAP_SIZE]; // Bitmap for keys 0-127
 } nkro_keyboard_report_t;
 
 //--------------------------------------------------------------------+

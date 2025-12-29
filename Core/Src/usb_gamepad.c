@@ -11,7 +11,6 @@
 #include <math.h>
 #include <string.h>
 
-
 //--------------------------------------------------------------------+
 // Variables internes
 //--------------------------------------------------------------------+
@@ -57,12 +56,12 @@ static float apply_deadzone(float value, float deadzone) {
  */
 static float apply_curve(float value, uint8_t curve_type) {
   switch (curve_type) {
-    case 1: // Smooth (quadratic ease-in-out)
-      return value * value;
-    case 2: // Aggressive (cubic)
-      return value * value * value;
-    default: // Linear
-      return value;
+  case 1: // Smooth (quadratic ease-in-out)
+    return value * value;
+  case 2: // Aggressive (cubic)
+    return value * value * value;
+  default: // Linear
+    return value;
   }
 }
 
@@ -103,30 +102,30 @@ void usb_gamepad_set_axis_from_distance(uint8_t axis_index, float distance) {
 
   // Store raw value for snappy mode processing
   raw_axis_values[axis_index] = distance;
-  
+
   // Get gamepad settings
   const settings_t *s = settings_get();
   float deadzone = s ? (s->gamepad.deadzone / 255.0f) : 0.0f;
   uint8_t curve_type = s ? s->gamepad.curve_type : 0;
   bool snappy_mode = s ? s->gamepad.snappy_mode : false;
   bool square_mode = s ? s->gamepad.square_mode : false;
-  
+
   // Apply deadzone
   float processed = apply_deadzone(distance, deadzone);
-  
+
   // Apply analog curve
   processed = apply_curve(processed, curve_type);
-  
+
   // Snappy mode: use max of opposing axes (for axes 3↔5 which are A↔D)
   if (snappy_mode) {
     // Keys 3 and 5 are A and D (opposing)
     if (axis_index == 3 && raw_axis_values[5] > processed) {
-      processed = 0.0f;  // D is stronger, suppress A
+      processed = 0.0f; // D is stronger, suppress A
     } else if (axis_index == 5 && raw_axis_values[3] > processed) {
-      processed = 0.0f;  // A is stronger, suppress D
+      processed = 0.0f; // A is stronger, suppress D
     }
   }
-  
+
   // Square mode: remove circular boundary limitation
   // This is typically applied to X/Y pairs but we just max out the range
   if (square_mode) {

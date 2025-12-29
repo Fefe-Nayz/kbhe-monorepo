@@ -9,7 +9,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,7 +29,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 // Analog Curve Constants
 //--------------------------------------------------------------------+
-#define ANALOG_CURVE_POINTS 4    // 4-point bezier curve (P0, P1, P2, P3)
+#define ANALOG_CURVE_POINTS 4 // 4-point bezier curve (P0, P1, P2, P3)
 
 //--------------------------------------------------------------------+
 // Gamepad Mapping Constants
@@ -46,8 +45,8 @@ typedef enum {
 } gamepad_axis_t;
 
 typedef enum {
-  GAMEPAD_DIR_POSITIVE = 0,  // Press increases axis value
-  GAMEPAD_DIR_NEGATIVE = 1   // Press decreases axis value  
+  GAMEPAD_DIR_POSITIVE = 0, // Press increases axis value
+  GAMEPAD_DIR_NEGATIVE = 1  // Press decreases axis value
 } gamepad_direction_t;
 
 typedef enum {
@@ -79,21 +78,21 @@ typedef enum {
  * @brief Global keyboard options
  */
 typedef struct __attribute__((packed)) {
-  uint8_t keyboard_enabled : 1; // Enable keyboard HID output
-  uint8_t gamepad_enabled : 1;  // Enable gamepad HID output
-  uint8_t raw_hid_echo : 1;     // Enable RAW HID echo mode
-  uint8_t led_enabled : 1;      // Enable LED matrix
-  uint8_t nkro_enabled : 1;     // Use NKRO instead of 6KRO keyboard
+  uint8_t keyboard_enabled : 1;      // Enable keyboard HID output
+  uint8_t gamepad_enabled : 1;       // Enable gamepad HID output
+  uint8_t raw_hid_echo : 1;          // Enable RAW HID echo mode
+  uint8_t led_enabled : 1;           // Enable LED matrix
+  uint8_t nkro_enabled : 1;          // Use NKRO instead of 6KRO keyboard
   uint8_t gamepad_with_keyboard : 1; // Send keyboard along with gamepad
-  uint8_t reserved : 2;         // Reserved for future use
+  uint8_t reserved : 2;              // Reserved for future use
 } settings_options_t;
 
 /**
  * @brief Analog curve point (normalized 0-255 for both axes)
  */
 typedef struct __attribute__((packed)) {
-  uint8_t x;  // X position (0-255, represents 0-4mm travel)
-  uint8_t y;  // Y value (0-255, represents analog output)
+  uint8_t x; // X position (0-255, represents 0-4mm travel)
+  uint8_t y; // Y value (0-255, represents analog output)
 } curve_point_t;
 
 /**
@@ -102,55 +101,57 @@ typedef struct __attribute__((packed)) {
  * Only P1 and P2 are configurable control points
  */
 typedef struct __attribute__((packed)) {
-  curve_point_t p1;  // First control point
-  curve_point_t p2;  // Second control point
+  curve_point_t p1; // First control point
+  curve_point_t p2; // Second control point
 } settings_curve_t;
 
 /**
  * @brief Per-key gamepad mapping
  */
 typedef struct __attribute__((packed)) {
-  uint8_t axis;       // gamepad_axis_t - which axis to map to (0 = none)
-  uint8_t direction;  // gamepad_direction_t - positive or negative
-  uint8_t button;     // gamepad_button_t - button to press (0 = none)
-  uint8_t reserved;   // Padding
+  uint8_t axis;      // gamepad_axis_t - which axis to map to (0 = none)
+  uint8_t direction; // gamepad_direction_t - positive or negative
+  uint8_t button;    // gamepad_button_t - button to press (0 = none)
+  uint8_t reserved;  // Padding
 } settings_gamepad_mapping_t;
 
 /**
  * @brief Key-specific settings
  */
 typedef struct __attribute__((packed)) {
-  uint8_t hid_keycode;          // HID keycode for this key
-  uint8_t actuation_point_mm;   // Actuation point in 0.1mm (e.g., 20 = 2.0mm)
-  uint8_t release_point_mm;     // Release point in 0.1mm  
+  uint8_t hid_keycode;        // HID keycode for this key
+  uint8_t actuation_point_mm; // Actuation point in 0.1mm (e.g., 20 = 2.0mm)
+  uint8_t release_point_mm;   // Release point in 0.1mm
   uint8_t rapid_trigger_activation; // Initial activation distance in 0.1mm
-  uint8_t rapid_trigger_press;  // Press sensitivity in 0.01mm (e.g., 30 = 0.30mm)
-  uint8_t rapid_trigger_release;// Release sensitivity in 0.01mm
-  uint8_t socd_pair;            // SOCD paired key index (255 = none)
+  uint8_t
+      rapid_trigger_press; // Press sensitivity in 0.01mm (e.g., 30 = 0.30mm)
+  uint8_t rapid_trigger_release;     // Release sensitivity in 0.01mm
+  uint8_t socd_pair;                 // SOCD paired key index (255 = none)
   uint8_t rapid_trigger_enabled : 1; // Enable rapid trigger for this key
-  uint8_t disable_kb_on_gamepad : 1; // Disable keyboard output when gamepad active
-  uint8_t curve_enabled : 1;    // Enable custom analog curve
-  uint8_t reserved_bits : 5;    // Reserved bits
-  settings_curve_t curve;       // Per-key analog curve (4 bytes)
-  settings_gamepad_mapping_t gamepad_map;  // Per-key gamepad mapping (4 bytes)
+  uint8_t
+      disable_kb_on_gamepad : 1; // Disable keyboard output when gamepad active
+  uint8_t curve_enabled : 1;     // Enable custom analog curve
+  uint8_t reserved_bits : 5;     // Reserved bits
+  settings_curve_t curve;        // Per-key analog curve (4 bytes)
+  settings_gamepad_mapping_t gamepad_map; // Per-key gamepad mapping (4 bytes)
 } settings_key_t;
 
 /**
  * @brief Calibration settings for ADC offset correction
  */
 typedef struct __attribute__((packed)) {
-  int16_t lut_zero_value;       // LUT reference zero value (default ~2118)
-  int16_t key_zero_values[6];   // Per-key zero values
+  int16_t lut_zero_value;     // LUT reference zero value (default ~2118)
+  int16_t key_zero_values[6]; // Per-key zero values
 } settings_calibration_t;
 
 /**
  * @brief Gamepad settings
  */
 typedef struct __attribute__((packed)) {
-  uint8_t deadzone;             // Analog deadzone (0-255)
-  uint8_t curve_type;           // Analog curve (0=linear, 1=smooth, 2=aggressive)
-  uint8_t square_mode;          // Use square joystick mapping
-  uint8_t snappy_mode;          // Faster return to neutral
+  uint8_t deadzone;    // Analog deadzone (0-255)
+  uint8_t curve_type;  // Analog curve (0=linear, 1=smooth, 2=aggressive)
+  uint8_t square_mode; // Use square joystick mapping
+  uint8_t snappy_mode; // Faster return to neutral
   uint8_t reserved[4];
 } settings_gamepad_t;
 
@@ -178,19 +179,19 @@ typedef struct __attribute__((packed)) {
 
   // Per-key settings (6 keys)
   settings_key_t keys[6];
-  
+
   // Gamepad settings
   settings_gamepad_t gamepad;
-  
+
   // Calibration settings
   settings_calibration_t calibration;
 
   // LED matrix data
   settings_led_t led; // LED matrix pixels and brightness
-  
+
   // LED effect settings
-  uint8_t led_effect_mode;   // Current effect mode
-  uint8_t led_effect_speed;  // Effect animation speed
+  uint8_t led_effect_mode;  // Current effect mode
+  uint8_t led_effect_speed; // Effect animation speed
   uint8_t led_effect_color_r;
   uint8_t led_effect_color_g;
   uint8_t led_effect_color_b;
@@ -208,7 +209,7 @@ typedef struct __attribute__((packed)) {
 // Set to 1 to force defaults on startup (ignores saved settings)
 // Useful for development or recovering from bad settings
 #ifndef SETTINGS_FORCE_DEFAULTS
-#define SETTINGS_FORCE_DEFAULTS 0  // Set to 0 after initial deploy
+#define SETTINGS_FORCE_DEFAULTS 0 // Set to 0 after initial deploy
 #endif
 
 #define SETTINGS_DEFAULT_OPTIONS                                               \
@@ -230,53 +231,91 @@ typedef struct __attribute__((packed)) {
 #define SETTINGS_DEFAULT_CURVE {.p1 = {85, 85}, .p2 = {170, 170}}
 
 // Default gamepad mapping: no mapping
-#define SETTINGS_DEFAULT_GAMEPAD_MAP {.axis = 0, .direction = 0, .button = 0, .reserved = 0}
+#define SETTINGS_DEFAULT_GAMEPAD_MAP                                           \
+  {.axis = 0, .direction = 0, .button = 0, .reserved = 0}
 
 // Default key settings with keycodes and SOCD pairs (A↔D = keys 3↔5)
 // Rapid trigger disabled by default, with 2.0mm actuation point
 #define SETTINGS_DEFAULT_KEY_0                                                 \
-  {.hid_keycode = HID_KEY_Q_CODE, .actuation_point_mm = 20,                    \
-   .release_point_mm = 18, .rapid_trigger_activation = 5,                      \
-   .rapid_trigger_press = 30, .rapid_trigger_release = 30,                     \
-   .socd_pair = 255, .rapid_trigger_enabled = 0, .curve_enabled = 0,           \
-   .curve = SETTINGS_DEFAULT_CURVE, .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
+  {.hid_keycode = HID_KEY_Q_CODE,                                              \
+   .actuation_point_mm = 20,                                                   \
+   .release_point_mm = 18,                                                     \
+   .rapid_trigger_activation = 5,                                              \
+   .rapid_trigger_press = 30,                                                  \
+   .rapid_trigger_release = 30,                                                \
+   .socd_pair = 255,                                                           \
+   .rapid_trigger_enabled = 0,                                                 \
+   .curve_enabled = 0,                                                         \
+   .curve = SETTINGS_DEFAULT_CURVE,                                            \
+   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_1                                                 \
-  {.hid_keycode = HID_KEY_W_CODE, .actuation_point_mm = 20,                    \
-   .release_point_mm = 18, .rapid_trigger_activation = 5,                      \
-   .rapid_trigger_press = 30, .rapid_trigger_release = 30,                     \
-   .socd_pair = 255, .rapid_trigger_enabled = 0, .curve_enabled = 0,           \
-   .curve = SETTINGS_DEFAULT_CURVE, .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
+  {.hid_keycode = HID_KEY_W_CODE,                                              \
+   .actuation_point_mm = 20,                                                   \
+   .release_point_mm = 18,                                                     \
+   .rapid_trigger_activation = 5,                                              \
+   .rapid_trigger_press = 30,                                                  \
+   .rapid_trigger_release = 30,                                                \
+   .socd_pair = 255,                                                           \
+   .rapid_trigger_enabled = 0,                                                 \
+   .curve_enabled = 0,                                                         \
+   .curve = SETTINGS_DEFAULT_CURVE,                                            \
+   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_2                                                 \
-  {.hid_keycode = HID_KEY_E_CODE, .actuation_point_mm = 20,                    \
-   .release_point_mm = 18, .rapid_trigger_activation = 5,                      \
-   .rapid_trigger_press = 30, .rapid_trigger_release = 30,                     \
-   .socd_pair = 255, .rapid_trigger_enabled = 0, .curve_enabled = 0,           \
-   .curve = SETTINGS_DEFAULT_CURVE, .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
+  {.hid_keycode = HID_KEY_E_CODE,                                              \
+   .actuation_point_mm = 20,                                                   \
+   .release_point_mm = 18,                                                     \
+   .rapid_trigger_activation = 5,                                              \
+   .rapid_trigger_press = 30,                                                  \
+   .rapid_trigger_release = 30,                                                \
+   .socd_pair = 255,                                                           \
+   .rapid_trigger_enabled = 0,                                                 \
+   .curve_enabled = 0,                                                         \
+   .curve = SETTINGS_DEFAULT_CURVE,                                            \
+   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_3                                                 \
-  {.hid_keycode = HID_KEY_A_CODE, .actuation_point_mm = 20,                    \
-   .release_point_mm = 18, .rapid_trigger_activation = 5,                      \
-   .rapid_trigger_press = 30, .rapid_trigger_release = 30,                     \
-   .socd_pair = 5, .rapid_trigger_enabled = 0, .curve_enabled = 0,             \
-   .curve = SETTINGS_DEFAULT_CURVE, .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
+  {.hid_keycode = HID_KEY_A_CODE,                                              \
+   .actuation_point_mm = 20,                                                   \
+   .release_point_mm = 18,                                                     \
+   .rapid_trigger_activation = 5,                                              \
+   .rapid_trigger_press = 30,                                                  \
+   .rapid_trigger_release = 30,                                                \
+   .socd_pair = 5,                                                             \
+   .rapid_trigger_enabled = 0,                                                 \
+   .curve_enabled = 0,                                                         \
+   .curve = SETTINGS_DEFAULT_CURVE,                                            \
+   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_4                                                 \
-  {.hid_keycode = HID_KEY_S_CODE, .actuation_point_mm = 20,                    \
-   .release_point_mm = 18, .rapid_trigger_activation = 5,                      \
-   .rapid_trigger_press = 30, .rapid_trigger_release = 30,                     \
-   .socd_pair = 255, .rapid_trigger_enabled = 0, .curve_enabled = 0,           \
-   .curve = SETTINGS_DEFAULT_CURVE, .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
+  {.hid_keycode = HID_KEY_S_CODE,                                              \
+   .actuation_point_mm = 20,                                                   \
+   .release_point_mm = 18,                                                     \
+   .rapid_trigger_activation = 5,                                              \
+   .rapid_trigger_press = 30,                                                  \
+   .rapid_trigger_release = 30,                                                \
+   .socd_pair = 255,                                                           \
+   .rapid_trigger_enabled = 0,                                                 \
+   .curve_enabled = 0,                                                         \
+   .curve = SETTINGS_DEFAULT_CURVE,                                            \
+   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_5                                                 \
-  {.hid_keycode = HID_KEY_D_CODE, .actuation_point_mm = 20,                    \
-   .release_point_mm = 18, .rapid_trigger_activation = 5,                      \
-   .rapid_trigger_press = 30, .rapid_trigger_release = 30,                     \
-   .socd_pair = 3, .rapid_trigger_enabled = 0, .curve_enabled = 0,             \
-   .curve = SETTINGS_DEFAULT_CURVE, .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
+  {.hid_keycode = HID_KEY_D_CODE,                                              \
+   .actuation_point_mm = 20,                                                   \
+   .release_point_mm = 18,                                                     \
+   .rapid_trigger_activation = 5,                                              \
+   .rapid_trigger_press = 30,                                                  \
+   .rapid_trigger_release = 30,                                                \
+   .socd_pair = 3,                                                             \
+   .rapid_trigger_enabled = 0,                                                 \
+   .curve_enabled = 0,                                                         \
+   .curve = SETTINGS_DEFAULT_CURVE,                                            \
+   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 
 #define SETTINGS_DEFAULT_GAMEPAD                                               \
   {.deadzone = 10, .curve_type = 0, .square_mode = 0, .snappy_mode = 0}
 
 // Default calibration values (from offset.c)
 #define SETTINGS_DEFAULT_CALIBRATION                                           \
-  {.lut_zero_value = 2118, .key_zero_values = {2100, 2110, 2118, 2130, 2114, 2094}}
+  {.lut_zero_value = 2118,                                                     \
+   .key_zero_values = {2100, 2110, 2118, 2130, 2114, 2094}}
 
 //--------------------------------------------------------------------+
 // Settings API
@@ -530,7 +569,8 @@ uint8_t settings_apply_curve(uint8_t key_index, uint8_t input);
  * @param key_index Key index (0-5)
  * @return Pointer to gamepad mapping or NULL if invalid index
  */
-const settings_gamepad_mapping_t *settings_get_key_gamepad_mapping(uint8_t key_index);
+const settings_gamepad_mapping_t *
+settings_get_key_gamepad_mapping(uint8_t key_index);
 
 /**
  * @brief Set gamepad mapping for a specific key
@@ -538,7 +578,8 @@ const settings_gamepad_mapping_t *settings_get_key_gamepad_mapping(uint8_t key_i
  * @param mapping Gamepad mapping to apply
  * @return true if successful
  */
-bool settings_set_key_gamepad_mapping(uint8_t key_index, const settings_gamepad_mapping_t *mapping);
+bool settings_set_key_gamepad_mapping(
+    uint8_t key_index, const settings_gamepad_mapping_t *mapping);
 
 /**
  * @brief Check if gamepad+keyboard mode is enabled

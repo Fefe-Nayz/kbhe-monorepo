@@ -31,7 +31,8 @@ static const uint8_t DEFAULT_KEY_HID_CODES[6] = {
 };
 
 // Default rapid trigger settings
-#define DEFAULT_RAPID_TRIGGER_DELTA 0.5f // 0.5mm default sensitivity
+#define DEFAULT_RAPID_TRIGGER_DELTA 0.3f    // 0.3mm default sensitivity
+#define DEFAULT_RAPID_TRIGGER_ACTIVATION 0.5f // 0.5mm initial activation
 
 // Default actuation point (1.2mm)
 #define DEFAULT_ACTUATION_POINT 1.2f
@@ -99,6 +100,20 @@ static int isRapidTriggerEnabled(int keyIndex) {
   return 0; // Disabled by default
 }
 
+/**
+ * @brief Get rapid trigger initial activation distance in mm
+ */
+static float getRapidTriggerActivation(int keyIndex) {
+  const settings_t *s = settings_get();
+  if (s) {
+    return s->keys[keyIndex].rapid_trigger_activation / 10.0f;  // Convert from 0.1mm
+  }
+  return DEFAULT_RAPID_TRIGGER_ACTIVATION;
+}
+
+/**
+ * @brief Get rapid trigger press sensitivity in mm
+ */
 static float getRapidTriggerPressSensitivity(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
@@ -240,8 +255,8 @@ void press(int keyIndex, int rapid) {
   if (!settings_is_keyboard_enabled()) {
     return;
   }
-
-  // If this key is used for gamepad input with keyboard disabled, skip
+  
+  // Check if keyboard output disabled for this key when gamepad active
   if (settings_is_gamepad_enabled()) {
     const settings_key_t *key_settings = settings_get_key(keyIndex);
     if (key_settings && key_settings->disable_kb_on_gamepad) {
@@ -327,8 +342,38 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   float actuationPoint = getActuationPoint(keyIndex);
   float releasePoint = getReleasePoint(keyIndex);
   int rapidTriggerEnabled = isRapidTriggerEnabled(keyIndex);
-  float rapidPressSensitivity = getRapidTriggerPressSensitivity(keyIndex);
-  float rapidReleaseSensitivity = getRapidTriggerReleaseSensitivity(keyIndex);
+  int lastState = states[keyIndex];
+
+  /**
+   * FIXED ACTUATION MODE (when rapid trigger disabled)
+   * Simple threshold-based actuation and release
+   */
+  if (!rapidTriggerEnabled) {
+    // Press when crossing actuation point going down
+    if (lastState == 0 && currentDistance >= actuationPoint) {
+      updateKeyData(keyIndex, currentDistance, 1);
+      press(keyIndex, 0);
+      return;
+    }
+    
+    // Release when crossing release point going up
+    if (lastState == 1 && currentDistance < releasePoint) {
+      updateKeyData(keyIndex, currentDistance, 1);
+      release(keyIndex, 0);
+      return;
+    }
+    
+    updateKeyData(keyIndex, currentDistance, 0);
+    return;
+  }
+
+  /**
+   * RAPID TRIGGER MODE
+   * Dynamic actuation based on travel distance changes
+   */
+  float rapidActivation = getRapidTriggerActivation(keyIndex);
+  float rapidPressDelta = getRapidTriggerPressSensitivity(keyIndex);
+  float rapidReleaseDelta = getRapidTriggerReleaseSensitivity(keyIndex);
 
   /**
    * NORMAL RELEASE DETECTION

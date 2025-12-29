@@ -10,7 +10,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,9 +55,9 @@ typedef enum {
   CMD_SET_GAMEPAD_SETTINGS = 0x45,
   CMD_GET_CALIBRATION = 0x46,
   CMD_SET_CALIBRATION = 0x47,
-  CMD_AUTO_CALIBRATE = 0x48,  // Auto-calibrate a key (read current ADC as zero)
-  CMD_GET_KEY_CURVE = 0x49,   // Get per-key analog curve
-  CMD_SET_KEY_CURVE = 0x4A,   // Set per-key analog curve
+  CMD_AUTO_CALIBRATE = 0x48, // Auto-calibrate a key (read current ADC as zero)
+  CMD_GET_KEY_CURVE = 0x49,  // Get per-key analog curve
+  CMD_SET_KEY_CURVE = 0x4A,  // Set per-key analog curve
   CMD_GET_KEY_GAMEPAD_MAP = 0x4B, // Get per-key gamepad mapping
   CMD_SET_KEY_GAMEPAD_MAP = 0x4C, // Set per-key gamepad mapping
   CMD_GET_GAMEPAD_WITH_KB = 0x4D, // Get gamepad+keyboard mode
@@ -79,8 +78,8 @@ typedef enum {
   CMD_LED_CLEAR = 0x6B,
   CMD_LED_FILL = 0x6C,
   CMD_LED_TEST_RAINBOW = 0x6D,
-  CMD_GET_LED_EFFECT = 0x6E,    // Get current LED effect mode
-  CMD_SET_LED_EFFECT = 0x6F,    // Set LED effect mode
+  CMD_GET_LED_EFFECT = 0x6E,       // Get current LED effect mode
+  CMD_SET_LED_EFFECT = 0x6F,       // Set LED effect mode
   CMD_GET_LED_EFFECT_SPEED = 0x70, // Get effect speed
   CMD_SET_LED_EFFECT_SPEED = 0x71, // Set effect speed
   CMD_SET_LED_EFFECT_COLOR = 0x72, // Set effect color
@@ -88,7 +87,7 @@ typedef enum {
   // Debug commands (0xE0 - 0xEF)
   CMD_GET_ADC_VALUES = 0xE0,
   CMD_GET_KEY_STATES = 0xE1,
-  CMD_GET_LOCK_STATES = 0xE2,  // Get Caps/Num/Scroll lock states
+  CMD_GET_LOCK_STATES = 0xE2, // Get Caps/Num/Scroll lock states
 
   // Echo command for testing (0xFE)
   CMD_ECHO = 0xFE,
@@ -153,9 +152,10 @@ typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
   uint8_t key_index;
-  uint8_t hid_keycode;              // HID keycode for this key
-  uint8_t actuation_point_mm;       // Fixed actuation point in 0.1mm (when RT disabled)
-  uint8_t release_point_mm;         // Fixed release point in 0.1mm (when RT disabled)
+  uint8_t hid_keycode; // HID keycode for this key
+  uint8_t
+      actuation_point_mm;   // Fixed actuation point in 0.1mm (when RT disabled)
+  uint8_t release_point_mm; // Fixed release point in 0.1mm (when RT disabled)
   uint8_t rapid_trigger_activation; // RT initial activation in 0.1mm
   uint8_t rapid_trigger_press;      // RT press sensitivity in 0.01mm
   uint8_t rapid_trigger_release;    // RT release sensitivity in 0.01mm
@@ -192,10 +192,10 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t deadzone;       // 0-255
-  uint8_t curve_type;     // 0=linear, 1=smooth, 2=aggressive
-  uint8_t square_mode;    // 0 or 1
-  uint8_t snappy_mode;    // 0 or 1
+  uint8_t deadzone;    // 0-255
+  uint8_t curve_type;  // 0=linear, 1=smooth, 2=aggressive
+  uint8_t square_mode; // 0 or 1
+  uint8_t snappy_mode; // 0 or 1
   uint8_t reserved[58];
 } hid_packet_gamepad_settings_t;
 
@@ -216,7 +216,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t key_index;      // Key to calibrate (0-5), or 0xFF for all
+  uint8_t key_index; // Key to calibrate (0-5), or 0xFF for all
   uint8_t reserved[61];
 } hid_packet_auto_calibrate_t;
 
@@ -226,9 +226,9 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint16_t adc_values[6];    // Raw ADC values (12-bit)
-  uint16_t scan_time_us;     // Main loop scan time in microseconds
-  uint16_t scan_rate_hz;     // Calculated scan rate in Hz
+  uint16_t adc_values[6]; // Raw ADC values (12-bit)
+  uint16_t scan_time_us;  // Main loop scan time in microseconds
+  uint16_t scan_rate_hz;  // Calculated scan rate in Hz
   uint8_t reserved[46];
 } hid_resp_adc_values_t;
 
@@ -304,12 +304,12 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t key_index;      // Key index (0-5)
-  uint8_t curve_enabled;  // 0 = disabled (linear), 1 = enabled
-  uint8_t p1_x;           // Control point 1 X (0-255)
-  uint8_t p1_y;           // Control point 1 Y (0-255)
-  uint8_t p2_x;           // Control point 2 X (0-255)
-  uint8_t p2_y;           // Control point 2 Y (0-255)
+  uint8_t key_index;     // Key index (0-5)
+  uint8_t curve_enabled; // 0 = disabled (linear), 1 = enabled
+  uint8_t p1_x;          // Control point 1 X (0-255)
+  uint8_t p1_y;          // Control point 1 Y (0-255)
+  uint8_t p2_x;          // Control point 2 X (0-255)
+  uint8_t p2_y;          // Control point 2 Y (0-255)
   uint8_t reserved[56];
 } hid_packet_key_curve_t;
 
@@ -319,10 +319,10 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t key_index;      // Key index (0-5)
-  uint8_t axis;           // gamepad_axis_t (0=none, 1=LX, 2=LY, etc.)
-  uint8_t direction;      // 0=positive, 1=negative
-  uint8_t button;         // gamepad_button_t (0=none, 1=A, 2=B, etc.)
+  uint8_t key_index; // Key index (0-5)
+  uint8_t axis;      // gamepad_axis_t (0=none, 1=LX, 2=LY, etc.)
+  uint8_t direction; // 0=positive, 1=negative
+  uint8_t button;    // gamepad_button_t (0=none, 1=A, 2=B, etc.)
   uint8_t reserved[58];
 } hid_packet_key_gamepad_map_t;
 

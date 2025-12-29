@@ -16,11 +16,11 @@ extern "C" {
 //--------------------------------------------------------------------+
 // HID Keyboard LED bit masks
 //--------------------------------------------------------------------+
-#define HID_LED_NUM_LOCK    (1 << 0)
-#define HID_LED_CAPS_LOCK   (1 << 1)
+#define HID_LED_NUM_LOCK (1 << 0)
+#define HID_LED_CAPS_LOCK (1 << 1)
 #define HID_LED_SCROLL_LOCK (1 << 2)
-#define HID_LED_COMPOSE     (1 << 3)
-#define HID_LED_KANA        (1 << 4)
+#define HID_LED_COMPOSE (1 << 3)
+#define HID_LED_KANA (1 << 4)
 
 //--------------------------------------------------------------------+
 // API
@@ -34,7 +34,7 @@ void led_indicator_init(void);
 /**
  * @brief Update LED state from HID keyboard LED report
  * @param led_state HID LED state byte
- * 
+ *
  * Behavior:
  * - Caps Lock ON: LED solid ON
  * - Num Lock ON (no caps): LED blinking
