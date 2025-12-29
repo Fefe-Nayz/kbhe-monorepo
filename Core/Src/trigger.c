@@ -342,38 +342,8 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   float actuationPoint = getActuationPoint(keyIndex);
   float releasePoint = getReleasePoint(keyIndex);
   int rapidTriggerEnabled = isRapidTriggerEnabled(keyIndex);
-  int lastState = states[keyIndex];
-
-  /**
-   * FIXED ACTUATION MODE (when rapid trigger disabled)
-   * Simple threshold-based actuation and release
-   */
-  if (!rapidTriggerEnabled) {
-    // Press when crossing actuation point going down
-    if (lastState == 0 && currentDistance >= actuationPoint) {
-      updateKeyData(keyIndex, currentDistance, 1);
-      press(keyIndex, 0);
-      return;
-    }
-    
-    // Release when crossing release point going up
-    if (lastState == 1 && currentDistance < releasePoint) {
-      updateKeyData(keyIndex, currentDistance, 1);
-      release(keyIndex, 0);
-      return;
-    }
-    
-    updateKeyData(keyIndex, currentDistance, 0);
-    return;
-  }
-
-  /**
-   * RAPID TRIGGER MODE
-   * Dynamic actuation based on travel distance changes
-   */
-  float rapidActivation = getRapidTriggerActivation(keyIndex);
-  float rapidPressDelta = getRapidTriggerPressSensitivity(keyIndex);
-  float rapidReleaseDelta = getRapidTriggerReleaseSensitivity(keyIndex);
+  float rapidPressSensitivity = getRapidTriggerPressSensitivity(keyIndex);
+  float rapidReleaseSensitivity = getRapidTriggerReleaseSensitivity(keyIndex);
 
   /**
    * NORMAL RELEASE DETECTION
