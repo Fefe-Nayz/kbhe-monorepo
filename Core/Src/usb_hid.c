@@ -4,6 +4,7 @@
  * et fonctions d'envoi de rapport clavier
  */
 
+#include "raw_hid.h"
 #include "tusb.h"
 #include "usb_hid.h"
 #include <string.h>
@@ -159,24 +160,22 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
     (void)instance;
     (void)report_id;
     
-    if (report_type == HID_REPORT_TYPE_OUTPUT) {
-        // buffer[0] contient l'état des LEDs
-        // Bit 0: Num Lock
-        // Bit 1: Caps Lock
-        // Bit 2: Scroll Lock
-        // Bit 3: Compose
-        // Bit 4: Kana
+    switch (instance) {
+        // case 0: // Keyboard
+        //     if (report_type == HID_REPORT_TYPE_OUTPUT && bufsize >= 1) {
+        //         // uint8_t led_state = buffer[0];
+        //         // Gérer l'état des LEDs si nécessaire
+        //         // Par exemple, allumer une LED physique pour Caps Lock
+        //     }
+        //     break;
         
-        if (bufsize >= 1) {
-            uint8_t led_state = buffer[0];
-            
-            // Ici vous pouvez traiter l'état des LEDs
-            // Par exemple, allumer/éteindre des LEDs physiques
-            (void)led_state;
-            
-            // TODO: Implémenter le contrôle des LEDs si nécessaire
-            // if (led_state & KEYBOARD_LED_CAPSLOCK) { ... }
-        }
+        case 1:
+            raw_hid_on_receive(buffer, bufsize);
+            break;
+        
+        default:
+            // Autres instances si nécessaire
+            break;
     }
 }
 

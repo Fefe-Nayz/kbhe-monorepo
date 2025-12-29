@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "adc_ema.h"
+#include "raw_hid.h"
 #include "stm32f7xx_hal_adc.h"
 #include "trigger.h"
 #include "tusb.h"
@@ -331,6 +332,8 @@ int main(void)
                                           .speed = TUSB_SPEED_HIGH};
   tusb_init(1, &rhport_init);
 
+  raw_hid_init();
+
   triggerInit();
 
   DWT_CycleCounter_Init();
@@ -350,6 +353,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1) {
     tud_task(); // TinyUSB device task
+    raw_hid_task();
 
     // If a full ADC scan is complete, process keys and restart
     if (adc_scan_complete) {

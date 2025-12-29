@@ -75,6 +75,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # USB application sources
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_descriptors.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/raw_hid.c
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
     # Key trigger logic
