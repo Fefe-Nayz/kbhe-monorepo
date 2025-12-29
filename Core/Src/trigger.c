@@ -322,6 +322,11 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   float correctedCurrentVoltage = getCorrectedValue(keyIndex, currentVoltage);
   float currentDistance = getValueFromLUT(correctedCurrentVoltage);
 
+  // Si aucune variation de distance, on ne fait rien
+  if (lastDistance == currentDistance) {
+    return;
+  }
+
   // TODO: Review normalization approach
   // Update gamepad axis with current key distance
   // Distance is 0.0 (released) to ~4.0mm, normalize to 0-1 range
@@ -332,11 +337,6 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   if (normalizedDistance > 1.0f)
     normalizedDistance = 1.0f;
   usb_gamepad_set_axis_from_distance(keyIndex, normalizedDistance);
-
-  // Si aucune variation de distance, on ne fait rien
-  if (lastDistance == currentDistance) {
-    return;
-  }
 
   // Get per-key settings
   float actuationPoint = getActuationPoint(keyIndex);
