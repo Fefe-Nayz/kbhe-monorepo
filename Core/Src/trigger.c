@@ -4,11 +4,10 @@
 #include "usb_hid.h"
 #include <stdint.h>
 
-
 /**
  * DISABLE KEYBOARD TYPING
  */
-#define DISABLE_KEYBOARD_TYPING 1
+#define DISABLE_KEYBOARD_TYPING 0
 
 // Mapping des touches vers les keycodes HID
 static const uint8_t KEY_HID_CODES[6] = {
@@ -41,6 +40,10 @@ float distances[6] = {0, 0, 0, 0, 0, 0};
 // Dernier état de la touche (0 = relachée, 1 = appuyée)
 int states[6] = {0, 0, 0, 0, 0, 0};
 
+int socdKeyMapping[6] = {-1, -1, -1, 5, -1, 3};
+// Si l'état de la touche est override par le SOCD
+int socdOverrideState[6] = {0, 0, 0, 0, 0, 0};
+
 void triggerInit() { offsetInit(); }
 
 int getKeyState(int keyIndex) {
@@ -71,21 +74,54 @@ void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
   distances[keyIndex] = currentDistance;
 }
 
-void press(int keyIndex, int rapid) {
-  if (keyIndex < 0 || keyIndex >= 6)
+void handleSOCDOnRelease(int keyIndex) {
+  // Récuperer la touche liée à la touche relachée
+  int socdMappedKey = socdKeyMapping[keyIndex];
+
+  // Si le SOCD est actif
+  if (socdMappedKey == -1)
     return;
 
-  if (states[keyIndex] == 1) {
+  // Si la touche liée était override par le SOCD on la remet dans son état
+  // normal
+  int mappedKeyState = states[socdMappedKey];
+  int mappedKeyOverrideState = socdOverrideState[socdMappedKey];
+
+  if (mappedKeyState == 1 && mappedKeyOverrideState == 1) {
+    if (DISABLE_KEYBOARD_TYPING) {
+      return;
+    }
+
+    usb_hid_key_press(KEY_HID_CODES[socdMappedKey]);
+  }
+
+  // Désactiver l'override SOCD
+  socdOverrideState[socdMappedKey] = 0;
+}
+
+void handleSOCDOnPress(int keyIndex) {
+  // Récuperer la touche liée à la touche pressée
+  int socdMappedKey = socdKeyMapping[keyIndex];
+
+  // Si le SOCD est actif
+  if (socdMappedKey == -1)
+    return;
+
+  // Si la touche liée est déjà relachée, on ne fait rien
+  int mappedKeyState = states[socdMappedKey];
+
+  if (mappedKeyState == 0) {
     return;
   }
 
-  states[keyIndex] = 1;
+  // Relacher la touche liée par override SOCD
+  socdOverrideState[socdMappedKey] = 1;
 
   if (DISABLE_KEYBOARD_TYPING) {
     return;
   }
 
-  usb_hid_key_press(KEY_HID_CODES[keyIndex]);
+  usb_hid_key_release(KEY_HID_CODES[socdMappedKey]);
 }
 
 void release(int keyIndex, int rapid) {
@@ -102,7 +138,34 @@ void release(int keyIndex, int rapid) {
     return;
   }
 
+  // Gérer le SOCD
+  handleSOCDOnRelease(keyIndex);
+
   usb_hid_key_release(KEY_HID_CODES[keyIndex]);
+}
+
+void press(int keyIndex, int rapid) {
+  if (keyIndex < 0 || keyIndex >= 6)
+    return;
+
+  // Si la touche est déjà pressée, on ne fait rien
+  if (states[keyIndex] == 1) {
+    return;
+  }
+
+  // Mettre à jour l'état de la touche
+  states[keyIndex] = 1;
+
+  // Si la saisie clavier est désactivée, on ne fait rien de plus
+  if (DISABLE_KEYBOARD_TYPING) {
+    return;
+  }
+
+  // Gérer le SOCD
+  handleSOCDOnPress(keyIndex);
+
+  // Envoyer l'événement de pression de touche via USB HID
+  usb_hid_key_press(KEY_HID_CODES[keyIndex]);
 }
 
 void handleTrigger(int keyIndex, int currentVoltage) {

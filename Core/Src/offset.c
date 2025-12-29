@@ -1,6 +1,6 @@
 // Décalage par rapport au zéro de la LUT
 int LUT_ZERO_VALUE = 2118;
-int KEY_ZERO_VALUES[6] = { 2101, 2110, 2129, 2132, 2117, 2105 };
+int KEY_ZERO_VALUES[6] = { 2100, 2110, 2118, 2130, 2114, 2094 };
 int OFFSET[6] = {0,0,0,0,0,0};
 
 // Calcule dynamiquement les offsets à partir des valeurs zéro mesurées
