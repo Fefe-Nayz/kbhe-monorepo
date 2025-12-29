@@ -31,10 +31,8 @@
 #include "usb_gamepad.h"
 #include "usb_hid.h"
 #include "usb_hid_nkro.h"
-#include "led_matrix.h"
 #include <stdint.h>
 #include <stdio.h>
-
 
 /* USER CODE END Includes */
 
@@ -413,10 +411,10 @@ int main(void) {
       usb_hid_task();
       usb_hid_nkro_task();
       usb_gamepad_task();
-      
+
       // Update LED effects (uses HAL_GetTick for timing)
       led_matrix_effect_tick(HAL_GetTick());
-      
+
       // Update PE0 LED indicator blinking (for num lock)
       led_indicator_tick(HAL_GetTick());
 

@@ -45,9 +45,7 @@ static inline bool get_key_bit(uint8_t keycode) {
 // Public API
 //--------------------------------------------------------------------+
 
-bool usb_hid_nkro_is_ready(void) {
-  return tud_hid_n_ready(HID_ITF_NKRO);
-}
+bool usb_hid_nkro_is_ready(void) { return tud_hid_n_ready(HID_ITF_NKRO); }
 
 void usb_hid_nkro_key_press(uint8_t keycode) {
   if (keycode == 0)
@@ -107,9 +105,7 @@ bool usb_hid_nkro_send_report_if_changed(void) {
   return false;
 }
 
-void usb_hid_nkro_task(void) {
-  usb_hid_nkro_send_report_if_changed();
-}
+void usb_hid_nkro_task(void) { usb_hid_nkro_send_report_if_changed(); }
 
 void usb_hid_nkro_release_all(void) {
   memset(&nkro_report, 0, sizeof(nkro_report));

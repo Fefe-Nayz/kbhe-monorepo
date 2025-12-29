@@ -49,41 +49,30 @@ static uint8_t const desc_nkro_report[] = {
     HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),
     HID_USAGE(HID_USAGE_DESKTOP_KEYBOARD),
     HID_COLLECTION(HID_COLLECTION_APPLICATION),
-    
+
     // Modifier keys (8 bits)
     HID_USAGE_PAGE(HID_USAGE_PAGE_KEYBOARD),
-    HID_USAGE_MIN(224),  // Left Control
-    HID_USAGE_MAX(231),  // Right GUI
-    HID_LOGICAL_MIN(0),
-    HID_LOGICAL_MAX(1),
-    HID_REPORT_COUNT(8),
-    HID_REPORT_SIZE(1),
-    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
-    
+    HID_USAGE_MIN(224), // Left Control
+    HID_USAGE_MAX(231), // Right GUI
+    HID_LOGICAL_MIN(0), HID_LOGICAL_MAX(1), HID_REPORT_COUNT(8),
+    HID_REPORT_SIZE(1), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+
     // LED output (5 bits)
     HID_USAGE_PAGE(HID_USAGE_PAGE_LED),
-    HID_USAGE_MIN(1),   // Num Lock
-    HID_USAGE_MAX(5),   // Kana
-    HID_REPORT_COUNT(5),
-    HID_REPORT_SIZE(1),
+    HID_USAGE_MIN(1), // Num Lock
+    HID_USAGE_MAX(5), // Kana
+    HID_REPORT_COUNT(5), HID_REPORT_SIZE(1),
     HID_OUTPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
     // Padding for LED byte alignment
-    HID_REPORT_COUNT(1),
-    HID_REPORT_SIZE(3),
-    HID_OUTPUT(HID_CONSTANT),
-    
+    HID_REPORT_COUNT(1), HID_REPORT_SIZE(3), HID_OUTPUT(HID_CONSTANT),
+
     // Keyboard bitmap (keys 0-127 = 16 bytes)
-    HID_USAGE_PAGE(HID_USAGE_PAGE_KEYBOARD),
-    HID_USAGE_MIN(0),
-    HID_USAGE_MAX(127),  // Supports keys 0-127
-    HID_LOGICAL_MIN(0),
-    HID_LOGICAL_MAX(1),
-    HID_REPORT_COUNT(128),
-    HID_REPORT_SIZE(1),
-    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
-    
-    HID_COLLECTION_END
-};
+    HID_USAGE_PAGE(HID_USAGE_PAGE_KEYBOARD), HID_USAGE_MIN(0),
+    HID_USAGE_MAX(127), // Supports keys 0-127
+    HID_LOGICAL_MIN(0), HID_LOGICAL_MAX(1), HID_REPORT_COUNT(128),
+    HID_REPORT_SIZE(1), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+
+    HID_COLLECTION_END};
 
 static uint8_t const desc_raw_hid_report[] = {
     TUD_HID_REPORT_DESC_GENERIC_INOUT(64)};
@@ -121,7 +110,13 @@ static uint8_t const desc_gamepad_report[] = {
 //--------------------------------------------------------------------+
 
 // Interface numbers
-enum { ITF_NUM_HID, ITF_NUM_RAW_HID, ITF_NUM_GAMEPAD, ITF_NUM_NKRO, ITF_NUM_TOTAL };
+enum {
+  ITF_NUM_HID,
+  ITF_NUM_RAW_HID,
+  ITF_NUM_GAMEPAD,
+  ITF_NUM_NKRO,
+  ITF_NUM_TOTAL
+};
 
 // Invoked when received GET HID REPORT DESCRIPTOR
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {

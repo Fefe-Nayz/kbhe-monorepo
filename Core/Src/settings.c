@@ -9,7 +9,6 @@
 #include "usb_gamepad.h"
 #include <string.h>
 
-
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
@@ -61,19 +60,14 @@ static void settings_set_defaults(void) {
 
   // Default per-key settings with keycodes and SOCD pairs
   const settings_key_t default_keys[6] = {
-    SETTINGS_DEFAULT_KEY_0,
-    SETTINGS_DEFAULT_KEY_1,
-    SETTINGS_DEFAULT_KEY_2,
-    SETTINGS_DEFAULT_KEY_3,
-    SETTINGS_DEFAULT_KEY_4,
-    SETTINGS_DEFAULT_KEY_5
-  };
+      SETTINGS_DEFAULT_KEY_0, SETTINGS_DEFAULT_KEY_1, SETTINGS_DEFAULT_KEY_2,
+      SETTINGS_DEFAULT_KEY_3, SETTINGS_DEFAULT_KEY_4, SETTINGS_DEFAULT_KEY_5};
   memcpy(current_settings.keys, default_keys, sizeof(default_keys));
-  
+
   // Default gamepad settings
   settings_gamepad_t default_gamepad = SETTINGS_DEFAULT_GAMEPAD;
   current_settings.gamepad = default_gamepad;
-  
+
   // Default calibration settings
   settings_calibration_t default_calibration = SETTINGS_DEFAULT_CALIBRATION;
   current_settings.calibration = default_calibration;
@@ -81,9 +75,9 @@ static void settings_set_defaults(void) {
   // Default LED settings (all LEDs off, medium brightness)
   memset(current_settings.led.pixels, 0, LED_MATRIX_DATA_BYTES);
   current_settings.led.brightness = 50; // Medium brightness
-  
+
   // Default LED effect settings
-  current_settings.led_effect_mode = 0;  // None
+  current_settings.led_effect_mode = 0; // None
   current_settings.led_effect_speed = 50;
   current_settings.led_effect_color_r = 255;
   current_settings.led_effect_color_g = 0;
@@ -334,7 +328,8 @@ bool settings_set_calibration(const settings_calibration_t *calibration) {
   if (calibration == NULL)
     return false;
 
-  memcpy(&current_settings.calibration, calibration, sizeof(settings_calibration_t));
+  memcpy(&current_settings.calibration, calibration,
+         sizeof(settings_calibration_t));
   return true; // Don't auto-save
 }
 
@@ -360,7 +355,8 @@ bool settings_set_key_curve(uint8_t key_index, const settings_curve_t *curve) {
   if (key_index >= 6 || curve == NULL)
     return false;
 
-  memcpy(&current_settings.keys[key_index].curve, curve, sizeof(settings_curve_t));
+  memcpy(&current_settings.keys[key_index].curve, curve,
+         sizeof(settings_curve_t));
   return true;
 }
 
@@ -387,14 +383,15 @@ bool settings_is_key_curve_enabled(uint8_t key_index) {
  * @param p3 End point
  * @return Bezier value
  */
-static uint8_t bezier_cubic(uint8_t t_byte, uint8_t p0, uint8_t p1, uint8_t p2, uint8_t p3) {
+static uint8_t bezier_cubic(uint8_t t_byte, uint8_t p0, uint8_t p1, uint8_t p2,
+                            uint8_t p3) {
   // Convert to fixed point (16.16 format for better precision)
-  uint32_t t = ((uint32_t)t_byte << 8) / 255;  // t is now 0-256
-  uint32_t t2 = (t * t) >> 8;                   // t^2
-  uint32_t t3 = (t2 * t) >> 8;                  // t^3
-  uint32_t mt = 256 - t;                        // 1-t
-  uint32_t mt2 = (mt * mt) >> 8;                // (1-t)^2
-  uint32_t mt3 = (mt2 * mt) >> 8;               // (1-t)^3
+  uint32_t t = ((uint32_t)t_byte << 8) / 255; // t is now 0-256
+  uint32_t t2 = (t * t) >> 8;                 // t^2
+  uint32_t t3 = (t2 * t) >> 8;                // t^3
+  uint32_t mt = 256 - t;                      // 1-t
+  uint32_t mt2 = (mt * mt) >> 8;              // (1-t)^2
+  uint32_t mt3 = (mt2 * mt) >> 8;             // (1-t)^3
 
   // B(t) = (1-t)^3*P0 + 3*(1-t)^2*t*P1 + 3*(1-t)*t^2*P2 + t^3*P3
   uint32_t b0 = (mt3 * p0) >> 8;
@@ -403,25 +400,26 @@ static uint8_t bezier_cubic(uint8_t t_byte, uint8_t p0, uint8_t p1, uint8_t p2, 
   uint32_t b3 = (t3 * p3) >> 8;
 
   uint32_t result = b0 + b1 + b2 + b3;
-  if (result > 255) result = 255;
+  if (result > 255)
+    result = 255;
   return (uint8_t)result;
 }
 
 uint8_t settings_apply_curve(uint8_t key_index, uint8_t input) {
   if (key_index >= 6)
     return input;
-  
+
   // If curve is disabled, return linear
   if (!current_settings.keys[key_index].curve_enabled)
     return input;
-  
+
   const settings_curve_t *curve = &current_settings.keys[key_index].curve;
-  
+
   // For bezier curve, we need to find t such that bezier_x(t) = input
   // Then return bezier_y(t)
   // Since this is computationally expensive, we use a simpler approach:
   // Assume X is roughly linear and just compute Y at t=input/255
-  
+
   // P0 = (0, 0), P1 = curve->p1, P2 = curve->p2, P3 = (255, 255)
   return bezier_cubic(input, 0, curve->p1.y, curve->p2.y, 255);
 }
@@ -430,17 +428,20 @@ uint8_t settings_apply_curve(uint8_t key_index, uint8_t input) {
 // Per-Key Gamepad Mapping API
 //--------------------------------------------------------------------+
 
-const settings_gamepad_mapping_t *settings_get_key_gamepad_mapping(uint8_t key_index) {
+const settings_gamepad_mapping_t *
+settings_get_key_gamepad_mapping(uint8_t key_index) {
   if (key_index >= 6)
     return NULL;
   return &current_settings.keys[key_index].gamepad_map;
 }
 
-bool settings_set_key_gamepad_mapping(uint8_t key_index, const settings_gamepad_mapping_t *mapping) {
+bool settings_set_key_gamepad_mapping(
+    uint8_t key_index, const settings_gamepad_mapping_t *mapping) {
   if (key_index >= 6 || mapping == NULL)
     return false;
 
-  memcpy(&current_settings.keys[key_index].gamepad_map, mapping, sizeof(settings_gamepad_mapping_t));
+  memcpy(&current_settings.keys[key_index].gamepad_map, mapping,
+         sizeof(settings_gamepad_mapping_t));
   return true;
 }
 

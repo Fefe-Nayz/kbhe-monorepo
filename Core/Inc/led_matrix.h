@@ -9,7 +9,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -33,20 +32,20 @@ extern "C" {
 // LED Effect Modes
 //--------------------------------------------------------------------+
 typedef enum {
-  LED_EFFECT_NONE = 0,           // Static pattern (user-defined)
-  LED_EFFECT_RAINBOW = 1,        // Rainbow wave (diagonal)
-  LED_EFFECT_BREATHING = 2,      // Breathing (fade in/out)
-  LED_EFFECT_STATIC_RAINBOW = 3, // Static rainbow pattern
-  LED_EFFECT_SOLID = 4,          // Solid color
-  LED_EFFECT_PLASMA = 5,         // Plasma (psychedelic waves)
-  LED_EFFECT_FIRE = 6,           // Fire effect
-  LED_EFFECT_OCEAN = 7,          // Ocean waves (horizontal)
-  LED_EFFECT_MATRIX = 8,         // Matrix rain (digital rain)
-  LED_EFFECT_SPARKLE = 9,        // Sparkle/Twinkle
+  LED_EFFECT_NONE = 0,               // Static pattern (user-defined)
+  LED_EFFECT_RAINBOW = 1,            // Rainbow wave (diagonal)
+  LED_EFFECT_BREATHING = 2,          // Breathing (fade in/out)
+  LED_EFFECT_STATIC_RAINBOW = 3,     // Static rainbow pattern
+  LED_EFFECT_SOLID = 4,              // Solid color
+  LED_EFFECT_PLASMA = 5,             // Plasma (psychedelic waves)
+  LED_EFFECT_FIRE = 6,               // Fire effect
+  LED_EFFECT_OCEAN = 7,              // Ocean waves (horizontal)
+  LED_EFFECT_MATRIX = 8,             // Matrix rain (digital rain)
+  LED_EFFECT_SPARKLE = 9,            // Sparkle/Twinkle
   LED_EFFECT_BREATHING_RAINBOW = 10, // Breathing rainbow
-  LED_EFFECT_SPIRAL = 11,        // Spiral
-  LED_EFFECT_COLOR_CYCLE = 12,   // Solid color cycle
-  LED_EFFECT_REACTIVE = 13,      // React to key presses
+  LED_EFFECT_SPIRAL = 11,            // Spiral
+  LED_EFFECT_COLOR_CYCLE = 12,       // Solid color cycle
+  LED_EFFECT_REACTIVE = 13,          // React to key presses
   LED_EFFECT_MAX
 } led_effect_mode_t;
 

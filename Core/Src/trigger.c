@@ -31,7 +31,7 @@ static const uint8_t DEFAULT_KEY_HID_CODES[6] = {
 };
 
 // Default rapid trigger settings
-#define DEFAULT_RAPID_TRIGGER_DELTA 0.3f    // 0.3mm default sensitivity
+#define DEFAULT_RAPID_TRIGGER_DELTA 0.3f      // 0.3mm default sensitivity
 #define DEFAULT_RAPID_TRIGGER_ACTIVATION 0.5f // 0.5mm initial activation
 
 // Default actuation point (2.0mm)
@@ -73,7 +73,7 @@ static uint8_t getKeyHIDCode(int keyIndex) {
 static float getActuationPoint(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].actuation_point_mm / 10.0f;  // Convert from 0.1mm
+    return s->keys[keyIndex].actuation_point_mm / 10.0f; // Convert from 0.1mm
   }
   return DEFAULT_ACTUATION_POINT;
 }
@@ -84,7 +84,7 @@ static float getActuationPoint(int keyIndex) {
 static float getReleasePoint(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].release_point_mm / 10.0f;  // Convert from 0.1mm
+    return s->keys[keyIndex].release_point_mm / 10.0f; // Convert from 0.1mm
   }
   return DEFAULT_RELEASE_POINT;
 }
@@ -97,7 +97,7 @@ static int isRapidTriggerEnabled(int keyIndex) {
   if (s) {
     return s->keys[keyIndex].rapid_trigger_enabled;
   }
-  return 0;  // Disabled by default
+  return 0; // Disabled by default
 }
 
 /**
@@ -106,7 +106,8 @@ static int isRapidTriggerEnabled(int keyIndex) {
 static float getRapidTriggerActivation(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].rapid_trigger_activation / 10.0f;  // Convert from 0.1mm
+    return s->keys[keyIndex].rapid_trigger_activation /
+           10.0f; // Convert from 0.1mm
   }
   return DEFAULT_RAPID_TRIGGER_ACTIVATION;
 }
@@ -117,7 +118,8 @@ static float getRapidTriggerActivation(int keyIndex) {
 static float getRapidTriggerPressSensitivity(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].rapid_trigger_press / 100.0f;  // Convert from 0.01mm
+    return s->keys[keyIndex].rapid_trigger_press /
+           100.0f; // Convert from 0.01mm
   }
   return DEFAULT_RAPID_TRIGGER_DELTA;
 }
@@ -128,7 +130,8 @@ static float getRapidTriggerPressSensitivity(int keyIndex) {
 static float getRapidTriggerReleaseSensitivity(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].rapid_trigger_release / 100.0f;  // Convert from 0.01mm
+    return s->keys[keyIndex].rapid_trigger_release /
+           100.0f; // Convert from 0.01mm
   }
   return DEFAULT_RAPID_TRIGGER_DELTA;
 }
@@ -141,7 +144,7 @@ static int getSOCDPairedKey(int keyIndex) {
   if (s && s->keys[keyIndex].socd_pair < 6) {
     return s->keys[keyIndex].socd_pair;
   }
-  return -1;  // No SOCD pair
+  return -1; // No SOCD pair
 }
 
 void triggerInit() {
@@ -186,16 +189,16 @@ void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
  */
 static void handleSOCDOnRelease(int keyIndex) {
   int socdMappedKey = getSOCDPairedKey(keyIndex);
-  
+
   // No SOCD mapping for this key
   if (socdMappedKey == -1)
     return;
-  
+
   // If the opposing key was overridden and is still physically pressed,
   // re-send the key press
   int mappedKeyState = states[socdMappedKey];
   int mappedKeyOverrideState = socdOverrideState[socdMappedKey];
-  
+
   if (mappedKeyState == 1 && mappedKeyOverrideState == 1) {
     if (settings_is_keyboard_enabled()) {
       if (settings_is_nkro_enabled()) {
@@ -205,7 +208,7 @@ static void handleSOCDOnRelease(int keyIndex) {
       }
     }
   }
-  
+
   // Clear the override state
   socdOverrideState[socdMappedKey] = 0;
 }
@@ -216,19 +219,19 @@ static void handleSOCDOnRelease(int keyIndex) {
  */
 static void handleSOCDOnPress(int keyIndex) {
   int socdMappedKey = getSOCDPairedKey(keyIndex);
-  
+
   // No SOCD mapping for this key
   if (socdMappedKey == -1)
     return;
-  
+
   // If the opposing key is not pressed, nothing to do
   int mappedKeyState = states[socdMappedKey];
   if (mappedKeyState == 0)
     return;
-  
+
   // Mark the opposing key as overridden by SOCD
   socdOverrideState[socdMappedKey] = 1;
-  
+
   // Release the opposing key
   if (settings_is_keyboard_enabled()) {
     if (settings_is_nkro_enabled()) {
@@ -248,7 +251,7 @@ void press(int keyIndex, int rapid) {
   }
 
   states[keyIndex] = 1;
-  
+
   // Trigger reactive LED effect
   led_matrix_key_event(keyIndex, true);
 
@@ -256,7 +259,7 @@ void press(int keyIndex, int rapid) {
   if (!settings_is_keyboard_enabled()) {
     return;
   }
-  
+
   // Check if keyboard output disabled for this key when gamepad active
   if (settings_is_gamepad_enabled()) {
     const settings_key_t *key_settings = settings_get_key(keyIndex);
@@ -284,7 +287,7 @@ void release(int keyIndex, int rapid) {
   }
 
   states[keyIndex] = 0;
-  
+
   // Trigger reactive LED effect
   led_matrix_key_event(keyIndex, false);
 
@@ -292,7 +295,7 @@ void release(int keyIndex, int rapid) {
   if (!settings_is_keyboard_enabled()) {
     return;
   }
-  
+
   // Check if keyboard output disabled for this key when gamepad active
   if (settings_is_gamepad_enabled()) {
     const settings_key_t *key_settings = settings_get_key(keyIndex);
@@ -351,14 +354,14 @@ void handleTrigger(int keyIndex, int currentVoltage) {
       press(keyIndex, 0);
       return;
     }
-    
+
     // Release when crossing release point going up
     if (lastState == 1 && currentDistance < releasePoint) {
       updateKeyData(keyIndex, currentDistance, 1);
       release(keyIndex, 0);
       return;
     }
-    
+
     updateKeyData(keyIndex, currentDistance, 0);
     return;
   }

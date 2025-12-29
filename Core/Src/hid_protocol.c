@@ -11,7 +11,6 @@
 #include "trigger.h"
 #include <string.h>
 
-
 //--------------------------------------------------------------------+
 // External declarations for debug data
 //--------------------------------------------------------------------+
@@ -138,17 +137,17 @@ static void cmd_set_nkro_enabled(const uint8_t *in, uint8_t *out) {
 static void cmd_get_key_settings(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_settings_t *req = (const hid_packet_key_settings_t *)in;
   hid_packet_key_settings_t *resp = (hid_packet_key_settings_t *)out;
-  
+
   resp->command_id = CMD_GET_KEY_SETTINGS;
-  
+
   if (req->key_index >= 6) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
-  
+
   const settings_t *s = settings_get();
   const settings_key_t *key = &s->keys[req->key_index];
-  
+
   resp->status = HID_RESP_OK;
   resp->key_index = req->key_index;
   resp->hid_keycode = key->hid_keycode;
@@ -165,14 +164,14 @@ static void cmd_get_key_settings(const uint8_t *in, uint8_t *out) {
 static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_settings_t *req = (const hid_packet_key_settings_t *)in;
   hid_packet_key_settings_t *resp = (hid_packet_key_settings_t *)out;
-  
+
   resp->command_id = CMD_SET_KEY_SETTINGS;
-  
+
   if (req->key_index >= 6) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
-  
+
   settings_key_t key;
   key.hid_keycode = req->hid_keycode;
   key.actuation_point_mm = req->actuation_point_mm;
@@ -184,9 +183,9 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   key.rapid_trigger_enabled = req->rapid_trigger_enabled ? 1 : 0;
   key.disable_kb_on_gamepad = req->disable_kb_on_gamepad ? 1 : 0;
   key.reserved_bits = 0;
-  
+
   bool success = settings_set_key(req->key_index, &key);
-  
+
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
   resp->key_index = req->key_index;
   resp->hid_keycode = key.hid_keycode;
@@ -202,16 +201,17 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
 
 static void cmd_get_all_key_settings(const uint8_t *in, uint8_t *out) {
   hid_packet_all_keys_t *resp = (hid_packet_all_keys_t *)out;
-  
+
   resp->command_id = CMD_GET_ALL_KEY_SETTINGS;
   resp->status = HID_RESP_OK;
-  
+
   const settings_t *s = settings_get();
   for (int i = 0; i < 6; i++) {
     resp->keys[i].hid_keycode = s->keys[i].hid_keycode;
     resp->keys[i].actuation_point_mm = s->keys[i].actuation_point_mm;
     resp->keys[i].release_point_mm = s->keys[i].release_point_mm;
-    resp->keys[i].rapid_trigger_activation = s->keys[i].rapid_trigger_activation;
+    resp->keys[i].rapid_trigger_activation =
+        s->keys[i].rapid_trigger_activation;
     resp->keys[i].rapid_trigger_press = s->keys[i].rapid_trigger_press;
     resp->keys[i].rapid_trigger_release = s->keys[i].rapid_trigger_release;
     resp->keys[i].socd_pair = s->keys[i].socd_pair;
@@ -223,9 +223,9 @@ static void cmd_get_all_key_settings(const uint8_t *in, uint8_t *out) {
 static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
   const hid_packet_all_keys_t *req = (const hid_packet_all_keys_t *)in;
   hid_packet_all_keys_t *resp = (hid_packet_all_keys_t *)out;
-  
+
   resp->command_id = CMD_SET_ALL_KEY_SETTINGS;
-  
+
   bool success = true;
   for (int i = 0; i < 6; i++) {
     settings_key_t key;
@@ -239,11 +239,11 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
     key.rapid_trigger_enabled = req->keys[i].rapid_trigger_enabled ? 1 : 0;
     key.disable_kb_on_gamepad = req->keys[i].disable_kb_on_gamepad ? 1 : 0;
     key.reserved_bits = 0;
-    
+
     if (!settings_set_key(i, &key)) {
       success = false;
     }
-    
+
     resp->keys[i].hid_keycode = key.hid_keycode;
     resp->keys[i].actuation_point_mm = key.actuation_point_mm;
     resp->keys[i].release_point_mm = key.release_point_mm;
@@ -254,16 +254,16 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
     resp->keys[i].rapid_trigger_enabled = key.rapid_trigger_enabled;
     resp->keys[i].disable_kb_on_gamepad = key.disable_kb_on_gamepad;
   }
-  
+
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
 }
 
 static void cmd_get_gamepad_settings(const uint8_t *in, uint8_t *out) {
   hid_packet_gamepad_settings_t *resp = (hid_packet_gamepad_settings_t *)out;
-  
+
   resp->command_id = CMD_GET_GAMEPAD_SETTINGS;
   resp->status = HID_RESP_OK;
-  
+
   const settings_t *s = settings_get();
   resp->deadzone = s->gamepad.deadzone;
   resp->curve_type = s->gamepad.curve_type;
@@ -272,11 +272,12 @@ static void cmd_get_gamepad_settings(const uint8_t *in, uint8_t *out) {
 }
 
 static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
-  const hid_packet_gamepad_settings_t *req = (const hid_packet_gamepad_settings_t *)in;
+  const hid_packet_gamepad_settings_t *req =
+      (const hid_packet_gamepad_settings_t *)in;
   hid_packet_gamepad_settings_t *resp = (hid_packet_gamepad_settings_t *)out;
-  
+
   resp->command_id = CMD_SET_GAMEPAD_SETTINGS;
-  
+
   settings_gamepad_t gamepad;
   gamepad.deadzone = req->deadzone;
   gamepad.curve_type = req->curve_type;
@@ -286,9 +287,9 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
   gamepad.reserved[1] = 0;
   gamepad.reserved[2] = 0;
   gamepad.reserved[3] = 0;
-  
+
   bool success = settings_set_gamepad(&gamepad);
-  
+
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
   resp->deadzone = gamepad.deadzone;
   resp->curve_type = gamepad.curve_type;
@@ -305,10 +306,10 @@ extern void offsetRecalculate(void);
 
 static void cmd_get_calibration(const uint8_t *in, uint8_t *out) {
   hid_packet_calibration_t *resp = (hid_packet_calibration_t *)out;
-  
+
   resp->command_id = CMD_GET_CALIBRATION;
   resp->status = HID_RESP_OK;
-  
+
   const settings_calibration_t *cal = settings_get_calibration();
   resp->lut_zero_value = cal->lut_zero_value;
   for (int i = 0; i < 6; i++) {
@@ -319,22 +320,22 @@ static void cmd_get_calibration(const uint8_t *in, uint8_t *out) {
 static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
   const hid_packet_calibration_t *req = (const hid_packet_calibration_t *)in;
   hid_packet_calibration_t *resp = (hid_packet_calibration_t *)out;
-  
+
   resp->command_id = CMD_SET_CALIBRATION;
-  
+
   settings_calibration_t cal;
   cal.lut_zero_value = req->lut_zero_value;
   for (int i = 0; i < 6; i++) {
     cal.key_zero_values[i] = req->key_zero_values[i];
   }
-  
+
   bool success = settings_set_calibration(&cal);
-  
+
   // Recalculate offsets with new calibration
   if (success) {
     offsetRecalculate();
   }
-  
+
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
   resp->lut_zero_value = cal.lut_zero_value;
   for (int i = 0; i < 6; i++) {
@@ -343,13 +344,14 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
 }
 
 static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
-  const hid_packet_auto_calibrate_t *req = (const hid_packet_auto_calibrate_t *)in;
+  const hid_packet_auto_calibrate_t *req =
+      (const hid_packet_auto_calibrate_t *)in;
   hid_packet_calibration_t *resp = (hid_packet_calibration_t *)out;
-  
+
   resp->command_id = CMD_AUTO_CALIBRATE;
-  
+
   uint8_t key_index = req->key_index;
-  
+
   if (key_index == 0xFF) {
     // Auto-calibrate all keys
     for (int i = 0; i < 6; i++) {
@@ -364,10 +366,10 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
-  
+
   // Recalculate offsets
   offsetRecalculate();
-  
+
   // Return updated calibration
   const settings_calibration_t *cal = settings_get_calibration();
   resp->lut_zero_value = cal->lut_zero_value;
@@ -383,17 +385,17 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
 static void cmd_get_key_curve(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_curve_t *req = (const hid_packet_key_curve_t *)in;
   hid_packet_key_curve_t *resp = (hid_packet_key_curve_t *)out;
-  
+
   resp->command_id = CMD_GET_KEY_CURVE;
-  
+
   uint8_t key_index = req->key_index;
   if (key_index >= 6) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
-  
+
   const settings_curve_t *curve = settings_get_key_curve(key_index);
-  
+
   resp->status = HID_RESP_OK;
   resp->key_index = key_index;
   resp->curve_enabled = settings_is_key_curve_enabled(key_index) ? 1 : 0;
@@ -406,24 +408,24 @@ static void cmd_get_key_curve(const uint8_t *in, uint8_t *out) {
 static void cmd_set_key_curve(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_curve_t *req = (const hid_packet_key_curve_t *)in;
   hid_packet_key_curve_t *resp = (hid_packet_key_curve_t *)out;
-  
+
   resp->command_id = CMD_SET_KEY_CURVE;
-  
+
   uint8_t key_index = req->key_index;
   if (key_index >= 6) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
-  
+
   settings_curve_t curve;
   curve.p1.x = req->p1_x;
   curve.p1.y = req->p1_y;
   curve.p2.x = req->p2_x;
   curve.p2.y = req->p2_y;
-  
+
   settings_set_key_curve(key_index, &curve);
   settings_set_key_curve_enabled(key_index, req->curve_enabled != 0);
-  
+
   resp->status = HID_RESP_OK;
   resp->key_index = key_index;
   resp->curve_enabled = req->curve_enabled;
@@ -438,19 +440,21 @@ static void cmd_set_key_curve(const uint8_t *in, uint8_t *out) {
 //--------------------------------------------------------------------+
 
 static void cmd_get_key_gamepad_map(const uint8_t *in, uint8_t *out) {
-  const hid_packet_key_gamepad_map_t *req = (const hid_packet_key_gamepad_map_t *)in;
+  const hid_packet_key_gamepad_map_t *req =
+      (const hid_packet_key_gamepad_map_t *)in;
   hid_packet_key_gamepad_map_t *resp = (hid_packet_key_gamepad_map_t *)out;
-  
+
   resp->command_id = CMD_GET_KEY_GAMEPAD_MAP;
-  
+
   uint8_t key_index = req->key_index;
   if (key_index >= 6) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
-  
-  const settings_gamepad_mapping_t *mapping = settings_get_key_gamepad_mapping(key_index);
-  
+
+  const settings_gamepad_mapping_t *mapping =
+      settings_get_key_gamepad_mapping(key_index);
+
   resp->status = HID_RESP_OK;
   resp->key_index = key_index;
   resp->axis = mapping->axis;
@@ -459,25 +463,26 @@ static void cmd_get_key_gamepad_map(const uint8_t *in, uint8_t *out) {
 }
 
 static void cmd_set_key_gamepad_map(const uint8_t *in, uint8_t *out) {
-  const hid_packet_key_gamepad_map_t *req = (const hid_packet_key_gamepad_map_t *)in;
+  const hid_packet_key_gamepad_map_t *req =
+      (const hid_packet_key_gamepad_map_t *)in;
   hid_packet_key_gamepad_map_t *resp = (hid_packet_key_gamepad_map_t *)out;
-  
+
   resp->command_id = CMD_SET_KEY_GAMEPAD_MAP;
-  
+
   uint8_t key_index = req->key_index;
   if (key_index >= 6) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
-  
+
   settings_gamepad_mapping_t mapping;
   mapping.axis = req->axis;
   mapping.direction = req->direction;
   mapping.button = req->button;
   mapping.reserved = 0;
-  
+
   settings_set_key_gamepad_mapping(key_index, &mapping);
-  
+
   resp->status = HID_RESP_OK;
   resp->key_index = key_index;
   resp->axis = req->axis;
@@ -495,9 +500,9 @@ static void cmd_get_gamepad_with_kb(const uint8_t *in, uint8_t *out) {
 static void cmd_set_gamepad_with_kb(const uint8_t *in, uint8_t *out) {
   const hid_packet_bool_t *req = (const hid_packet_bool_t *)in;
   hid_packet_bool_t *resp = (hid_packet_bool_t *)out;
-  
+
   settings_set_gamepad_with_keyboard(req->value != 0);
-  
+
   resp->command_id = CMD_SET_GAMEPAD_WITH_KB;
   resp->status = HID_RESP_OK;
   resp->value = settings_is_gamepad_with_keyboard() ? 1 : 0;
@@ -707,7 +712,7 @@ static void cmd_set_led_effect(const uint8_t *in, uint8_t *out) {
   hid_packet_t *req = (hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_LED_EFFECT;
-  
+
   uint8_t mode = req->payload[0];
   if (mode < LED_EFFECT_MAX) {
     led_matrix_set_effect((led_effect_mode_t)mode);
@@ -728,7 +733,7 @@ static void cmd_set_led_effect_speed(const uint8_t *in, uint8_t *out) {
   hid_packet_t *req = (hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_LED_EFFECT_SPEED;
-  
+
   led_matrix_set_effect_speed(req->payload[0]);
   resp->status_or_len = HID_RESP_OK;
 }
@@ -737,8 +742,9 @@ static void cmd_set_led_effect_color(const uint8_t *in, uint8_t *out) {
   hid_packet_t *req = (hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_LED_EFFECT_COLOR;
-  
-  led_matrix_set_effect_color(req->payload[0], req->payload[1], req->payload[2]);
+
+  led_matrix_set_effect_color(req->payload[0], req->payload[1],
+                              req->payload[2]);
   resp->status_or_len = HID_RESP_OK;
 }
 
@@ -754,10 +760,10 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   for (int i = 0; i < 6; i++) {
     resp->adc_values[i] = adc_values[i];
   }
-  
+
   // Include timing information from main loop
   resp->scan_time_us = (uint16_t)adc_full_cycle_us;
-  
+
   // Calculate scan rate in Hz (1,000,000 / scan_time_us)
   if (adc_full_cycle_us > 0) {
     resp->scan_rate_hz = (uint16_t)(1000000 / adc_full_cycle_us);
@@ -773,19 +779,23 @@ static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
 
   for (int i = 0; i < 6; i++) {
     resp->key_states[i] = states[i] ? 1 : 0;
-    
+
     // Normalized distance (0.0-1.0) to uint8 (0-255) for progress bars
     float d = distances[i];
-    if (d < 0.0f) d = 0.0f;
-    if (d > 1.0f) d = 1.0f;
+    if (d < 0.0f)
+      d = 0.0f;
+    if (d > 1.0f)
+      d = 1.0f;
     resp->distances_norm[i] = (uint8_t)(d * 255.0f);
-    
+
     // Raw distance in mm * 100 (0.01mm units)
     // distances[i] is normalized 0-1, representing 0-4mm travel
     float dist_mm = distances[i] * 4.0f;
-    if (dist_mm < 0.0f) dist_mm = 0.0f;
-    if (dist_mm > 4.0f) dist_mm = 4.0f;
-    resp->distances_mm[i] = (uint16_t)(dist_mm * 100.0f);  // e.g., 1.25mm -> 125
+    if (dist_mm < 0.0f)
+      dist_mm = 0.0f;
+    if (dist_mm > 4.0f)
+      dist_mm = 4.0f;
+    resp->distances_mm[i] = (uint16_t)(dist_mm * 100.0f); // e.g., 1.25mm -> 125
   }
 }
 
@@ -793,14 +803,16 @@ static void cmd_get_lock_states(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_LOCK_STATES;
   resp->status_or_len = HID_RESP_OK;
-  
+
   // Byte 2: Lock states as bit flags
   // Bit 0: Num Lock
   // Bit 1: Caps Lock
   // Bit 2: Scroll Lock
   uint8_t lock_state = 0;
-  if (led_indicator_is_num_lock()) lock_state |= 0x01;
-  if (led_indicator_is_caps_lock()) lock_state |= 0x02;
+  if (led_indicator_is_num_lock())
+    lock_state |= 0x01;
+  if (led_indicator_is_caps_lock())
+    lock_state |= 0x02;
   // TODO: Add scroll lock when implemented
   resp->payload[0] = lock_state;
 }

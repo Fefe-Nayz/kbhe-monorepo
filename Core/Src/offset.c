@@ -16,7 +16,7 @@ void offsetInit(void) {
   if (cal == NULL) {
     return;
   }
-  
+
   for (int i = 0; i < 6; ++i) {
     OFFSET[i] = cal->key_zero_values[i] - cal->lut_zero_value;
   }
@@ -31,6 +31,4 @@ int getCorrectedValue(int sensor_index, int voltage) {
 }
 
 // Recalculate offsets (call after settings calibration is updated)
-void offsetRecalculate(void) {
-  offsetInit();
-}
+void offsetRecalculate(void) { offsetInit(); }
