@@ -1698,7 +1698,7 @@ but NOT saved to flash until you click "Save to Flash".
                 rb = ttk.Radiobutton(
                     selector_frame, text=f"Key {i+1}",
                     variable=self.selected_key_var, value=i,
-                    command=self.load_selected_key_settings
+                    command=lambda idx=i: self.load_selected_key_settings(idx)
                 )
                 rb.pack(side=tk.LEFT, padx=10)
             
@@ -1903,9 +1903,10 @@ but NOT saved to flash until you click "Save to Flash".
             else:
                 self.release_sens_frame.pack_forget()
         
-        def load_selected_key_settings(self):
+        def load_selected_key_settings(self, key_idx=None):
             """Load settings for the selected key."""
-            key_idx = self.selected_key_var.get()
+            if key_idx is None:
+                key_idx = self.selected_key_var.get()
             try:
                 settings = self.device.get_key_settings(key_idx)
                 if settings:
