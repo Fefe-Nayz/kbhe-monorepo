@@ -21,11 +21,11 @@
 #include "main.h"
 
 // Buffer allocated will be twice this
-#define BUFFER_SIZE 24
+#define BUFFER_SIZE 32
 
 // LED on/off counts.  PWM timer is running 125 counts.  LED_CNT need to be set to the total counts in the PWM.
-#define LED_OFF 75 * LED_CNT / 300  // Roughly 25 %
-#define LED_ON 150 * LED_CNT / 300   // Roughly 50 %
+#define LED_OFF 43 // 32% duty cycle
+#define LED_ON 86   // 65% duty cycle
 #define LED_RESET_CYCLES 10        // Full 24-bit cycles
 
 #define GL 0 // Green LED
@@ -48,7 +48,7 @@ typedef enum {
 typedef struct {
     TIM_HandleTypeDef *timer;               // Timer running the PWM - MUST run at 800 kHz
     uint32_t channel;                       // Timer channel
-    uint16_t dma_buffer[BUFFER_SIZE * 2];   // Fixed size DMA buffer
+    uint16_t *dma_buffer;                   // Pointer to DMA buffer (non-cacheable, defined elsewhere)
     uint16_t leds;                          // Number of LEDs on the string
     uint8_t *led;                           // Dynamically allocated array of LED RGB values
     ws2812_stateTypeDef led_state;          // LED Transfer state machine

@@ -31,8 +31,10 @@
 #include "usb_gamepad.h"
 #include "usb_hid.h"
 #include "usb_hid_nkro.h"
+#include "ws2812.h" // Include WS2812 header
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/cdefs.h>
 
 /* USER CODE END Includes */
 
@@ -55,9 +57,9 @@
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
-TIM_HandleTypeDef htim3; // WS2812 LED PWM timer
-DMA_HandleTypeDef hdma_tim3_ch2;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+DMA_HandleTypeDef hdma_tim3_ch2;
 
 PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
@@ -66,6 +68,12 @@ PCD_HandleTypeDef hpcd_USB_OTG_HS;
  * ADC DMA NUMBER OF CONVERSIONS COMPLETED
  */
 uint32_t num_conv = 0;
+
+/**
+ * LED DMA BUFFER
+ */
+uint16_t ws2812_dma_buffer[BUFFER_SIZE * 2]
+    __attribute__((aligned(BUFFER_SIZE * 2 * 2)));
 
 /**
  * EMA FILTERING
@@ -91,7 +99,11 @@ uint16_t mux_channel = 0;
 /**
  * ADC DMA BUFFER
  */
-uint16_t adc_buffer[NUM_MUX];
+// Déclarer un buffer de 128 valeurs de type uint16_t (2 octets chacune) soit
+// 256 octets
+#define ADC_BUFFER_LENGTH 128
+uint16_t adc_buffer[ADC_BUFFER_LENGTH]
+    __attribute__((aligned(ADC_BUFFER_LENGTH * 2)));
 
 /**
  * ADC VALUES FOR ALL MUX CHANNELS
@@ -161,8 +173,8 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USB_OTG_HS_PCD_Init(void);
-static void MX_TIM3_Init(void); // WS2812 LED timer
 static void MX_TIM4_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -280,7 +292,6 @@ static void MUX_SelectChannel(uint8_t channel) {
 //============================================================================+
 // WS2812 LED DMA CALLBACKS
 //============================================================================+
-#include "ws2812.h"
 
 // External reference to the WS2812 handle from led_matrix.c
 extern ws2812_handleTypeDef led_ws2812_handle;
@@ -332,6 +343,9 @@ int main(void) {
   /* Enable I-Cache---------------------------------------------------------*/
   SCB_EnableICache();
 
+  /* Enable D-Cache---------------------------------------------------------*/
+  SCB_EnableDCache();
+
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick.
@@ -354,14 +368,17 @@ int main(void) {
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_USB_OTG_HS_PCD_Init();
-  MX_TIM3_Init(); // WS2812 LED timer
   MX_TIM4_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
   // Initialize WS2812 LED Matrix (8x8 = 64 LEDs)
   if (!led_matrix_init(&htim3, TIM_CHANNEL_2)) {
     // LED init failed, but continue anyway
   }
+
+  // Affectation du buffer DMA non-cacheable au handle WS2812
+  led_ws2812_handle.dma_buffer = ws2812_dma_buffer;
 
   // Initialisation TinyUSB - RHPORT 1 = USB HS avec PHY intégré
   const tusb_rhport_init_t rhport_init = {.role = TUSB_ROLE_DEVICE,
@@ -590,20 +607,27 @@ static void MX_ADC1_Init(void) {
 }
 
 /**
- * @brief TIM3 Initialization Function (WS2812 LED PWM)
- * @note  Timer runs at 800kHz for WS2812 timing
+ * @brief TIM3 Initialization Function
  * @param None
  * @retval None
  */
 static void MX_TIM3_Init(void) {
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
 
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = LED_CNT - 1; // 96MHz / 120 = 800kHz for WS2812
+  htim3.Init.Period = 134;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
@@ -628,16 +652,10 @@ static void MX_TIM3_Init(void) {
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK) {
     Error_Handler();
   }
+  /* USER CODE BEGIN TIM3_Init 2 */
 
-  // Configure GPIO for TIM3_CH2 (PC7)
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  GPIO_InitStruct.Pin = WS2812_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
-  HAL_GPIO_Init(WS2812_GPIO_Port, &GPIO_InitStruct);
+  /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
 }
 
 /**
@@ -754,14 +772,14 @@ static void MX_USB_OTG_HS_PCD_Init(void) {
 static void MX_DMA_Init(void) {
 
   /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE(); // For TIM3 (WS2812)
-  __HAL_RCC_DMA2_CLK_ENABLE(); // For ADC
+  __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Stream5_IRQn interrupt configuration (TIM3_CH2) */
+  /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-  /* DMA2_Stream0_IRQn interrupt configuration (ADC) */
+  /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 }
@@ -886,15 +904,26 @@ void MPU_Config(void) {
    */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
   MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-  MPU_InitStruct.BaseAddress = 0x0;
-  MPU_InitStruct.Size = MPU_REGION_SIZE_4GB;
-  MPU_InitStruct.SubRegionDisable = 0x87;
+  MPU_InitStruct.BaseAddress = (uint32_t)&adc_buffer;
+  MPU_InitStruct.Size = MPU_REGION_SIZE_256B;
+  MPU_InitStruct.SubRegionDisable = 0x00;
   MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-  MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
   MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
   MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
   MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
+  HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
+  /** Initializes and configures the Region and the memory to be protected
+   */
+  MPU_InitStruct.Number = MPU_REGION_NUMBER1;
+  MPU_InitStruct.BaseAddress = (uint32_t)&ws2812_dma_buffer;
+  MPU_InitStruct.Size = MPU_REGION_SIZE_128B;
+  MPU_InitStruct.SubRegionDisable = 0x0;
+  MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
+  MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
 
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
   /* Enables the MPU */
