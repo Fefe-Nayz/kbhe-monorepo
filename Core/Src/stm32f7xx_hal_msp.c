@@ -255,9 +255,9 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
 
     /* USER CODE END TIM3_MspPostInit 0 */
 
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
     /**TIM3 GPIO Configuration
-    PA7     ------> TIM3_CH2
+    PC7     ------> TIM3_CH2
     */
     GPIO_InitStruct.Pin = LED_DATA_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
