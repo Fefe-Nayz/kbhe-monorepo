@@ -31,8 +31,7 @@ static const uint8_t DEFAULT_KEY_HID_CODES[6] = {
 };
 
 // Default rapid trigger settings
-#define DEFAULT_RAPID_TRIGGER_DELTA 0.3f    // 0.3mm default sensitivity
-#define DEFAULT_RAPID_TRIGGER_ACTIVATION 0.5f // 0.5mm initial activation
+#define DEFAULT_RAPID_TRIGGER_DELTA 0.5f    // 0.5mm default sensitivity
 
 // Default actuation point (1.2mm)
 #define DEFAULT_ACTUATION_POINT 1.2f
@@ -98,17 +97,6 @@ static int isRapidTriggerEnabled(int keyIndex) {
     return s->keys[keyIndex].rapid_trigger_enabled;
   }
   return 0; // Disabled by default
-}
-
-/**
- * @brief Get rapid trigger initial activation distance in mm
- */
-static float getRapidTriggerActivation(int keyIndex) {
-  const settings_t *s = settings_get();
-  if (s) {
-    return s->keys[keyIndex].rapid_trigger_activation / 10.0f;  // Convert from 0.1mm
-  }
-  return DEFAULT_RAPID_TRIGGER_ACTIVATION;
 }
 
 /**
