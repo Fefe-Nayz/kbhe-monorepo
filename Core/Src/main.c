@@ -76,11 +76,17 @@ uint16_t ws2812_dma_buffer[BUFFER_SIZE * 2]
     __attribute__((aligned(BUFFER_SIZE * 2 * 2)));
 
 /**
- * EMA FILTERING
+ * EMA FILTERING - Default values (can be overridden via settings)
  */
-#define ADC_EMA_NOISE_BAND 30u
-#define ADC_EMA_ALPHA_MIN_Q15 ADC_EMA_Q15_FROM_RATIO(1u, 32u)
-#define ADC_EMA_ALPHA_MAX_Q15 ADC_EMA_Q15_FROM_RATIO(1u, 4u)
+#define ADC_EMA_NOISE_BAND_DEFAULT 30u
+#define ADC_EMA_ALPHA_MIN_DENOM_DEFAULT 32u
+#define ADC_EMA_ALPHA_MAX_DENOM_DEFAULT 4u
+
+// Runtime filter parameters
+static uint8_t filter_enabled = 1;
+static uint8_t filter_noise_band = ADC_EMA_NOISE_BAND_DEFAULT;
+static uint8_t filter_alpha_min_denom = ADC_EMA_ALPHA_MIN_DENOM_DEFAULT;
+static uint8_t filter_alpha_max_denom = ADC_EMA_ALPHA_MAX_DENOM_DEFAULT;
 
 /**
  * MUX CONFIGURATION
@@ -163,6 +169,44 @@ uint16_t key_2_values_filtered = 0;
  * Flag to indicate a full scan is complete and main loop can process
  */
 static volatile uint8_t adc_scan_complete = 0;
+
+//--------------------------------------------------------------------+
+// Filter Management Functions
+//--------------------------------------------------------------------+
+
+/**
+ * @brief Reinitialize all EMA filters with current parameters
+ */
+static void reinit_ema_filters(void) {
+  uint16_t alpha_min = ADC_EMA_Q15_FROM_RATIO(1u, filter_alpha_min_denom);
+  uint16_t alpha_max = ADC_EMA_Q15_FROM_RATIO(1u, filter_alpha_max_denom);
+  
+  for (uint16_t i = 0; i < (uint16_t)(NUM_MUX * NUM_MUX_CHANNELS); i++) {
+    adc_ema_init(&adc_ema_states[i], filter_noise_band, alpha_min, alpha_max);
+  }
+}
+
+uint8_t get_filter_enabled(void) { return filter_enabled; }
+
+void set_filter_enabled(uint8_t enabled) { 
+  filter_enabled = enabled ? 1 : 0;
+}
+
+void get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom, uint8_t *alpha_max_denom) {
+  if (noise_band) *noise_band = filter_noise_band;
+  if (alpha_min_denom) *alpha_min_denom = filter_alpha_min_denom;
+  if (alpha_max_denom) *alpha_max_denom = filter_alpha_max_denom;
+}
+
+void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom, uint8_t alpha_max_denom) {
+  // Validate and clamp parameters
+  filter_noise_band = noise_band > 0 ? noise_band : 1;
+  filter_alpha_min_denom = alpha_min_denom > 0 ? alpha_min_denom : 1;
+  filter_alpha_max_denom = alpha_max_denom > 0 ? alpha_max_denom : 1;
+  
+  // Reinitialize filters with new parameters
+  reinit_ema_filters();
+}
 
 /* USER CODE END PV */
 
@@ -328,12 +372,8 @@ int main(void)
     adc_values[i] = 0;
   }
 
-  // Initialize EMA state for each logical ADC channel.
-  for (uint16_t i = 0; i < (uint16_t)(NUM_MUX * NUM_MUX_CHANNELS); i++) {
-    adc_ema_init(&adc_ema_states[i], (uint16_t)ADC_EMA_NOISE_BAND,
-                 (uint16_t)ADC_EMA_ALPHA_MIN_Q15,
-                 (uint16_t)ADC_EMA_ALPHA_MAX_Q15);
-  }
+  // Initialize EMA state for each logical ADC channel using runtime parameters
+  reinit_ema_filters();
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -871,13 +911,19 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
       uint16_t new_adc_value = adc_buffer[i];
 
       uint16_t logical_index = (uint16_t)(mux_channel + (i * NUM_MUX_CHANNELS));
-      uint16_t filtered_adc_value =
-          adc_ema_update(&adc_ema_states[logical_index], new_adc_value);
+      
+      // Apply EMA filter if enabled, otherwise use raw value
+      uint16_t output_value;
+      if (filter_enabled) {
+        output_value = adc_ema_update(&adc_ema_states[logical_index], new_adc_value);
+      } else {
+        output_value = new_adc_value;
+      }
 
       /* END ANALYSIS */
 
-      // Store filtered value
-      adc_values[logical_index] = filtered_adc_value;
+      // Store filtered/raw value
+      adc_values[logical_index] = output_value;
       // Store raw value
       adc_values_raw[logical_index] = new_adc_value;
     }

@@ -5,6 +5,7 @@
 
 #include "led_matrix.h"
 #include "ws2812.h"
+#include "main.h"
 #include <string.h>
 
 //--------------------------------------------------------------------+
@@ -296,8 +297,13 @@ static uint8_t effect_color_r = 255;
 static uint8_t effect_color_g = 0;
 static uint8_t effect_color_b = 0;
 static uint8_t effect_speed = 50;
+static uint8_t fps_limit = 60; // Default 60 FPS
 static uint32_t last_effect_tick = 0;
+static uint32_t last_render_tick = 0; // Separate tick for FPS limiting
 static uint16_t effect_offset = 0;
+
+// Diagnostic mode: 0=normal, 1=DMA stress (no CPU computation), 2=CPU stress (compute but no DMA)
+static uint8_t diagnostic_mode = 0;
 
 // Reactive effect state
 static uint8_t key_brightness[6] = {0, 0, 0, 0, 0, 0};
@@ -320,6 +326,56 @@ void led_matrix_set_effect_speed(uint8_t speed) {
 }
 
 uint8_t led_matrix_get_effect_speed(void) { return effect_speed; }
+
+void led_matrix_set_fps_limit(uint8_t fps) {
+  fps_limit = fps;
+}
+
+uint8_t led_matrix_get_fps_limit(void) { return fps_limit; }
+
+void led_matrix_set_diagnostic_mode(uint8_t mode) {
+  uint8_t old_mode = diagnostic_mode;
+  diagnostic_mode = mode;
+  
+  // Handle timer output enable/disable for Mode 3
+  if (mode == 3 && old_mode != 3) {
+    // Entering Mode 3: Disable timer output (GPIO to low)
+    // This keeps DMA running but no signal reaches LEDs
+    TIM_HandleTypeDef *timer = led_ws2812_handle.timer;
+    if (timer) {
+      // Disable the timer channel output
+      HAL_TIM_PWM_Stop(timer, led_ws2812_handle.channel);
+      // Restart DMA without PWM output - DMA still writes to CCR but pin stays low
+      HAL_TIM_PWM_Start_DMA(timer, led_ws2812_handle.channel, 
+                           (uint32_t*)led_ws2812_handle.dma_buffer, BUFFER_SIZE * 2);
+      // Disable the output compare channel
+      __HAL_TIM_DISABLE_OCxPRELOAD(timer, led_ws2812_handle.channel);
+      // Force pin low by setting to GPIO output
+      GPIO_InitTypeDef GPIO_InitStruct = {0};
+      GPIO_InitStruct.Pin = LED_DATA_Pin;
+      GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+      GPIO_InitStruct.Pull = GPIO_NOPULL;
+      GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+      HAL_GPIO_Init(LED_DATA_GPIO_Port, &GPIO_InitStruct);
+      HAL_GPIO_WritePin(LED_DATA_GPIO_Port, LED_DATA_Pin, GPIO_PIN_RESET);
+    }
+  } else if (old_mode == 3 && mode != 3) {
+    // Exiting Mode 3: Re-enable timer output
+    TIM_HandleTypeDef *timer = led_ws2812_handle.timer;
+    if (timer) {
+      // Restore GPIO to alternate function for timer
+      GPIO_InitTypeDef GPIO_InitStruct = {0};
+      GPIO_InitStruct.Pin = LED_DATA_Pin;
+      GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+      GPIO_InitStruct.Pull = GPIO_NOPULL;
+      GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+      GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
+      HAL_GPIO_Init(LED_DATA_GPIO_Port, &GPIO_InitStruct);
+    }
+  }
+}
+
+uint8_t led_matrix_get_diagnostic_mode(void) { return diagnostic_mode; }
 
 void led_matrix_key_event(uint8_t key_index, bool pressed) {
   if (key_index >= 6)
@@ -584,28 +640,93 @@ static void effect_reactive(void) {
 }
 
 void led_matrix_effect_tick(uint32_t tick) {
-  if (!initialized || !display_enabled || current_effect == LED_EFFECT_NONE) {
+  if (!initialized || !display_enabled) {
     return;
   }
 
-  // Calculate time delta
-  uint32_t delta = tick - last_effect_tick;
+  // Calculate time deltas
+  uint32_t effect_delta = tick - last_effect_tick;
+  uint32_t render_delta = tick - last_render_tick;
 
-  // Update at rate determined by speed
-  // speed 1 = 200ms interval (5 FPS), speed 255 = 5ms interval (200 FPS)
-  // Formula: interval = 200 - (speed * 195 / 255)
-  // This gives range from 200ms (slow) to 5ms (fast)
-  uint32_t update_interval = 200 - (effect_speed * 195 / 255);
-  if (update_interval < 5)
-    update_interval = 5;
+  // Effect animation speed (controls how fast effect_offset increments)
+  // speed 1 = 200ms interval, speed 255 = 5ms interval
+  uint32_t effect_interval = 200 - (effect_speed * 195 / 255);
+  if (effect_interval < 5)
+    effect_interval = 5;
 
-  if (delta < update_interval) {
+  // Update effect_offset based on effect speed (independent of render rate)
+  // This ensures animation speed stays constant regardless of FPS limit
+  if (effect_delta >= effect_interval) {
+    // Calculate how many steps to advance (handles frame skipping)
+    uint16_t steps = effect_delta / effect_interval;
+    effect_offset += steps;
+    last_effect_tick = tick - (effect_delta % effect_interval); // Keep remainder for smoother timing
+  }
+
+  // FPS limit controls how often we actually render
+  // fps_limit = 0 means unlimited (render every call)
+  if (fps_limit > 0) {
+    uint32_t min_render_interval = 1000 / fps_limit;
+    if (render_delta < min_render_interval) {
+      return; // Skip this render frame
+    }
+  }
+
+  last_render_tick = tick;
+
+  // Handle diagnostic modes
+  if (diagnostic_mode == 1) {
+    // Mode 1: DMA Stress - trigger DMA transfer without CPU computation
+    // Just mark buffer dirty to cause DMA activity at current FPS rate
+    led_ws2812_handle.is_dirty = 1;
+    return;
+  }
+  
+  if (diagnostic_mode == 2) {
+    // Mode 2: CPU Stress - do heavy computation but don't trigger DMA
+    // Run a rainbow-like computation to stress CPU
+    for (uint8_t y = 0; y < LED_MATRIX_HEIGHT; y++) {
+      for (uint8_t x = 0; x < LED_MATRIX_WIDTH; x++) {
+        uint8_t hue = (x * 20) + (y * 20) + (effect_offset * 2);
+        uint8_t r, g, b;
+        led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+        // Store in local pixels array but DON'T send to WS2812
+        uint8_t idx = y * LED_MATRIX_WIDTH + x;
+        pixels_original[idx * 3 + 0] = r;
+        pixels_original[idx * 3 + 1] = g;
+        pixels_original[idx * 3 + 2] = b;
+      }
+    }
+    // Explicitly clear dirty flag to prevent DMA
+    led_ws2812_handle.is_dirty = 0;
     return;
   }
 
-  last_effect_tick = tick;
-  effect_offset++;
+  if (diagnostic_mode == 3) {
+    // Mode 3: CPU + DMA Stress, no PWM output
+    // Compute effect AND fill DMA buffer, but timer output is disabled
+    // This tests if DMA memory access causes issues even without pin toggling
+    for (uint8_t y = 0; y < LED_MATRIX_HEIGHT; y++) {
+      for (uint8_t x = 0; x < LED_MATRIX_WIDTH; x++) {
+        uint8_t hue = (x * 20) + (y * 20) + (effect_offset * 2);
+        uint8_t r, g, b;
+        led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+        // Update WS2812 buffer (this will trigger DMA buffer updates)
+        uint8_t idx = y * LED_MATRIX_WIDTH + x;
+        setLedValues(&led_ws2812_handle, idx, r, g, b);
+      }
+    }
+    // Note: DMA still runs and updates the CCR register, but if timer output
+    // was disabled before entering this mode, no signal goes to LEDs
+    return;
+  }
 
+  // Normal mode: skip if no effect selected
+  if (current_effect == LED_EFFECT_NONE) {
+    return;
+  }
+
+  // Now render the effect using current effect_offset
   switch (current_effect) {
   case LED_EFFECT_RAINBOW:
     effect_rainbow();

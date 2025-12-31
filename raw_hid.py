@@ -87,6 +87,16 @@ class Command(IntEnum):
     GET_LED_EFFECT_SPEED = 0x70
     SET_LED_EFFECT_SPEED = 0x71
     SET_LED_EFFECT_COLOR = 0x72
+    GET_LED_FPS_LIMIT = 0x73
+    SET_LED_FPS_LIMIT = 0x74
+    GET_LED_DIAGNOSTIC = 0x75
+    SET_LED_DIAGNOSTIC = 0x76
+    
+    # ADC Filter commands
+    GET_FILTER_ENABLED = 0x80
+    SET_FILTER_ENABLED = 0x81
+    GET_FILTER_PARAMS = 0x82
+    SET_FILTER_PARAMS = 0x83
     
     # Debug commands
     GET_ADC_VALUES = 0xE0
@@ -612,6 +622,73 @@ class KBHEDevice:
         resp = self.send_command(Command.SET_LED_EFFECT_COLOR, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
+    def get_led_fps_limit(self):
+        """Get LED FPS limit (0 = unlimited)."""
+        resp = self.send_command(Command.GET_LED_FPS_LIMIT)
+        if resp and len(resp) >= 3 and resp[1] == Status.OK:
+            return resp[2]
+        return None
+    
+    def set_led_fps_limit(self, fps):
+        """Set LED FPS limit (0 = unlimited, 1-255 = limit)."""
+        data = [0, fps]  # placeholder, fps
+        resp = self.send_command(Command.SET_LED_FPS_LIMIT, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+    
+    def get_led_diagnostic(self):
+        """Get LED diagnostic mode (0=normal, 1=DMA stress, 2=CPU stress)."""
+        resp = self.send_command(Command.GET_LED_DIAGNOSTIC)
+        if resp and len(resp) >= 3 and resp[1] == Status.OK:
+            return resp[2]
+        return None
+    
+    def set_led_diagnostic(self, mode):
+        """Set LED diagnostic mode.
+        0 = Normal operation
+        1 = DMA stress only (sends data without computing effects - tests if DMA causes ADC noise)
+        2 = CPU stress only (computes effects but doesn't send to LEDs - tests if CPU load causes ADC issues)
+        """
+        data = [0, mode]
+        resp = self.send_command(Command.SET_LED_DIAGNOSTIC, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+    
+    # --- ADC Filter Commands ---
+    
+    def get_filter_enabled(self):
+        """Get ADC filter enabled state."""
+        resp = self.send_command(Command.GET_FILTER_ENABLED)
+        if resp and len(resp) >= 3 and resp[1] == Status.OK:
+            return resp[2] != 0
+        return None
+    
+    def set_filter_enabled(self, enabled):
+        """Set ADC filter enabled state."""
+        data = [0, 1 if enabled else 0]
+        resp = self.send_command(Command.SET_FILTER_ENABLED, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+    
+    def get_filter_params(self):
+        """Get ADC filter parameters.
+        Returns dict with noise_band, alpha_min_denom, alpha_max_denom."""
+        resp = self.send_command(Command.GET_FILTER_PARAMS)
+        if resp and len(resp) >= 5 and resp[1] == Status.OK:
+            return {
+                'noise_band': resp[2],
+                'alpha_min_denom': resp[3],
+                'alpha_max_denom': resp[4]
+            }
+        return None
+    
+    def set_filter_params(self, noise_band, alpha_min_denom, alpha_max_denom):
+        """Set ADC filter parameters.
+        noise_band: Noise band in ADC counts (default 30)
+        alpha_min_denom: Alpha min denominator 1/N (default 32)
+        alpha_max_denom: Alpha max denominator 1/N (default 4)
+        """
+        data = [0, noise_band, alpha_min_denom, alpha_max_denom]
+        resp = self.send_command(Command.SET_FILTER_PARAMS, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+    
     # --- Debug Commands ---
     
     def get_adc_values(self):
@@ -1128,6 +1205,99 @@ if HAS_GUI:
             
             ttk.Button(config_frame, text="🔄 Refresh Configuration", command=self.refresh_config_display).pack(pady=5)
             
+            # ADC EMA Filter Settings
+            filter_frame = ttk.LabelFrame(parent, text="🎚️ ADC EMA Filter Settings", padding="10")
+            filter_frame.pack(fill=tk.X, pady=5)
+            
+            # Filter enable checkbox
+            self.filter_enabled_var = tk.BooleanVar(value=True)
+            ttk.Checkbutton(
+                filter_frame, text="Enable ADC EMA Filter",
+                variable=self.filter_enabled_var,
+                command=self.on_filter_enabled_change
+            ).pack(anchor=tk.W)
+            
+            ttk.Label(filter_frame, text="(Disabling filter shows raw ADC values, may be noisy)", 
+                      foreground="gray").pack(anchor=tk.W, pady=(0, 10))
+            
+            # Filter parameters
+            params_frame = ttk.Frame(filter_frame)
+            params_frame.pack(fill=tk.X)
+            
+            # Noise Band
+            nb_frame = ttk.Frame(params_frame)
+            nb_frame.pack(fill=tk.X, pady=2)
+            ttk.Label(nb_frame, text="Noise Band (ADC counts):", width=25).pack(side=tk.LEFT)
+            self.filter_noise_band_var = tk.IntVar(value=30)
+            ttk.Spinbox(nb_frame, from_=1, to=100, width=8, 
+                        textvariable=self.filter_noise_band_var).pack(side=tk.LEFT, padx=5)
+            ttk.Label(nb_frame, text="(default: 30)", foreground="gray").pack(side=tk.LEFT)
+            
+            # Alpha Min Denominator
+            amin_frame = ttk.Frame(params_frame)
+            amin_frame.pack(fill=tk.X, pady=2)
+            ttk.Label(amin_frame, text="Alpha Min (1/N, slow):", width=25).pack(side=tk.LEFT)
+            self.filter_alpha_min_var = tk.IntVar(value=32)
+            ttk.Spinbox(amin_frame, from_=2, to=128, width=8, 
+                        textvariable=self.filter_alpha_min_var).pack(side=tk.LEFT, padx=5)
+            ttk.Label(amin_frame, text="(default: 32 → 1/32 = strong smoothing)", foreground="gray").pack(side=tk.LEFT)
+            
+            # Alpha Max Denominator
+            amax_frame = ttk.Frame(params_frame)
+            amax_frame.pack(fill=tk.X, pady=2)
+            ttk.Label(amax_frame, text="Alpha Max (1/N, fast):", width=25).pack(side=tk.LEFT)
+            self.filter_alpha_max_var = tk.IntVar(value=4)
+            ttk.Spinbox(amax_frame, from_=1, to=32, width=8, 
+                        textvariable=self.filter_alpha_max_var).pack(side=tk.LEFT, padx=5)
+            ttk.Label(amax_frame, text="(default: 4 → 1/4 = fast response)", foreground="gray").pack(side=tk.LEFT)
+            
+            # Apply button
+            btn_frame = ttk.Frame(filter_frame)
+            btn_frame.pack(fill=tk.X, pady=10)
+            ttk.Button(btn_frame, text="📤 Apply Filter Settings", 
+                       command=self.apply_filter_settings).pack(side=tk.LEFT, padx=5)
+            ttk.Button(btn_frame, text="📥 Reload From Device", 
+                       command=self.load_filter_settings).pack(side=tk.LEFT, padx=5)
+            ttk.Button(btn_frame, text="🔄 Reset to Defaults", 
+                       command=self.reset_filter_defaults).pack(side=tk.LEFT, padx=5)
+            
+            # Load initial filter settings
+            self.load_filter_settings()
+            
+            # LED Diagnostic Mode (for troubleshooting ADC noise)
+            diag_frame = ttk.LabelFrame(parent, text="🔬 LED Diagnostic Mode (ADC Noise Testing)", padding="10")
+            diag_frame.pack(fill=tk.X, pady=5)
+            
+            ttk.Label(diag_frame, text="Use this to diagnose if ADC noise is caused by LED DMA activity or CPU computation:",
+                      foreground="gray").pack(anchor=tk.W)
+            
+            self.diagnostic_mode_var = tk.IntVar(value=0)
+            
+            ttk.Radiobutton(diag_frame, text="Normal Operation", 
+                           variable=self.diagnostic_mode_var, value=0,
+                           command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
+            
+            ttk.Radiobutton(diag_frame, text="Mode 1: DMA Stress (sends LED data, no CPU computation)", 
+                           variable=self.diagnostic_mode_var, value=1,
+                           command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
+            ttk.Label(diag_frame, text="    → If noise appears: DMA/electrical interference is the cause",
+                      foreground="blue", font=('Arial', 9)).pack(anchor=tk.W)
+            
+            ttk.Radiobutton(diag_frame, text="Mode 2: CPU Stress (computes effects, no LED updates)", 
+                           variable=self.diagnostic_mode_var, value=2,
+                           command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
+            ttk.Label(diag_frame, text="    → If noise appears: CPU load/interrupt latency is the cause",
+                      foreground="blue", font=('Arial', 9)).pack(anchor=tk.W)
+            
+            ttk.Radiobutton(diag_frame, text="Mode 3: DMA + CPU (computes & sends data, LED pin disabled)", 
+                           variable=self.diagnostic_mode_var, value=3,
+                           command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
+            ttk.Label(diag_frame, text="    → If noise disappears: PWM pin switching is causing interference",
+                      foreground="blue", font=('Arial', 9)).pack(anchor=tk.W)
+            
+            ttk.Label(diag_frame, text="\n💡 Tips: Also try moving LED cables away from sensor wires to test electrical coupling",
+                      foreground="gray").pack(anchor=tk.W)
+            
             # Initial config display
             self.refresh_config_display()
         
@@ -1287,6 +1457,65 @@ if HAS_GUI:
             # This is just for testing - toggle locks via actual key press
             # For now, show a message that user needs to press physical key
             self.status_var.set(f"Press physical key with HID code 0x{keycode:02X} to toggle")
+        
+        # --- Filter Settings Methods ---
+        
+        def load_filter_settings(self):
+            """Load filter settings from device."""
+            try:
+                enabled = self.device.get_filter_enabled()
+                if enabled is not None:
+                    self.filter_enabled_var.set(enabled)
+                
+                params = self.device.get_filter_params()
+                if params:
+                    self.filter_noise_band_var.set(params['noise_band'])
+                    self.filter_alpha_min_var.set(params['alpha_min_denom'])
+                    self.filter_alpha_max_var.set(params['alpha_max_denom'])
+                    
+                self.status_var.set("📥 Filter settings loaded from device")
+            except Exception as e:
+                self.status_var.set(f"❌ Error loading filter settings: {e}")
+        
+        def on_filter_enabled_change(self):
+            """Handle filter enable/disable toggle."""
+            enabled = self.filter_enabled_var.get()
+            if self.device.set_filter_enabled(enabled):
+                self.status_var.set(f"🎚️ Filter {'enabled' if enabled else 'disabled'} - LIVE")
+            else:
+                self.status_var.set("❌ Failed to update filter state")
+        
+        def apply_filter_settings(self):
+            """Apply filter parameters to device."""
+            noise_band = self.filter_noise_band_var.get()
+            alpha_min = self.filter_alpha_min_var.get()
+            alpha_max = self.filter_alpha_max_var.get()
+            
+            if self.device.set_filter_params(noise_band, alpha_min, alpha_max):
+                self.status_var.set(f"📤 Filter params applied: band={noise_band}, αmin=1/{alpha_min}, αmax=1/{alpha_max}")
+            else:
+                self.status_var.set("❌ Failed to apply filter parameters")
+        
+        def reset_filter_defaults(self):
+            """Reset filter to default values."""
+            self.filter_enabled_var.set(True)
+            self.filter_noise_band_var.set(30)
+            self.filter_alpha_min_var.set(32)
+            self.filter_alpha_max_var.set(4)
+            
+            # Apply defaults to device
+            self.device.set_filter_enabled(True)
+            self.device.set_filter_params(30, 32, 4)
+            self.status_var.set("🔄 Filter reset to defaults")
+        
+        def on_diagnostic_mode_change(self):
+            """Handle diagnostic mode change."""
+            mode = self.diagnostic_mode_var.get()
+            mode_names = {0: "Normal", 1: "DMA Stress", 2: "CPU Stress"}
+            if self.device.set_led_diagnostic(mode):
+                self.status_var.set(f"🔬 Diagnostic mode: {mode_names.get(mode, 'Unknown')}")
+            else:
+                self.status_var.set("❌ Failed to set diagnostic mode")
         
         def refresh_config_display(self):
             """Refresh the configuration display."""
@@ -1593,6 +1822,24 @@ but NOT saved to flash until you click "Save to Flash".
             
             ttk.Label(speed_frame, text="(1 = Slow, 255 = Fast)", foreground="gray").pack()
             
+            # FPS Limit
+            fps_frame = ttk.LabelFrame(parent, text="🎬 FPS Limit", padding="10")
+            fps_frame.pack(fill=tk.X, pady=5)
+            
+            self.fps_limit_var = tk.IntVar(value=60)
+            fps_slider = ttk.Scale(
+                fps_frame, from_=0, to=120,
+                variable=self.fps_limit_var,
+                orient=tk.HORIZONTAL,
+                command=self.on_fps_limit_change
+            )
+            fps_slider.pack(fill=tk.X, padx=5)
+            
+            self.fps_limit_label = ttk.Label(fps_frame, text="60 FPS", font=('Arial', 12))
+            self.fps_limit_label.pack()
+            
+            ttk.Label(fps_frame, text="(0 = Unlimited, 1-120 = Limit)", foreground="gray").pack()
+            
             # Effect Color
             color_frame = ttk.LabelFrame(parent, text="🎨 Effect Color", padding="10")
             color_frame.pack(fill=tk.X, pady=5)
@@ -1639,6 +1886,11 @@ but NOT saved to flash until you click "Save to Flash".
                 if speed is not None:
                     self.effect_speed_var.set(speed)
                     self.effect_speed_label.config(text=str(speed))
+                
+                fps = self.device.get_led_fps_limit()
+                if fps is not None:
+                    self.fps_limit_var.set(fps)
+                    self.fps_limit_label.config(text=f"{fps} FPS" if fps > 0 else "Unlimited")
             except Exception as e:
                 self.status_var.set(f"❌ Error loading effect settings: {e}")
         
@@ -1655,6 +1907,13 @@ but NOT saved to flash until you click "Save to Flash".
             self.effect_speed_label.config(text=str(speed))
             self.device.set_led_effect_speed(speed)
             self.status_var.set(f"⚡ Effect speed set to {speed} - LIVE (not saved)")
+        
+        def on_fps_limit_change(self, value):
+            """Handle FPS limit change."""
+            fps = int(float(value))
+            self.fps_limit_label.config(text=f"{fps} FPS" if fps > 0 else "Unlimited")
+            self.device.set_led_fps_limit(fps)
+            self.status_var.set(f"🎬 FPS limit set to {fps if fps > 0 else 'Unlimited'} - LIVE (not saved)")
         
         def pick_effect_color(self):
             """Pick effect color."""

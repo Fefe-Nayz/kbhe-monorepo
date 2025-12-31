@@ -195,7 +195,14 @@ typedef struct __attribute__((packed)) {
   uint8_t led_effect_color_r;
   uint8_t led_effect_color_g;
   uint8_t led_effect_color_b;
-  uint8_t led_reserved[3];
+  uint8_t led_fps_limit;    // FPS limit for LED effects (0 = unlimited)
+  uint8_t led_reserved[2];
+
+  // ADC EMA Filter settings
+  uint8_t filter_enabled;     // Enable/disable ADC EMA filtering
+  uint8_t filter_noise_band;  // Noise band in ADC counts (default 30)
+  uint8_t filter_alpha_min;   // Alpha min denominator (1/N, default 32)
+  uint8_t filter_alpha_max;   // Alpha max denominator (1/N, default 4)
 
   // Footer
   uint32_t magic_end; // Magic number to validate end

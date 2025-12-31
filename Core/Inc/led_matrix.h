@@ -225,6 +225,30 @@ void led_matrix_set_effect_speed(uint8_t speed);
 uint8_t led_matrix_get_effect_speed(void);
 
 /**
+ * @brief Set FPS limit for LED effects
+ * @param fps FPS value (1-255, 0 = unlimited)
+ */
+void led_matrix_set_fps_limit(uint8_t fps);
+
+/**
+ * @brief Get FPS limit
+ * @return Current FPS limit (0 = unlimited)
+ */
+uint8_t led_matrix_get_fps_limit(void);
+
+/**
+ * @brief Set diagnostic mode for troubleshooting
+ * @param mode 0=normal, 1=DMA stress (no CPU), 2=CPU stress (no DMA)
+ */
+void led_matrix_set_diagnostic_mode(uint8_t mode);
+
+/**
+ * @brief Get diagnostic mode
+ * @return Current diagnostic mode
+ */
+uint8_t led_matrix_get_diagnostic_mode(void);
+
+/**
  * @brief Update effect animation (call periodically from main loop)
  * @param tick Current system tick (ms)
  */

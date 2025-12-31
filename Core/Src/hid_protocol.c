@@ -748,6 +748,88 @@ static void cmd_set_led_effect_color(const uint8_t *in, uint8_t *out) {
   resp->status_or_len = HID_RESP_OK;
 }
 
+static void cmd_get_led_fps_limit(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_GET_LED_FPS_LIMIT;
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = led_matrix_get_fps_limit();
+}
+
+static void cmd_set_led_fps_limit(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *req = (hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_SET_LED_FPS_LIMIT;
+
+  led_matrix_set_fps_limit(req->payload[0]);
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = led_matrix_get_fps_limit();
+}
+
+static void cmd_get_led_diagnostic(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_GET_LED_DIAGNOSTIC;
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = led_matrix_get_diagnostic_mode();
+}
+
+static void cmd_set_led_diagnostic(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *req = (hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_SET_LED_DIAGNOSTIC;
+
+  led_matrix_set_diagnostic_mode(req->payload[0]);
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = led_matrix_get_diagnostic_mode();
+}
+
+//--------------------------------------------------------------------+
+// Internal Functions - Filter Commands
+//--------------------------------------------------------------------+
+
+static void cmd_get_filter_enabled(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_GET_FILTER_ENABLED;
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = get_filter_enabled();
+}
+
+static void cmd_set_filter_enabled(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *req = (hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_SET_FILTER_ENABLED;
+
+  set_filter_enabled(req->payload[0]);
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = get_filter_enabled();
+}
+
+static void cmd_get_filter_params(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_GET_FILTER_PARAMS;
+  resp->status_or_len = HID_RESP_OK;
+  
+  uint8_t noise_band, alpha_min, alpha_max;
+  get_filter_params(&noise_band, &alpha_min, &alpha_max);
+  resp->payload[0] = noise_band;
+  resp->payload[1] = alpha_min;
+  resp->payload[2] = alpha_max;
+}
+
+static void cmd_set_filter_params(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *req = (hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_SET_FILTER_PARAMS;
+
+  set_filter_params(req->payload[0], req->payload[1], req->payload[2]);
+  resp->status_or_len = HID_RESP_OK;
+  
+  uint8_t noise_band, alpha_min, alpha_max;
+  get_filter_params(&noise_band, &alpha_min, &alpha_max);
+  resp->payload[0] = noise_band;
+  resp->payload[1] = alpha_min;
+  resp->payload[2] = alpha_max;
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Debug Commands
 //--------------------------------------------------------------------+
@@ -1020,6 +1102,39 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_LED_EFFECT_COLOR:
     cmd_set_led_effect_color(in_packet, out_packet);
+    break;
+
+  case CMD_GET_LED_FPS_LIMIT:
+    cmd_get_led_fps_limit(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_FPS_LIMIT:
+    cmd_set_led_fps_limit(in_packet, out_packet);
+    break;
+
+  case CMD_GET_LED_DIAGNOSTIC:
+    cmd_get_led_diagnostic(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_DIAGNOSTIC:
+    cmd_set_led_diagnostic(in_packet, out_packet);
+    break;
+
+  // Filter commands
+  case CMD_GET_FILTER_ENABLED:
+    cmd_get_filter_enabled(in_packet, out_packet);
+    break;
+
+  case CMD_SET_FILTER_ENABLED:
+    cmd_set_filter_enabled(in_packet, out_packet);
+    break;
+
+  case CMD_GET_FILTER_PARAMS:
+    cmd_get_filter_params(in_packet, out_packet);
+    break;
+
+  case CMD_SET_FILTER_PARAMS:
+    cmd_set_filter_params(in_packet, out_packet);
     break;
 
   // Debug commands

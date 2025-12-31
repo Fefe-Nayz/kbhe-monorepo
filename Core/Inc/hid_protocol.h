@@ -83,6 +83,16 @@ typedef enum {
   CMD_GET_LED_EFFECT_SPEED = 0x70, // Get effect speed
   CMD_SET_LED_EFFECT_SPEED = 0x71, // Set effect speed
   CMD_SET_LED_EFFECT_COLOR = 0x72, // Set effect color
+  CMD_GET_LED_FPS_LIMIT = 0x73,    // Get LED FPS limit
+  CMD_SET_LED_FPS_LIMIT = 0x74,    // Set LED FPS limit
+  CMD_GET_LED_DIAGNOSTIC = 0x75,   // Get LED diagnostic mode
+  CMD_SET_LED_DIAGNOSTIC = 0x76,   // Set LED diagnostic mode
+
+  // ADC Filter commands (0x80 - 0x8F)
+  CMD_GET_FILTER_ENABLED = 0x80,   // Get filter enabled state
+  CMD_SET_FILTER_ENABLED = 0x81,   // Set filter enabled state
+  CMD_GET_FILTER_PARAMS = 0x82,    // Get filter parameters
+  CMD_SET_FILTER_PARAMS = 0x83,    // Set filter parameters
 
   // Debug commands (0xE0 - 0xEF)
   CMD_GET_ADC_VALUES = 0xE0,
