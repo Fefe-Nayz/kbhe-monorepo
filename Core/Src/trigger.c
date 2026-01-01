@@ -31,22 +31,25 @@ static const uint8_t DEFAULT_KEY_HID_CODES[6] = {
 };
 
 // Default rapid trigger settings
-#define DEFAULT_RAPID_TRIGGER_DELTA 0.5f    // 0.5mm default sensitivity
+#define DEFAULT_RAPID_TRIGGER_DELTA_UM 500  // 0.5mm = 500um default sensitivity
 
 // Default actuation point (1.2mm)
-#define DEFAULT_ACTUATION_POINT 1.2f
+#define DEFAULT_ACTUATION_POINT_UM 1200
 
 // Default release point (1.2mm)
-#define DEFAULT_RELEASE_POINT 1.2f
+#define DEFAULT_RELEASE_POINT_UM 1200
 
 // Valeur maximale d'appuie atteinte lorsque la touche est pressée puis en cours
-// de relachement
-float maxBottomDistances[6] = {0, 0, 0, 0, 0, 0};
+// de relachement (en micromètres)
+static int32_t maxBottomDistances_um[6] = {0, 0, 0, 0, 0, 0};
 // Valeur minimale d'appuie atteinte lorsque la touche est relachée puis en
-// cours d'appuie
-float minTopDistances[6] = {0, 0, 0, 0, 0, 0};
+// cours d'appuie (en micromètres)
+static int32_t minTopDistances_um[6] = {0, 0, 0, 0, 0, 0};
 
-// Dernière valeur d'appuie lue
+// Dernière valeur d'appuie lue (en micromètres)
+static int32_t distances_um[6] = {0, 0, 0, 0, 0, 0};
+
+// Distance normalisée (0..1) gardée pour compatibilité debug/HID
 float distances[6] = {0, 0, 0, 0, 0, 0};
 
 // Dernier état de la touche (0 = relachée, 1 = appuyée)
@@ -54,6 +57,9 @@ int states[6] = {0, 0, 0, 0, 0, 0};
 
 // Whether the key is currently overridden by SOCD
 static int socdOverrideState[6] = {0, 0, 0, 0, 0, 0};
+
+// Flag pour éviter les faux triggers au premier échantillon
+static uint8_t key_initialized[6] = {0, 0, 0, 0, 0, 0};
 
 /**
  * @brief Get HID keycode for a key from settings
@@ -67,25 +73,27 @@ static uint8_t getKeyHIDCode(int keyIndex) {
 }
 
 /**
- * @brief Get actuation point in mm for a key from settings
+ * @brief Get actuation point in um for a key from settings
+ * settings: actuation_point_mm est en 0.1mm => 0.1mm = 100um
  */
-static float getActuationPoint(int keyIndex) {
+static int32_t getActuationPointUm(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].actuation_point_mm / 10.0f; // Convert from 0.1mm
+    return (int32_t)s->keys[keyIndex].actuation_point_mm * 100;
   }
-  return DEFAULT_ACTUATION_POINT;
+  return (int32_t)DEFAULT_ACTUATION_POINT_UM;
 }
 
 /**
- * @brief Get release point in mm for a key from settings
+ * @brief Get release point in um for a key from settings
+ * settings: release_point_mm est en 0.1mm => 0.1mm = 100um
  */
-static float getReleasePoint(int keyIndex) {
+static int32_t getReleasePointUm(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].release_point_mm / 10.0f; // Convert from 0.1mm
+    return (int32_t)s->keys[keyIndex].release_point_mm * 100;
   }
-  return DEFAULT_RELEASE_POINT;
+  return (int32_t)DEFAULT_RELEASE_POINT_UM;
 }
 
 /**
@@ -100,24 +108,23 @@ static int isRapidTriggerEnabled(int keyIndex) {
 }
 
 /**
- * @brief Get rapid trigger press sensitivity in mm
+ * @brief Get rapid trigger press sensitivity in um
+ * settings: rapid_trigger_press est en 0.01mm => 0.01mm = 10um
  */
-static float getRapidTriggerPressSensitivity(int keyIndex) {
+static int32_t getRapidTriggerPressSensitivityUm(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].rapid_trigger_press /
-           100.0f; // Convert from 0.01mm
+    return (int32_t)s->keys[keyIndex].rapid_trigger_press * 10;
   }
-  return DEFAULT_RAPID_TRIGGER_DELTA;
+  return (int32_t)DEFAULT_RAPID_TRIGGER_DELTA_UM;
 }
 
-static float getRapidTriggerReleaseSensitivity(int keyIndex) {
+static int32_t getRapidTriggerReleaseSensitivityUm(int keyIndex) {
   const settings_t *s = settings_get();
   if (s) {
-    return s->keys[keyIndex].rapid_trigger_release /
-           100.0f; // Convert from 0.01mm
+    return (int32_t)s->keys[keyIndex].rapid_trigger_release * 10;
   }
-  return DEFAULT_RAPID_TRIGGER_DELTA;
+  return (int32_t)DEFAULT_RAPID_TRIGGER_DELTA_UM;
 }
 
 /**
@@ -137,6 +144,15 @@ void triggerInit() {
 
   // Apply compile-time flags
   usb_gamepad_set_enabled(!DISABLE_GAMEPAD_OUTPUT);
+
+  for (int i = 0; i < 6; i++) {
+    maxBottomDistances_um[i] = 0;
+    minTopDistances_um[i] = 0;
+    distances_um[i] = 0;
+    distances[i] = 0.0f;
+    states[i] = 0;
+    key_initialized[i] = 0;
+  }
 }
 
 int getKeyState(int keyIndex) {
@@ -145,26 +161,27 @@ int getKeyState(int keyIndex) {
   return states[keyIndex];
 }
 
-void updateKeyData(int keyIndex, float currentDistance, int resetExtremums) {
+static inline void updateKeyDataUm(int keyIndex, int32_t currentDistanceUm,
+                                   int resetExtremums) {
   if (resetExtremums) {
     // Réinitialisation des points extrêmes
-    minTopDistances[keyIndex] = currentDistance;
-    maxBottomDistances[keyIndex] = currentDistance;
+    minTopDistances_um[keyIndex] = currentDistanceUm;
+    maxBottomDistances_um[keyIndex] = currentDistanceUm;
   } else {
     // Mise à jour des points extrêmes
     // Si on remonte (distance diminue), on met à jour le minimum
-    if (currentDistance < minTopDistances[keyIndex]) {
-      minTopDistances[keyIndex] = currentDistance;
+    if (currentDistanceUm < minTopDistances_um[keyIndex]) {
+      minTopDistances_um[keyIndex] = currentDistanceUm;
     }
 
     // Si on descend (distance augmente), on met à jour le maximum
-    if (currentDistance > maxBottomDistances[keyIndex]) {
-      maxBottomDistances[keyIndex] = currentDistance;
+    if (currentDistanceUm > maxBottomDistances_um[keyIndex]) {
+      maxBottomDistances_um[keyIndex] = currentDistanceUm;
     }
   }
 
   // Mise à jour de la dernière distance (à la fin!)
-  distances[keyIndex] = currentDistance;
+  distances_um[keyIndex] = currentDistanceUm;
 }
 
 /**
@@ -304,57 +321,69 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   if (keyIndex < 0 || keyIndex >= 6)
     return;
 
-  int lastState = states[keyIndex];
-  float lastDistance = distances[keyIndex];
+  const int lastState = states[keyIndex];
+  const int32_t lastDistanceUm = distances_um[keyIndex];
 
-  float correctedCurrentVoltage = getCorrectedValue(keyIndex, currentVoltage);
-  float currentDistance = getValueFromLUT(correctedCurrentVoltage);
+  const int correctedCurrentVoltage = getCorrectedValue(keyIndex, currentVoltage);
+  const float currentDistanceMm = getValueFromLUT(correctedCurrentVoltage);
+  const int32_t currentDistanceUm = (int32_t)(currentDistanceMm * 1000.0f);
 
-  // Si aucune variation de distance, on ne fait rien
-  if (lastDistance == currentDistance) {
+  // Premier échantillon: initialiser sans déclencher d'événements
+  if (!key_initialized[keyIndex]) {
+    key_initialized[keyIndex] = 1;
+    updateKeyDataUm(keyIndex, currentDistanceUm, 1);
+    // distances[] est normalisé 0..1 pour debug/HID
+    float norm0 = currentDistanceMm / 4.0f;
+    if (norm0 < 0.0f) norm0 = 0.0f;
+    if (norm0 > 1.0f) norm0 = 1.0f;
+    distances[keyIndex] = norm0;
+    usb_gamepad_set_axis_from_distance(keyIndex, norm0);
     return;
   }
 
-  // TODO: Review normalization approach
-  // Update gamepad axis with current key distance
-  // Distance is 0.0 (released) to ~4.0mm, normalize to 0-1 range
-  // Assuming max travel is around 4mm, clamp and normalize
-  float normalizedDistance = currentDistance;
+  // Si aucune variation de distance, on ne fait rien
+  if (lastDistanceUm == currentDistanceUm) {
+    return;
+  }
+
+  // Update gamepad axis (distance en mm => normaliser à 0..1 sur 4mm)
+  float normalizedDistance = currentDistanceMm / 4.0f;
   if (normalizedDistance < 0.0f)
     normalizedDistance = 0.0f;
   if (normalizedDistance > 1.0f)
     normalizedDistance = 1.0f;
+  distances[keyIndex] = normalizedDistance;
   usb_gamepad_set_axis_from_distance(keyIndex, normalizedDistance);
 
-  // Get per-key settings
-  float actuationPoint = getActuationPoint(keyIndex);
-  float releasePoint = getReleasePoint(keyIndex);
-  int rapidTriggerEnabled = isRapidTriggerEnabled(keyIndex);
-  float rapidPressSensitivity = getRapidTriggerPressSensitivity(keyIndex);
-  float rapidReleaseSensitivity = getRapidTriggerReleaseSensitivity(keyIndex);
+  // Get per-key settings (en µm)
+  const int32_t actuationPointUm = getActuationPointUm(keyIndex);
+  const int32_t releasePointUm = getReleasePointUm(keyIndex);
+  const int rapidTriggerEnabled = isRapidTriggerEnabled(keyIndex);
+  const int32_t rapidPressSensitivityUm = getRapidTriggerPressSensitivityUm(keyIndex);
+  const int32_t rapidReleaseSensitivityUm = getRapidTriggerReleaseSensitivityUm(keyIndex);
 
   /**
    * NORMAL RELEASE DETECTION
    */
 
   // Si la touche est au dessus du point d'activation
-  if (currentDistance < releasePoint) {
+  if (currentDistanceUm < releasePointUm) {
     // Normal release
-    updateKeyData(keyIndex, currentDistance, 1);
+    updateKeyDataUm(keyIndex, currentDistanceUm, 1);
     release(keyIndex, 0);
     return;
   }
 
   // Si la touche est en descente
-  if (lastDistance < currentDistance) {
+  if (lastDistanceUm < currentDistanceUm) {
     /**
      * NORMAL PRESS DETECTION
      */
 
     // Si on passe sous le point d'activation
-    if (currentDistance >= actuationPoint && lastDistance < actuationPoint) {
+    if (currentDistanceUm >= actuationPointUm && lastDistanceUm < actuationPointUm) {
       // Normal press
-      updateKeyData(keyIndex, currentDistance, 1);
+      updateKeyDataUm(keyIndex, currentDistanceUm, 1);
       press(keyIndex, 0);
       return;
     }
@@ -366,14 +395,14 @@ void handleTrigger(int keyIndex, int currentVoltage) {
     // Si on est déjà sous le point d'activation
     // Et que la touche est relachée
     // Et que le rapid trigger est activé
-    if (lastState == 0 && lastDistance >= actuationPoint && rapidTriggerEnabled) {
-      float minTopDistance = minTopDistances[keyIndex];
+    if (lastState == 0 && lastDistanceUm >= actuationPointUm && rapidTriggerEnabled) {
+      const int32_t minTopDistanceUm = minTopDistances_um[keyIndex];
 
       // Si on est descendu de plus que le delta depuis le point le plus haut
       // atteint
-      if (currentDistance - minTopDistance >= rapidPressSensitivity) {
+      if (currentDistanceUm - minTopDistanceUm >= rapidPressSensitivityUm) {
         // Rapid press
-        updateKeyData(keyIndex, currentDistance, 1);
+        updateKeyDataUm(keyIndex, currentDistanceUm, 1);
         press(keyIndex, 1);
         return;
       }
@@ -381,7 +410,7 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   }
 
   // Si la touche est en montée
-  if (lastDistance > currentDistance) {
+  if (lastDistanceUm > currentDistanceUm) {
     /**
      * RAPID RELEASE DETECTION
      */
@@ -389,18 +418,18 @@ void handleTrigger(int keyIndex, int currentVoltage) {
     // Si la touche est déjà pressée
     // Et que le rapid trigger est activé
     if (lastState == 1 && rapidTriggerEnabled) {
-      float maxBottomDistance = maxBottomDistances[keyIndex];
+      const int32_t maxBottomDistanceUm = maxBottomDistances_um[keyIndex];
 
       // Si on est remonté de plus que le delta depuis le point le plus bas
       // atteint
-      if (maxBottomDistance - currentDistance >= rapidReleaseSensitivity) {
+      if (maxBottomDistanceUm - currentDistanceUm >= rapidReleaseSensitivityUm) {
         // Rapid release
-        updateKeyData(keyIndex, currentDistance, 1);
+        updateKeyDataUm(keyIndex, currentDistanceUm, 1);
         release(keyIndex, 1);
         return;
       }
     }
   }
 
-  updateKeyData(keyIndex, currentDistance, 0);
+  updateKeyDataUm(keyIndex, currentDistanceUm, 0);
 }
