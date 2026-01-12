@@ -705,7 +705,7 @@ static void cmd_get_led_effect(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_LED_EFFECT;
   resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = (uint8_t)led_matrix_get_effect();
+  resp->payload[0] = settings_get_led_effect_mode();
 }
 
 static void cmd_set_led_effect(const uint8_t *in, uint8_t *out) {
@@ -715,7 +715,7 @@ static void cmd_set_led_effect(const uint8_t *in, uint8_t *out) {
 
   uint8_t mode = req->payload[0];
   if (mode < LED_EFFECT_MAX) {
-    led_matrix_set_effect((led_effect_mode_t)mode);
+    settings_set_led_effect_mode(mode);
     resp->status_or_len = HID_RESP_OK;
   } else {
     resp->status_or_len = HID_RESP_INVALID_PARAM;
@@ -726,7 +726,7 @@ static void cmd_get_led_effect_speed(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_LED_EFFECT_SPEED;
   resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = led_matrix_get_effect_speed();
+  resp->payload[0] = settings_get_led_effect_speed();
 }
 
 static void cmd_set_led_effect_speed(const uint8_t *in, uint8_t *out) {
@@ -734,7 +734,7 @@ static void cmd_set_led_effect_speed(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_LED_EFFECT_SPEED;
 
-  led_matrix_set_effect_speed(req->payload[0]);
+  settings_set_led_effect_speed(req->payload[0]);
   resp->status_or_len = HID_RESP_OK;
 }
 
@@ -743,8 +743,8 @@ static void cmd_set_led_effect_color(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_LED_EFFECT_COLOR;
 
-  led_matrix_set_effect_color(req->payload[0], req->payload[1],
-                              req->payload[2]);
+  settings_set_led_effect_color(req->payload[0], req->payload[1],
+                                req->payload[2]);
   resp->status_or_len = HID_RESP_OK;
 }
 
@@ -807,7 +807,7 @@ static void cmd_get_filter_params(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_FILTER_PARAMS;
   resp->status_or_len = HID_RESP_OK;
-  
+
   uint8_t noise_band, alpha_min, alpha_max;
   get_filter_params(&noise_band, &alpha_min, &alpha_max);
   resp->payload[0] = noise_band;
@@ -822,7 +822,7 @@ static void cmd_set_filter_params(const uint8_t *in, uint8_t *out) {
 
   set_filter_params(req->payload[0], req->payload[1], req->payload[2]);
   resp->status_or_len = HID_RESP_OK;
-  
+
   uint8_t noise_band, alpha_min, alpha_max;
   get_filter_params(&noise_band, &alpha_min, &alpha_max);
   resp->payload[0] = noise_band;

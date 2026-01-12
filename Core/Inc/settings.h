@@ -195,14 +195,14 @@ typedef struct __attribute__((packed)) {
   uint8_t led_effect_color_r;
   uint8_t led_effect_color_g;
   uint8_t led_effect_color_b;
-  uint8_t led_fps_limit;    // FPS limit for LED effects (0 = unlimited)
+  uint8_t led_fps_limit; // FPS limit for LED effects (0 = unlimited)
   uint8_t led_reserved[2];
 
   // ADC EMA Filter settings
-  uint8_t filter_enabled;     // Enable/disable ADC EMA filtering
-  uint8_t filter_noise_band;  // Noise band in ADC counts (default 30)
-  uint8_t filter_alpha_min;   // Alpha min denominator (1/N, default 32)
-  uint8_t filter_alpha_max;   // Alpha max denominator (1/N, default 4)
+  uint8_t filter_enabled;    // Enable/disable ADC EMA filtering
+  uint8_t filter_noise_band; // Noise band in ADC counts (default 30)
+  uint8_t filter_alpha_min;  // Alpha min denominator (1/N, default 32)
+  uint8_t filter_alpha_max;  // Alpha max denominator (1/N, default 4)
 
   // Footer
   uint32_t magic_end; // Magic number to validate end
@@ -463,6 +463,49 @@ bool settings_set_led_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
  * @return Pointer to LED settings
  */
 const settings_led_t *settings_get_led(void);
+
+/**
+ * @brief Get LED effect mode
+ * @return Current effect mode
+ */
+uint8_t settings_get_led_effect_mode(void);
+
+/**
+ * @brief Set LED effect mode
+ * @param mode Effect mode
+ * @return true if successful
+ */
+bool settings_set_led_effect_mode(uint8_t mode);
+
+/**
+ * @brief Get LED effect speed
+ * @return Current effect speed
+ */
+uint8_t settings_get_led_effect_speed(void);
+
+/**
+ * @brief Set LED effect speed
+ * @param speed Effect speed
+ * @return true if successful
+ */
+bool settings_set_led_effect_speed(uint8_t speed);
+
+/**
+ * @brief Get LED effect color
+ * @param r Pointer to store red value
+ * @param g Pointer to store green value
+ * @param b Pointer to store blue value
+ */
+void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b);
+
+/**
+ * @brief Set LED effect color
+ * @param r Red value
+ * @param g Green value
+ * @param b Blue value
+ * @return true if successful
+ */
+bool settings_set_led_effect_color(uint8_t r, uint8_t g, uint8_t b);
 
 //--------------------------------------------------------------------+
 // Key Settings API

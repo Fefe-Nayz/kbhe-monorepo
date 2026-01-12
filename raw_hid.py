@@ -271,13 +271,15 @@ class KBHEDevice:
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def save_settings(self):
-        """Save settings to flash."""
-        resp = self.send_command(Command.SAVE_SETTINGS)
+        """Save settings to flash. Uses longer timeout for flash erase operation."""
+        # Flash erase for 128KB sector can take up to 2 seconds on STM32F7
+        resp = self.send_command(Command.SAVE_SETTINGS, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def factory_reset(self):
         """Reset to factory defaults."""
-        resp = self.send_command(Command.FACTORY_RESET)
+        # Factory reset also erases flash, needs longer timeout
+        resp = self.send_command(Command.FACTORY_RESET, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     # --- LED Matrix Commands ---

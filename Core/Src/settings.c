@@ -154,6 +154,13 @@ void settings_init(void) {
   led_matrix_set_raw_data(current_settings.led.pixels);
   led_matrix_set_enabled(current_settings.options.led_enabled);
 
+  // Apply LED effect settings
+  led_matrix_set_effect((led_effect_mode_t)current_settings.led_effect_mode);
+  led_matrix_set_effect_speed(current_settings.led_effect_speed);
+  led_matrix_set_effect_color(current_settings.led_effect_color_r,
+                              current_settings.led_effect_color_g,
+                              current_settings.led_effect_color_b);
+
   settings_dirty = false;
 }
 
@@ -281,6 +288,47 @@ bool settings_set_led_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
 }
 
 const settings_led_t *settings_get_led(void) { return &current_settings.led; }
+
+//--------------------------------------------------------------------+
+// LED Effect Settings API
+//--------------------------------------------------------------------+
+
+uint8_t settings_get_led_effect_mode(void) {
+  return current_settings.led_effect_mode;
+}
+
+bool settings_set_led_effect_mode(uint8_t mode) {
+  current_settings.led_effect_mode = mode;
+  led_matrix_set_effect((led_effect_mode_t)mode);
+  return true; // Don't auto-save
+}
+
+uint8_t settings_get_led_effect_speed(void) {
+  return current_settings.led_effect_speed;
+}
+
+bool settings_set_led_effect_speed(uint8_t speed) {
+  current_settings.led_effect_speed = speed;
+  led_matrix_set_effect_speed(speed);
+  return true; // Don't auto-save
+}
+
+void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b) {
+  if (r)
+    *r = current_settings.led_effect_color_r;
+  if (g)
+    *g = current_settings.led_effect_color_g;
+  if (b)
+    *b = current_settings.led_effect_color_b;
+}
+
+bool settings_set_led_effect_color(uint8_t r, uint8_t g, uint8_t b) {
+  current_settings.led_effect_color_r = r;
+  current_settings.led_effect_color_g = g;
+  current_settings.led_effect_color_b = b;
+  led_matrix_set_effect_color(r, g, b);
+  return true; // Don't auto-save
+}
 
 //--------------------------------------------------------------------+
 // Key Settings API
