@@ -4,9 +4,10 @@
  */
 
 #include "led_matrix.h"
-#include "ws2812.h"
 #include "main.h"
+#include "ws2812.h"
 #include <string.h>
+
 
 //--------------------------------------------------------------------+
 // Private Variables
@@ -302,7 +303,8 @@ static uint32_t last_effect_tick = 0;
 static uint32_t last_render_tick = 0; // Separate tick for FPS limiting
 static uint16_t effect_offset = 0;
 
-// Diagnostic mode: 0=normal, 1=DMA stress (no CPU computation), 2=CPU stress (compute but no DMA)
+// Diagnostic mode: 0=normal, 1=DMA stress (no CPU computation), 2=CPU stress
+// (compute but no DMA)
 static uint8_t diagnostic_mode = 0;
 
 // Reactive effect state
@@ -327,16 +329,14 @@ void led_matrix_set_effect_speed(uint8_t speed) {
 
 uint8_t led_matrix_get_effect_speed(void) { return effect_speed; }
 
-void led_matrix_set_fps_limit(uint8_t fps) {
-  fps_limit = fps;
-}
+void led_matrix_set_fps_limit(uint8_t fps) { fps_limit = fps; }
 
 uint8_t led_matrix_get_fps_limit(void) { return fps_limit; }
 
 void led_matrix_set_diagnostic_mode(uint8_t mode) {
   uint8_t old_mode = diagnostic_mode;
   diagnostic_mode = mode;
-  
+
   // Handle timer output enable/disable for Mode 3
   if (mode == 3 && old_mode != 3) {
     // Entering Mode 3: Disable timer output (GPIO to low)
@@ -345,9 +345,11 @@ void led_matrix_set_diagnostic_mode(uint8_t mode) {
     if (timer) {
       // Disable the timer channel output
       HAL_TIM_PWM_Stop(timer, led_ws2812_handle.channel);
-      // Restart DMA without PWM output - DMA still writes to CCR but pin stays low
-      HAL_TIM_PWM_Start_DMA(timer, led_ws2812_handle.channel, 
-                           (uint32_t*)led_ws2812_handle.dma_buffer, BUFFER_SIZE * 2);
+      // Restart DMA without PWM output - DMA still writes to CCR but pin stays
+      // low
+      HAL_TIM_PWM_Start_DMA(timer, led_ws2812_handle.channel,
+                            (uint32_t *)led_ws2812_handle.dma_buffer,
+                            BUFFER_SIZE * 2);
       // Disable the output compare channel
       __HAL_TIM_DISABLE_OCxPRELOAD(timer, led_ws2812_handle.channel);
       // Force pin low by setting to GPIO output
@@ -660,7 +662,9 @@ void led_matrix_effect_tick(uint32_t tick) {
     // Calculate how many steps to advance (handles frame skipping)
     uint16_t steps = effect_delta / effect_interval;
     effect_offset += steps;
-    last_effect_tick = tick - (effect_delta % effect_interval); // Keep remainder for smoother timing
+    last_effect_tick =
+        tick -
+        (effect_delta % effect_interval); // Keep remainder for smoother timing
   }
 
   // FPS limit controls how often we actually render
@@ -681,7 +685,7 @@ void led_matrix_effect_tick(uint32_t tick) {
     led_ws2812_handle.is_dirty = 1;
     return;
   }
-  
+
   if (diagnostic_mode == 2) {
     // Mode 2: CPU Stress - do heavy computation but don't trigger DMA
     // Run a rainbow-like computation to stress CPU

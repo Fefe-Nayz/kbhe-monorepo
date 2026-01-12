@@ -89,10 +89,10 @@ typedef enum {
   CMD_SET_LED_DIAGNOSTIC = 0x76,   // Set LED diagnostic mode
 
   // ADC Filter commands (0x80 - 0x8F)
-  CMD_GET_FILTER_ENABLED = 0x80,   // Get filter enabled state
-  CMD_SET_FILTER_ENABLED = 0x81,   // Set filter enabled state
-  CMD_GET_FILTER_PARAMS = 0x82,    // Get filter parameters
-  CMD_SET_FILTER_PARAMS = 0x83,    // Set filter parameters
+  CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
+  CMD_SET_FILTER_ENABLED = 0x81, // Set filter enabled state
+  CMD_GET_FILTER_PARAMS = 0x82,  // Get filter parameters
+  CMD_SET_FILTER_PARAMS = 0x83,  // Set filter parameters
 
   // Debug commands (0xE0 - 0xEF)
   CMD_GET_ADC_VALUES = 0xE0,
