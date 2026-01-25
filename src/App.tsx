@@ -1,7 +1,16 @@
-import { ComponentExample } from "@/components/component-example";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
 
-export function App() {
-return <ComponentExample />;
+export default function App() {
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <main>
+        <SidebarTrigger />
+        <div>
+            <h1>Hello World</h1>
+        </div>
+      </main>
+    </SidebarProvider>
+  )
 }
-
-export default App;
