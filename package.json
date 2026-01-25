@@ -14,6 +14,7 @@
     "@fontsource-variable/noto-sans": "^5.2.10",
     "@tabler/icons-react": "^3.36.1",
     "@tailwindcss/vite": "^4.1.17",
+    "@tauri-apps/api": "^2.9.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "react": "^19.2.0",
