@@ -1,22 +1,25 @@
+import { Button } from "@/components/ui/button"
+
 interface KeyProps {
   id: string
-  label: string
-  value: string
+  label: string | React.ReactNode
+  value: string 
   width: number
 }
 
 function Key({ id, label, value, width }: KeyProps) {
-  const widthPixels = (width * 2.5 * 16 + (width - 1) * 0.25 * 16) *  1.4 // conversion en pixels (1rem = 16px)
+  const widthPixels = (12 * width + (width - 1)) * 4
 
   return (
-    <button
+    <Button
       id={id}
       value={value}
+      variant="outline"
       style={{ width: `${widthPixels}px` }}
-      className="h-10 bg-white hover:bg-gray-600 active:bg-gray-500 text-black rounded px-2 py-1 text-xs font-semibold transition-colors border border-gray-600"
+      className="h-12 bg-transparent inset-shadow-2xs active:bg-blue-300 text-black rounded px-2 py-1 text-xs font-semibold transition-colors border border-gray-200"
     >
       <span>{label}</span>
-    </button>
+    </Button>
   )
 }
 
