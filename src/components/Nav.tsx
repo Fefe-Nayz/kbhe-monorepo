@@ -2,6 +2,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ThemeButton } from "./nav-components/themeButton"
 
 
+
 export function Nav() {
   return (
     <nav className="flex justify-between p-4 bg-white border-b">

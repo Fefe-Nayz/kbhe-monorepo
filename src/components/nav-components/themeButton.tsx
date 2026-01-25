@@ -10,10 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+import { IconSun } from "@tabler/icons-react"
+{/*import { IconSun, IconMoon } from "@tabler/icons-react"*/}
+
+
 export function ThemeButton() {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline">Open</Button>} />
+      <DropdownMenuTrigger render={<Button variant="outline"><IconSun /></Button>} />
       <DropdownMenuContent>
         <DropdownMenuGroup>
           <DropdownMenuLabel>Theme</DropdownMenuLabel>

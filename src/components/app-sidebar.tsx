@@ -4,8 +4,10 @@ import {
   IconHome,
   IconPencil,
   IconBrandSpeedtest,
+  IconViewfinder,
   IconSettings,
   IconBulb,
+  IconDeviceGamepad2,
 } from "@tabler/icons-react"
 
 import {
@@ -36,6 +38,16 @@ const items = [
   {
     title: "Calibration",
     url: "/calibration",
+    icon: IconViewfinder,
+  },
+  {
+    title: "Gamepad",
+    url: "/gamepad",
+    icon: IconDeviceGamepad2,
+  },
+  {
+    title: "Performance",
+    url: "/performance",
     icon: IconBrandSpeedtest,
   },
 
