@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom"
+
 import {
   IconHome,
   IconPencil,
@@ -23,17 +25,17 @@ import {
 const items = [
   {
     title: "Home",
-    url: "#",
+    url: "/",
     icon: IconHome,
   },
   {
     title: "Remap",
-    url: "#",
+    url: "/remap",
     icon: IconPencil,
   },
   {
     title: "Calibration",
-    url: "#",
+    url: "/calibration",
     icon: IconBrandSpeedtest,
   },
 
@@ -42,12 +44,14 @@ const items = [
 const led_items = [
   {
     title: "LED Effects",
-    url: "#",
+    url: "/led",
     icon: IconBulb,
   },
 ]
 
 export function AppSidebar() {
+
+  const navigate = useNavigate()
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
@@ -57,7 +61,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton onClick={() => window.location.href = item.url}>
+                  <SidebarMenuButton onClick={() => navigate(item.url)}>
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -74,7 +78,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {led_items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton onClick={() => window.location.href = item.url}>
+                  <SidebarMenuButton onClick={() => navigate(item.url)}>
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -91,7 +95,7 @@ export function AppSidebar() {
             <SidebarMenu>
               
                 <SidebarMenuItem key="settings">
-                  <SidebarMenuButton onClick={() => window.location.href = "/settings"}>
+                  <SidebarMenuButton onClick={() => navigate("/settings")}>
                     <IconSettings />
                     <span>Settings</span>
                   </SidebarMenuButton>
