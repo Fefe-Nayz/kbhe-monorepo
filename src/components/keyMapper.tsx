@@ -97,10 +97,6 @@ const AllKeys = [
   { id: "excl", label: "!", value: "Slash", width: 1, type: "Basic" },
 ];
 
-function run() {
-  console.log("run");
-}
-
 
 export default function KeyMapper() {
   const groupedKeys = AllKeys.reduce((acc, key) => {
