@@ -1,5 +1,6 @@
-
 import { Input } from "./ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area"
+
 
 import Key from "./keyboard-components/key"
 import {
@@ -108,36 +109,41 @@ export default function KeyMapper() {
   }, {} as Record<string, typeof AllKeys>);
 
   return (
-    <main className="flex flex-wrap gap-1 p-4 bg-white border border-gray-200 w-full">
+
+    <main className="relative flex flex-wrap gap-1 p-4 bg-white border border-gray-200 w-full">
       <div className="flex justify-end w-full mb-2">
         <Input placeholder="Search for a component here" />
       </div>
-
-      {Object.entries(groupedKeys).map(([type, keys]) => (
-        <Accordion defaultValue={["Basic"]} className="w-full mt-4">
-          <AccordionItem value={type}>
-            <AccordionTrigger>{type}</AccordionTrigger>
-            <AccordionContent>
-              {keys.map((keyData) => (
-                <div className="inline-block m-0.5" key={keyData.id}>
-                  <Key
-                    key={keyData.id}
-                    id={keyData.id}
-                    label={keyData.label}
-                    width={keyData.width}
-                    value={keyData.value}
-
-                  />
-
-                </div>
-
-              ))}
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      ))}
+      <ScrollArea className=" absolute h-45 w-full rounded-md border p-4">
 
 
+        {Object.entries(groupedKeys).map(([type, keys]) => (
+          <Accordion defaultValue={["Basic"]} className="w-full mt-4">
+            <AccordionItem value={type}>
+              <AccordionTrigger>{type}</AccordionTrigger>
+              <AccordionContent>
+                {keys.map((keyData) => (
+                  <div className="inline-block m-0.5" key={keyData.id}>
+                    <Key
+                      key={keyData.id}
+                      id={keyData.id}
+                      label={keyData.label}
+                      width={keyData.width}
+                      value={keyData.value}
+
+                    />
+
+                  </div>
+
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        ))}
+
+
+
+      </ScrollArea>
 
     </main>
   )

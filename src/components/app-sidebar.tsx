@@ -65,7 +65,7 @@ export function AppSidebar() {
 
   const navigate = useNavigate()
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="flex h-full">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Application</SidebarGroupLabel>

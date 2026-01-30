@@ -17,7 +17,7 @@ function Key({ id, label, value, width, onSelect }: KeyProps) {
       value={value}
       variant="outline"
       style={{ width: `${widthPixels}px` }}
-      className="h-12 bg-transparent inset-shadow-2xs active:bg-blue-300 text-black rounded px-2 py-1 text-xs font-semibold transition-colors border border-gray-200"
+      className="h-12 bg-transparent shadow-xs active:bg-blue-300 text-black rounded-x px-2 py-1 text-xs font-semibold transition-colors border border-gray-200"
       onClick={() => onSelect?.(id)}
 
     >

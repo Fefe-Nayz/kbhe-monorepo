@@ -1,4 +1,4 @@
-import { SidebarProvider }  from "@/components/ui/sidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Routes, Route } from "react-router-dom"
 
@@ -14,34 +14,37 @@ import Nav from "./components/Nav"
 
 export default function App() {
   return (
-    <>
+    <div className="h-screen flex flex-col min-w-300 min-h-300">
+
         <SidebarProvider>
         <AppSidebar />
 
-        <main className="w-full">
-        {/*
+        
+        <main className="h-screen w-screen">
+          {/*
         <div className="bg-amber-500">
             <SidebarTrigger />
         </div>
         
         */}
-        <Nav />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/remap" element={<Remap />} />
-          <Route path="/performance" element={<Performance />} />
-          <Route path="/calibration" element={<Calibration />} />
-          <Route path="/gamepad" element={<Gamepad />} />
-          <Route path="/led" element={<LED />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </main>
-        </SidebarProvider>
-       
-       
-      
-    </>
+
+
+
+          <Nav  />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/remap" element={<Remap />} />
+            <Route path="/performance" element={<Performance />} />
+            <Route path="/calibration" element={<Calibration />} />
+            <Route path="/gamepad" element={<Gamepad />} />
+            <Route path="/led" element={<LED />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </main>
+      </SidebarProvider>
+
+
+    </div>
 
   )
 }
-
