@@ -99,10 +99,19 @@ const AllKeys = [
   { id: "excl", label: "!", value: "Slash", width: 1, type: "Basic" },
 ];
 
+interface KeyMapperProps {
+  onButtonClick: (ids: string[] | string) => void;
+
+}
 
 
-export default function KeyMapper() {
+export default function KeyMapper( { onButtonClick } : KeyMapperProps) {
+  const [clickedKeys, setClickedKeys] = useState<string[]>([]);
 
+  const handleKeyClick = (id: string) => {
+        setClickedKeys([id]);
+        onButtonClick(id);
+    }
   const groupedKeys = AllKeys.reduce((acc, key) => {
     if (!acc[key.type]) {
       acc[key.type] = [];
@@ -149,7 +158,7 @@ export default function KeyMapper() {
                       label={keyData.label}
                       width={keyData.width}
                       value={keyData.value}
-
+                      onSelect={handleKeyClick}
                     />
 
                   </div>

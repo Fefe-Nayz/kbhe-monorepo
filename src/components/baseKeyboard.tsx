@@ -4,7 +4,7 @@ import Key from "./keyboard-components/key"
 import KeyEnter from "./keyboard-components/keyEnter"
 
 import { useScreenScale } from "@/hooks/mywindow"
-import { useEffect } from "react"
+import { useState, useEffect } from "react"
 
 const keyboard75Layout = [
   // Row 1
@@ -114,9 +114,50 @@ const keyboard75Layout = [
   ],
 ]
 
+interface BaseKeyboardProps {
+  mode: "single" | "multi";
+  onButtonClick: (ids: string[] | string) => void;
 
-export default function BaseKeyboard() {
+}
+
+
+
+export default function BaseKeyboard({ mode = "single", onButtonClick }: BaseKeyboardProps) {
   const scale = useScreenScale();
+  const [clickedKeys, setClickedKeys] = useState<string[]>([]);
+
+  const handleKeyClick = (id: string) => {
+    if (mode === "single") {
+      setClickedKeys((prev) => {
+        let updated: string[];
+
+        if (prev[0] === id) {
+          updated = [];
+        } else {
+          updated = [id];
+        }
+
+        onButtonClick(updated[0] ?? "");
+        return updated;
+      });
+    }
+    else {
+      setClickedKeys((prev) => {
+        let updated: string[];
+
+        if (!prev.includes(id)) {
+
+          updated = [...prev, id];
+        } else {
+          updated = prev.filter((k) => k !== id);
+        }
+
+        onButtonClick(updated);
+        return updated;
+      });
+    }
+  };
+
 
   useEffect(() => {
     console.log("Current scale:", scale);
@@ -134,6 +175,8 @@ export default function BaseKeyboard() {
                   label={keyData.label}
                   width={keyData.width * scale}
                   value={keyData.value}
+                  onSelect={handleKeyClick}
+
                 />
               ) : (
                 <Key
@@ -141,6 +184,8 @@ export default function BaseKeyboard() {
                   label={keyData.label}
                   width={keyData.width * scale}
                   value={keyData.value}
+                  onSelect={handleKeyClick}
+                  className={`${clickedKeys.includes(keyData.id) ? "bg-red-700 active:bg-red-500" : "bg-transparent active:bg-blue-300 "}`}
                 />
               )}
             </div>

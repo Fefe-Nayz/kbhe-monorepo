@@ -5,15 +5,17 @@ interface KeyProps {
   label: string | React.ReactNode
   value: string
   width: number
+  className?: string
+  onSelect?: (id: string) => void;
 }
 
-function KeyEnter({ id, label, value, width }: KeyProps) {
+function KeyEnter({ id, label, value, width, onSelect, className }: KeyProps) {
 
   const widthPixels = (width * 2.5 * 16 + (width - 1) * 0.25 * 16) * 1.4
 
   return (
     <div
-    
+
       className="h-26 absolute bg-transparent inset-shadow-2xs border-2 rounded hover:bg-accent transition-colors"
       style={{
         width: `${widthPixels}px`,
@@ -30,7 +32,8 @@ function KeyEnter({ id, label, value, width }: KeyProps) {
         id={id}
         value={value}
         variant="ghost"
-        className="w-full h-full p-0 bg-transparent hover:bg-transparent active:bg-black/5 rounded-none"
+        onClick={() => onSelect?.(id)}
+        className={`w-full h-full p-0 bg-transparent hover:bg-transparent active:bg-black/5 rounded-none ${className ?? ""}`}
       />
     </div>
   )
