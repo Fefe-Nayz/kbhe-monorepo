@@ -111,6 +111,7 @@ export default function KeyMapper( { onButtonClick } : KeyMapperProps) {
   const handleKeyClick = (id: string) => {
         setClickedKeys([id]);
         onButtonClick(id);
+        clickedKeys
     }
   const groupedKeys = AllKeys.reduce((acc, key) => {
     if (!acc[key.type]) {
@@ -160,6 +161,7 @@ export default function KeyMapper( { onButtonClick } : KeyMapperProps) {
                       value={keyData.value}
                       onSelect={handleKeyClick}
                     />
+
 
                   </div>
 

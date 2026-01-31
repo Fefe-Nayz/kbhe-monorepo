@@ -7,7 +7,7 @@ export default function Home() {
       {/*<h1 className="text-2xl font-bold mb-4">Welcome to the KBHE Configurator</h1>*/}
       <div className="bg-blue-600 flex justify-center mb-1">
         <BaseKeyboard
-          mode="multi"
+          mode="single"
           onButtonClick={(ids) => console.log("All pressed keys:", ids)}
         />
       </div>

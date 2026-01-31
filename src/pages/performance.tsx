@@ -9,7 +9,7 @@ export default function Performance() {
         <h1 className="text-3xl font-bold">Performance</h1>
         <p className="text-gray-600 mt-2">Performance page content</p>
         <div className="mt-6">
-          <BaseKeyboard mode="multi"
+          <BaseKeyboard mode="multi" 
           onButtonClick={(ids) => console.log("All pressed keys:", ids)} />
           <div>
             <PerformanceButtonDiv />

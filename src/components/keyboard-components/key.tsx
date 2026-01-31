@@ -18,7 +18,7 @@ function Key({ id, label, value, width, onSelect, className }: KeyProps) {
       value={value}
       variant="outline"
       style={{ width: `${widthPixels}px` }}
-      className={`h-12  shadow-xs active:bg-blue-300 
+      className={`h-12 shadow-xs 
                   text-black rounded-x px-2 py-1 text-xs font-semibold 
                   transition-colors border border-gray-200 
                   ${className ?? ""}`}
