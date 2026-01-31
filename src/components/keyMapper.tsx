@@ -123,17 +123,17 @@ export default function KeyMapper() {
   const [searchTerm, setSearchTerm] = useState("");
   return (
 
-    <main className="relative flex flex-wrap gap-1 p-4 bg-blue-500 border border-gray-200 w-full">
+    <main className="relative flex flex-wrap gap-1 p-4 bg-blue-500 border border-gray-200 w-full h-auto">
       <div className="flex justify-end w-full mb-2">
         <Input
-          placeholder="Search for a component here"
+          placeholder="Search for a component here..."
           value={searchTerm}
           onChange={(event) => {
             setSearchTerm(event.target.value);
             console.log(event.target.value);
           }} />
       </div>
-      <ScrollArea className=" absolute h-45 w-full rounded-md border p-4">
+      <ScrollArea className="bg-cyan-900 absolute h-45 w-full rounded-md border p-4">
 
 
         {Object.entries(groupedKeys).filter(([type, keys]) => funcFilter(type, searchTerm, keys)).map(([type, keys]) => (

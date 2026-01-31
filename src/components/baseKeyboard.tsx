@@ -4,7 +4,7 @@ import Key from "./keyboard-components/key"
 import KeyEnter from "./keyboard-components/keyEnter"
 
 import { useScreenScale } from "@/hooks/mywindow"
-
+import { useEffect } from "react"
 
 const keyboard75Layout = [
   // Row 1
@@ -117,25 +117,29 @@ const keyboard75Layout = [
 
 export default function BaseKeyboard() {
   const scale = useScreenScale();
+
+  useEffect(() => {
+    console.log("Current scale:", scale);
+  }, [scale]);
+
   return (
-    <div className={`flex flex-col gap-2 p-4 bg-white rounded-lg border border-gray-200 w-fit h-auto`} 
-    style={{ transform: `scale(${scale})` }}>
+    <div className={`flex flex-col gap-${2} p-4 bg-white rounded-lg border border-gray-200 w-fit h-auto`}>
       {keyboard75Layout.map((row, rowIndex) => (
-        <div key={rowIndex} className={`flex gap-${1 * scale}`}>
+        <div key={rowIndex} className={`flex gap-${1}`}>
           {row.map((keyData) => (
-            <div key={keyData.id} style={{ marginLeft: `${keyData.gap * 0.25 * scale}rem` }}>
+            <div key={keyData.id} style={{ marginLeft: `${keyData.gap * 0.25}rem` }}>
               {keyData.id === "enter" ? (
                 <KeyEnter
                   id={keyData.id}
                   label={keyData.label}
-                  width={keyData.width }
+                  width={keyData.width * scale}
                   value={keyData.value}
                 />
               ) : (
                 <Key
                   id={keyData.id}
                   label={keyData.label}
-                  width={keyData.width}
+                  width={keyData.width * scale}
                   value={keyData.value}
                 />
               )}

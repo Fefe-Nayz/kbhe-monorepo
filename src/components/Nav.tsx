@@ -5,7 +5,7 @@ import { ThemeButton } from "./nav-components/themeButton"
 
 export function Nav() {
   return (
-    <nav className="flex justify-between h-16 shrink-0 p-4 bg-white border-b ">
+    <nav className="flex justify-between h-16 shrink-0 p-4 bg-white border-b">
       <div className="flex items-center gap-4">
         <SidebarTrigger />
         <h1 className="text-xl font-bold">KBHE Configurator</h1>  

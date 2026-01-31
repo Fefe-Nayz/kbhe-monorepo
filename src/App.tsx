@@ -22,7 +22,7 @@ export default function App() {
         <AppSidebar />
 
         
-        <main className="bg-amber-300 overflow-hidden">
+        <main className="bg-amber-300 w-screen overflow-hidden">
           {/*
         <div className="bg-amber-500">
             <SidebarTrigger />

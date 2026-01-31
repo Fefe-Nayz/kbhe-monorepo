@@ -1,30 +1,30 @@
 import { useState, useEffect } from "react";
 
 export function useScreenScale(): number {
-  // Reference screen (1280x720)
-  const baseWidth = 1280;
-  const baseHeight = 720;
-  const baseDiagonal = Math.sqrt(baseWidth ** 2 + baseHeight ** 2);
+    // Reference screen (1280x720) and max screen (3840x2160)
+    const minW = 1280;
+    const maxW = 3840;
 
-  const minScale = 1;
-  const maxScale = 1.6; 
+    const minScale = 1;
+    const maxScale = 1.4;
 
-  const [scale, setScale] = useState(() => {
-    const diagonal = Math.sqrt(window.innerWidth ** 2 + window.innerHeight ** 2);
-    const currentScale = diagonal / baseDiagonal;
-    return Math.min(Math.max(currentScale, minScale), maxScale);
-  });
+    const [scale, setScale] = useState(() => {
+        const width = window.innerWidth
+        const a = (width - minW) / (maxW - minW);
+        return minScale + a * (maxScale - minScale);
+    });
 
-  useEffect(() => {
-    const handleResize = () => {
-      const diagonal = Math.sqrt(window.innerWidth ** 2 + window.innerHeight ** 2);
-      const currentScale = diagonal / baseDiagonal;
-      setScale(Math.min(Math.max(currentScale, minScale), maxScale));
-    };
+    useEffect(() => {
+        const handleResize = () => {
+            const width = window.innerWidth
+            const a = (width - minW) / (maxW - minW);
+            setScale(minScale + a * (maxScale - minScale));
+            console.log("Resized window, new scale:", scale);
+        };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
-  return scale;
+    return scale;
 }
