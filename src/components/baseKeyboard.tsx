@@ -3,6 +3,9 @@ import { IconBrandWindows } from "@tabler/icons-react"
 import Key from "./keyboard-components/key"
 import KeyEnter from "./keyboard-components/keyEnter"
 
+import { useScreenScale } from "@/hooks/mywindow"
+
+
 const keyboard75Layout = [
   // Row 1
   [
@@ -111,18 +114,21 @@ const keyboard75Layout = [
   ],
 ]
 
+
 export default function BaseKeyboard() {
+  const scale = useScreenScale();
   return (
-    <div className="flex flex-col gap-2 p-4 bg-white rounded-lg border border-gray-200 w-fit">
+    <div className={`flex flex-col gap-2 p-4 bg-white rounded-lg border border-gray-200 w-fit h-auto`} 
+    style={{ transform: `scale(${scale})` }}>
       {keyboard75Layout.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex gap-1">
+        <div key={rowIndex} className={`flex gap-${1 * scale}`}>
           {row.map((keyData) => (
-            <div key={keyData.id} style={{ marginLeft: `${keyData.gap * 0.25}rem` }}>
+            <div key={keyData.id} style={{ marginLeft: `${keyData.gap * 0.25 * scale}rem` }}>
               {keyData.id === "enter" ? (
                 <KeyEnter
                   id={keyData.id}
                   label={keyData.label}
-                  width={keyData.width}
+                  width={keyData.width }
                   value={keyData.value}
                 />
               ) : (

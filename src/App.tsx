@@ -14,22 +14,22 @@ import Nav from "./components/Nav"
 
 export default function App() {
   return (
-    <div className="h-screen flex flex-col min-w-300 min-h-300">
+
+
+    <div className="h-screen flex flex-col">
 
         <SidebarProvider>
         <AppSidebar />
 
         
-        <main className="h-screen w-screen">
+        <main className="bg-amber-300 overflow-hidden">
           {/*
         <div className="bg-amber-500">
             <SidebarTrigger />
         </div>
         
         */}
-
-
-
+        
           <Nav  />
           <Routes>
             <Route path="/" element={<Home />} />

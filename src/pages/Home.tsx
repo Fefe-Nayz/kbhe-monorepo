@@ -3,14 +3,13 @@ import KeyMapper from "@/components/keyMapper"
 
 export default function Home() {
   return (
-    <div className="p-4">
+    <div className="justify-center items-center p-4">
       <h1 className="text-2xl font-bold mb-4">Welcome to the KBHE Configurator</h1>
-      <div>
+      <div className="bg-blue-600 flex justify-center mb-1">
         <BaseKeyboard />
       </div>
-      <div>
+      <div className="bg-red-600 flex overflow-auto">
         <KeyMapper />
-
       </div>
       
     </div>

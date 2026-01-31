@@ -10,10 +10,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 
+import { useState } from "react";
 
 const AllKeys = [
 
-  { id: "esc", label: "Esc", value: "Escape", width: 1, type: "Extended" },
   { id: "f1", label: "F1", value: "F1", width: 1, type: "Basic" },
   { id: "f2", label: "F2", value: "F2", width: 1, type: "Basic" },
   { id: "f3", label: "F3", value: "F3", width: 1, type: "Basic" },
@@ -69,6 +69,7 @@ const AllKeys = [
   { id: "m", label: "M", value: "KeyM", width: 1, type: "Basic" },
   { id: "ù", label: "Ù", value: "Quote", width: 1, type: "Basic" },
 
+  { id: "esc", label: "Esc", value: "Escape", width: 1, type: "Extended" },
   { id: "shift", label: "Shift", value: "ShiftLeft", width: 1, type: "Extended" },
   { id: "shift_r", label: "Shift", value: "ShiftRight", width: 1, type: "Extended" },
   { id: "ctrl", label: "Ctrl", value: "ControlLeft", width: 1, type: "Extended" },
@@ -99,7 +100,9 @@ const AllKeys = [
 ];
 
 
+
 export default function KeyMapper() {
+
   const groupedKeys = AllKeys.reduce((acc, key) => {
     if (!acc[key.type]) {
       acc[key.type] = [];
@@ -108,21 +111,37 @@ export default function KeyMapper() {
     return acc;
   }, {} as Record<string, typeof AllKeys>);
 
+
+  const funcFilter = (type: string, searchTerm: string, keys: typeof AllKeys) => {
+    type
+    if (searchTerm === "") {
+      return true;
+    }
+    return keys.some(key => key.id.toLowerCase().includes(searchTerm.toLowerCase()))
+  }
+
+  const [searchTerm, setSearchTerm] = useState("");
   return (
 
-    <main className="relative flex flex-wrap gap-1 p-4 bg-white border border-gray-200 w-full">
+    <main className="relative flex flex-wrap gap-1 p-4 bg-blue-500 border border-gray-200 w-full">
       <div className="flex justify-end w-full mb-2">
-        <Input placeholder="Search for a component here" />
+        <Input
+          placeholder="Search for a component here"
+          value={searchTerm}
+          onChange={(event) => {
+            setSearchTerm(event.target.value);
+            console.log(event.target.value);
+          }} />
       </div>
       <ScrollArea className=" absolute h-45 w-full rounded-md border p-4">
 
 
-        {Object.entries(groupedKeys).map(([type, keys]) => (
+        {Object.entries(groupedKeys).filter(([type, keys]) => funcFilter(type, searchTerm, keys)).map(([type, keys]) => (
           <Accordion defaultValue={["Basic"]} className="w-full mt-4">
-            <AccordionItem value={type}>
-              <AccordionTrigger>{type}</AccordionTrigger>
+            <AccordionItem value={type} disabled = {searchTerm !== "" ? true : false}>
+              <AccordionTrigger >{type}</AccordionTrigger>
               <AccordionContent>
-                {keys.map((keyData) => (
+                {keys.filter(key => key.id.toLowerCase().includes(searchTerm.toLowerCase())).map((keyData) => (
                   <div className="inline-block m-0.5" key={keyData.id}>
                     <Key
                       key={keyData.id}

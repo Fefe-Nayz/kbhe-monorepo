@@ -65,7 +65,7 @@ export function AppSidebar() {
 
   const navigate = useNavigate()
   return (
-    <Sidebar collapsible="icon" className="flex h-full">
+    <Sidebar collapsible="icon" className="flex h-full flex-col">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Application</SidebarGroupLabel>
@@ -120,9 +120,9 @@ export function AppSidebar() {
     
 
 
-        <SidebarFooter>
+        <SidebarFooter className="bg-amber-700 p-1">
 
-            <div className="px-2 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            <div className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
                 TIPE 2026 - KBHE Configurator
             </div>
               
