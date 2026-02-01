@@ -1,7 +1,7 @@
 // https://crates.io/crates/hidapi/2.6.4
 
 //HidDevice is used to initiate conection to a device when you know it's vendor and product ID 
-//let mut device: HidDevice = api
+//let mut device: HidDevice = api.open();
 use hidapi::{ HidApi, DeviceInfo, HidDevice };
 
 extern crate hidapi;
