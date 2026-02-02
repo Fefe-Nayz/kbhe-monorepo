@@ -1,0 +1,44 @@
+# --- KiCad Ignore ---
+
+# Fichiers temporaires et de verrouillage
+*.lck
+*.lock
+*_autosave*
+
+# Fichiers de sauvegarde (Backups)
+*.bak
+*.kicad_pcb-bak
+*.sch-bak
+*-bak
+
+# Cache des empreintes (Footprint cache)
+fp-info-cache
+
+# Fichiers de configuration locale de l'utilisateur
+# (Contient la dernière vue, le zoom, etc. - à ne pas partager)
+*.kicad_prl
+
+# Dossiers de sortie (à adapter selon vos noms de dossiers)
+# Il est préférable de ne pas versionner les fichiers générés (Gerbers, BOM, etc.)
+/gerber/
+/plot/
+/bom/
+/fabrication/
+*.gbr
+*.drl
+*.pos
+*.rpt
+*.csv
+*.xml
+*.svg
+*.dxf
+*.step
+*.stp
+*.pdf
+
+# Fichiers Netlist (généralement pas nécessaires si vous avez le schématique)
+*.net
+
+# --- Fichiers OS (classique) ---
+.DS_Store
+Thumbs.db
