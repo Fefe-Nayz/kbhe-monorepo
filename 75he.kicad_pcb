@@ -4184,7 +4184,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "06b8b35d-36d0-4fbf-b817-fe48f2e4676a")
-		(at -66.675 142.875)
+		(at 261.9375 95.25)
 		(property "Reference" "SW56"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -7856,7 +7856,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "0c63245f-b2c4-4f92-8b26-cb45db100fcf")
-		(at -126.76 68.41)
+		(at 100.0125 114.3)
 		(property "Reference" "SW62"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -17811,7 +17811,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "22c0fbaa-cb59-4570-9100-5ee9c1cf8f53")
-		(at -106.61 -12.19)
+		(at 176.2125 114.3)
 		(property "Reference" "SW66"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -19512,7 +19512,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "250af5c5-5ac8-4910-b4cd-fa7df477b514")
-		(at -126.76 -32.34)
+		(at 280.9875 95.25)
 		(property "Reference" "SW57"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -30297,7 +30297,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "3a25c689-09dd-45e5-8537-6d17b9969b9c")
-		(at -126.76 28.11)
+		(at 61.9125 114.3)
 		(property "Reference" "SW60"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -36292,7 +36292,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "4643fed5-1f63-4aa8-8030-74fc1f8e1229")
-		(at -146.91 7.96)
+		(at 166.6875 95.25)
 		(property "Reference" "SW51"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -39141,7 +39141,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "4e2cdef7-9900-46b6-a08a-1f79a8a16d9c")
-		(at -146.91 48.26)
+		(at 204.7875 95.25)
 		(property "Reference" "SW53"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -58415,7 +58415,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "71fa58cf-9d3b-4687-8a91-4116afc9d106")
-		(at -146.91 88.56)
+		(at 242.8875 95.25)
 		(property "Reference" "SW55"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -58896,7 +58896,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "7264e218-3452-4e6f-bc34-0f9e3317c902")
-		(at -106.61 28.11)
+		(at 214.3125 114.3)
 		(property "Reference" "SW68"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -60232,7 +60232,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "759ae04e-c107-42a9-982b-a02204b06e06")
-		(at -106.61 68.41)
+		(at 252.4125 114.3)
 		(property "Reference" "SW70"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -67779,7 +67779,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "8ee0895a-84ad-4672-9f08-6f129b83400e")
-		(at -146.91 68.41)
+		(at 223.8375 95.25)
 		(property "Reference" "SW54"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -80023,7 +80023,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "a4e9fb3e-b8a6-4212-a7d9-99c150c6a2f0")
-		(at -106.61 -32.34)
+		(at 157.1625 114.3)
 		(property "Reference" "SW65"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -84175,7 +84175,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "aec20306-efd8-49b1-860e-97b1245efd0c")
-		(at -126.76 88.56)
+		(at 119.0625 114.3)
 		(property "Reference" "SW63"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -89329,7 +89329,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "bb87c91f-f98b-4453-ac46-e92e2413aab1")
-		(at -146.91 -12.19)
+		(at 147.6375 95.25)
 		(property "Reference" "SW50"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -95038,7 +95038,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "c568c002-9143-4504-a7d8-886a69be9856")
-		(at -106.61 48.26)
+		(at 233.3625 114.3)
 		(property "Reference" "SW69"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -96824,7 +96824,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "ca7ac312-2314-4878-b349-76cb3b56c9a7")
-		(at -126.76 108.71)
+		(at 138.1125 114.3)
 		(property "Reference" "SW64"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -97056,7 +97056,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "cd019b15-dc44-4cce-966e-9d618ec982e4")
-		(at -146.91 -32.34)
+		(at 128.5875 95.25)
 		(property "Reference" "SW49"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -102240,7 +102240,7 @@
 	(footprint "Package_QFP:LQFP-100_14x14mm_P0.5mm"
 		(layer "F.Cu")
 		(uuid "d6374262-abd9-4fce-9f6d-cd92141a0f07")
-		(at 196.9325 -45.835)
+		(at 170.375 -44.73)
 		(descr "LQFP, 100 Pin (https://www.nxp.com/docs/en/package-information/SOT407-1.pdf), generated with kicad-footprint-generator ipc_gullwing_generator.py")
 		(tags "LQFP QFP")
 		(property "Reference" "U1"
@@ -113939,7 +113939,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "ea02b79e-4f0d-475b-bd2a-9acf0cacde0b")
-		(at -146.91 28.11)
+		(at 185.7375 95.25)
 		(property "Reference" "SW52"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -116221,7 +116221,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "ed2dea19-37ae-4e78-a3f8-52b5da649fc8")
-		(at -126.76 48.26)
+		(at 80.9625 114.3)
 		(property "Reference" "SW61"
 			(at 0 -8.25 0)
 			(unlocked yes)
@@ -122019,7 +122019,7 @@
 	(footprint "75HE:Switch_1U"
 		(layer "F.Cu")
 		(uuid "f8cdb51d-9fcb-4460-96ae-e22cde2a3680")
-		(at -106.61 7.96)
+		(at 195.2625 114.3)
 		(property "Reference" "SW67"
 			(at 0 -8.25 0)
 			(unlocked yes)

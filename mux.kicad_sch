@@ -909,16 +909,6 @@
 			(embedded_fonts no)
 		)
 	)
-	(text "TODO: Add capacitor to VCC"
-		(exclude_from_sim no)
-		(at 87.884 18.542 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-		)
-		(uuid "10516df3-75d2-4ba2-b0cc-659bb5247675")
-	)
 	(junction
 		(at 195.58 52.07)
 		(diameter 0)
