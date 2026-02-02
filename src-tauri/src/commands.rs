@@ -2,7 +2,8 @@
 
 //HidDevice is used to initiate conection to a device when you know it's vendor and product ID 
 //let mut device: HidDevice = api.open();
-use hidapi::{ HidApi, DeviceInfo, HidDevice };
+// use hidapi::{ HidApi, DeviceInfo, HidDevice };
+use hidapi::{ HidApi, DeviceInfo };
 
 extern crate hidapi;
 
