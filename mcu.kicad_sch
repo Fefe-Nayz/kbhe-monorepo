@@ -4524,6 +4524,897 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "PCM_JLCPCB-Extended:Connector, USB-TYPE-C-16P"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "J"
+				(at 2.54 2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Connector, USB-TYPE-C-16P"
+				(at 2.54 -1.27 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Footprint" "PCM_JLCPCB:TYPE-C-SMD_HX-TYPE-C-16PIN"
+				(at 0 -10.16 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+						(italic yes)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://atta.szlcsc.com/upload/public/pdf/source/20220920/0EF8F885FCCEA71F60E9E85152155021.pdf"
+				(at -2.286 0.127 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+					(hide yes)
+				)
+			)
+			(property "Description" "3A 1 Horizontal attachment 16P Female -25℃~+85℃ Type-C SMD USB Connectors ROHS"
+				(at 2.54 1.27 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "LCSC" "C2927039"
+				(at 2.54 1.27 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "C2927039"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "Connector, USB-TYPE-C-16P_0_0"
+				(rectangle
+					(start -0.254 -17.78)
+					(end 0.254 -16.764)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 15.494)
+					(end 9.144 14.986)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 10.414)
+					(end 9.144 9.906)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 7.874)
+					(end 9.144 7.366)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 2.794)
+					(end 9.144 2.286)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 0.254)
+					(end 9.144 -0.254)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 -2.286)
+					(end 9.144 -2.794)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 -4.826)
+					(end 9.144 -5.334)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 -12.446)
+					(end 9.144 -12.954)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 10.16 -14.986)
+					(end 9.144 -15.494)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "Connector, USB-TYPE-C-16P_0_1"
+				(rectangle
+					(start -10.16 17.78)
+					(end 10.16 -17.78)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(polyline
+					(pts
+						(xy -8.89 -3.81) (xy -8.89 3.81)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -7.62 -3.81)
+					(end -6.35 3.81)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(arc
+					(start -7.62 3.81)
+					(mid -6.985 4.4423)
+					(end -6.35 3.81)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(arc
+					(start -7.62 3.81)
+					(mid -6.985 4.4423)
+					(end -6.35 3.81)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(arc
+					(start -8.89 3.81)
+					(mid -6.985 5.7067)
+					(end -5.08 3.81)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(arc
+					(start -5.08 -3.81)
+					(mid -6.985 -5.7067)
+					(end -8.89 -3.81)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(arc
+					(start -6.35 -3.81)
+					(mid -6.985 -4.4423)
+					(end -7.62 -3.81)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(arc
+					(start -6.35 -3.81)
+					(mid -6.985 -4.4423)
+					(end -7.62 -3.81)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(polyline
+					(pts
+						(xy -5.08 3.81) (xy -5.08 -3.81)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center -2.54 1.143)
+					(radius 0.635)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.27 4.318) (xy 0 6.858) (xy 1.27 4.318) (xy -1.27 4.318)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 -2.032) (xy 2.54 0.508) (xy 2.54 1.778)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 -3.302) (xy -2.54 -0.762) (xy -2.54 0.508)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 -5.842) (xy 0 4.318)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 0 -5.842)
+					(radius 1.27)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 1.905 1.778)
+					(end 3.175 3.048)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+			)
+			(symbol "Connector, USB-TYPE-C-16P_1_1"
+				(pin passive line
+					(at -7.62 -22.86 90)
+					(length 5.08)
+					(name "SHIELD"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "S1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -22.86 90)
+					(length 5.08)
+					(hide yes)
+					(name "GND"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A12B1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -22.86 90)
+					(length 5.08)
+					(name "GND"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B12A1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 15.24 15.24 180)
+					(length 5.08)
+					(hide yes)
+					(name "VBUS"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A9B4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 15.24 15.24 180)
+					(length 5.08)
+					(name "VBUS"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B9A4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 10.16 180)
+					(length 5.08)
+					(name "CC1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 7.62 180)
+					(length 5.08)
+					(name "CC2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 2.54 180)
+					(length 5.08)
+					(name "D-"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 0 180)
+					(length 5.08)
+					(name "D-"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 -2.54 180)
+					(length 5.08)
+					(name "D+"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 -5.08 180)
+					(length 5.08)
+					(name "D+"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 -12.7 180)
+					(length 5.08)
+					(name "SBU1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A8"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at 15.24 -15.24 180)
+					(length 5.08)
+					(name "SBU2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B8"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "PCM_JLCPCB-Resistors:0402,5.1kΩ"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "R"
+				(at 1.778 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "5.1kΩ"
+				(at 0 0 90)
+				(do_not_autoplace)
+				(effects
+					(font
+						(size 0.8 0.8)
+					)
+				)
+			)
+			(property "Footprint" "PCM_JLCPCB:R_0402"
+				(at -1.778 0 90)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010045_UNI-ROYAL-Uniroyal-Elec-0402WGF5101TCE_C25905.pdf"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "62.5mW Thick Film Resistors 50V ±100ppm/°C ±1% 5.1kΩ 0402 Chip Resistor - Surface Mount ROHS"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "LCSC" "C25905"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Stock" "3534773"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Price" "0.004USD"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Process" "SMT"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Minimum Qty" "20"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Attrition Qty" "10"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Class" "Basic Component"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Category" "Resistors,Chip Resistor - Surface Mount"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Part" "0402WGF5101TCE"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Resistance" "5.1kΩ"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Power(Watts)" "62.5mW"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Type" "Thick Film Resistors"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Overload Voltage (Max)" "50V"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Operating Temperature Range" "-55°C~+155°C"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Tolerance" "±1%"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Temperature Coefficient" "±100ppm/°C"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "R_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "0402,5.1kΩ_0_1"
+				(rectangle
+					(start -1.016 2.54)
+					(end 1.016 -2.54)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "0402,5.1kΩ_1_1"
+				(pin passive line
+					(at 0 3.81 270)
+					(length 1.27)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -3.81 90)
+					(length 1.27)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "PCM_JLCPCB-Resistors:0603,3kΩ"
 			(pin_numbers
 				(hide yes)
@@ -5592,6 +6483,143 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "power:VBUS"
+			(power)
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "#PWR"
+				(at 0 -3.81 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Value" "VBUS"
+				(at 0 3.556 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Power symbol creates a global label with name \"VBUS\""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "global power"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "VBUS_0_1"
+				(polyline
+					(pts
+						(xy -0.762 1.27) (xy 0 2.54)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 2.54) (xy 0.762 1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 0) (xy 0 2.54)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "VBUS_1_1"
+				(pin power_in line
+					(at 0 0 90)
+					(length 0)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+	)
+	(rectangle
+		(start 326.39 115.57)
+		(end 384.81 172.72)
+		(stroke
+			(width 0)
+			(type dash)
+		)
+		(fill
+			(type none)
+		)
+		(uuid 520ba328-fd59-4b3f-9d26-6752cce5b960)
 	)
 	(rectangle
 		(start 139.7 85.09)
@@ -5616,6 +6644,18 @@
 			(type none)
 		)
 		(uuid 57f9af3a-9ca7-49be-a40c-428bf7d45261)
+	)
+	(rectangle
+		(start 278.13 123.19)
+		(end 326.39 170.18)
+		(stroke
+			(width 0)
+			(type dash)
+		)
+		(fill
+			(type none)
+		)
+		(uuid 79d58886-77f1-4b04-9680-03268b667d6a)
 	)
 	(rectangle
 		(start 124.46 46.99)
@@ -5665,6 +6705,38 @@
 		)
 		(uuid a9ba64c0-118c-4c3f-8c61-07ab248108eb)
 	)
+	(rectangle
+		(start 102.87 106.68)
+		(end 147.32 147.32)
+		(stroke
+			(width 0)
+			(type dash)
+		)
+		(fill
+			(type none)
+		)
+		(uuid e6b59755-cc2b-40e9-92c4-92aefed2ce6b)
+	)
+	(text "HSE"
+		(exclude_from_sim no)
+		(at 103.886 104.394 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "1bb22af0-54a1-4230-b6ee-bdea2a599c97")
+	)
+	(text "TODO: ADD 3A FUZE"
+		(exclude_from_sim no)
+		(at 363.728 169.672 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "1f2e98fa-325f-4f02-91dd-4fb80b661550")
+	)
 	(text "ANALOG POWER SUPPLY"
 		(exclude_from_sim no)
 		(at 190.5 14.986 0)
@@ -5695,6 +6767,26 @@
 			(justify left)
 		)
 		(uuid "3fe98e24-68a2-43de-98ed-f2f0e9a5a55c")
+	)
+	(text "USB TYPE C CONNECTOR"
+		(exclude_from_sim no)
+		(at 338.836 112.776 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "507efa4f-91bf-4246-97a9-d30be4c89ce9")
+	)
+	(text "ELECTROSTATIC DISCHARGE PROTECTION"
+		(exclude_from_sim no)
+		(at 296.926 121.158 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "5568c355-9e18-4067-a285-9c2c4740a141")
 	)
 	(text "VCAP"
 		(exclude_from_sim no)
@@ -5772,6 +6864,12 @@
 		(uuid "0c46c21e-90d8-4c13-8c07-acba9a3b7f72")
 	)
 	(junction
+		(at 370.84 120.65)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "0d7be2ef-e7f5-418b-a1cc-79635e1338e4")
+	)
+	(junction
 		(at 193.04 67.31)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5824,6 +6922,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "45e84ca8-4850-41a8-baf0-8ddcbd1c082b")
+	)
+	(junction
+		(at 297.18 152.4)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "46de975d-113b-4555-b193-115699ed807d")
 	)
 	(junction
 		(at 135.89 33.02)
@@ -5904,6 +7008,24 @@
 		(uuid "ab95e3e6-4829-4735-bed8-dae090d4a506")
 	)
 	(junction
+		(at 347.98 139.7)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "caceccce-c18b-45b1-ba39-c926af83af4d")
+	)
+	(junction
+		(at 347.98 144.78)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "e15944f1-b239-4e3e-bed8-bd1f0ea651e2")
+	)
+	(junction
+		(at 334.01 162.56)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "e220f4af-f828-4f75-92d9-de650269ccd5")
+	)
+	(junction
 		(at 156.21 25.4)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5945,6 +7067,14 @@
 		(color 0 0 0 0)
 		(uuid "f8ca223a-80af-4619-8f27-cb80f65ec933")
 	)
+	(no_connect
+		(at 347.98 130.81)
+		(uuid "311a73a7-babf-480e-b85a-172bb84862d3")
+	)
+	(no_connect
+		(at 347.98 128.27)
+		(uuid "ac8d75a2-e80a-49a1-97f7-387df0db76ef")
+	)
 	(wire
 		(pts
 			(xy 125.73 33.02) (xy 135.89 33.02)
@@ -5954,6 +7084,16 @@
 			(type default)
 		)
 		(uuid "00bccd8b-5e89-4b93-be6b-fbb212f7b204")
+	)
+	(wire
+		(pts
+			(xy 339.09 162.56) (xy 339.09 161.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "01b9b2aa-1ad9-4378-94c4-37a35da91941")
 	)
 	(wire
 		(pts
@@ -6014,6 +7154,16 @@
 			(type default)
 		)
 		(uuid "14419f39-351f-43d5-b6d2-02df2fd84350")
+	)
+	(wire
+		(pts
+			(xy 347.98 166.37) (xy 342.9 166.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "14a00e9f-6b8e-4b77-b412-a951f052767d")
 	)
 	(wire
 		(pts
@@ -6107,6 +7257,16 @@
 	)
 	(wire
 		(pts
+			(xy 303.53 140.97) (xy 298.45 140.97)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3391bc09-651a-48b6-b5ce-4f2577852503")
+	)
+	(wire
+		(pts
 			(xy 228.6 158.75) (xy 243.84 158.75)
 		)
 		(stroke
@@ -6167,6 +7327,16 @@
 	)
 	(wire
 		(pts
+			(xy 298.45 139.7) (xy 298.45 140.97)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3aae9311-0699-4ea7-a01d-91e1b4698825")
+	)
+	(wire
+		(pts
 			(xy 152.4 57.15) (xy 152.4 58.42)
 		)
 		(stroke
@@ -6217,6 +7387,16 @@
 	)
 	(wire
 		(pts
+			(xy 339.09 153.67) (xy 347.98 153.67)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "436a86bc-bdec-4665-a338-aec885dd7258")
+	)
+	(wire
+		(pts
 			(xy 228.6 110.49) (xy 242.57 110.49)
 		)
 		(stroke
@@ -6224,6 +7404,16 @@
 			(type default)
 		)
 		(uuid "4873566e-e918-43c8-b5ce-f5a25ca62171")
+	)
+	(wire
+		(pts
+			(xy 363.22 120.65) (xy 370.84 120.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "49d70103-ec73-4d44-9360-1298073cec5b")
 	)
 	(wire
 		(pts
@@ -6244,6 +7434,16 @@
 			(type default)
 		)
 		(uuid "4e181160-827c-40d1-a035-0236c2602cc3")
+	)
+	(wire
+		(pts
+			(xy 298.45 132.08) (xy 308.61 132.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "509df3ee-630a-4c7e-8e32-c6e8ed9fcb82")
 	)
 	(wire
 		(pts
@@ -6347,6 +7547,26 @@
 	)
 	(wire
 		(pts
+			(xy 313.69 143.51) (xy 327.66 143.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6279b4ad-6304-43bc-9010-d63cf150cb44")
+	)
+	(wire
+		(pts
+			(xy 327.66 140.97) (xy 327.66 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "632a70ce-860d-4ca3-9d34-d3618c77b4af")
+	)
+	(wire
+		(pts
 			(xy 124.46 125.73) (xy 124.46 138.43)
 		)
 		(stroke
@@ -6357,6 +7577,16 @@
 	)
 	(wire
 		(pts
+			(xy 347.98 158.75) (xy 347.98 166.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "68c4130a-92a9-4328-8b5a-747ceb1f73db")
+	)
+	(wire
+		(pts
 			(xy 135.89 105.41) (xy 135.89 120.65)
 		)
 		(stroke
@@ -6364,6 +7594,16 @@
 			(type default)
 		)
 		(uuid "69766e65-74d0-43b4-866c-6c4114580239")
+	)
+	(wire
+		(pts
+			(xy 334.01 162.56) (xy 339.09 162.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6b115a35-7527-49be-be7c-45c713665cd7")
 	)
 	(wire
 		(pts
@@ -6387,6 +7627,26 @@
 	)
 	(wire
 		(pts
+			(xy 328.93 153.67) (xy 328.93 151.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6c71c89b-fd4d-4753-98c9-1896531664a3")
+	)
+	(wire
+		(pts
+			(xy 328.93 161.29) (xy 328.93 162.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6c76317b-d2e3-4417-9a31-552076c44950")
+	)
+	(wire
+		(pts
 			(xy 193.04 67.31) (xy 195.58 67.31)
 		)
 		(stroke
@@ -6407,6 +7667,16 @@
 	)
 	(wire
 		(pts
+			(xy 297.18 153.67) (xy 297.18 152.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "71cf5fd8-2897-4835-ae2b-b12895e1333d")
+	)
+	(wire
+		(pts
 			(xy 111.76 138.43) (xy 124.46 138.43)
 		)
 		(stroke
@@ -6424,6 +7694,16 @@
 			(type default)
 		)
 		(uuid "7459f74e-837f-431a-b2bf-ca66da471ba3")
+	)
+	(wire
+		(pts
+			(xy 297.18 152.4) (xy 308.61 152.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "74e033a3-12db-4e1e-9ee5-3cebd61b029b")
 	)
 	(wire
 		(pts
@@ -6507,6 +7787,16 @@
 	)
 	(wire
 		(pts
+			(xy 280.67 143.51) (xy 303.53 143.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "895a4903-eac0-4709-9ed6-a0f19c6ae17a")
+	)
+	(wire
+		(pts
 			(xy 208.28 67.31) (xy 208.28 41.91)
 		)
 		(stroke
@@ -6524,6 +7814,26 @@
 			(type default)
 		)
 		(uuid "8cfcafd4-fdeb-4539-9a0b-c5258c7e02ce")
+	)
+	(wire
+		(pts
+			(xy 327.66 139.7) (xy 347.98 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "92211d36-1189-4dcb-bbbf-f77c0d4856bd")
+	)
+	(wire
+		(pts
+			(xy 328.93 151.13) (xy 347.98 151.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "95f7614b-f84f-4e6a-899d-5939d465cb0d")
 	)
 	(wire
 		(pts
@@ -6557,6 +7867,16 @@
 	)
 	(wire
 		(pts
+			(xy 370.84 120.65) (xy 381 120.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a0b1eec8-99a3-466f-b311-293d4d694973")
+	)
+	(wire
+		(pts
 			(xy 210.82 50.8) (xy 218.44 50.8)
 		)
 		(stroke
@@ -6584,6 +7904,16 @@
 			(type default)
 		)
 		(uuid "a5f20c1b-a64d-4e98-a848-02e739267623")
+	)
+	(wire
+		(pts
+			(xy 347.98 144.78) (xy 347.98 146.05)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a73c2435-e265-4b34-948c-2e55074eab86")
 	)
 	(wire
 		(pts
@@ -6617,6 +7947,16 @@
 	)
 	(wire
 		(pts
+			(xy 328.93 162.56) (xy 334.01 162.56)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b1ccdc1d-7e39-4d95-8647-b5e495675467")
+	)
+	(wire
+		(pts
 			(xy 228.6 156.21) (xy 243.84 156.21)
 		)
 		(stroke
@@ -6624,6 +7964,26 @@
 			(type default)
 		)
 		(uuid "b1d7f134-09fd-4169-a088-da5b4fabb684")
+	)
+	(wire
+		(pts
+			(xy 308.61 132.08) (xy 308.61 135.89)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b20116e6-8a62-4eb9-a80d-8e789e3ea402")
+	)
+	(wire
+		(pts
+			(xy 347.98 143.51) (xy 347.98 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b5dfa14b-4e2f-46e4-a400-fb34fc092665")
 	)
 	(wire
 		(pts
@@ -6647,6 +8007,26 @@
 	)
 	(wire
 		(pts
+			(xy 280.67 139.7) (xy 298.45 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ba8bc910-3fbd-4236-a1c4-b8067165926f")
+	)
+	(wire
+		(pts
+			(xy 313.69 140.97) (xy 327.66 140.97)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c0420ca8-078f-403c-b47d-d1c89baaf248")
+	)
+	(wire
+		(pts
 			(xy 228.6 171.45) (xy 242.57 171.45)
 		)
 		(stroke
@@ -6667,6 +8047,16 @@
 	)
 	(wire
 		(pts
+			(xy 327.66 143.51) (xy 327.66 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cb0788e1-6447-4aef-8444-03e56c1d2eea")
+	)
+	(wire
+		(pts
 			(xy 208.28 41.91) (xy 201.93 41.91)
 		)
 		(stroke
@@ -6674,6 +8064,16 @@
 			(type default)
 		)
 		(uuid "d0916471-6a00-47ab-b1b1-854f44ac283e")
+	)
+	(wire
+		(pts
+			(xy 308.61 152.4) (xy 308.61 148.59)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d09ca0b2-0b13-4cc5-bc9c-800d16ea1fdb")
 	)
 	(wire
 		(pts
@@ -6737,6 +8137,16 @@
 	)
 	(wire
 		(pts
+			(xy 327.66 144.78) (xy 347.98 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "dfd2ff5f-9063-44d7-b05e-e2b0eb5dba06")
+	)
+	(wire
+		(pts
 			(xy 203.2 67.31) (xy 205.74 67.31)
 		)
 		(stroke
@@ -6744,6 +8154,16 @@
 			(type default)
 		)
 		(uuid "dfe290a2-b6bd-4526-b6a5-0d8f3fae41a4")
+	)
+	(wire
+		(pts
+			(xy 347.98 139.7) (xy 347.98 140.97)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e62d5d50-c2cc-47bd-a6c2-9749b4ca0f7b")
 	)
 	(wire
 		(pts
@@ -6787,6 +8207,16 @@
 	)
 	(wire
 		(pts
+			(xy 347.98 138.43) (xy 347.98 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fbc85408-0aa7-444c-8b79-a99f01a8e6ed")
+	)
+	(wire
+		(pts
 			(xy 111.76 102.87) (xy 111.76 120.65)
 		)
 		(stroke
@@ -6805,6 +8235,16 @@
 		)
 		(uuid "0c867a3e-dd70-4e87-bac7-b1e6c397f4c2")
 	)
+	(label "USB_D+"
+		(at 280.67 139.7 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1c4d9748-1bfb-4980-bd95-0ca01431cb9f")
+	)
 	(label "ADC1_0"
 		(at 231.14 77.47 0)
 		(effects
@@ -6814,6 +8254,26 @@
 			(justify left bottom)
 		)
 		(uuid "1e33a1fa-52f8-4c49-8165-b89795b4e08b")
+	)
+	(label "USB_PLUG_D+"
+		(at 330.2 139.7 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "2858c6e5-e904-4120-8927-0bf49d92e712")
+	)
+	(label "USB_D-"
+		(at 280.67 143.51 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "28eaf17f-66ef-4882-9c81-ce9b7d606d40")
 	)
 	(label "ADC1_1"
 		(at 231.14 80.01 0)
@@ -6934,6 +8394,16 @@
 			(justify left bottom)
 		)
 		(uuid "9686e551-1b52-4c87-9be4-52a929687182")
+	)
+	(label "USB_PLUG_D-"
+		(at 330.2 144.78 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "9755cc73-3384-46c0-9b27-3c987bcb965f")
 	)
 	(label "ADC1_2"
 		(at 231.14 82.55 0)
@@ -7672,6 +9142,229 @@
 		)
 	)
 	(symbol
+		(lib_id "PCM_JLCPCB-Resistors:0402,5.1kΩ")
+		(at 339.09 157.48 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "086f3088-3d9f-4f93-8e60-1a6f594a0cf9")
+		(property "Reference" "R201"
+			(at 341.63 157.4799 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "5.1kΩ"
+			(at 339.09 157.48 90)
+			(do_not_autoplace yes)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:R_0402"
+			(at 340.868 157.48 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010045_UNI-ROYAL-Uniroyal-Elec-0402WGF5101TCE_C25905.pdf"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "62.5mW Thick Film Resistors 50V ±100ppm/°C ±1% 5.1kΩ 0402 Chip Resistor - Surface Mount ROHS"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C25905"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Stock" "3534773"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Price" "0.004USD"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Process" "SMT"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Category" "Resistors,Chip Resistor - Surface Mount"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part" "0402WGF5101TCE"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Resistance" "5.1kΩ"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Power(Watts)" "62.5mW"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Type" "Thick Film Resistors"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Overload Voltage (Max)" "50V"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Operating Temperature Range" "-55°C~+155°C"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tolerance" "±1%"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Temperature Coefficient" "±100ppm/°C"
+			(at 339.09 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "c12bfefc-a32c-46ac-aa7f-05ae909875f8")
+		)
+		(pin "1"
+			(uuid "272fcbfb-62f5-4f3e-a911-6dee70e3432a")
+		)
+		(instances
+			(project ""
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "R201")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
 		(at 218.44 54.61 0)
 		(unit 1)
@@ -7869,7 +9562,7 @@
 	)
 	(symbol
 		(lib_id "Power_Protection:USBLC6-2SC6")
-		(at 330.2 140.97 0)
+		(at 308.61 143.51 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -7878,25 +9571,25 @@
 		(fields_autoplaced yes)
 		(uuid "1482385b-0e9f-470e-910d-02eda378a2dd")
 		(property "Reference" "U2"
-			(at 331.8511 133.35 0)
+			(at 311.7281 133.35 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Value" "USBLC6-2SC6"
-			(at 331.8511 135.89 0)
+			(at 311.7281 135.89 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-6"
-			(at 331.47 147.32 0)
+			(at 307.34 137.16 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7907,7 +9600,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.st.com/resource/en/datasheet/usblc6-2.pdf"
-			(at 331.47 149.225 0)
+			(at 307.34 135.255 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7917,7 +9610,7 @@
 			)
 		)
 		(property "Description" "Very low capacitance ESD protection diode, 2 data-line, SOT-23-6"
-			(at 330.2 140.97 0)
+			(at 308.61 143.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8411,6 +10104,138 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 297.18 161.29 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "375bc4cc-e472-443a-b72a-fece1acf7659")
+		(property "Reference" "#PWR0220"
+			(at 297.18 167.64 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 297.18 166.37 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 297.18 161.29 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 297.18 161.29 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 297.18 161.29 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "0f6ce69f-e7b8-4eb5-a694-4be34176289d")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0220")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:VBUS")
+		(at 297.18 152.4 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "40b9af2b-6cd0-4197-8cbf-ce5fd075a6d9")
+		(property "Reference" "#PWR0221"
+			(at 297.18 156.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "VBUS"
+			(at 297.18 147.32 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 297.18 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 297.18 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"VBUS\""
+			(at 297.18 152.4 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "972ce368-0e9c-4f8e-8c00-e4a9376a4d33")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0221")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+3.3VA")
 		(at 172.72 90.17 90)
 		(unit 1)
@@ -8694,6 +10519,228 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
 					(reference "R1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_JLCPCB-Resistors:0402,5.1kΩ")
+		(at 328.93 157.48 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "48f15f95-10aa-4265-b758-e6014f6d9f91")
+		(property "Reference" "R202"
+			(at 331.47 157.4799 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "5.1kΩ"
+			(at 328.93 157.48 90)
+			(do_not_autoplace yes)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:R_0402"
+			(at 330.708 157.48 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010045_UNI-ROYAL-Uniroyal-Elec-0402WGF5101TCE_C25905.pdf"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "62.5mW Thick Film Resistors 50V ±100ppm/°C ±1% 5.1kΩ 0402 Chip Resistor - Surface Mount ROHS"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C25905"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Stock" "3534773"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Price" "0.004USD"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Process" "SMT"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Category" "Resistors,Chip Resistor - Surface Mount"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part" "0402WGF5101TCE"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Resistance" "5.1kΩ"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Power(Watts)" "62.5mW"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Type" "Thick Film Resistors"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Overload Voltage (Max)" "50V"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Operating Temperature Range" "-55°C~+155°C"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tolerance" "±1%"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Temperature Coefficient" "±100ppm/°C"
+			(at 328.93 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "666e405e-313d-4b5e-b859-de84ef5f4b54")
+		)
+		(pin "1"
+			(uuid "c1f468b8-7a40-401f-989e-af3472524832")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "R202")
 					(unit 1)
 				)
 			)
@@ -9823,6 +11870,268 @@
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
 					(reference "X1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 334.01 162.56 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "810eb53a-3160-4bfc-880e-8efc176d6f35")
+		(property "Reference" "#PWR0218"
+			(at 334.01 168.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 334.01 167.64 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 334.01 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 334.01 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 334.01 162.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "e563464c-aa23-43db-b85a-e63ef702c606")
+		)
+		(instances
+			(project ""
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0218")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
+		(at 297.18 157.48 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "8371c833-709a-461a-8080-f83c5585c1d7")
+		(property "Reference" "C214"
+			(at 299.72 154.9399 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 299.72 157.48 0)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:C_0402"
+			(at 295.402 157.48 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C1525"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Stock" "20208285"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Price" "0.004USD"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Process" "SMT"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part" "CL05B104KO5NNNC"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Voltage Rated" "16V"
+			(at 299.72 160.02 0)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Tolerance" "±10%"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Capacitance" "100nF"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Temperature Coefficient" "X7R"
+			(at 297.18 157.48 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "f4bd225b-8176-45b6-b720-eefa923de2af")
+		)
+		(pin "1"
+			(uuid "c105609d-829a-4335-b0d5-0cb6c73fc262")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "C214")
 					(unit 1)
 				)
 			)
@@ -11500,6 +13809,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 298.45 132.08 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d090e42c-117c-4367-90c0-6208266ca663")
+		(property "Reference" "#PWR0222"
+			(at 298.45 138.43 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 298.45 137.16 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 298.45 132.08 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 298.45 132.08 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 298.45 132.08 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "94e5c7a5-9761-4124-b232-123f00a52670")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0222")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "MCU_ST_STM32F7:STM32F723VETx")
 		(at 200.66 140.97 0)
 		(unit 1)
@@ -12061,6 +14436,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:VBUS")
+		(at 342.9 166.37 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e08afa1b-8b8b-4978-acb5-567114a9e1f3")
+		(property "Reference" "#PWR0219"
+			(at 342.9 170.18 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "VBUS"
+			(at 342.9 161.29 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 342.9 166.37 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 342.9 166.37 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"VBUS\""
+			(at 342.9 166.37 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "26bd0c89-db5d-4342-a89f-a0e60c0cc4ea")
+		)
+		(instances
+			(project ""
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0219")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 124.46 114.3 180)
 		(unit 1)
@@ -12121,6 +14562,120 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
 					(reference "#PWR0216")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_JLCPCB-Extended:Connector, USB-TYPE-C-16P")
+		(at 363.22 143.51 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e2a73db1-a84e-4828-bd10-95a36063d380")
+		(property "Reference" "J201"
+			(at 374.65 143.5099 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Connector, USB-TYPE-C-16P"
+			(at 360.68 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "Connector_USB:USB_C_Receptacle_XKB_U262-16XN-4BVC11"
+			(at 363.22 133.35 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://atta.szlcsc.com/upload/public/pdf/source/20220920/0EF8F885FCCEA71F60E9E85152155021.pdf"
+			(at 365.506 143.637 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Description" "3A 1 Horizontal attachment 16P Female -25℃~+85℃ Type-C SMD USB Connectors ROHS"
+			(at 360.68 144.78 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2927039"
+			(at 360.68 144.78 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "B5"
+			(uuid "26a3d83e-d00d-4791-95c9-cc79a689a150")
+		)
+		(pin "A6"
+			(uuid "154a53bc-9dba-4d34-9c30-64aadf77846e")
+		)
+		(pin "A12B1"
+			(uuid "189a5746-15d4-4f38-8515-a33bffecba90")
+		)
+		(pin "B12A1"
+			(uuid "dd390201-f44c-49ce-879a-9e9ae9cd203b")
+		)
+		(pin "A5"
+			(uuid "310f4397-0ef4-491c-a571-4c6b7fcbb1f5")
+		)
+		(pin "B7"
+			(uuid "94eba015-9fc5-4d23-a365-80655f2e4845")
+		)
+		(pin "A7"
+			(uuid "d0f2a562-0209-4982-a784-c0310b5e5560")
+		)
+		(pin "A8"
+			(uuid "ffdb3950-78e3-4a6e-8a88-29d4a200bbc7")
+		)
+		(pin "B8"
+			(uuid "6c48d79a-1a95-4118-a497-d69c7a3c6588")
+		)
+		(pin "S1"
+			(uuid "277b4545-39f9-489b-9be0-0d88ab7c5f87")
+		)
+		(pin "A9B4"
+			(uuid "f11a6cd1-931a-4363-86df-bd4c206622e3")
+		)
+		(pin "B9A4"
+			(uuid "84039275-92b3-4b9a-86e9-1652916840c3")
+		)
+		(pin "B6"
+			(uuid "b8cfa800-4f97-4234-9d92-82acf5cc4718")
+		)
+		(instances
+			(project ""
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "J201")
 					(unit 1)
 				)
 			)
@@ -12636,6 +15191,72 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
 					(reference "C178")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 381 120.65 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f4a33c1b-655e-4364-877f-6264cd4a0cc0")
+		(property "Reference" "#PWR0217"
+			(at 381 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 381 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 381 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 381 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 381 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "9f55e0c3-93d5-4023-ba86-ccbe404eb639")
+		)
+		(instances
+			(project ""
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0217")
 					(unit 1)
 				)
 			)
