@@ -6819,6 +6819,16 @@
 		)
 		(uuid "a1dbd3ea-599e-4a74-aba7-bb26d85dc0eb")
 	)
+	(text "TODO: CHECK CLOCK FREQUENCY WITH STMCUBEMX"
+		(exclude_from_sim no)
+		(at 122.936 150.622 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "a5ca89df-5ec6-4256-8eef-7f6e2f2ddf18")
+	)
 	(text "POWER SUPPLY"
 		(exclude_from_sim no)
 		(at 87.376 14.478 0)
@@ -6838,6 +6848,16 @@
 			)
 		)
 		(uuid "f611dd82-af7d-4d71-9662-10a7b4efff37")
+	)
+	(text "TODO: CHECK PIN FEATURES WITH CUBEMX"
+		(exclude_from_sim no)
+		(at 123.19 164.084 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "fdee35a1-5f43-43e3-92f2-04264995738a")
 	)
 	(junction
 		(at 161.29 198.12)
@@ -7137,6 +7157,16 @@
 	)
 	(wire
 		(pts
+			(xy 167.64 163.83) (xy 172.72 163.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0a4b84bf-ed98-4136-ae8f-022ca5c46ab7")
+	)
+	(wire
+		(pts
 			(xy 181.61 24.13) (xy 191.77 24.13)
 		)
 		(stroke
@@ -7187,6 +7217,16 @@
 	)
 	(wire
 		(pts
+			(xy 167.64 166.37) (xy 172.72 166.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1ae2ffc4-eb5f-44ec-8143-08efe826e2f5")
+	)
+	(wire
+		(pts
 			(xy 167.64 25.4) (xy 167.64 67.31)
 		)
 		(stroke
@@ -7224,6 +7264,16 @@
 			(type default)
 		)
 		(uuid "202c6eaf-58f7-4db7-bf09-c633ade51699")
+	)
+	(wire
+		(pts
+			(xy 167.64 161.29) (xy 172.72 161.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "20666b6b-3a4a-4d5d-acfd-5f195d76c36a")
 	)
 	(wire
 		(pts
@@ -8505,28 +8555,6 @@
 		)
 		(uuid "f6b0ca66-b806-4c2d-a1d0-8fc5eafb35e9")
 	)
-	(global_label "M_SEL_3"
-		(shape input)
-		(at 264.16 201.93 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "108b2230-820d-4b4f-a745-3cdae987750e")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 253.1921 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "M2_OUT"
 		(shape input)
 		(at 242.57 171.45 0)
@@ -8793,7 +8821,7 @@
 	)
 	(global_label "M_SEL_1"
 		(shape input)
-		(at 264.16 198.12 180)
+		(at 167.64 163.83 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8801,9 +8829,53 @@
 			)
 			(justify right)
 		)
-		(uuid "c501e6cb-a7b0-47fb-aed9-07489fe68314")
+		(uuid "bbe4e812-aef5-4800-a846-20eeca5e9eed")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 253.1921 198.12 0)
+			(at 156.6721 163.83 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "M_SEL_0"
+		(shape input)
+		(at 167.64 161.29 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "c9ff86f9-8103-49d0-92cc-f4f9999a4fc5")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 156.6721 161.29 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "M_SEL_2"
+		(shape input)
+		(at 167.64 166.37 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "d12a2a0a-fe6c-452c-aff0-1e33e042511f")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 156.6721 166.37 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8875,28 +8947,6 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "M_SEL_0"
-		(shape input)
-		(at 264.16 194.31 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "ec597b3b-933a-400e-bf38-198faaf4cb37")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 253.1921 194.31 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
 				(hide yes)
 			)
 		)
