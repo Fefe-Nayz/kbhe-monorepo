@@ -5716,6 +5716,17 @@
 		)
 		(uuid "8049193b-97c2-49a7-9c0b-79e916ba1235")
 	)
+	(text "PLEASE CHECK ANALOG POWER SUPPLY"
+		(exclude_from_sim no)
+		(at 180.086 21.844 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a1dbd3ea-599e-4a74-aba7-bb26d85dc0eb")
+	)
 	(text "POWER SUPPLY"
 		(exclude_from_sim no)
 		(at 87.376 14.478 0)
