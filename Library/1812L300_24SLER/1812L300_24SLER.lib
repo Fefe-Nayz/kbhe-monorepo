@@ -1,0 +1,24 @@
+EESchema-LIBRARY Version 2.3
+#encoding utf-8
+#SamacSys ECAD Model 1812L300_24SLER
+#/13227464/1824302/2.50/2/2/Resettable Fuse
+DEF 1812L300_24SLER F 0 30 Y Y 1 F N
+F0 "F" 550 250 50 H V L CNN
+F1 "1812L300_24SLER" 550 150 50 H V L CNN
+F2 "1812L190SLPR" 550 50 50 H I L CNN
+F3 "https://www.littelfuse.com/~/media/electronics/datasheets/resettable_ptcs/littelfuse_ptc_low_rho_datasheet.pdf.pdf" 550 -50 50 H I L CNN
+F4 "Low Rho Surface Mount Resettable PTC Fuse" 550 -150 50 H I L CNN "Description"
+F5 "0.7" 550 -250 50 H I L CNN "Height"
+F6 "576-1812L300/24SLER" 550 -350 50 H I L CNN "Mouser Part Number"
+F7 "https://www.mouser.co.uk/ProductDetail/Littelfuse/1812L300-24SLER?qs=7MVldsJ5UaxHXD%252BUZrdyuw%3D%3D" 550 -450 50 H I L CNN "Mouser Price/Stock"
+F8 "LITTELFUSE" 550 -550 50 H I L CNN "Manufacturer_Name"
+F9 "1812L300/24SLER" 550 -650 50 H I L CNN "Manufacturer_Part_Number"
+DRAW
+X ~ 1 0 0 200 R 50 50 0 0 P
+X ~ 2 700 0 200 L 50 50 0 0 P
+P 5 0 1 6 200 50 500 50 500 -50 200 -50 200 50 N
+P 4 0 1 6 220 -80 280 -80 420 80 480 80 N
+ENDDRAW
+ENDDEF
+#
+#End Library
