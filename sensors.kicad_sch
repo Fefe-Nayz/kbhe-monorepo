@@ -10419,7 +10419,7 @@
 			)
 		)
 	)
-	(global_label "K78_OUT"
+	(global_label "K76_OUT"
 		(shape input)
 		(at 417.83 217.17 90)
 		(fields_autoplaced yes)
