@@ -67,6 +67,23 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="flex h-full flex-col">
       <SidebarContent>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Profiles</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+                <SidebarMenuItem key="profiles">
+                  <SidebarMenuButton onClick={() => navigate("/profiles")}>
+                    <IconSettings />
+                    <span>Profiles</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+
+
         <SidebarGroup>
           <SidebarGroupLabel>Application</SidebarGroupLabel>
           <SidebarGroupContent>

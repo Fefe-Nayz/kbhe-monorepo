@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 
-import { invoke } from '@tauri-apps/api/core';
+//import { invoke } from '@tauri-apps/api/core';
 
 // Types
 export type KeyMode = 'single' | 'multi';
@@ -23,7 +23,7 @@ export interface KeyboardLayout {
   keys: KeyConfig[][];
 }
 
-interface KeyboardState {
+export interface KeyboardState {
   
   mode: KeyMode;
   displayedInfo: displayedInfo;
@@ -39,6 +39,7 @@ interface KeyboardState {
   updateLayout: (layout: KeyboardLayout) => void;
   resetLayout: (defaultLayout: KeyboardLayout) => void;
 }
+
 
 const defaultLayout: KeyboardLayout = {
   keys: [
@@ -186,7 +187,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         set({ layout: { ...newKeys} });*/
 
         console.log(keyId, update)
-        invoke("update_key")
+        //invoke("update_key")
       },
 
       updateLayout: (layout) => set({ layout }),
