@@ -7107,6 +7107,232 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "SamacSys_Parts:SN74AHCT1G125DBVR"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "IC"
+				(at 21.59 7.62 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Value" "SN74AHCT1G125DBVR"
+				(at 21.59 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Footprint" "SOT95P280X145-5N"
+				(at 21.59 -94.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "http://www.ti.com/lit/ds/symlink/sn74ahct1g125.pdf"
+				(at 21.59 -194.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Description" "74AHCT Single Tri-state Bus Buffer SOT23 SN74AHCT1G125DBVR, Bus Buffer, HCT, 8.5 ns@ 50 pF, 8mA 4.5 ??? 5.5 V 5-Pin SOT-23"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Height" "1.45"
+				(at 21.59 -394.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer_Name" "Texas Instruments"
+				(at 21.59 -494.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer_Part_Number" "SN74AHCT1G125DBVR"
+				(at 21.59 -594.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Mouser Part Number" "595-SNAHCT1G125DBVR"
+				(at 21.59 -694.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74AHCT1G125DBVR?qs=N6WZOzgtpqVaVW8Lh%252BgevA%3D%3D"
+				(at 21.59 -794.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Arrow Part Number" "SN74AHCT1G125DBVR"
+				(at 21.59 -894.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Arrow Price/Stock" "https://www.arrow.com/en/products/sn74ahct1g125dbvr/texas-instruments?utm_currency=USD&region=nac"
+				(at 21.59 -994.92 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(symbol "SN74AHCT1G125DBVR_1_1"
+				(rectangle
+					(start 5.08 2.54)
+					(end 20.32 -7.62)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin passive line
+					(at 0 0 0)
+					(length 5.08)
+					(name "~{OE}"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -2.54 0)
+					(length 5.08)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 0 -5.08 0)
+					(length 5.08)
+					(name "GND"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 25.4 0 180)
+					(length 5.08)
+					(name "Y"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at 25.4 -2.54 180)
+					(length 5.08)
+					(name "VCC"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "TS3USB221ARSER:TS3USB221ARSER"
 			(pin_names
 				(offset 0.254)
@@ -8629,6 +8855,12 @@
 		(uuid "011aa657-62e7-4a77-bcc0-087f64f08e26")
 	)
 	(junction
+		(at 318.77 96.52)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "07f2e4cd-8f37-4f7d-b8dc-b98f2ebfe607")
+	)
+	(junction
 		(at 124.46 138.43)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -8681,6 +8913,18 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "26234d6f-b550-47de-84c6-4ac992970f19")
+	)
+	(junction
+		(at 325.12 104.14)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "2b415447-0dcf-4f2f-a521-cf71c1e87cdb")
+	)
+	(junction
+		(at 330.2 96.52)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "2bbcfede-cdc3-4afa-8dc9-729b43edbc06")
 	)
 	(junction
 		(at 144.78 95.25)
@@ -8869,12 +9113,240 @@
 		(uuid "fb7d7e16-fd4e-4209-9e92-c6c8c6a3a1be")
 	)
 	(no_connect
+		(at 172.72 135.89)
+		(uuid "02c5447a-ffd3-4fac-94b3-44be0335a5db")
+	)
+	(no_connect
+		(at 228.6 110.49)
+		(uuid "072455d2-ac2c-47b4-941e-8ac9f2cb2a3e")
+	)
+	(no_connect
+		(at 172.72 168.91)
+		(uuid "0dea96ef-ad72-4778-8b32-c36c71094ba9")
+	)
+	(no_connect
+		(at 228.6 181.61)
+		(uuid "1c8a584e-a0da-4627-90c2-843520ec2a44")
+	)
+	(no_connect
+		(at 172.72 146.05)
+		(uuid "1ce809a4-6fef-4169-b0b7-7f238419c519")
+	)
+	(no_connect
+		(at 172.72 130.81)
+		(uuid "2a5310e5-3b5d-43c2-89db-02cc18d0aa43")
+	)
+	(no_connect
+		(at 228.6 130.81)
+		(uuid "2e497186-9d39-493c-9344-abcb92202297")
+	)
+	(no_connect
 		(at 368.3 129.54)
 		(uuid "311a73a7-babf-480e-b85a-172bb84862d3")
 	)
 	(no_connect
+		(at 172.72 158.75)
+		(uuid "31b976d1-db75-4a0e-84b9-8b8c3998b888")
+	)
+	(no_connect
+		(at 172.72 123.19)
+		(uuid "33e4259d-2882-4019-9f7c-b49a19cb6798")
+	)
+	(no_connect
+		(at 172.72 120.65)
+		(uuid "39f92cb3-8724-4d9f-9142-425635c859da")
+	)
+	(no_connect
+		(at 228.6 148.59)
+		(uuid "42bcd1a9-3183-4a30-afb6-8979160485d9")
+	)
+	(no_connect
+		(at 228.6 168.91)
+		(uuid "43580d12-6134-438c-b1ac-0b9f9c643396")
+	)
+	(no_connect
+		(at 172.72 171.45)
+		(uuid "44c7f114-4b4c-463d-b9ff-b147ea44c988")
+	)
+	(no_connect
+		(at 172.72 118.11)
+		(uuid "44c8a3dd-8293-4663-a41a-15c583230e2a")
+	)
+	(no_connect
+		(at 172.72 176.53)
+		(uuid "4a4987ad-9675-4319-aff8-8b4b423a5151")
+	)
+	(no_connect
+		(at 228.6 135.89)
+		(uuid "4dcb2102-f5fd-4dff-b895-a518e8bf1f11")
+	)
+	(no_connect
+		(at 172.72 138.43)
+		(uuid "51399d14-4ffd-484a-be82-26da5ca16534")
+	)
+	(no_connect
+		(at 172.72 140.97)
+		(uuid "5342c3b3-3ce6-44b9-9154-f4d9b1451739")
+	)
+	(no_connect
+		(at 172.72 115.57)
+		(uuid "5c3f6882-09b3-4cf1-99af-a9df6521deac")
+	)
+	(no_connect
+		(at 228.6 199.39)
+		(uuid "636c3206-ef44-46ba-a70c-83a9e11a5a8f")
+	)
+	(no_connect
+		(at 228.6 146.05)
+		(uuid "683d5dc9-b955-4bd5-ac4e-33eff92715ae")
+	)
+	(no_connect
+		(at 228.6 163.83)
+		(uuid "6b9d1d95-587c-4486-9f07-5f62499c5fe8")
+	)
+	(no_connect
+		(at 228.6 194.31)
+		(uuid "6cfec262-0237-437f-883b-993ac2b87ca7")
+	)
+	(no_connect
+		(at 228.6 166.37)
+		(uuid "72dec3fd-4e95-4f24-ab97-b685abc4fe61")
+	)
+	(no_connect
+		(at 228.6 191.77)
+		(uuid "77c18beb-149d-4105-86ac-5869b3a04333")
+	)
+	(no_connect
+		(at 172.72 143.51)
+		(uuid "79321126-ecc4-4221-a4bb-9538e3cf435a")
+	)
+	(no_connect
+		(at 228.6 189.23)
+		(uuid "7a7b6c0d-b430-4084-aff9-f2fc774685d3")
+	)
+	(no_connect
+		(at 228.6 140.97)
+		(uuid "81289d8f-4c6e-49e1-bebb-f62b3d717ee1")
+	)
+	(no_connect
+		(at 228.6 128.27)
+		(uuid "81f59e6d-1136-4060-ada5-87f4367d3cee")
+	)
+	(no_connect
+		(at 172.72 125.73)
+		(uuid "8f152e94-7328-4576-a5f6-cb055821343c")
+	)
+	(no_connect
+		(at 228.6 184.15)
+		(uuid "8ff2ced3-f987-41d7-bf64-bcf905a68d5e")
+	)
+	(no_connect
+		(at 228.6 171.45)
+		(uuid "9000707d-7a1a-499f-b722-aea1600a205e")
+	)
+	(no_connect
+		(at 172.72 107.95)
+		(uuid "958e79a0-0056-41c8-94c2-0ac5f3bb54b4")
+	)
+	(no_connect
+		(at 228.6 153.67)
+		(uuid "99ec1460-b859-43ef-b7c1-b2117591e564")
+	)
+	(no_connect
+		(at 172.72 128.27)
+		(uuid "9a195bea-8c7f-43ce-8d0f-b2b3bf79184e")
+	)
+	(no_connect
+		(at 172.72 153.67)
+		(uuid "a0bdfaf3-763f-470a-b62e-9f9a03c78810")
+	)
+	(no_connect
 		(at 368.3 127)
 		(uuid "ac8d75a2-e80a-49a1-97f7-387df0db76ef")
+	)
+	(no_connect
+		(at 172.72 151.13)
+		(uuid "ad32f3bd-8367-4dcf-b1f1-805185a3642d")
+	)
+	(no_connect
+		(at 228.6 133.35)
+		(uuid "ada00fae-f4ba-43c0-8e4e-6b923927b053")
+	)
+	(no_connect
+		(at 172.72 110.49)
+		(uuid "b1a39b2d-296f-44fd-8d29-28f1a8d326f2")
+	)
+	(no_connect
+		(at 172.72 173.99)
+		(uuid "b5e78095-0595-44f2-bdb6-d4c6fc870c4f")
+	)
+	(no_connect
+		(at 228.6 113.03)
+		(uuid "b606ce4a-7515-48f0-81b6-2496425fdc80")
+	)
+	(no_connect
+		(at 228.6 143.51)
+		(uuid "b85c7ab0-4bcd-4889-b160-2ce8d6516fd9")
+	)
+	(no_connect
+		(at 172.72 181.61)
+		(uuid "bd27bce9-6328-46d7-8df5-44dcac0a29e0")
+	)
+	(no_connect
+		(at 172.72 133.35)
+		(uuid "c11bdbd3-e087-46c2-be79-1804e9a8dcbe")
+	)
+	(no_connect
+		(at 228.6 138.43)
+		(uuid "c2e213ee-a541-434d-833c-e62b2c343619")
+	)
+	(no_connect
+		(at 228.6 102.87)
+		(uuid "c4812a13-2f61-4ed9-800a-097144941f04")
+	)
+	(no_connect
+		(at 228.6 179.07)
+		(uuid "d4cd1152-b9bd-41f1-a4d9-d8087536c554")
+	)
+	(no_connect
+		(at 172.72 156.21)
+		(uuid "d7529ee7-9312-4605-92cd-1c5b38385fc8")
+	)
+	(no_connect
+		(at 228.6 125.73)
+		(uuid "df40a5d3-9b15-48dd-a4ed-7eebeec1bb5a")
+	)
+	(no_connect
+		(at 228.6 186.69)
+		(uuid "e701ad43-c191-4439-b5e8-b746832ce5c1")
+	)
+	(no_connect
+		(at 228.6 100.33)
+		(uuid "ebb170ad-4bfc-45c3-adc6-16a2a1438cea")
+	)
+	(no_connect
+		(at 228.6 201.93)
+		(uuid "eca07e50-f6d3-4f56-a5b1-90aba516d1cb")
+	)
+	(no_connect
+		(at 228.6 196.85)
+		(uuid "f4ea8a54-2c14-4f99-9293-ab6271e205a2")
+	)
+	(no_connect
+		(at 228.6 97.79)
+		(uuid "f72b73cc-a65f-4d5d-bcf7-cae23e49c3e2")
+	)
+	(no_connect
+		(at 228.6 151.13)
+		(uuid "fbe513ab-d4a3-470a-9895-9932aa590dd2")
+	)
+	(no_connect
+		(at 172.72 113.03)
+		(uuid "fd536416-ef95-481a-a2b9-ddf1801fbcb0")
+	)
+	(no_connect
+		(at 172.72 179.07)
+		(uuid "ff761821-31db-4964-8a46-a7babc17fe7a")
 	)
 	(wire
 		(pts
@@ -9838,6 +10310,16 @@
 	)
 	(wire
 		(pts
+			(xy 325.12 104.14) (xy 330.2 104.14)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "92114df9-c561-44f9-8c69-b6b01a9d9932")
+	)
+	(wire
+		(pts
 			(xy 347.98 138.43) (xy 368.3 138.43)
 		)
 		(stroke
@@ -9865,6 +10347,16 @@
 			(type default)
 		)
 		(uuid "95f7614b-f84f-4e6a-899d-5939d465cb0d")
+	)
+	(wire
+		(pts
+			(xy 341.63 96.52) (xy 330.2 96.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "96ddfd8e-af3e-47c2-9b02-5af689335786")
 	)
 	(wire
 		(pts
@@ -9988,6 +10480,16 @@
 	)
 	(wire
 		(pts
+			(xy 318.77 104.14) (xy 325.12 104.14)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a974874f-8e02-4171-8ee1-4459823a5aa0")
+	)
+	(wire
+		(pts
 			(xy 97.79 73.66) (xy 97.79 76.2)
 		)
 		(stroke
@@ -10078,7 +10580,7 @@
 	)
 	(wire
 		(pts
-			(xy 228.6 77.47) (xy 242.57 77.47)
+			(xy 228.6 77.47) (xy 243.84 77.47)
 		)
 		(stroke
 			(width 0)
@@ -10095,6 +10597,16 @@
 			(type default)
 		)
 		(uuid "ba8bc910-3fbd-4236-a1c4-b8067165926f")
+	)
+	(wire
+		(pts
+			(xy 318.77 96.52) (xy 313.69 96.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bfe5c80d-fb45-4c33-9e2a-b5c2c4e096ad")
 	)
 	(wire
 		(pts
@@ -10295,6 +10807,16 @@
 			(type default)
 		)
 		(uuid "f74bc7c1-cc95-4e4a-a217-6e95c5416bfa")
+	)
+	(wire
+		(pts
+			(xy 330.2 96.52) (xy 318.77 96.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f785a65d-5dcb-46af-9fab-a55abb13eab2")
 	)
 	(wire
 		(pts
@@ -10716,7 +11238,7 @@
 	)
 	(global_label "P_OUT"
 		(shape input)
-		(at 242.57 77.47 0)
+		(at 243.84 77.47 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -10726,7 +11248,7 @@
 		)
 		(uuid "0a04ec1e-089a-472f-a0ec-ae6561624931")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 251.4214 77.47 0)
+			(at 252.6914 77.47 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10780,6 +11302,28 @@
 			)
 		)
 	)
+	(global_label "LED_DATA_5V"
+		(shape input)
+		(at 313.69 93.98 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "26f64051-875c-4b0d-a5b8-13124dbbb811")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 328.7704 93.98 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "DFU_SW"
 		(shape input)
 		(at 95.25 76.2 90)
@@ -10815,6 +11359,28 @@
 		(uuid "2e4bda7d-1607-4e48-81dd-dbe04a0d71a0")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 228.6991 137.16 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "LED_DATA"
+		(shape input)
+		(at 288.29 96.52 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "61993619-2536-42f7-8b29-63f691447db9")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 276.4753 96.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12124,6 +12690,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 325.12 104.14 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "11a0a4e9-b28c-47bf-ae2c-4d1e3bbbf11a")
+		(property "Reference" "#PWR0239"
+			(at 325.12 110.49 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 325.12 109.22 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 325.12 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 325.12 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 325.12 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "b5b418ba-1917-48f5-851f-b1f1b041790c")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0239")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Power_Protection:USBLC6-2SC6")
 		(at 328.93 142.24 180)
 		(unit 1)
@@ -12203,6 +12835,164 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
 					(reference "U2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SamacSys_Parts:SN74AHCT1G125DBVR")
+		(at 288.29 93.98 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "1962d2f2-09ef-4a66-961f-9e881e281d83")
+		(property "Reference" "IC1"
+			(at 300.99 106.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74AHCT1G125DBVR"
+			(at 300.99 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SamacSys_Parts:SOT95P280X145-5N"
+			(at 309.88 188.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/ds/symlink/sn74ahct1g125.pdf"
+			(at 309.88 288.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Description" "74AHCT Single Tri-state Bus Buffer SOT23 SN74AHCT1G125DBVR, Bus Buffer, HCT, 8.5 ns@ 50 pF, 8mA 4.5 ??? 5.5 V 5-Pin SOT-23"
+			(at 288.29 93.98 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Height" "1.45"
+			(at 309.88 488.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 309.88 588.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74AHCT1G125DBVR"
+			(at 309.88 688.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Mouser Part Number" "595-SNAHCT1G125DBVR"
+			(at 309.88 788.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74AHCT1G125DBVR?qs=N6WZOzgtpqVaVW8Lh%252BgevA%3D%3D"
+			(at 309.88 888.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Arrow Part Number" "SN74AHCT1G125DBVR"
+			(at 309.88 988.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "Arrow Price/Stock" "https://www.arrow.com/en/products/sn74ahct1g125dbvr/texas-instruments?utm_currency=USD&region=nac"
+			(at 309.88 1088.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C7484"
+			(at 288.29 93.98 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "c5b97fc3-6241-4195-ac95-7d600c492cbd")
+		)
+		(pin "3"
+			(uuid "aa643c9b-9c82-48d1-8b87-b1de8cd45c30")
+		)
+		(pin "5"
+			(uuid "c70b5005-ccb2-4ec4-8bc7-0ec5ae376eb9")
+		)
+		(pin "2"
+			(uuid "6564842c-4092-423d-b039-68e9d1cfdde0")
+		)
+		(pin "4"
+			(uuid "957af9db-7687-4f02-bb6f-a601ca35f37d")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "IC1")
 					(unit 1)
 				)
 			)
@@ -15132,6 +15922,202 @@
 		)
 	)
 	(symbol
+		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
+		(at 318.77 100.33 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "724fb91b-3702-489b-907b-247a3382cf36")
+		(property "Reference" "C216"
+			(at 321.31 97.7899 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 321.31 100.33 0)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:C_0402"
+			(at 316.992 100.33 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C1525"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Stock" "20208285"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Price" "0.004USD"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Process" "SMT"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part" "CL05B104KO5NNNC"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Voltage Rated" "16V"
+			(at 321.31 102.87 0)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Tolerance" "±10%"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Capacitance" "100nF"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Temperature Coefficient" "X7R"
+			(at 318.77 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "a8dccf09-ca91-496b-84b7-d5fa7e591a2f")
+		)
+		(pin "1"
+			(uuid "2b46a55c-ef54-4491-8b34-c146ab17795f")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "C216")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:Crystal_GND24")
 		(at 124.46 120.65 0)
 		(unit 1)
@@ -17423,6 +18409,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+5V")
+		(at 341.63 96.52 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c869de79-73c1-440d-99b7-5262ecf40606")
+		(property "Reference" "#PWR0238"
+			(at 341.63 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 341.63 101.6 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 341.63 96.52 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 341.63 96.52 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 341.63 96.52 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "7ec1c0d7-a5d7-4506-8991-872891936999")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0238")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 124.46 138.43 0)
 		(unit 1)
@@ -17877,6 +18929,202 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
 					(reference "#PWR0222")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_JLCPCB-Capacitors:0402,1uF")
+		(at 330.2 100.33 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d571114c-3bf4-446e-aaff-e36b23d6b86e")
+		(property "Reference" "C217"
+			(at 332.74 97.7899 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1uF"
+			(at 332.74 100.33 0)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:C_0402"
+			(at 328.422 100.33 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05A105KA5NQNC_C52923.pdf"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "25V 1uF X5R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C52923"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Stock" "7021828"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Price" "0.006USD"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Process" "SMT"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part" "CL05A105KA5NQNC"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Voltage Rated" "25V"
+			(at 332.74 102.87 0)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Tolerance" "±10%"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Capacitance" "1uF"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Temperature Coefficient" "X5R"
+			(at 330.2 100.33 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "d12d0e8c-dd47-4cab-8061-6d540f12e49b")
+		)
+		(pin "2"
+			(uuid "e49a60ea-cac6-4266-9377-723be7f05956")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "C217")
 					(unit 1)
 				)
 			)
@@ -19664,6 +20912,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 288.29 93.98 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "faeea2a2-79e9-4d3a-a951-0ae809352045")
+		(property "Reference" "#PWR0224"
+			(at 288.29 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 288.29 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 288.29 93.98 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 288.29 93.98 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 288.29 93.98 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "1512b1ba-049c-4a3e-9eb3-d9f0fea500c4")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0224")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0603,2.2uF")
 		(at 166.37 193.04 0)
 		(unit 1)
@@ -19854,6 +21168,72 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
 					(reference "C175")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 288.29 99.06 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "fe15d702-1a2e-4b66-844a-cb383dc758e3")
+		(property "Reference" "#PWR0237"
+			(at 288.29 105.41 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 288.29 104.14 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 288.29 99.06 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 288.29 99.06 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 288.29 99.06 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "6d8f6743-f5e0-4fe6-9d7f-fc64b61b2ca1")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "#PWR0237")
 					(unit 1)
 				)
 			)

@@ -4645,28 +4645,6 @@
 			)
 		)
 	)
-	(global_label "K26_OUT"
-		(shape input)
-		(at 85.09 99.06 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "f2e315c5-8b84-4f04-8b08-b9da260687e2")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 96.3604 99.06 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "K21_OUT"
 		(shape input)
 		(at 69.85 52.07 0)

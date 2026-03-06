@@ -884,6 +884,10 @@
     [
       "f26c38a6-65b7-4d4b-b531-bf41915dd707",
       "Power Supply"
+    ],
+    [
+      "84df50b8-8ca3-419c-821a-323741d71109",
+      "LED"
     ]
   ],
   "text_variables": {}
