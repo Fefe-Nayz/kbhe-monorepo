@@ -1235,6 +1235,529 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "PCM_JLCPCB-Diodes:LED,0805,Green"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "D"
+				(at 2.032 0.834 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "Green"
+				(at 2.032 -1.2122 0)
+				(effects
+					(font
+						(size 0.8 0.8)
+					)
+					(justify left)
+				)
+			)
+			(property "Footprint" "PCM_JLCPCB:D_0805"
+				(at -1.778 0 90)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_1806151820_Hubei-KENTO-Elec-KT-0805G_C2297.pdf"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Emerald 0805 LED Indication - Discrete ROHS"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "LCSC" "C2297"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Stock" "2062782"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Price" "0.014USD"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Process" "SMT"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Minimum Qty" "20"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Attrition Qty" "10"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Class" "Basic Component"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Category" "Optoelectronics,Light Emitting Diodes (LED)"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer" "Hubei KENTO Elec"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Part" "KT-0805G"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Emitted Color" "Emerald"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "D_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "LED,0805,Green_0_1"
+				(polyline
+					(pts
+						(xy -1.905 0) (xy -3.429 1.524) (xy -3.429 1.016) (xy -3.429 1.524) (xy -2.921 1.524)
+					)
+					(stroke
+						(width 0.127)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.905 -1.27) (xy -3.429 0.254) (xy -3.429 -0.254) (xy -3.429 0.254) (xy -2.921 0.254)
+					)
+					(stroke
+						(width 0.127)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.27 1.27) (xy 0 -1.27) (xy 1.27 1.27) (xy -1.27 1.27)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.27 -1.27) (xy 1.27 -1.27)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "LED,0805,Green_1_1"
+				(pin passive line
+					(at 0 3.81 270)
+					(length 3.81)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -3.81 90)
+					(length 3.81)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "PCM_JLCPCB-Resistors:0402,1kΩ"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "R"
+				(at 1.778 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "1kΩ"
+				(at 0 0 90)
+				(do_not_autoplace)
+				(effects
+					(font
+						(size 0.8 0.8)
+					)
+				)
+			)
+			(property "Footprint" "PCM_JLCPCB:R_0402"
+				(at -1.778 0 90)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "62.5mW Thick Film Resistors 50V ±100ppm/°C ±1% 1kΩ 0402 Chip Resistor - Surface Mount ROHS"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "LCSC" "C11702"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Stock" "13226393"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Price" "0.004USD"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Process" "SMT"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Minimum Qty" "20"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Attrition Qty" "10"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Class" "Basic Component"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Category" "Resistors,Chip Resistor - Surface Mount"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Part" "0402WGF1001TCE"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Resistance" "1kΩ"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Power(Watts)" "62.5mW"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Type" "Thick Film Resistors"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Overload Voltage (Max)" "50V"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Operating Temperature Range" "-55°C~+155°C"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Tolerance" "±1%"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Temperature Coefficient" "±100ppm/°C"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "R_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "0402,1kΩ_0_1"
+				(rectangle
+					(start -1.016 2.54)
+					(end 1.016 -2.54)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "0402,1kΩ_1_1"
+				(pin passive line
+					(at 0 3.81 270)
+					(length 1.27)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -3.81 90)
+					(length 1.27)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "TPS7A4701RGWR:TPS7A4701RGWR"
 			(pin_names
 				(offset 0.254)
@@ -2316,6 +2839,12 @@
 		(uuid "430f3cdd-db5f-459c-b1a8-2e85e9ef05c7")
 	)
 	(junction
+		(at 245.11 137.16)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "45a5bc3c-8262-40d7-9157-8252ac11e7a2")
+	)
+	(junction
 		(at 143.51 106.68)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -2463,6 +2992,16 @@
 	)
 	(wire
 		(pts
+			(xy 245.11 119.38) (xy 251.46 119.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1e395f69-73e8-4998-8e0e-9c33681f741b")
+	)
+	(wire
+		(pts
 			(xy 62.23 116.84) (xy 62.23 118.11)
 		)
 		(stroke
@@ -2503,6 +3042,26 @@
 	)
 	(wire
 		(pts
+			(xy 259.08 119.38) (xy 264.16 119.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2f2a2f5c-7f16-4d35-aad1-0ab57b42ed93")
+	)
+	(wire
+		(pts
+			(xy 264.16 137.16) (xy 245.11 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "33d7336c-c645-4872-bfed-38e5aecc74f5")
+	)
+	(wire
+		(pts
 			(xy 209.55 137.16) (xy 245.11 137.16)
 		)
 		(stroke
@@ -2530,6 +3089,16 @@
 			(type default)
 		)
 		(uuid "40c0b581-28ae-4340-b931-b3194de32fbd")
+	)
+	(wire
+		(pts
+			(xy 264.16 119.38) (xy 264.16 123.19)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4e45bd54-332b-4fff-8a8e-03997ea88d1f")
 	)
 	(wire
 		(pts
@@ -2693,6 +3262,16 @@
 	)
 	(wire
 		(pts
+			(xy 264.16 130.81) (xy 264.16 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c0e6c57b-ec05-407a-b6cc-51e6d1399423")
+	)
+	(wire
+		(pts
 			(xy 245.11 124.46) (xy 245.11 119.38)
 		)
 		(stroke
@@ -2831,7 +3410,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0e4617c9-2b63-465a-bd2c-c2d619dd8298")
-		(property "Reference" "#PWR0185"
+		(property "Reference" "#PWR?"
 			(at 62.23 124.46 0)
 			(effects
 				(font
@@ -2879,6 +3458,12 @@
 			(uuid "de56553c-5b77-4cfc-ae7f-6c22b071a874")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0185")
@@ -2897,7 +3482,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0fc67c6e-dc41-46a1-a63e-1a7c67eb31f5")
-		(property "Reference" "U5"
+		(property "Reference" "U?"
 			(at 209.55 106.68 0)
 			(effects
 				(font
@@ -2955,6 +3540,12 @@
 			(uuid "377bd61d-68cc-43c7-b54e-8519852bc974")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "U?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "U5")
@@ -2973,7 +3564,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2688f5c7-474f-4975-a91e-339b87c836eb")
-		(property "Reference" "#PWR0186"
+		(property "Reference" "#PWR?"
 			(at 77.47 142.24 0)
 			(effects
 				(font
@@ -3021,6 +3612,12 @@
 			(uuid "762f0f11-c89a-446d-b758-cf541661f5a3")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0186")
@@ -3039,7 +3636,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "2c079acd-46fc-4216-8923-6e45d545e69c")
-		(property "Reference" "#PWR0223"
+		(property "Reference" "#PWR?"
 			(at 177.8 128.27 0)
 			(effects
 				(font
@@ -3087,6 +3684,12 @@
 			(uuid "eab250bf-4de9-4240-bc9e-785208c21901")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0223")
@@ -3105,7 +3708,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "3f88ea7a-d61d-4c37-a62b-98b7f13f0435")
-		(property "Reference" "C184"
+		(property "Reference" "C?"
 			(at 137.16 107.9499 0)
 			(effects
 				(font
@@ -3283,6 +3886,12 @@
 			(uuid "6d477928-cc31-44f1-8140-c5bc54bbf996")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "C?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "C184")
@@ -3301,7 +3910,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "4712e097-5f30-42e0-8680-12be67d1f109")
-		(property "Reference" "#PWR0221"
+		(property "Reference" "#PWR?"
 			(at 49.53 110.49 0)
 			(effects
 				(font
@@ -3349,6 +3958,12 @@
 			(uuid "a1a011f0-3ed9-4e97-bd5c-2b3d3e862dd7")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0221")
@@ -3367,7 +3982,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "4cdc9d4e-afc4-409e-a53a-e34f9d5945a1")
-		(property "Reference" "C182"
+		(property "Reference" "C?"
 			(at 71.12 153.6699 0)
 			(effects
 				(font
@@ -3545,6 +4160,12 @@
 			(uuid "040d4170-25b9-4b60-bddb-c30e6b4a6363")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "C?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "C182")
@@ -3563,7 +4184,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5365ea16-54fe-4495-bd4f-37ba7295d119")
-		(property "Reference" "#PWR0191"
+		(property "Reference" "#PWR?"
 			(at 209.55 143.51 0)
 			(effects
 				(font
@@ -3611,6 +4232,12 @@
 			(uuid "613c7614-d0f6-4f67-84e7-873b86e49d01")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0191")
@@ -3629,7 +4256,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5636fe1d-cecb-4802-8536-055891028f3a")
-		(property "Reference" "#PWR0189"
+		(property "Reference" "#PWR?"
 			(at 245.11 123.19 0)
 			(effects
 				(font
@@ -3677,6 +4304,12 @@
 			(uuid "f0bfde32-797b-437b-82c0-792c44a28cee")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0189")
@@ -3695,7 +4328,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5db9f944-0f4b-498e-8636-6b388f587bf2")
-		(property "Reference" "#PWR0187"
+		(property "Reference" "#PWR?"
 			(at 134.62 120.65 0)
 			(effects
 				(font
@@ -3743,6 +4376,12 @@
 			(uuid "15c5c6a5-80b8-4275-885f-709e3ebf2805")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0187")
@@ -3761,7 +4400,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6031ba94-1c62-4804-a398-9ddfba6a7a26")
-		(property "Reference" "#PWR0188"
+		(property "Reference" "#PWR?"
 			(at 143.51 110.49 0)
 			(effects
 				(font
@@ -3809,6 +4448,12 @@
 			(uuid "7a783175-9e16-45c4-b3fa-d70435ec0925")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0188")
@@ -3827,7 +4472,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "66057559-80d2-44f4-89fa-c27a3cfccaef")
-		(property "Reference" "C187"
+		(property "Reference" "C?"
 			(at 247.65 125.7299 0)
 			(effects
 				(font
@@ -4005,6 +4650,12 @@
 			(uuid "dc289d3f-244c-4aa4-8cf6-4e24e1fd8798")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "C?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "C187")
@@ -4023,7 +4674,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6a13e6ee-3b11-4a61-9c9d-cadfabd2b1f5")
-		(property "Reference" "#PWR0183"
+		(property "Reference" "#PWR?"
 			(at 123.19 158.75 0)
 			(effects
 				(font
@@ -4071,6 +4722,12 @@
 			(uuid "b933f578-0db9-4276-8ec6-c4d913758e7c")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0183")
@@ -4089,7 +4746,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "732bbfd2-fe73-4381-bbe5-e3e7513a0088")
-		(property "Reference" "C183"
+		(property "Reference" "C?"
 			(at 64.77 110.4899 0)
 			(effects
 				(font
@@ -4267,6 +4924,12 @@
 			(uuid "619882b6-2b52-410e-a92b-08ac9a6d117f")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "C?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "C183")
@@ -4285,7 +4948,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a1fe1310-3dab-475b-a422-874b3f5bf6fb")
-		(property "Reference" "C186"
+		(property "Reference" "C?"
 			(at 180.34 128.2699 0)
 			(effects
 				(font
@@ -4463,6 +5126,12 @@
 			(uuid "dc4a7068-b011-4ce9-b1f6-99a234d35f22")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "C?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "C186")
@@ -4481,7 +5150,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a4843e1e-7273-4852-883c-0afdd7d3d822")
-		(property "Reference" "U4"
+		(property "Reference" "U?"
 			(at 102.87 96.52 0)
 			(effects
 				(font
@@ -4599,9 +5268,404 @@
 			(uuid "fb1976d1-5fa0-46f0-966e-20249e2d860b")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "U?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "U4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_JLCPCB-Resistors:0402,1kΩ")
+		(at 264.16 127 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "afafb788-aa50-40f9-8cf8-0601c0254a2a")
+		(property "Reference" "R6"
+			(at 266.7 126.9999 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "1kΩ"
+			(at 264.16 127 90)
+			(do_not_autoplace yes)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:R_0402"
+			(at 262.382 127 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010216_UNI-ROYAL-Uniroyal-Elec-0402WGF1001TCE_C11702.pdf"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "62.5mW Thick Film Resistors 50V ±100ppm/°C ±1% 1kΩ 0402 Chip Resistor - Surface Mount ROHS"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C11702"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Stock" "13226393"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Price" "0.004USD"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Process" "SMT"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Category" "Resistors,Chip Resistor - Surface Mount"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "UNI-ROYAL(Uniroyal Elec)"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part" "0402WGF1001TCE"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Resistance" "1kΩ"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Power(Watts)" "62.5mW"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Type" "Thick Film Resistors"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Overload Voltage (Max)" "50V"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Operating Temperature Range" "-55°C~+155°C"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tolerance" "±1%"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Temperature Coefficient" "±100ppm/°C"
+			(at 264.16 127 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "3fe863b9-6884-4398-808e-253bac166148")
+		)
+		(pin "2"
+			(uuid "bd7ddc9f-c0dd-4370-90f5-b6f702d4e684")
+		)
+		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "R6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_JLCPCB-Diodes:LED,0805,Green")
+		(at 255.27 119.38 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "c0c73584-6b3f-430c-ab30-e125bbc971f6")
+		(property "Reference" "D1"
+			(at 255.27 116.586 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Green"
+			(at 255.27 114.046 90)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:D_0805"
+			(at 255.27 121.158 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_1806151820_Hubei-KENTO-Elec-KT-0805G_C2297.pdf"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Emerald 0805 LED Indication - Discrete ROHS"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2297"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Stock" "2062782"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Price" "0.014USD"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Process" "SMT"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Category" "Optoelectronics,Light Emitting Diodes (LED)"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Manufacturer" "Hubei KENTO Elec"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Part" "KT-0805G"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Emitted Color" "Emerald"
+			(at 255.27 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "3e267b45-059f-4a46-84ea-f93f3ee71058")
+		)
+		(pin "2"
+			(uuid "b9dd9958-afe0-44ed-a4f0-d334cc14117a")
+		)
+		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "D1")
 					(unit 1)
 				)
 			)
@@ -4617,7 +5681,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f2910bc8-92b3-417f-8545-204fd3e0ac64")
-		(property "Reference" "#PWR0182"
+		(property "Reference" "#PWR?"
 			(at 68.58 168.91 0)
 			(effects
 				(font
@@ -4665,6 +5729,12 @@
 			(uuid "9fdc056b-3d02-4f0f-99bc-fab17eb96c4a")
 		)
 		(instances
+			(project "power_supply"
+				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
 					(reference "#PWR0182")
@@ -4673,4 +5743,10 @@
 			)
 		)
 	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
 )
