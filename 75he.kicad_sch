@@ -12612,6 +12612,48 @@
 		)
 	)
 	(sheet
+		(at 232.41 93.345)
+		(size 42.545 38.1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "79a7e965-7423-4472-8532-0afc280c9eed")
+		(property "Sheetname" "Mounting Holes"
+			(at 232.41 92.6334 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "screws.kicad_sch"
+			(at 232.41 132.0296 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23"
+					(page "8")
+				)
+			)
+		)
+	)
+	(sheet
 		(at 231.14 27.94)
 		(size 46.99 39.37)
 		(exclude_from_sim no)
