@@ -8886,7 +8886,7 @@
 		(uuid a665b98a-763f-4e38-ac99-5dee89521b3b)
 	)
 	(rectangle
-		(start 179.07 17.78)
+		(start 199.39 17.78)
 		(end 233.68 39.37)
 		(stroke
 			(width 0)
@@ -8933,7 +8933,7 @@
 	)
 	(text "ANALOG POWER SUPPLY"
 		(exclude_from_sim no)
-		(at 190.5 14.986 0)
+		(at 210.82 14.986 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -9022,17 +9022,6 @@
 			(justify left)
 		)
 		(uuid "8092c6cf-d966-4318-af29-46ba3c2cd954")
-	)
-	(text "EST CE QU'IL FAUT RAJOUTER UN 100nF? Et le 10nF c sur le VREF+ ?"
-		(exclude_from_sim no)
-		(at 237.49 22.352 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "a1dbd3ea-599e-4a74-aba7-bb26d85dc0eb")
 	)
 	(text "TODO: CHECK CLOCK FREQUENCY WITH STMCUBEMX"
 		(exclude_from_sim no)
