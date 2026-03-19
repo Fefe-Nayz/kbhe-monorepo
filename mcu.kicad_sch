@@ -9133,7 +9133,7 @@
 		)
 		(uuid "2c5a1288-cb05-4e66-8465-290a28d475bf")
 	)
-	(text "TODO:\n\n- Check differential pairs\n- Check MCU pinout\n- Check MCU power supply\n- Check LDO circuit"
+	(text "TODO:\n\n- Check differential pairs\n- Check MCU pinout\n- Check MCU power supply\n- Check LDO circuit\n\n- Emplacement des VIS\n- Stabilisateur"
 		(exclude_from_sim no)
 		(at 356.87 33.528 0)
 		(effects
@@ -13054,7 +13054,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "07f90348-7f58-46f2-a549-0c1ef3717f47")
-		(property "Reference" "SW_BOOT"
+		(property "Reference" "SW_BOOT1"
 			(at 31.75 83.1849 90)
 			(effects
 				(font
@@ -13126,7 +13126,7 @@
 		(instances
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
-					(reference "SW_BOOT")
+					(reference "SW_BOOT1")
 					(unit 1)
 				)
 			)
@@ -17911,7 +17911,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "96bb18e2-9b56-499b-a3b9-a46bc8343495")
-		(property "Reference" "SW_RESET"
+		(property "Reference" "SW_RESET1"
 			(at 95.25 58.42 0)
 			(effects
 				(font
@@ -18199,7 +18199,7 @@
 		(instances
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
-					(reference "SW_RESET")
+					(reference "SW_RESET1")
 					(unit 1)
 				)
 			)
