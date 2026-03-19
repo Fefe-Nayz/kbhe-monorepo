@@ -5,4 +5,5 @@
   (lib (name "SN74LV4051ADYYR")(type "KiCad")(uri "${KIPRJMOD}/Library/SN74LV4051ADYYR/KiCADv6/SN74LV4051ADYYR.kicad_sym")(options "")(descr ""))
   (lib (name "TS3USB221ARSER")(type "KiCad")(uri "${KIPRJMOD}/Library/TS3USB221ARSER/KiCADv6/TS3USB221ARSER.kicad_sym")(options "")(descr ""))
   (lib (name "1812L300_24SLER")(type "KiCad")(uri "${KIPRJMOD}/Library/1812L300_24SLER/1812L300_24SLER.kicad_sym")(options "")(descr ""))
+  (lib (name "EC11E15244B2")(type "KiCad")(uri "${KIPRJMOD}/Library/EC11E15244B2/KiCad/EC11E15244B2.kicad_sym")(options "")(descr ""))
 )
