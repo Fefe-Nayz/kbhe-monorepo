@@ -1,0 +1,278 @@
+       深圳市韩               有限公司
+TYPE-C 16Pin      SMT 2MD
+ 李春风           HX TYPE-C 16PIN
+
+ 罗孝金
+                深圳市韩下电子有限公司
+                   Shenzhen Hanxia Electronic Co., Ltd
+                   Tel: 0755-33819206   Fax: 0755-27597491
+
+
+
+
+                   承          认         书
+
+
+
+
+                                                             ¾
+     SPECIFICATION FOR APPROVAL
+
+
+
+
+                                                         «Ë
+                                                  Þ¹
+                                            ÐÏ
+ 客   户 Customer：
+
+
+ 产品名称 Project：                          ÓÓ
+                                         TYPE-C
+                              ×
+                       µç
+
+ 规格型号 Part No：                      HX TYPE-C 16PIN
+                ÏÂ
+
+
+
+           贵公司承认印 Approal slgnatures
+         º«
+
+
+
+
+      料 号/Part No.                  签     章/Signatures
+     ÊÐ
+ ÛÚ
+Éî
+
+
+
+
+                                                  日期 Date:
+
+
+     拟制/Drawn
+
+     审核/Check
+
+     批准/Approved
+RATING                                DC 5 V         3A
+PRACTICAL
+TEMPERATURE                -25~85ºC
+RANGE                        -25ºC~+85ºC
+
+
+                     UNLESS OTHERWISE SPECIFIED
+                     THE STANDARD RANGE OF ATMOSPHERIC
+                     CONDITIONS FOR MAKING MEASUREMENTS
+STANDARD
+                     AND TESTS ARE AS FOLLOWS:
+ATMOSPHEIC
+                    (1) BETWEEN BODY AND CONDUCTOR: 5ºC TO 35
+CONDITIONS
+                    (2) BETWEEN CONDUCTORS NOT TO BE CONTACT 45% TO 85%
+                    (3) PRESSURE 86Kpa TO 106Kpa
+
+                     (1)         5 ~35
+                     (2)         45%~85%
+                     (3)         86 Kpa~106Kpa
+
+MECHANICAL
+
+      ITEM                           TEST CONDITIONS                               PERFORMANCE
+
+
+      CONNECTION    MEASUREMENT SHALL BE MADE AFTER CONNECTING AND
+        FORCE       DISCONNECTING USING STANDARD PLUG GAUGE 3 TIMES                    0.5-2.0Kgf
+                            PLUG GAUGE      3
+1
+
+      DISCONNECTI
+                    MEASUREMENT SHALL BE MADE AFTER CONNECTING AND
+          ON
+                    DISCONNECTING USING STANDARD PLUG GAUGE 3 TIMES                    0.8-2.0Kgf
+         FORCE
+                            PLUG GAUGE      3
+
+
+                                                                              THERE SHALL BE NO DAMAGE
+                                                                              TO THE TERMINAL SUCH     AS
+                    A STATIC LOAD OF 0.1N/m(1kgf/cm)SHALL BE APPLIED TO THE   CRACKS, LOOSENESS OR PLAY
+       TERMINAL
+                    TIP OF THE TERMINAL FOR 1 MIN                             ELECTRICAL ,AND MECHANICAL
+2      STRENGTH
+                    IN ANY DIRECTION                                          CHARACTERISTICS  SHALL   BE
+                                              1     0.1N/m(1kgf/cm)   .       SATISFIED
+
+
+
+ELECTRICAL
+      ITEM                         TEST CONDITIONS                               PERFORMANCE
+
+        CONTACT       MEASURED AT SMALL CURRENT           100m A OR LESS
+3.1    RESISTANCE   1000Hz                                                            40m    MAX
+                              100 m A
+
+                    APPLY A VOLTAGE OF 100V DC FOR 1 MIN
+                    TO     FOLLOWING     PORTIONS     AFTER WHICH
+                    MEASUREMENT
+                    SHALL BE MADE:
+                    (1) BETWEEN BODY AND CONDUCTOR
+       INSULATION
+                    (2) BETWEEN CONDUCTORS NOT TO BE CONTACT
+3.2    RESISTANCE                                                                     100M   MIN
+                    (3) BETWEEN CONDUCTORS NOT TO BE WHEN PLUG IS
+                        INSERTED DC100V 1 MIN
+                         100V DC    1
+                           1
+                           2
+                           3
+                      AC 100V ims(50~60Hz)FOR 1 MIN TRIP CURRENT:0.5mA
+                      (1) BETWEEN BODY AND CONDUCTOR
+                      (2) BETWEEN CONDUCTORS NOT TO BE CONTACL
+                      (3) BETWEEN CONDUCTORS NOT TO BE WHEN PLUG
+       DIELECTRIC
+                            IS INSERTED DC 100V 1 MIN                                                  WITHOUT DAMAGE TO
+3.3     STRENGTH
+                                AC 100V        50Hz /min          1                      0.5mA,   PARTS ARCING OR BREAKDOWN ETC
+                                                  :
+                      (1)
+                      (2)
+                      (3)
+
+URABILITY
+      ITEM            TEST CONDITIONS                                                                    PERFORMANCE
+
+
+
+                                                                                                     1 SOLDER WETTING TIME SHALL
+                      THE TOP OF THE TERMINALS SHALL BE
+        SOLDERA-                                                                                          BE 3 SEC OR LESS
+                      DIPPED 1mm IN THE SOLDER BATH OF
+             BILITY                                                                                                    3
+4 1                   250 5            FOR 5    0.5 SECONDS
+             TEST                                                                                      2 THE AREA OF SOLDERING
+                                                      1mm     ,              250 5 ,         5
+                                                                                                        SHOULD BE OVER 75%
+                        0.5
+                                                                                                                    75%
+
+
+
+
+                      REFLOW SOLDERING CONDITIONS:
+                      PREHEAT:TEMPERATURE                   ON        THE       COPPER    FOIL
+                      SURFACE SHOULD REACH 180 .120S AFTER THE P.C.B
+                      ENTERED INTO THE SOLDERING EQUIPMENT.
+                      TALLEST           TEMPERATURE:TEMPERATURE                     ON    THE
+                      COPPER FOIL SURFACE SHOULD REACH THE PEAK
+                      TEMPERATURE OF 260±5                  WITH IN 20 SECONDS.
+
+
+
+       RESISTANCE                                                                                 WITHOUT DEFOR MATION OF CASE OR
+                            :                                 180       ,120s
+              TO                                                                                  EXCESSIVE LOOSENESS OF TEMINALS
+4.2     SOLDERING                  :                              260    5                  20    ELECTRICAL CHARACTERISTICS SHALL
+        HEAT TEST                                                                                           BE SATISFIED
+                   SOLDERING IRON METHOD:
+      RESISTANCE
+                   BIT TEMPERATURE 330           5         APPLICATION
+         TO
+                   TIME OF SOLDERING IRON3                 0.5 SEC                          WITHOUT DEFORMATION OF CASE OR
+4 2
+      SOLDERING
+                   HOWEVER EXCESSIVE PRESSURE SHALL                                         EXCESSIVE LOOSENESS OF TEMINALS
+      HEAT TEST
+                   NOT BE APPLIED TO THE TERMINAL                                           ELECTRICAL CHARACTERISTICS SHALL
+                                                     330    5                                           BE SATISFIED
+                     3 0.5
+
+                   THE JACK SHALL BE STORED AT A TEMPERATURE
+                   OF 40 2     AND A HUMIDITY OF 90%TO 96% FOR
+      HUMIDITY     96 Hr,THEN THE JACK SHALL BE MAINTAINED
+4 3     TEST       AT STANDARD ATMOSPHERIC CONDITION FOR 1 Hr
+                   FOR OTHER PROCEDURES                                                       THERE SHALL BE NO DAMAGE ON
+                       40 2                          90~96% Hr           96                            APPEARANCE
+                                             1                                                 MECHANICAL AND ELECTRICAL
+                                                                                                CHARACTERISTICS SHALL BE
+                   THE JACK SHALL BE STORED AT A TEMPERATURE                                                 SATISFIED
+                   OF70 2     FOR 96 HOURS AND THEN IT SHALL
+      HEAT TEST    BE SUBJECTED TO THE CONTROLLED RECOVERY
+4.4
+                   MBASURBM
+                              70    2            96                               1
+
+
+
+
+                   THE JACK SHALL BE STORED AT A TEMPERATURE                          THERE SHALL BE NO DAMAGE ON
+                   OF-25 3     FOR 96 HOURS AND THEN IT SHALL                         APPEARANCE
+      COLD TEST    BE SUBJECTED TO THE CONTROLLED RECOVERY                            MECHANICAL AND ELECTRICAL
+4 5
+                   CONDITIONS FOR 1 HOUR AFTER WHICH                                  CHARACTERISTICS SHALL BE
+                              -25   3   96                                    1       SATISFIED
+
+
+
+
+                    WITHOUT LOAD
+                    CONNECTION AND DISCONNECTION SHALL
+                    BE MADE WITH THE MATING PLUGS AND
+                    JACKS FOR 10000 CYCLES AT A SPEED                                   1       CONTACT RESISTANCE SHALL BE
+                    OF 10 TO 25 CYCLES/MIN                                                      0.1
+                    无负荷                                                                 2       DISCONNECTION FORCE SHALL BE
+                    将结合了的标准Plug(尽量要近于中心的)在1分                                                    0.8 TO 2.0N
+                    钟内以10-25的速度，进行10000 次插入，拔出
+      LIFE TEST                                                                         3       MECHANICAL         AND   ELECTRICAL
+4 6                 LOAD：
+                                                                                                CHARACTERISTICS          SHALL   BE
+                    AT RATING CONDITION （NON-INDUCTIVE LOAD）
+                                                                                                SATISFIED
+                    CONNECTION AND DISCONNECTION SHALL
+                    BE MADE 10000 CYCLES AT A SPEED                                   (1)              0.1
+
+                    10 TO 20 CYCLES / MIN                                             (2)             0.8~2.0N
+
+                    负荷                                                                (3)       :             ,
+
+                    以定格状态(无诱导负荷)在1 分钟内以10-20次
+                    的速度进行 10000 次插入、拔出
+                    THE JACK SHALL BE SUB JECTED TO 5 CYCLES OF                  THERE SHALL BE NO DEFORMATION OR
+                    THE FOLLOWING CONDITIONS SHOWED IN THE                       CRACKS IN MOLDED PART.
+                    FIGURE,AND THEN SHALL RETURNED ALLOWED                       INSERTION    EXTRACTION FORCE:3 TO 20N
+                    TO REMAIN IN ROOM AMBIENT CONDITION FOR                      CONTACT RESISTANCE:MAX.30M
+                    30 MINUTES                                                   INSULATION RESISTANCE: MIN.100 M
+                                          5                          30          DIELECTRIC WITHSTANDING VOLTAGE:
+                    Temp( )                                                      100VAC/MIN(BETWEEN TERMINALS)
+      TEMPARATURE
+      CYCLINGTEST
+4.7
+                                                                                        3N   20N
+                                                                                              30m
+                                                                                              100 M
+                                                                                              100VAC
+
+
+
+
+                    THE JACK SHALL BE SUBJECTED TO5 CYCLES OF                    THERE SHALL BE NO DEFORMATION OR
+
+                    THE FOLLOWING CONDITIONS SHOWED IN THE                       CRACKS IN MOLDED PART.
+                                                                                 INSERTION    EXTRACTION FORCE:3 TO 25N
+                    FIGURE,AND THEN SHALL RETURNED AND
+                                                                                 CONTACT RESISTANCE:MAX.30M
+                    ALLOWED
+                                                                                 INSULATION RESISTANCE: MIN.100 M
+                    TO REMAIN IN ROOM AMBIENT CONDITION FOR                      DIELECTRIC WITHSTANDING VOLTAGE:
+4.8                 30 MINUTES                5                 30        TEMP   500VAC/MIN(BETWEEN TERMINALS)
+      COLD&HEAT     ( )
+      SHOCK TEST
+                                                                                        3N   25N
+                                                                                              30m
+                                                                                              100 M
+                                                                                              500VAC
+

@@ -1,0 +1,1387 @@
+                                                                                                                           TS3USB221A
+                                                                                     SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+    TS3USB221A ESD Protected, High-Speed USB 2.0 (480Mbps) 1:2 Multiplexer and
+                    Demultiplexer Switch With Single Enable
+1 Features                                                             3 Description
+•   VCC operation at 2.5V to 3.3V                                      The TS3USB221A device is a high-bandwidth
+•   VI/O accepts signals up to 5.5V                                    switch specially designed for the switching of high-
+•   1.8V compatible control-pin inputs                                 speed USB 2.0 signals in handset and consumer
+•   Low-power mode when OE is disabled (1μA)                           applications, such as cell phones, digital cameras,
+•   RON = 6Ω maximum                                                   and notebooks with hubs or controllers with limited
+•   ΔRON = 0.2Ω typical                                                USB I/Os. The wide bandwidth (900MHz) of this
+•   CIO(ON) = 6pf typical                                              switch allows signals to pass with minimum edge and
+•   Low power consumption (30μA maximum)                               phase distortion. The device multiplexes differential
+•   High bandwidth (900MHz typical)                                    outputs from a USB host device to one of two
+•   Latch-up performance exceeds 100mA                                 corresponding outputs. The switch is bidirectional and
+    per JESD 78, Class II                                              offers little or no attenuation of the high-speed signals
+•   ESD performance tested per JEDEC JS-001                            at the outputs. The device also has a low power
+    – 7000V human-body model                                           mode that can reduce the power consumption to
+    – 1000V charged-device model (JEDEC JS-002)                        1μA for portable applications with a battery or limited
+•   ESD performance I/O to GND                                         power budget. The device is designed for low bit-to-bit
+    – 12kV human-body model                                            skew and high channel-to-channel noise isolation, and
+                                                                       is compatible with various standards, such as high-
+2 Applications                                                         speed USB 2.0 (480Mbps).
+•   Routes signals for USB 1.0, 1.1, and 2.0                           The TS3USB221A device integrates ESD protection
+•   Mobile phones                                                      cells on all pins, is available in a tiny μQFN package
+•   Cameras                                                            (2mm × 1.5mm) and is characterized over the free air
+•   Notebooks                                                          temperature range from –40°C to 85°C.
+•   USB I/O expansion
+                                                                                           Package Information
+                                                                             PART NUMBER            PACKAGE(1)        PACKAGE SIZE(2)
+                                                                       TS3USB221A             RSE (UQFN, 10)         2mm × 1.5mm
+
+                                                                       (1)    For all available packages, see Section 11.
+                                                                       (2)    The package size (length × width) is a nominal value and
+                                                                              includes pins, where applicable.
+                                         D+                                                   1D+
+                                         D−                                                   1D−
+
+                                                                                              2D+
+                                                                                              2D−
+
+
+                                                                                              S
+                                                                                              OE
+    EN is the internal enable signal applied to the switch.
+
+                                                         Simplified Schematic
+
+
+
+
+     An IMPORTANT NOTICE at the end of this data sheet addresses availability, warranty, changes, use in safety-critical applications,
+     intellectual property matters and other important disclaimers. PRODUCTION DATA.
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                                                                  www.ti.com
+
+
+                                                                        Table of Contents
+1 Features............................................................................1     7.1 Overview................................................................... 12
+2 Applications..................................................................... 1       7.2 Functional Block Diagram......................................... 12
+3 Description.......................................................................1       7.3 Feature Description...................................................13
+4 Pin Configuration and Functions...................................3                       7.4 Device Functional Modes..........................................13
+5 Specifications.................................................................. 4      8 Application and Implementation.................................. 14
+  5.1 Absolute Maximum Ratings........................................ 4                    8.1 Application Information............................................. 14
+  5.2 ESD Ratings............................................................... 4          8.2 Typical Application.................................................... 14
+  5.3 Recommended Operating Conditions.........................4                            8.3 Power Supply Recommendations.............................15
+  5.4 Thermal Information....................................................5              8.4 Layout....................................................................... 16
+  5.5 Electrical Characteristics.............................................5            9 Device and Documentation Support............................18
+  5.6 Dynamic Electrical Characteristics, VCC = 3.3V                                        9.1 Receiving Notification of Documentation Updates....18
+    ±10%............................................................................. 6     9.2 Support Resources................................................... 18
+  5.7 Dynamic Electrical Characteristics, VCC = 2.5V                                        9.3 Trademarks............................................................... 18
+    ±10%............................................................................. 6     9.4 Electrostatic Discharge Caution................................18
+  5.8 Switching Characteristics, VCC = 3.3V ±10%..............6                             9.5 Glossary....................................................................18
+  5.9 Switching Characteristics, VCC = 2.5V ±10%..............6                           10 Revision History.......................................................... 18
+  5.10 Typical Characteristics.............................................. 7            11 Mechanical, Packaging, and Orderable
+6 Parameter Measurement Information............................ 8                           Information.................................................................... 19
+7 Detailed Description......................................................12
+
+
+
+
+2       Submit Document Feedback                                                                                         Copyright © 2024 Texas Instruments Incorporated
+
+                                                                   Product Folder Links: TS3USB221A
+                                                                                                                               TS3USB221A
+www.ti.com                                                                                   SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+4 Pin Configuration and Functions
+
+                                    VCC                                                                   VCC
+
+                                         10                                                                 10
+                   1D+         1                  9        S                                 S       9              1    1D+
+
+                   1D–         2                  8        D+                                D+      8              2    1D–
+
+                   2D+         3                  7        D–                                D–      7              3    2D+
+
+                   2D–         4         5        6        OE                                OE      6      5       4    2D–
+
+                                    GND                                                                   GND
+   Figure 4-1. RSE Package, 10-Pin µQFN (Top View)                                  Figure 4-2. RSE Package, 10-Pin µQFN (Bottom
+                                                                                                        View)
+
+                                                                Table 4-1. Pin Functions
+                    PIN
+                                                  TYPE(1)                                         DESCRIPTION
+ NAME                              NO.
+ 1D+                                1                 I/O
+                                                                   USB port 1
+ 1D–                                2                 I/O
+ 2D+                                3                 I/O
+                                                                   USB port 2
+ 2D–                                4                 I/O
+ GND                                5                 —            Ground
+ OE                                 6                  I           Bus-switch enable
+ D+                                 8                 I/O
+                                                                   Common USB port
+ D—                                 7                 I/O
+ S                                  9                  I           Select input
+ VCC                               10                 —            Supply voltage
+
+(1)    I = input, O = output
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                              Submit Document Feedback     3
+                                                               Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                                               www.ti.com
+
+5 Specifications
+5.1 Absolute Maximum Ratings
+over operating free-air temperature range (unless otherwise noted) (1)
+                                                                                                                     MIN         MAX            UNIT
+    Supply voltage, VCC                                                                                              –0.5         4.6             V
+    Control input voltage, VS, V OE (2) (3)                                                                          –0.5          7              V
+    Switch I/O voltage, VI/O   (2) (3) (4)                                                                           –0.5          7              V
+    Control input clamp current, IIK                        VIN < 0                                                               –50            mA
+    I/O port clamp current, II/OK                           VI/O < 0                                                              –50            mA
+    ON-state switch current, II/O (5)                                                                                            ±120            mA
+    Continuous current through VCC or GND                                                                                        ±100            mA
+    Tstg         Storage temperature range                                                                           –65          150            °C
+
+(1)        Operation outside the Absolute Maximum Ratings may cause permanent device damage. Absolute Maximum Ratings do not imply
+           functional operation of the device at these or any other conditions beyond those listed under Recommended Operating Conditions.
+           If used outside the Recommended Operating Conditions but within the Absolute Maximum Ratings, the device may not be fully
+           functional, and this may affect device reliability, functionality, performance, and shorten the device lifetime.
+(2)        All voltages are with respect to ground, unless otherwise specified.
+(3)        The input and output voltage ratings may be exceeded if the input and output clamp-current ratings are observed.
+(4)        VI and VO are used to denote specific conditions for VI/O.
+(5)        II and IO are used to denote specific conditions for II/O.
+5.2 ESD Ratings
+                                                                                                                             VALUE             UNIT
+                                                  Human-body model (HBM), per ANSI/         All pins except I/O to GND       ±7000
+                                                  ESDA/JEDEC JS-001(1)
+                                                                                            I/O to GND                       ±12000
+    V(ESD)      Electrostatic discharge                                                                                                          V
+                                                  Charged-device model (CDM), per ANSI/
+                                                                                            All pins                         ±1000
+                                                  ESDA/JEDEC JS-002(2)
+
+(1)        JEDEC document JEP155 states that 500V HBM allows safe manufacturing with a standard ESD control process. Manufacturing with
+           less than 500V HBM is possible with the necessary precautions.
+(2)        JEDEC document JEP157 states that 250V CDM allows safe manufacturing with a standard ESD control process. Manufacturing with
+           less than 250V CDM is possible with the necessary precautions.
+5.3 Recommended Operating Conditions
+                                                                                                                      MIN              MAX      UNIT
+    VCC        Supply voltage                                                                                          2.3              3.6       V
+                                                                            VCC = 2.3V to 2.7V                0.46 × VCC                VCC
+               High-level control input voltage                                                                                                   V
+    VS, V                                                                   VCC = 2.7V to 3.6V                0.46 × VCC                VCC
+    OE                                                                      VCC = 2.3V to 2.7V                           0    0.25 × VCC
+               Low-level control input voltage                                                                                                    V
+                                                                            VCC = 2.7V to 3.6V                           0    0.25 × VCC
+    VI/O       Data input/output voltage(1)                                                                              0              5.5       V
+    TA         Operating free-air temperature                                                                         –40                85      °C
+
+(1)        The I/O pins are 5.5V tolerant and functional for the entire range. However, for VI/O > 3.6V, channel RON will be high (up to 100Ω).
+
+
+
+
+4           Submit Document Feedback                                                                     Copyright © 2024 Texas Instruments Incorporated
+
+                                                           Product Folder Links: TS3USB221A
+                                                                                                                                  TS3USB221A
+www.ti.com                                                                                   SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+5.4 Thermal Information
+                                                                                                              RSE (UQFN)
+                                              THERMAL METRIC(1)                                                                          UNIT
+                                                                                                                10 PINS
+ RθJA               Junction-to-ambient thermal resistance                                                          204.8
+ RθJC(top)          Junction-to-case (top) thermal resistance                                                       118.1
+ RθJB               Junction-to-board thermal resistance                                                            121.5                °C/W
+ ψJT                Junction-to-top characterization parameter                                                      13.9
+ ψJB                Junction-to-board characterization parameter                                                    121.2
+
+(1)       For more information about traditional and new thermal metrics, see the Semiconductor and IC Package Thermal Metrics application
+          note.
+5.5 Electrical Characteristics
+over operating free-air temperature range (unless otherwise noted) (1)
+                    PARAMETER                                        TEST CONDITIONS                         MIN      TYP(2)      MAX      UNIT
+ VIK              Input-Source Clamp Voltage        VCC = 3.6V, 2.7V, II = –18 mA                            –1.8                           V
+                  Input leakage current, control
+ IIN                                                VCC = 3.6V, 2.7V, 0V, VIN = 0V to 3.6V                                         ±1       μA
+                  inputs
+                                                    VCC = 3.6V, 2.7V, VO = 0V to 5.25V, VI = 0V,
+ IOZ (3)          Off-state leakage current                                                                                        ±1       μA
+                                                    VIN = VCC or GND, Switch OFF
+                                                                          VI/O = 0V to 5.25V                                       ±2
+ I(OFF)           Power-off leakage current         VCC = 0V              VI/O = 0V to 3.6V                                        ±2       μA
+                                                                          VI/O = 0V to 2.7V                                        ±1
+                                                    VCC = 3.6V, 2.7V, VIN = VCC or GND,
+ ICC              Supply Current                                                                                                   30       μA
+                                                    II/O = 0V, Switch ON or OFF
+                  Supply Current (low power         VCC = 3.6V, 2.7V, VIN = VCC or GND,
+ ICC                                                                                                                                1       μA
+                  mode)                             Switch disabled, OE in high state
+                                                    One input at 1.8V,    VCC = 3.6V                                               20
+                  Supply-current change, control
+ ΔICC (4)                                           Other inputs at VCC                                                                     μA
+                  inputs                                                  VCC = 2.7V                                               0.5
+                                                    or GND
+                  Input capacitance, control
+ Cin                                                VCC = 3.3V, 2.5V, VIN = VCC or 0V                                       1.5    2.5      pF
+                  inputs
+ Cio(OFF)         OFF capacitance                   VCC = 3.3V, 2.5V, VI/O = VCC or 0V, Switch OFF                          3.5     5       pF
+ Cio(ON)          ON capacitance                    VCC = 3.3V, 2.5V, VI/O = VCC or 0V, Switch ON                            6     7.5      pF
+                                                                          VI = 0V, IO = 30mA                                 3      6
+ RON (5)          ON-state resistance               VCC = 3V, 2.3V                                                                          Ω
+                                                                          VI = 2.4V, IO = –15mA                             3.4     6
+
+                  ON-state resistance match                               VI = 0V, IO = 30mA                                0.2
+ ΔRON                                               VCC = 3V, 2.3V                                                                          Ω
+                  between channels                                        VI = 1.7, IO = –15mA                              0.2
+                                                                          VI = 0V, IO = 30mA                                 1
+ RON(flat)        ON-state resistance flatness      VCC = 3V, 2.3V                                                                          Ω
+                                                                          VI = 1.7, IO = –15mA                               1
+
+(1)       VIN and IIN refer to control inputs. VI, VO, II, and IO refer to data pins.
+(2)       All typical values are at VCC = 3.3V (unless otherwise noted), TA = 25°C.
+(3)       For I/O ports, the parameter IOZ includes the input leakage current.
+(4)       This is the increase in supply current for each input that is at the specified TTL voltage level, rather than VCC or GND.
+(5)       Measured by the voltage drop between the A and B terminals at the indicated current through the switch. ON-state resistance is
+          determined by the lower of the voltages of the two (A or B) terminals.
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                              Submit Document Feedback             5
+                                                       Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                                                www.ti.com
+
+5.6 Dynamic Electrical Characteristics, VCC = 3.3V ±10%
+over operating range, TA = –40°C to 85°C, VCC = 3.3V ±10%, GND = 0V
+                         PARAMETER                                      TEST CONDITIONS                            MIN         TYP      MAX       UNIT
+    XTALK            Crosstalk                             RL = 50 , f = 250MHz                                                   –40              dB
+    OIRR             OFF isolation                         RL = 50 , f = 250MHz                                                   –41              dB
+    BW               Bandwidth (–3 dB)                     RL = 50                                                                0.9             GHz
+
+
+5.7 Dynamic Electrical Characteristics, VCC = 2.5V ±10%
+over operating range, TA = –40°C to 85°C, VCC = 2.5V ±10%, GND = 0V
+                         PARAMETER                                      TEST CONDITIONS                            MIN         TYP       MAX      UNIT
+    XTALK            Crosstalk                             RL = 50 , f = 250MHz                                                 –39                dB
+    OIRR             OFF isolation                         RL = 50 , f = 250MHz                                                   -40              dB
+    BW               Bandwidth (3 dB)                      RL = 50                                                                0.9             GHz
+
+
+5.8 Switching Characteristics, VCC = 3.3V ±10%
+over operating range, TA = –40°C to 85°C, VCC = 3.3V ±10%, GND = 0V
+                                                 PARAMETER                                                      MIN      TYP(1)         MAX      UNIT
+    tpd             Propagation delay(2) (3)                                                                               0.25                   ns
+                                                                               S to D, nD                                                30
+    tON             Line enable time                                                                                                              ns
+                                                                               OE to D, nD                                               17
+                                                                               S to D, nD                                                12
+    tOFF            Line disable time                                                                                                             ns
+                                                                               OE to D, nD                                               10
+    tSK(O)          Output skew between center port to any other port(2)                                                    0.1          0.2      ns
+    tSK(P)          Skew between opposite transitions of the same output (tPHL– tPLH   )(2)                                 0.1          0.2      ns
+
+(1)          For Max or Min conditions, use the appropriate value specified under Electrical Characteristics for the applicable device type.
+(2)          Specified by design
+(3)          The bus switch contributes no propagational delay other than the RC delay of the on resistance of the switch and the load capacitance.
+             The time constant for the switch alone is of the order of 0.25ns for 10pF load. This time constant is much smaller than the rise/fall
+             times of typical driving signals, therefore the time adds very little propagational delay to the system. Propagational delay of the bus
+             switch, when used in a system, is determined by the driving circuit on the driving side of the switch and the switch interactions with the
+             load on the driven side.
+5.9 Switching Characteristics, VCC = 2.5V ±10%
+over operating range, TA = –40°C to 85°C, VCC = 2.5V ±10%, GND = 0V
+                                                  PARAMETER                                                       MIN     TYP(1)        MAX       UNIT
+    tpd             Propagation delay(2) (3)                                                                                 0.25                  ns
+                                                                       S to D, nD                                                         50
+    tON             Line enable time                                                                                                               ns
+                                                                       OE to D, nD                                                        32
+                                                                       S to D, nD                                                         23
+    tOFF            Line disable time                                                                                                              ns
+                                                                       OE to D, nD                                                        12
+    tSK(O)          Output skew between center port to any other port(2)                                                      0.1        0.2       ns
+    tSK(P)          Skew between opposite transitions of the same output (tPHL– tPLH)(2)                                      0.1        0.2       ns
+
+(1)          For Max or Min conditions, use the appropriate value specified under Electrical Characteristics for the applicable device type.
+(2)          Specified by design
+(3)          The bus switch contributes no propagational delay other than the RC delay of the on resistance of the switch and the load capacitance.
+             The time constant for the switch alone is of the order of 0.25ns for 10pF load. This time constant is much smaller than the rise/fall
+             times of typical driving signals, therefore the time adds very little propagational delay to the system. Propagational delay of the bus
+             switch, when used in a system, is determined by the driving circuit on the driving side of the switch and the switch interactions with the
+             load on the driven side.
+
+
+
+
+6            Submit Document Feedback                                                                      Copyright © 2024 Texas Instruments Incorporated
+
+                                                            Product Folder Links: TS3USB221A
+                                                                                                                                                                                                      TS3USB221A
+www.ti.com                                                                                                                                       SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+5.10 Typical Characteristics
+                                         0
+                                                                                                                                          –20
+
+                                         –1
+                                                                                                                                          –30
+
+                                         –2                                                                                               –40
+
+
+
+
+                                                                                                                       Attenuation (dB)
+                             Gain (dB)
+
+
+
+
+                                         –3                                                                                               –50
+
+                                                                                                                                          –60
+                                         –4
+                                                                                                                                          –70
+                                         –5
+                                                                                                                                          –80
+
+                                         –6                                                                                               –90
+
+
+                                         –7                                                                                               –100
+                                          1E+6      1E+7    1E+8            1E+9        1E+10                                               1E+6              1E+7        1E+8             1E+9       1E+10
+                                                           Frequency (Hz)                                                                                                 Frequency (Hz)
+
+                                              Figure 5-1. Gain vs Frequency                                       Figure 5-2. OFF Isolation vs Frequency
+                                                                                                                      11
+                                                                                                                                                   VCC=2.3V
+                             -25                                                                                                                   VCC=3.0V
+                                                                                                                      10
+                             -35
+                                                                                                                      9
+                             -45
+                                                                                                                      8
+         Attenuation (dB)
+
+
+
+
+                             -55
+                                                                                                                      7
+
+
+
+
+                                                                                                            RON ()
+                             -65
+                                                                                                                      6
+                             -75
+                                                                                                                      5
+                             -85
+                                                                                                                      4
+                             -95
+                                                                                                                      3
+                            -105
+                                                                                                                      2
+                                 1E+6               1E+7      1E+8             1E+9         1E+10
+                                                                                                                                0                0.5    1       1.5   2      2.5     3     3.5    4   4.5     5
+                                                            Frequency                                                                                                      VIN (V)
+
+                                 Figure 5-3. Crosstalk vs Frequency                                                   Figure 5-4. Ron vs VIN (IOUT = –30 mA)
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                                                                                            Submit Document Feedback               7
+                                                                                      Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                                               www.ti.com
+
+6 Parameter Measurement Information
+                                          VCC
+
+                                                                                                   TEST            RL           CL       VCOM
+                                                1D or 2D VOUT1 or VOUT2
+                                                                                                    tON          500 Ω         50 pF       V+
+            VIN           D
+                                                1D or 2D             CL(2)              RL
+                                                                                                    tOFF         500 Ω         50 pF       V+
+
+
+
+         VCTRL             S
+                                                                                          Logic                                                  1.8 V
+                                                             CL(2)             RL         Input                 50%              50%
+       Logic                                                                                (VI)                                                 0
+                                          GND
+     Input(1)
+                                                                                                      tON                               tOFF
+                                                                                        Switch                                                   VOH
+                                                                                        Output                           90%            90%
+                                                                              (VOUT1 or VOUT2)                                                   VOL
+
+
+    (1) All input pulses are supplied by generators having the following characteristics: PRR ≤ 10 MHz, Z = 50 Ω, t < 5 ns, t < 5 ns.
+                                                                                                         O         r         f
+    (2) C includes probe and jig capacitance.
+         L
+
+                                         Figure 6-1. Turn-On (tON) and Turn-Off Time (tOFF)
+
+
+                                                                      VCC
+            Network Analyzer
+
+                                                                                                               Channel OFF: 1D to D
+                           50 W                 VOUT1 1D
+                                                                                                               VCTRL = VCC or GND
+                                                                                  D          VIN
+         Source
+                                        50 W            2D
+          Signal                                                                                               Network Analyzer Setup
+
+                                                VCTRL S                                                        Source Power = 0 dBm
+                         50 W                                                                                  (632-mV P-P at 50-W load)
+                                                +                     GND
+                                                                                                               DC Bias = 350 mV
+
+
+
+
+                                                      Figure 6-2. OFF Isolation (OISO)
+
+
+
+
+8       Submit Document Feedback                                                                           Copyright © 2024 Texas Instruments Incorporated
+
+                                                         Product Folder Links: TS3USB221A
+                                                                                                                              TS3USB221A
+www.ti.com                                                                                 SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+
+                                                                 VCC
+             Network Analyzer
+                                                                                                       Channel ON: 1D to D
+                           50 W             VOUT1 1D                                                   Channel OFF: 2D to D
+                                                                                    VIN                VCTRL = VCC or GND
+         Source
+                                            VOUT2 2D
+         Signal
+                                                                                 50 W                  Network Analyzer Setup
+                                            VCTRL S
+                          50 W                +                                                        Source Power = 0 dBm
+                                                                GND                                    (632-mV P-P at 50-W load)
+                                                                                                       DC Bias = 350 mV
+
+
+
+
+                                                          Figure 6-3. Crosstalk (XTALK)
+
+                                                                       VCC
+            Network Analyzer
+
+                          50 W                    VOUT1    1D                                           Channel ON: 1D to D
+                                                                                D         VIN           VCTRL = VCC or GND
+         Source
+                                                           2D
+          Signal
+                                                                                                        Network Analyzer Setup
+
+                         50 W               VCTRL          S                                           Source Power = 0 dBm
+                                                  +                                                    (632-mV P-P at 50-W load)
+                                                                       GND
+                                                                                                       DC Bias = 350 mV
+
+
+
+
+                                                           Figure 6-4. Bandwidth (BW)
+
+
+
+                                                                                                          400 mV
+
+
+
+
+                                                          Figure 6-5. Propagation Delay
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                            Submit Document Feedback     9
+                                                           Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                                                     www.ti.com
+
+                                                                                                                          800 mV
+
+                                              50%                                                                         50%
+                            Input
+                                                                                                                          400 mV
+                                     tPLH                                             tPHL
+
+                                                                                                                          VOH
+
+                                                                                                                          50%
+                          Output
+                                                                                                                          VOL
+                                                          tSK(P) = | tPHL – tPLH |
+
+                                                         PULSE SKEW tSK(P)
+
+
+                                                                                                                          800 mV
+
+                                              50%                                                                         50%
+                            Input
+                                                                                                                          400 mV
+                                    tPLH1                                            tPHL1
+                                                                                                                          VOH
+
+                                                      50%                                                                 50%
+                         Output 1
+                                                       tSK(O)                                                             VOL
+                                                                                                 tSK(O)
+                                                                                                                          VOH
+
+                                                      50%                                                                 50%
+                         Output 2
+                                                                                                                          VOL
+                                    tPLH2                                                        tPHL2
+
+                                               tSK(O) = | tPLH1 – tPLH2 | or | tPHL1 – tPHL2 |
+
+                                                       OUTPUT SKEW tSK(P)
+
+                                                     Figure 6-6. Skew Test
+
+
+                                        VCC
+
+
+                    VOUT1 1D
+
+                                                     D                  VIN
+         +                                                                                                Channel ON
+                    VOUT2 2D
+                                                                                                                   VIN * VOUT2 or VOUT1
+                                                                                                          r on +                        W
+                                                                                                                           IIN
+                VCTRL                                                         IIN
+                            S                                                                             VCTRL = VIH or VIL
+                     +
+                                       GND
+
+
+
+
+                                            Figure 6-7. ON-State Resistance (ron)
+
+
+
+
+10    Submit Document Feedback                                                                                     Copyright © 2024 Texas Instruments Incorporated
+
+                                                Product Folder Links: TS3USB221A
+                                                                                                                         TS3USB221A
+www.ti.com                                                                            SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+
+                                                  VCC
+
+
+                         VOUT1 1D
+
+                                                           D          VIN
+           +
+                         VOUT2 2D                                      +
+                                                                                           OFF-State Leakage Current
+                                                                                           Channel OFF
+                                                                                           VCTRL = VIH or VIL
+                   VCTRL         S
+                         +
+                                                  GND
+
+
+
+
+                                                  Figure 6-8. OFF-State Leakage Current
+
+                                                               VCC
+
+
+
+                                          VOUT1 1D
+               Capacitance
+                  Meter                                                                      VBIAS = VCC or GND
+                                          VOUT2 2D
+                                                                                             VCTRL = VCC or GND
+                                             VIN D
+                 VBIAS                                                                        Capacitance is measured at 1D,
+                                          VCTRL S                                             2D, D, and S inputs during ON
+                                                                                              and OFF conditions.
+
+                                                               GND
+
+
+
+
+                                                         Figure 6-9. Capacitance
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                        Submit Document Feedback   11
+                                                        Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                            www.ti.com
+
+7 Detailed Description
+7.1 Overview
+The TS3USB221A device is a 2-channel SPDT switch specially designed for the switching of high-speed USB
+2.0 signals in handset and consumer applications, such as cell phones, digital cameras, and notebooks with
+hubs or controllers with limited USB I/Os. The wide bandwidth (900MHz) of this switch allows signals to pass
+with minimum edge and phase distortion. The device multiplexes differential outputs from a USB host device to
+one of two corresponding outputs. The switch is bidirectional and offers little or no attenuation of the high-speed
+signals at the outputs. The device also has a low power mode that can reduce the power consumption to 1μA for
+portable applications with a battery or limited power budget.
+The device is designed for low bit-to-bit skew and high channel-to-channel noise isolation, and is compatible with
+various standards, such as high-speed USB 2.0 (480Mbps).
+The TS3USB221A device integrates ESD protection cells on all pins, is available in a tiny μQFN package (2mm
+× 1.5mm) and is characterized over the free air temperature range from –40°C to 85°C.
+7.2 Functional Block Diagram
+                                          D+                                             1D+
+                                          D−                                             1D−
+
+                                                                                         2D+
+                                                                                         2D−
+
+
+                                                                                         S
+                                                                                         OE
+
+
+                                           A                                             B
+                                                           VCC
+
+
+                                                         Charge
+                                                         Pump
+
+
+
+
+                                                                 EN (see Note A)
+
+A.   EN is the internal enable signal applied to the switch.
+
+                                Figure 7-1. Simplified Schematic of Each FET Switch (SW)
+
+
+
+
+12    Submit Document Feedback                                                            Copyright © 2024 Texas Instruments Incorporated
+
+                                                      Product Folder Links: TS3USB221A
+                                                                                                                        TS3USB221A
+www.ti.com                                                                           SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+7.3 Feature Description
+7.3.1 Low Power Mode
+The TS3USB221A has a low power mode that reduces the power consumption to 1 μA while the devices is
+not in use. To put the device in low power mode and disable the switch, the bus-switch enable pin OE must be
+supplied with a logic "High" signal.
+7.4 Device Functional Modes
+                                                          Table 7-1. Truth Table
+                    S                             OE                         FUNCTION
+                                  X                           H                            Disconnect
+                                  L                           L                              D = 1D
+                                  H                           L                              D = 2D
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                         Submit Document Feedback   13
+                                                       Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                          www.ti.com
+
+8 Application and Implementation
+                                                            Note
+      Information in the following applications sections is not part of the TI component specification,
+      and TI does not warrant its accuracy or completeness. TI’s customers are responsible for
+      determining suitability of components for their purposes, as well as validating and testing their design
+      implementation to confirm system functionality.
+
+8.1 Application Information
+There are many USB applications in which the USB hubs or controllers have a limited number of USB I/Os.
+The TS3USB221A can effectively expand the limited USB I/Os by switching between multiple USB buses and
+interface with the buses on a single USB hub or controller.
+8.2 Typical Application
+         3.3 V
+
+
+                     0.1 μF                              0.1 μF
+
+                                                                         VCC
+                                   System
+                                  Controller                       TS3USB221A
+                                                                    2-channel
+                                                                      SPDT
+                                   Switch                         S
+                                 Control Logic                    OE
+                                                                            1D+
+                                                                            1D-                          USB Port 1
+                                                                  D+
+                                    USB
+                                  Controller                      D-
+                                                                                  2D+
+                                                                                                         USB Port 2
+                                                                                  2D-
+
+                                                                        GND
+
+
+
+
+                                         Figure 8-1. Application Schematic
+
+
+
+
+14    Submit Document Feedback                                                          Copyright © 2024 Texas Instruments Incorporated
+
+                                               Product Folder Links: TS3USB221A
+                                                                                                                                                                                                                                        TS3USB221A
+www.ti.com                                                                                                                                                                           SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+8.2.1 Design Requirements
+Follow the design requirements of the USB 1.0,1.1, and 2.0 standards.
+TI recommends that the digital control pins S and OE be pulled up to VCC or down to GND to avoid undesired
+switch positions that can result from the floating pin.
+8.2.2 Detailed Design Procedure
+The TS3USB221A can operate properly without any external components. However, TI recommends to connect
+unused pins to ground through a 50Ω resistor to prevent signal reflections back into the device.
+8.2.3 Application Curves
+
+
+                              0.5                                                                                                                                       0.5
+                              0.4                                                                                                                                       0.4
+                              0.3                                                                                                                                       0.3
+    Differential Signal (V)
+
+
+
+
+                                                                                                                                         Differential Signal (V)
+                              0.2                                                                                                                                       0.2
+                              0.1                                                                                                                                       0.1
+                              0.0                                                                                                                                       0.0
+                              –0.1                                                                                                                                      –0.1
+                              –0.2                                                                                                                                      –0.2
+                              –0.3                                                                                                                                      –0.3
+                              –0.4                                                                                                                                      –0.4
+                              –0.5                                                                                                                                      –0.5
+
+                                     0.0   0.2   0.4    0.5   0.8   1.0                            1.2    1.4   1.6   1.8   2.0                                                0.0   0.2    0.4   0.5   0.8    1.0        1.2   1.4   1.6   1.8   2.0
+                                                                                              –9                                                                                                                     –9
+                                                              Time (X 10 ) (s)                                                                                                                          Time (X 10 ) (s)
+
+  Figure 8-2. Eye Pattern: 480Mbps USB Signal With                                                                                      Figure 8-3. Eye Pattern: 480Mbps USB Signal With
+               No Switch (Through Path)                                                                                                                  Switch NC Path
+
+                                                                                                   0.5
+                                                                                                   0.4
+                                                                                                   0.3
+                                                                    Differential Signal (V)
+
+
+
+
+                                                                                                   0.2
+                                                                                                   0.1
+                                                                                                   0.0
+                                                                                                   –0.1
+                                                                                                   –0.2
+                                                                                                   –0.3
+                                                                                                   –0.4
+                                                                                                   –0.5
+
+                                                                                                          0.0   0.2   0.4   0.5   0.8   1.0                             1.2    1.4    1.6   1.8   2.0
+                                                                                                                                                                   –9
+                                                                                                                                  Time (X 10 ) (s)
+
+                                                       Figure 8-4. Eye Pattern: 480Mbps USB Signal With Switch NO Path
+
+8.3 Power Supply Recommendations
+Make sure the power to the device is supplied through the VCC pin and follows the USB 1.0, 1.1, and 2.0
+standards. A bypass capacitor is recommended to be placed as close to the supply pin VCC to help smooth out
+lower frequency noise to provide better load regulation across the frequency spectrum.
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                                                                                                                               Submit Document Feedback                  15
+                                                                                                                Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                  www.ti.com
+
+8.4 Layout
+8.4.1 Layout Guidelines
+Place supply bypass capacitors as close to VCC pin as possible and avoid placing the bypass caps near the
+D+/D– traces.
+Make sure the high speed D+/D– trace lengths match and are no more than 4 inches; otherwise, the eye
+diagram performance can degrade. A high-speed USB connection is made through a shielded, twisted pair cable
+with a differential characteristic impedance. In layout, make sure the impedance of D+ and D– traces match the
+cable characteristic differential impedance for optimal performance.
+Route the high-speed USB signals using a minimum of vias and corners to reduce signal reflections and
+impedance changes. When a via must be used, increase the clearance size around the via to minimize the
+capacitance. Each via introduces discontinuities in the transmission line of the signal and increases the chance
+of picking up interference from the other layers of the board. Be careful when designing test points on twisted
+pair lines; through-hole pins are not recommended.
+When it becomes necessary to turn 90°, use two 45° turns or an arc instead of making a single 90° turn. This
+reduces reflections on the signal traces by minimizing impedance discontinuities.
+Do not route USB traces under or near crystals, oscillators, clock signal generators, switching regulators,
+mounting holes, magnetic devices or ICs that use or duplicate clock signals.
+Avoid stubs on the high-speed USB signals because stubs cause signal reflections. If a stub is unavoidable,
+keep the stub less than 200mm.
+Route all high-speed USB signal traces over continuous planes (VCC or GND), with no interruptions.
+Avoid crossing over anti-etch, commonly found with plane splits.
+Due to high frequencies associated with the USB, a printed circuit board with at least four layers is
+recommended; two signal layers separated by a ground and power layer as shown in Figure 8-5.
+                                                                  Signal 1
+
+
+                                                                  GND Plane
+
+
+                                                                  Power Plane
+
+
+                                                                  Signal 2
+
+
+                                      Figure 8-5. Four-Layer Board Stack-Up
+
+Make sure the majority of signal traces run on a single layer, preferably Signal 1. Make sure the GND plane,
+which is solid with no cuts, is immediately next to this layer. Avoid running signal traces across a split in the
+ground or power plane. When running across split planes is unavoidable, sufficient decoupling must be used.
+Minimizing the number of signal vias reduces EMI by reducing inductance at high frequencies.
+
+
+
+
+16    Submit Document Feedback                                                  Copyright © 2024 Texas Instruments Incorporated
+
+                                             Product Folder Links: TS3USB221A
+                                                                                                                        TS3USB221A
+www.ti.com                                                                            SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+
+8.4.2 Layout Example
+                                LEGEND
+
+         VIA to Power Plane                Polygonal Copper Pour
+          VIA to GND Plane
+
+                                                                                         Bypass Capacitor
+
+                                                                        V+
+
+                                                                                                              To Microcontroller
+
+
+                                                                   10
+                                                       1 1D+       VCC       S    9
+USB Port 1
+
+                                                       2 1D-                 D+   8
+
+                                                                                                                          To USB Host
+                                                       3 2D+                 D-   7
+USB Port 2
+                                                       4 2D-                 OE 6
+                                                                   GND
+                                                                    5
+
+
+                                                                                                              To Microcontroller
+
+
+
+                                                  Figure 8-6. Package Layout Diagram
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                        Submit Document Feedback    17
+                                                      Product Folder Links: TS3USB221A
+TS3USB221A
+SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024                                                                                             www.ti.com
+
+9 Device and Documentation Support
+9.1 Receiving Notification of Documentation Updates
+To receive notification of documentation updates, navigate to the device product folder on ti.com. Click on
+Notifications to register and receive a weekly digest of any product information that has changed. For change
+details, review the revision history included in any revised document.
+9.2 Support Resources
+TI E2E™ support forums are an engineer's go-to source for fast, verified answers and design help — straight
+from the experts. Search existing answers or ask your own question to get the quick design help you need.
+Linked content is provided "AS IS" by the respective contributors. They do not constitute TI specifications and do
+not necessarily reflect TI's views; see TI's Terms of Use.
+9.3 Trademarks
+TI E2E™ is a trademark of Texas Instruments.
+All trademarks are the property of their respective owners.
+9.4 Electrostatic Discharge Caution
+                   This integrated circuit can be damaged by ESD. Texas Instruments recommends that all integrated circuits be handled
+                   with appropriate precautions. Failure to observe proper handling and installation procedures can cause damage.
+                   ESD damage can range from subtle performance degradation to complete device failure. Precision integrated circuits may
+                   be more susceptible to damage because very small parametric changes could cause the device not to meet its published
+                   specifications.
+
+
+9.5 Glossary
+ TI Glossary            This glossary lists and explains terms, acronyms, and definitions.
+
+10 Revision History
+NOTE: Page numbers for previous revisions may differ from page numbers in the current version.
+Changes from Revision B (July 2024) to Revision C (October 2024)                                                            Page
+• Changed Features bullet from: RON = 6ω maximum to: RON = 6Ω maximum....................................................1
+• Changed Features bullet from: δrON = 0.2ω typical to: ΔrON = 0.2Ω typical.......................................................1
+
+
+
+Changes from Revision A (February 2015) to Revision B (July 2024)                                                                                Page
+• Updated the numbering format for tables, figures, and cross-references throughout the document................. 1
+• Updated the ESD performance test conditions in the Features section............................................................. 1
+• Changed CDM test conditions in the ESD Ratings table from: per JEDEC specification JESD22-C101 to: per
+  ANSI/ESDA/JEDEC JS-002............................................................................................................................... 4
+• Added footnote to the VI/O parameter in the Recommended Operating Conditions table.................................. 4
+• Changed RSE (UQFN) junction-to-ambient thermal resistance value from: 179.7°C/W to: 204.8°C/W............ 5
+• Changed RSE (UQFN) junction-to-case (top) thermal resistance value from: 107.9°C/W to: 118.1°C/W......... 5
+• Changed RSE (UQFN) junction-to-board thermal resistance value from: 100.7°C/W to: 121.5°C/W................ 5
+• Changed RSE (UQFN) junction-to-top characterization parameter value from: 7.1°C/W to: 13.9°C/W.............5
+• Changed RSE (UQFN) junction-to-board characterization parameter value from: 100.0°C/W to: 121.2°C/W...5
+• Changed the VIK value in the Electrical Characteristics table from: –1.8V maximum to: –1.8V minimum......... 5
+• Changed the Typical Characteristics section......................................................................................................7
+
+
+
+
+18    Submit Document Feedback                                                                            Copyright © 2024 Texas Instruments Incorporated
+
+                                                        Product Folder Links: TS3USB221A
+                                                                                                                                    TS3USB221A
+www.ti.com                                                                                 SCDS277C – NOVEMBER 2008 – REVISED OCTOBER 2024
+
+Changes from Revision * (November 2008) to Revision A (February 2015)                                                                        Page
+• Added ESD Ratings table, Feature Description section, Device Functional Modes, Application and
+  Implementation section, Power Supply Recommendations section, Layout section, Device and
+  Documentation Support section, and Mechanical, Packaging, and Orderable Information section. ................. 1
+• Deleted the Ordering Information table from the data sheet. See the Mechanical, Packaging, and Orderable
+  Information section for the ordering information................................................................................................. 1
+• Update the document to the new TI data sheet standard ................................................................................. 1
+
+
+11 Mechanical, Packaging, and Orderable Information
+The following pages include mechanical, packaging, and orderable information. This information is the most
+current data available for the designated devices. This data is subject to change without notice and revision of
+this document. For browser-based versions of this data sheet, refer to the left-hand navigation.
+
+
+
+
+Copyright © 2024 Texas Instruments Incorporated                                                                 Submit Document Feedback           19
+                                                       Product Folder Links: TS3USB221A
+                                                                                                                                                                      PACKAGE OPTION ADDENDUM
+
+       www.ti.com                                                                                                                                                                                                    8-Nov-2025
+
+
+
+
+PACKAGING INFORMATION
+
+       Orderable part number          Status     Material type      Package | Pins      Package qty | Carrier        RoHS             Lead finish/              MSL rating/               Op temp (°C)          Part marking
+                                        (1)            (2)                                                             (3)            Ball material             Peak reflow                                           (6)
+                                                                                                                                            (4)                      (5)
+
+         TS3USB221ARSER               Active      Production       UQFN (RSE) | 10       3000 | LARGE T&R             Yes                NIPDAU            Level-1-260C-UNLIM               -40 to 85       (LH7, LHH, LHO, LH
+                                                                                                                                                                                                                   R, LHV)
+        TS3USB221ARSER.A              Active      Production       UQFN (RSE) | 10       3000 | LARGE T&R             Yes                NIPDAU            Level-1-260C-UNLIM               -40 to 85       (LH7, LHH, LHO, LH
+                                                                                                                                                                                                                   R, LHV)
+        TS3USB221ARSER.B              Active      Production       UQFN (RSE) | 10       3000 | LARGE T&R             Yes                NIPDAU            Level-1-260C-UNLIM               -40 to 85       (LH7, LHH, LHO, LH
+                                                                                                                                                                                                                   R, LHV)
+       TS3USB221ARSERG4               Active      Production       UQFN (RSE) | 10       3000 | LARGE T&R             Yes                NIPDAU            Level-1-260C-UNLIM               -40 to 85       (LH7, LHH, LHO, LH
+                                                                                                                                                                                                                   R, LHV)
+
+(1)
+      Status: For more details on status, see our product life cycle.
+
+(2)
+   Material type: When designated, preproduction parts are prototypes/experimental devices, and are not yet approved or released for full production. Testing and final process, including without limitation quality assurance,
+reliability performance testing, and/or process qualification, may not yet be complete, and this item is subject to further changes or possible discontinuation. If available for ordering, purchases will be subject to an additional
+waiver at checkout, and are intended for early internal evaluation purposes only. These items are sold without warranties of any kind.
+
+(3)
+      RoHS values: Yes, No, RoHS Exempt. See the TI RoHS Statement for additional information and value definition.
+
+(4)
+   Lead finish/Ball material: Parts may have multiple material finish options. Finish options are separated by a vertical ruled line. Lead finish/Ball material values may wrap to two lines if the finish value exceeds the maximum
+column width.
+
+(5)
+  MSL rating/Peak reflow: The moisture sensitivity level ratings and peak solder (reflow) temperatures. In the event that a part has multiple moisture sensitivity ratings, only the lowest level per JEDEC standards is shown.
+Refer to the shipping label for the actual reflow temperature that will be used to mount the part to the printed circuit board.
+
+(6)
+      Part marking: There may be an additional marking, which relates to the logo, the lot trace code information, or the environmental category of the part.
+
+Multiple part markings will be inside parentheses. Only one part marking contained in parentheses and separated by a "~" will appear on a part. If a line is indented then it is a continuation of the previous line and the two
+combined represent the entire part marking for that device.
+
+Important Information and Disclaimer:The information provided on this page represents TI's knowledge and belief as of the date that it is provided. TI bases its knowledge and belief on information provided by third parties, and
+makes no representation or warranty as to the accuracy of such information. Efforts are underway to better integrate information from third parties. TI has taken and continues to take reasonable steps to provide representative
+and accurate information but may not have conducted destructive testing or chemical analysis on incoming materials and chemicals. TI and TI suppliers consider certain information to be proprietary, and thus CAS numbers
+and other limited information may not be available for release.
+
+In no event shall TI's liability arising out of such information exceed the total purchase price of the TI part(s) at issue in this document sold by TI to Customer on an annual basis.
+
+
+                                                                                                          Addendum-Page 1
+                                                                                                                          PACKAGE OPTION ADDENDUM
+
+   www.ti.com                                                                                                                               8-Nov-2025
+
+
+
+
+OTHER QUALIFIED VERSIONS OF TS3USB221A :
+
+• Automotive : TS3USB221A-Q1
+
+NOTE: Qualified Version Definitions:
+
+       • Automotive - Q100 devices qualified for high-reliability automotive applications targeting zero defects
+
+
+
+
+                                                                                                        Addendum-Page 2
+                                                                               PACKAGE MATERIALS INFORMATION
+
+www.ti.com                                                                                                                                          27-Jul-2025
+
+
+
+TAPE AND REEL INFORMATION
+
+       REEL DIMENSIONS                                                                      TAPE DIMENSIONS
+                                                                                       K0         P1
+
+
+
+                                                                                                                         B0 W
+                                        Reel
+                                      Diameter
+                                                                                    Cavity             A0
+                                                                A0   Dimension designed to accommodate the component width
+                                                                B0   Dimension designed to accommodate the component length
+                                                                K0   Dimension designed to accommodate the component thickness
+                                                                W    Overall width of the carrier tape
+                                                                P1   Pitch between successive cavity centers
+
+
+                                       Reel Width (W1)
+                              QUADRANT ASSIGNMENTS FOR PIN 1 ORIENTATION IN TAPE
+
+                                                                                                        Sprocket Holes
+
+
+                                                 Q1        Q2          Q1    Q2
+
+                                                 Q3        Q4          Q3    Q4                    User Direction of Feed
+
+
+
+                                                            Pocket Quadrants
+
+
+*All dimensions are nominal
+             Device           Package Package Pins              SPQ       Reel   Reel   A0                     B0         K0     P1     W     Pin1
+                               Type Drawing                             Diameter Width (mm)                   (mm)       (mm)   (mm)   (mm) Quadrant
+                                                                          (mm) W1 (mm)
+   TS3USB221ARSER              UQFN     RSE           10        3000        180.0           8.4        1.68   2.13       0.76   4.0    8.0     Q1
+
+
+
+
+                                                                      Pack Materials-Page 1
+                                                                PACKAGE MATERIALS INFORMATION
+
+www.ti.com                                                                                                              27-Jul-2025
+
+
+
+ TAPE AND REEL BOX DIMENSIONS
+
+
+
+
+                                                               Width (mm)
+                                                                              H
+                      W
+
+
+
+
+                                                          L
+
+
+
+
+*All dimensions are nominal
+             Device           Package Type   Package Drawing   Pins         SPQ    Length (mm)   Width (mm)   Height (mm)
+    TS3USB221ARSER               UQFN             RSE           10          3000      210.0        185.0         35.0
+
+
+
+
+                                                        Pack Materials-Page 2
+                                                                                                                   PACKAGE OUTLINE
+RSE0010A                                                        SCALE 7.000
+                                                                                                               UQFN - 0.6 mm max height
+                                                                                                                   PLASTIC QUAD FLATPACK - NO LEAD
+
+
+
+                                                        1.55
+                                      B                                                     A
+                                                        1.45
+
+
+
+
+                   PIN 1 INDEX AREA
+                                                                                        2.05
+                                                                                        1.95
+
+
+
+
+                            0.6                                                                      C
+                            0.5
+
+                                                                                                          SEATING PLANE
+                               0.05
+                               0.00                                                                  0.05 C
+                                              0.35
+                                           2X
+                                              0.25                                          0.4
+                                      0.1   C A B                                      8X
+                                                                                            0.3                                       (0.12)
+                                      0.05   C                                                     0.45                               TYP
+                                                                                                2X
+                                                        5                                          0.35
+
+                                           4
+                                                                                   6
+
+
+
+
+                                                                                   SYMM
+                              2X
+                              1.5
+
+
+                                                                                                              0.25
+                                                                                                         4X
+                                                                                                              0.15
+                                                                                   9                            0.1    C A B
+                                           1
+                           6X 0.5                                                                               0.05    C
+                                                      10
+                                         PIN 1 ID                                                    0.3
+                                                       SYMM                                     4X
+                                       (45 X 0.1)                                                    0.2
+                                                                                                      0.1       C A B
+                                                                                                      0.05       C
+                                                                                                                                  4220307/A 03/2020
+
+NOTES:
+
+1. All linear dimensions are in millimeters. Any dimensions in parenthesis are for reference only. Dimensioning and tolerancing
+   per ASME Y14.5M.
+2. This drawing is subject to change without notice.
+
+
+
+
+                                                                              www.ti.com
+                                                                                   EXAMPLE BOARD LAYOUT
+RSE0010A                                                                                      UQFN - 0.6 mm max height
+                                                                                                  PLASTIC QUAD FLATPACK - NO LEAD
+
+
+
+
+                                                                   SYMM
+                                                (R0.05) TYP
+                                                                   10           2X (0.6)
+                                    8X (0.55)
+
+
+
+                                                1                                             9
+
+                              4X (0.25)
+
+
+
+                                                                                                     SYMM
+                                    6X (0.5)                                                                  (1.8)
+
+
+
+                                                                                                      4X
+                                                                                                      (0.2)
+
+                                                4                                             6
+
+
+
+
+                                                                    5
+                                                                             2X (0.3)
+
+                                                                    (1.35)
+
+                                                      LAND PATTERN EXAMPLE
+                                                         EXPOSED METAL SHOWN
+                                                              SCALE:30X
+
+                         0.07 MAX                                            0.07 MIN
+                     ALL AROUND                                          ALL AROUND
+                                                       METAL                                              SOLDER MASK
+                                                                                                          OPENING
+
+
+                      EXPOSED
+                        METAL                           SOLDER MASK          EXPOSED                          METAL
+                                                        OPENING                METAL                          UNDER
+                                                                                                              SOLDER MASK
+                                 NON SOLDER MASK                                           SOLDER MASK
+                                     DEFINED                                                 DEFINED
+                                   (PREFERRED)
+
+
+                                                     SOLDER MASK DETAILS
+                                                              NOT TO SCALE
+
+
+                                                                                                                      4220307/A 03/2020
+
+NOTES: (continued)
+
+3. For more information, see Texas Instruments literature number SLUA271 (www.ti.com/lit/slua271).
+
+
+
+
+                                                                   www.ti.com
+                                                                                 EXAMPLE STENCIL DESIGN
+RSE0010A                                                                                    UQFN - 0.6 mm max height
+                                                                                              PLASTIC QUAD FLATPACK - NO LEAD
+
+
+
+
+                                                              SYMM
+
+
+                                               (R0.05) TYP                 2X (0.6)
+                                                                   10
+
+                               8X (0.55)
+
+
+                                           1                                            9
+
+                           4X (0.25)
+
+
+                                                                                               SYMM
+                               6X (0.5)                                                                    (1.8)
+
+
+
+                                                                                                4X (0.2)
+
+                                           4                                            6
+
+
+
+
+                                                               5
+                                                                         2X
+                                                                         (0.3)
+
+
+                                                               (1.35)
+
+
+                                                    SOLDER PASTE EXAMPLE
+                                                     BASED ON 0.1 mm THICKNESS
+                                                            SCALE: 30X
+
+
+
+
+                                                                                                                   4220307/A 03/2020
+
+NOTES: (continued)
+
+5. Laser cutting apertures with trapezoidal walls and rounded corners may offer better paste release. IPC-7525 may have alternate
+  design recommendations.
+
+
+
+
+                                                                   www.ti.com
+                                         IMPORTANT NOTICE AND DISCLAIMER
+TI PROVIDES TECHNICAL AND RELIABILITY DATA (INCLUDING DATASHEETS), DESIGN RESOURCES (INCLUDING REFERENCE
+DESIGNS), APPLICATION OR OTHER DESIGN ADVICE, WEB TOOLS, SAFETY INFORMATION, AND OTHER RESOURCES “AS IS”
+AND WITH ALL FAULTS, AND DISCLAIMS ALL WARRANTIES, EXPRESS AND IMPLIED, INCLUDING WITHOUT LIMITATION ANY
+IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT OF THIRD
+PARTY INTELLECTUAL PROPERTY RIGHTS.
+These resources are intended for skilled developers designing with TI products. You are solely responsible for (1) selecting the appropriate
+TI products for your application, (2) designing, validating and testing your application, and (3) ensuring your application meets applicable
+standards, and any other safety, security, regulatory or other requirements.
+These resources are subject to change without notice. TI grants you permission to use these resources only for development of an
+application that uses the TI products described in the resource. Other reproduction and display of these resources is prohibited. No license
+is granted to any other TI intellectual property right or to any third party intellectual property right. TI disclaims responsibility for, and you fully
+indemnify TI and its representatives against any claims, damages, costs, losses, and liabilities arising out of your use of these resources.
+TI’s products are provided subject to TI’s Terms of Sale, TI’s General Quality Guidelines, or other applicable terms available either on
+ti.com or provided in conjunction with such TI products. TI’s provision of these resources does not expand or otherwise alter TI’s applicable
+warranties or warranty disclaimers for TI products. Unless TI explicitly designates a product as custom or customer-specified, TI products
+are standard, catalog, general purpose devices.
+TI objects to and rejects any additional or different terms you may propose.
+IMPORTANT NOTICE
+
+                                                Copyright © 2025, Texas Instruments Incorporated
+                                                                Last updated 10/2025
+

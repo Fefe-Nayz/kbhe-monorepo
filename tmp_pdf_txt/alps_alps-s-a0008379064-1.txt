@@ -1,0 +1,2997 @@
+    EC11               11mm Size Metal Shaft Type
+                       Compact and highly reliable type available in
+                       many varieties
+                                                             ■ Typical Specifications
+                                                                                Items                                      Specifications
+
+                                                                                                                      Two phase of A, B
+
+
+
+
+                                                                                                                                                           Encoders
+                                                              Output signal                                            Self-return switch
+                                                                                                                     (EC111 / EC11E0B)
+
+                                                              Rating                                                       10mA 5V DC
+
+                                                                                                                    15,000 cycles
+                                                              Operating life                                100,000 cycles（EC11K / EC11J）
+
+                                                              Operating temperature range                               −40℃ to ＋85℃
+
+
+
+
+                                                                                                                                                           Metal
+                                                                                                                                                           Shaft
+   Product Line
+                 Shaft Length     of
+                           the shaft Torque Number Number Push-on Travel of push- Operating life                     t pcs.）
+                                                                                                   Minimum order uni （                         Drawing
+ Structure                                                                                                                       Product No.
+              configuration (mm) （mN・m） of detent of pulse switch on switch（mm） （cycles）            Japan         Export                         No.
+
+
+
+
+                                                                                                                                                           Insulated
+                                                                                                                                                             Shaft
+                                                               Without         —                                               EC11B15202AN      1
+
+ Horizontal                       12±7        30        15                     0.5                   700          1,400        EC11B15242AZ      2
+                                                                 With
+                                                                               1.5                                             EC11B15242B1      3
+
+
+
+
+                                                                                                                                                           Shaft Type
+                                                                                                                               EC11E09204A4
+
+
+
+
+                                                                                                                                                            Through
+                                              18        9
+
+                                              30        15     Without         —                                               EC11E15204A3      4
+
+                                  10±7        36        18                                                                     EC11E1820402
+                                              18        9                                                                      EC11E09244BS
+
+
+
+
+                                                                                                                                                           Type
+                                                                                                                                                           Ring
+                                              30                                                                               EC11E15244G1
+                         20                             15
+                                  7＋
+                                   −4
+                                     3      Without                            0.5                                             EC11E153440D
+                                  10±7        36                                                                               EC11E18244AU
+                                                        18
+                                  7＋
+                                   −4
+                                     3      Without                                                                            EC11E183440C
+                Flat                                             With                                                                            5
+                                              18        9                                                                      EC11E09244AQ
+                                  10±7
+  Vertical                                    30                                                    1,200         2,400        EC11E15244B2
+                                                        15
+                                  7＋
+                                   −4
+                                     3      Without                            1.5      15,000                                 EC11E1534408
+                                  10±7        36                                                                               EC11E18244A5
+                                                        18
+                                  7＋
+                                   −4
+                                     3      Without                                                                            EC11E1834403
+                                                               Without         —                                               EC11N1520401      6
+
+                         15                                                    0.5                                             EC11N1524402
+                                                                 With                                                                            7
+                                                                               1.5                                             EC11N1525404
+                                  10±7
+                                              30               Without         —                                               EC11N1520402      6
+
+                         20                                                    0.5                                             EC11N1524403
+                                                                 With                                                                            7
+                                                        15                     1.5                                             EC11N1525405
+                                  12±7                         Without         —                                               EC11G1560414      8
+
+                                 8.5±5      Without                                                                            EC11G1574402      9
+ Less shaft
+   wobble
+            Serrated     25                                                                                                    EC11G1564411     10
+                                  12±7        30                 With          1.5
+                                                                                                                               EC11M1565403      9
+
+                                 8.5±5      Without                                                                            EC11M1575403     10
+
+                                              18        9                                           1,000         2,000        EC11K0920404
+                                                               Without         —                                                                 11
+                                              30        15                                                                     EC11K1520406
+                                              18        9                                                                      EC11K0924404
+  Vertical      Flat     20       12±5                                         0.5      100,000
+                                              30        15                                                                     EC11K1524406     12
+                                                                 With
+                                              18        9                                                                      EC11K0925416
+                                                                               1.5
+                                              30        15                                                                     EC11K1525413
+
+                                                                                                             Refer to P.267 for attached parts.
+Note
+                                                                                                          Refer to P.268 for product varieties.
+Other varieties are also available. Please inquire.
+                                                                                                      Refer to P.270 for switch specifications.
+                                                                                                       Refer to P.299 for soldering conditions.
+                                                                                                                                                         261
+                  EC11                  11mm Size Metal Shaft Type
+
+
+
+                 Product Line
+
+               Structure
+                                Shaft      Length of the shaft Torque Number Number Push-on                Travel of push-on Operating life Minimum order unit（pcs.）    Product No.
+                                                                                                                                                                                      Drawing
+                             configuration       (mm)         （mN・m） of detent of pulse switch               switch（mm） （cycles）              Japan       Export                        No.
+   Encoders
+
+
+
+
+                                                                       18            9                                                                                 EC11J0920404
+                                                                                                Without        ー                                                                       13
+                                                                       30            15                                                                                EC11J152040F
+                                                       12±5            18            9                                                                                 EC11J0924411
+                                                      （Initial）
+                Reflow          Flat        20                                                                0.5         100,000          600           600
+                                                       10±4
+                                                    （After reflow）     30            15                                                                                EC11J1524413
+                                                                                                 With                                                                                  14
+                                                                       18            9                                                                                 EC11J0925403
+                                                                                                               1.5
+                                                                                                                                                                       EC11J1525402
+Metal
+Shaft
+
+
+
+
+                                            25                         30            15         Without        ー                                                       EC11E152T409    15
+                             20-tooth
+              Push lock                                10±7                                                                                800          1,600
+                             Serrated
+                                           26.4                                                  With           8                                                      EC11E152U402    16
+
+                                             15                                                 Without        ー           15,000                                      EC1110120005    17
+Insulated
+  Shaft
+
+
+
+
+                                                                                   Self-
+              Self-return
+               switch
+                                                      3 to 30        Without      return                      0.5                         1,200         2,400          EC111012010H
+                                Flat        20                                    switch                                                                                               18
+                                                                                                 With          1.5                                                     EC1110120201
+                                           Inner-
+                                                                                                              0.5
+Shaft Type
+
+
+
+
+                                         shaft=25
+ Through
+
+
+
+
+                                           Outer-
+                                                                                                                                                                       EC11EBB24C03    19
+                              Slotted    shaft=15
+                                                       10±7            30            15         Without        ー
+              Dual-shaft                                                                                                   15,000          700          1,400
+                                           Inner-
+                                Flat     shaft=25
+                                                                                                 With          1.5
+                                           Outer-                                Self-return
+                                                                                                                                                                       EC11E0B2LB01    20
+                              Slotted    shaft=15
+                                                      3 to 30        Without      switch
+                                                                                                Without        ー
+Type
+Ring
+
+
+
+
+              Note
+              Other varieties are also available. Please inquire.
+
+
+                 Packing Specifications
+              Tray
+                                                     Number of packages（pcs.）                    Export package measurements
+                         Product No.
+                                                  1 case /Japan        1 case /export packing               （mm）
+
+                     EC11B                              700                  1,400                   524×374×201
+
+
+                     EC11E09/15/18/EC11N               1,200                 2,400
+                                                                                                    540×360×250
+                     EC11G/EC11K/EC11M                 1,000                 2,000
+
+
+                     EC11J                              600                    600                  369×283×263
+
+
+                     EC11E152T/U                        800                  1,600                   507×363×230
+
+
+                     EC111                             1,200                 2,400
+                                                                                                     507×363×216
+                     EC11E0B/BB                         700                  1,400
+
+
+
+
+                                                                                                                                                Refer to P.267 for attached parts.
+                                                                                                                                             Refer to P.268 for product varieties.
+                                                                                                                                         Refer to P.270 for switch specifications.
+                                                                                                                                          Refer to P.299 for soldering conditions.
+      262
+                                                                     EC11／11mm Size Metal Shaft Type
+
+
+
+
+ Dimensions                                                                                                                         Unit:mm
+
+                                                                                        PC board mounting hole dimensions
+No.                Photo                              Style
+                                                                                          （Viewed from mounting side）
+
+      EC11B
+
+
+
+
+                                                                                                                                                Encoders
+      Horizontal               5.5         20
+                                                              11.7                                       3.7
+                                      7         12
+                                                                                                     2.1
+                                                                                                                           Mounting
+
+
+
+
+                                                      ø6
+                                                                                                                           surface
+
+
+
+
+                                                     4.5
+
+
+
+
+                                                                             6.5 7.25
+1                                                                                                                  B
+
+
+
+
+                                                                                                   1.8
+                                                                                                                   C
+
+
+
+
+                                                                                            13.5
+                                                                      6
+
+
+
+
+                                                                                                   5
+                                                                                                                   A
+                                                 C1
+
+
+
+
+                                                                       0.8
+                                                                              3.5
+                                     0.8    M7G0.75            2                                                         3-ø1 holes
+
+
+
+
+                                                                                                                                                Metal
+                                                                                                                                                Shaft
+                               5.7                                                                  3.8
+                                                              14.1
+
+
+
+       EC11B
+       Horizontal
+
+
+
+
+                                                                                                                                                Insulated
+                                                                                                          5
+
+
+
+
+                                                                                                                                                  Shaft
+       with push-on switch                                                                          2.1
+      （travel 0.5mm）                                                                                                       Mounting
+                                                                                                                           surface
+
+                                                                                                          E        B
+
+
+
+
+                                                                                                  1.8
+                                                                                                                   C
+
+
+
+
+                                                                                           13.5
+2
+
+
+
+
+                                                                                                                                                Shaft Type
+                                                                                                  5
+                                                                                                                   A
+
+
+
+
+                                                                                                                                                 Through
+                                                                                                          D
+
+                                                                                                   2.5                     5-ø1 holes
+
+                                                G                                                        3.8
+
+
+
+
+                                                                                                                                                Type
+                                                                                                                                                Ring
+                                                                                                    D                  E
+
+       EC11B
+       Horizontal                                                                                        5
+       with push-on switch                                                                          2.1
+      （travel 1.5mm）                                                                                                       Mounting
+                                                                                                                           surface
+
+                                                                                                         E         B
+
+                                                                                                 1.8
+                                                                                                                   C
+3
+                                                                                          13.5
+
+                                                                                                 5
+                                                                                                                   A
+                                                                                                         D
+
+                                                                                                   2.5                     5-ø1 holes
+
+                                                G                                                        3.8
+
+
+
+                                                                                                    D                  E
+
+      EC11E
+      Vertical
+                                                                                                              12.5
+                                                                                                                            Dummy
+                                                                                                               5
+
+
+                                                                                                                            1.5
+                                                                                          7
+
+
+
+
+4
+                                                                                          7.5
+
+
+
+
+                                                                                                                              2.6
+
+
+
+
+                                                                                                         ACB
+
+                                                                                                                           5-ø1 holes
+                                                                                                               5
+
+
+
+
+       EC11E
+       Vertical
+                                                                                                             12.5
+       with push-on switch
+      （travel 0.5mm / 1.5mm）                                                                                   5
+                                                                                                         D           E
+                                                                                                                            1.5
+                                                                                          7
+
+
+
+
+5
+                                                                                          7.5
+
+
+
+
+                                                                                                                             2.6
+
+
+
+
+                                                                                                         ACB
+
+                                                                                                                           5-ø1 holes
+                                                                                                               5
+
+
+
+
+                                                                                                                                              263
+                  EC11          11mm Size Metal Shaft Type
+
+
+
+               Dimensions                                                                                                                                                                                                                                                                  Unit:mm
+
+                                                                                                                                                                                                                           PC board mounting hole dimensions
+              No.              Photo                                                                     Style
+                                                                                                                                                                                                                             （Viewed from mounting side）
+   Encoders
+
+
+
+
+                    EC11N                     L      L1                 LB                   R
+                    Vertical                 19.5    15                  7                   5
+                                             24.5    20                 10                   7
+                                                                                                                                              L
+                                                                                                                                                                                                                                                            12.5
+                                                                                               L         3.5                   4.5            (L1 )                                                                                                                            Dummy
+                                                                                                                                                                                                        11.7                                                 5
+                                                                                                     Dummy
+                                                                                                                                             LB           ℓ                                                                12.5
+                                                                 3.5             4.5           (L1 ) terminal                                                                                                                                 Dummy
+                                                                                                                                                      11.7                                                                  5
+                                                             Dummy
+
+
+
+
+                                                                                                                                                                      ø6
+                                                                                                                                                                     4.5
+              6                                                                              LB          ℓ                                                                                                                                                                 1.5
+
+
+
+
+                                                                                                           2.5
+                                                             terminal
+
+
+
+
+                                                                                                                                                                                                                6
+
+
+
+
+                                                                                                                                                                                                                                            7
+                                                                                                                  ø6
+                                                                                                                 4.5
+                                                                                                                                                                                                                                          1.5
+
+
+
+
+                                                                2.5
+
+
+
+
+                                                                                                                                                                                                                6
+
+
+
+
+                                                                                                                                                                                                                                            7.5
+                                                                                                                                                                     C1
+
+
+
+
+                                                                                                                                                                        6
+
+
+
+
+                                                                                                                                                                                                               7
+
+
+
+
+                                                                                                                                                                                                                                                                               2.6
+                                                                                                                                                                                   7.5 max.
+                                                                                                                 (Switch01)                                                                          ACB
+                                                                                                                                                                                                                                                        ACB              5-ø1 holes
+
+
+
+
+                                                                                                                                                                        6
+Metal
+Shaft
+
+
+
+
+                                                                                                                                              R0.5
+
+
+
+
+                                                                                                                                                                                                               7.5
+                                                                                                                  C1
+
+
+
+
+                                                                                                                                                                                                                                              2.6
+                                                                                                           3.5                                                                                                                                               5
+
+
+
+
+                                                                                                                                  7.5 max.
+                                                                    (Switch01)                                                                        ACB                                               9.2
+                                                                                               R0.5                                                                                                                      ACB          5-ø1 holes
+                                                                3.5                                                                                                                                                         5
+                                                                                                                                                          9.2
+
+
+                     EC11N                    L      L1                 LB                   R
+Insulated
+  Shaft
+
+
+
+
+                     Vertical                19.5    15                  7                   5
+                     with push-on switch                                                                                                                              Switch travel
+                                             24.5    20                 10                   7
+                    （travel 0.5mm / 1.5mm）                                                                              L travel
+                                                                                                                    Switch
+                                                                                                                                                           0.5 or 1.5                                                                                        12.5
+                                                                                         L          3.5           4.5    (L1 )
+                                                                                                               0.5 or 1.5                                                                     11.7                                12.5                        5
+                                                             3.5          4.5               1 )
+                                                                                         (L(Switch02)                          LB             ℓ
+                                                                                                                                                  11.7                                                                             5
+Shaft Type
+
+
+
+
+                                                                                                                                                                                           D        E                                                        D       E
+                                                                                                   ℓ
+
+
+
+
+                                                                                                                                                           ø6
+                                                                                                                                                          4.5
+                                                                                      LB
+ Through
+
+
+
+
+              7                                     (Switch02)                                                                                                                                                                                                                 1.5
+                                                                                                   2.5
+
+
+
+
+                                                                                                                                                  D       E                                                                       D       E
+                                                                                                            ø6
+                                                                                                           4.5
+
+
+
+
+                                                                                                                                                                                                            6
+
+
+
+
+                                                                                                                                                                                                                                                7
+                                                                                                                                                                                                                                                      1.5
+                                                        2.5
+
+
+
+
+                                                                                                                                                                    6
+
+
+
+
+                                                                                                                                                                                                            6
+
+
+                                                                                                                                                                                                                     7
+
+
+
+
+                                                                                                                                                                                                                                                7.5
+                                                                                                                                                          C1
+
+
+
+
+                                                                                                                                                                                                                                                                                  2.6
+                                                                                                                                                                        7.5 max.
+                                                                                                        (Switch01)                                                                         ACB                                                               ACB
+                                                                                                                                                                    6
+                                                                                                                                                                                                                                                                           5-ø1 holes
+
+
+
+
+                                                                                                                                                                                                                     7.5
+                                                                                                             C1                    R0.5
+
+
+
+
+                                                                                                                                                                                                                                                       2.6
+                                                                                                   3.5                                                                                                                                                           5
+                                                                                                                          7.5 max.
+
+
+
+
+                                                             (Switch01)                                                                           ACB                                         9.2                    D       E
+                                                                                        R0.5                                                                                                                                      ACB           5-ø1 holes
+                                                        3.5
+Type
+
+
+
+
+                                                                                                                                                                                                                                      5
+Ring
+
+
+
+
+                                                                                                                                                  9.2                                  D                E
+
+
+                    EC11G                               Mounting
+                                                        surface           3.5
+                    Vertical                                                            25
+                                                                                 Mounting
+                                                                              4.5      (20.5) 3.5
+                                                                                 surface                                   25 13.1
+                                                             Dummy            1.5 7               4.5                     (20.5) 11.7                                       13.1
+                                                             terminal               Dummy        1.5                                                                        11.7                                           ø2.05 hole
+                                                                                    terminal                          7                 D             E
+                                                                                                                                                                                                                               12.5              2-R0.8
+                                                                                                                                                                                                                                                    ø2.05 hole
+                                                                                                                                                                            D          E                                         5                       of shaft
+                                                                                                                                                                                                                                                 Center12.5                     2-R0.8
+                                                                                                                                                          6
+
+
+
+
+                                                                                                                                                                                                                              1.55                        5                     Center of shaft
+                                                          ø1.5
+
+
+
+
+                                                                                                                                                                                              6
+                                                                                                                        7.5max.
+
+
+
+
+                                                                                                                                                                                                                                D E                    1.55
+                                                                                       ø1.5
+                                                         ø2
+
+
+
+
+                                                                                                                                                                6
+                                                                                                                                                          7.5max.
+
+
+
+
+                                                                                                                                                                                                                                              2.6
+                                                                                                                                                                                                                                                         D E
+              8
+                                                                   2.5
+
+
+
+
+                                                                                      ø2
+
+
+
+
+                                                                                                   0.5x45°
+                                                                                                                                                                                              6
+
+
+
+
+                                                                                                                                                                                                                                                                           2.6
+                                                                                (SW01)
+                                                                                                                                                                                                                     7
+
+
+
+
+                                                                                                   CHAM                               ACB
+                                                                                                  2.5
+
+
+
+
+                                                                                                                                   0.5x45°
+                                                                                                        (SW01)
+                                                                                        ø7
+
+
+
+
+                                                                                                                                                                                                                                                7
+                                                                                                                                   CHAM9.2                                  ACB
+                                                                                                                                                                                                                                      4.5
+
+
+
+
+                                                                    3.5
+                                                                                                                  ø7
+
+
+
+
+                                                                                                                                                                            9.2
+                                                                                                                                                                                                                     7.5
+
+                                                                                                                                                                                                                           2.2
+
+
+
+
+                                                                                         90° 3.5                                                                                                                                                1.5
+
+                                                                                                                                                                                                                                                                   4.5
+                                                                                            ±2°
+                                                                                                                                                                                                                                                7.5
+
+                                                                                                                                                                                                                                                       2.2
+
+                                                                                                                      90°                                                                                                                                                      1.5
+                                                             8±0.1                                                        ±2°                                                                                                    ACB          5-ø1 hole
+                                                                                         8±0.1                                                                                                                                                               ACB
+                                                                           0.1                                                                                                                                                    5                                        5-ø1 hole
+                                                                                                   15°
+
+
+
+
+                                                                                                         0.1                                                                                                                                                     5
+                                                                                                                                  15°
+                                                                                             ∅
+                                                                          3
+
+
+
+                                                                                             8±
+                                                                        0.0
+
+
+
+
+                                                                                                                          ∅
+                                                                                               0.0
+
+                                                                                                        3
+
+
+
+                                                                                                                           8±
+                                                                      9±
+
+
+
+
+                                                                                                    0.0
+                                                                                                   5
+                                                                   ∅
+
+
+
+
+                                                                                                                              0.0
+                                                                                                   9±
+
+
+
+
+                                                                                                                                  5
+                                                                                               ∅
+
+
+
+
+                                                        Mounting                                                                         Switch travel
+                     EC11G, EC11M                       surface            3.5 Mounting 25                                                                                  Switch travel
+                                                                               surface      3.5
+                     Vertical                                                 4.5      (20.5)
+                                                                                                                              1.525
+                                                                                                                                                                 1.5
+                     with push-on switch                            1.5                      7                  4.5               (20.5)           13.1
+                                                                                                                                                   11.7                             13.1                                   ø2.05 hole
+                    （travel 1.5mm）                                (SW02)                       1.5
+                                                                                             (SW02)
+                                                                                                                          7
+                                                                                                                                                  D             E                   11.7                                        12.5
+                                                                                                                                                                                                                                 1.55
+                                                                                                                                                                                                                                                      ø2.05 hole
+                                                                                                                                                                                                                                                      2-R0.8
+                                                                                                                                                                                                                                                       Center of shaft 2-R0.8
+                                                                                                                                                                                                                                                            12.5
+                                                                                                                                                                                   D               E
+                                                                                                                                                                                                                                                            1.55        Center of shaft
+                                                                                                                                                                                                                                      5
+                                                                                                                                                                     6
+                                                                                                                               7.5max.
+
+
+
+
+                                                                                                                                                                                                                                  D         E                        5
+                                                                                                                                                                                                         6
+                                                      ø1.5
+
+
+
+
+                                                                                                                                                                    7.5max.
+                                                             ø2
+
+
+
+
+                                                                                                                                                                                                                                                              D           E
+                                                                                 ø1.5
+
+
+
+
+                                                                                                                                                                                                                                                    2.6
+                                                                                                                                                                        6
+
+
+
+
+              9
+                                                                  2.5
+
+
+
+
+                                                                                             ø2
+
+
+
+
+                                                                                                                                                                                                                                                                                  2.6
+                                                                                                                                                                                                                     7
+                                                                                                                                                                                                         6
+
+
+
+
+                                                                                                        0.5x45°
+                                                                                        ø7 2.5
+
+
+
+
+                                                                                  (SW01)                CHAM                                  A CB
+                                                                                                                                                                                                                                                7
+
+
+
+
+                                                                                                                                         0.5x45°
+                                                                                                             (SW01)
+                                                                                                                                                                                                                                          4.5
+
+
+
+
+                                                                    3.5                                                                  CHAM9.2                                       A CB
+                                                                                                                                                                                                                      2.2
+                                                                                                                                                                                                                     7.5
+
+
+
+
+                                                                                         90° 3.5
+                                                                                                                                                                                                                                                                         4.5
+
+
+
+
+                                                                                                                                                                                                                                                      1.5
+                                                                                                                        ø7
+
+
+
+
+                                                                                            ±2°                                                                                        9.2
+                                                                                                                                                                                                                                                 2.2
+                                                                                                                                                                                                                                                7.5
+
+
+
+
+                                                                                                                      90°                                                                                                                                                            1.5
+                                                             8±0.1                                                        ±2°                                                                                                     A CB
+                                                                                         8±0.1                                                                                                                                                    5-ø1 hole
+                                                                           0.1                                                                                                                                                      5                     A CB
+                                                                                                   15°
+
+
+
+
+                                                                                                                                              D                E                                                                                                                5-ø1 hole
+                                                                                                         0.1                                                                                                                                                5
+                                                                                                                                  15°
+
+
+
+
+                                                                                                                                                                                   D               E
+                                                                                             ∅
+                                                                          3
+
+
+
+                                                                                             8±
+                                                                        0.0
+
+
+
+
+                                                                                                                          ∅
+                                                                                               0.0
+
+
+
+
+                       EC11G       EC11M
+                                                                                                        3
+
+
+
+                                                                                                                          8±
+                                                                      9±
+
+
+
+
+                                                                                                    0.0
+                                                                                                   5
+                                                                   ∅
+
+
+
+
+                                                                                                                              0.0
+                                                                                                   9±
+
+
+
+
+                                                                                                                                 5
+                                                                                               ∅
+
+
+
+
+                                                                                                                                     Switch travel
+                     EC11G, EC11M                             Mounting
+                                                              surface
+                                                                                3.5             25
+                                                                                         Mounting 3.5
+                                                                                                                                                                        Switch travel
+                                                                                                                          1.5 25
+                     Vertical                                                         4.5surface
+                                                                                               (20.5)                                         13.1             1.5
+                     with push-on switch                                                       7                  4.5              (20.5)
+                                                                                                                                              11.7                                 13.1
+                                                                    (SW02)                                                    7                                                    11.7
+                    （travel 1.5mm）                                                                (SW02)
+                                                                                                                                             D             E
+                                                                                                                                                                                   D           E
+                                                                                                                                                                                                                             ø2.05 hole
+                                                                                                                                                                                                                                  12.5
+                                                                                                                                                                                                                                                      Center of shaft
+                                                                                                                                                                                                                                                        ø2.05 hole
+                                                                                                                                                                                                                                                                                     Center of shaft
+                                                                                                                              7.5max.
+
+
+
+
+                                                                                                                                                                                                                                    5                        12.5
+                                                                                                                                                                7.5max. 6
+
+
+
+
+                                                                                                                                                                                                                                 D      E                       5
+                                                                                                                                                                                                   6
+
+
+
+
+                                                                                                                                                                                                                                                  2.6
+
+
+
+
+                                                                                                                                                                                                                                                            D      E
+                                                                                                                                                                   6
+                                                      ø2
+
+
+
+
+                                                                                                                                                                                                                                                                                 2.6
+                                                                                                                                                                                                                         7
+
+
+
+
+                                                                                                         0.5x45°
+                                                                                                                                                                                                   6
+                                                                                 ø2
+                                                         ø1.5
+
+
+
+
+              10
+                                                              2.5
+
+
+
+
+                                                                                      (SW01)             CHAM                                  ACB
+                                                                                                                                                                                                                                                      7
+
+
+
+
+                                                                                                                                            0.5x45°
+                                                                                    ø1.5
+                                                                                           2.5
+
+
+
+
+                                                                                                              (SW01)
+                                                                                                                                                                                                                                          4.5
+
+
+
+
+                                                                        1.5                                                                    9.2                                 ACB
+                                                                                           ø7
+
+
+
+
+                                                                                                                                            CHAM
+                                                                                                                                                                                                                         7.5
+                                                                                                                                                                                                                                2.2
+
+
+
+
+                                                                                                                                                                                                                                                      1.5
+                                                                                                                                                                                                                                                                         4.5
+
+
+
+
+                                                                        3.5                         1.5                                                                            9.2
+                                                                                                                          ø7
+
+
+
+
+                                                                                                                                                                                                                                                      7.5
+                                                                                                                                                                                                                                                            2.2
+
+
+
+
+                                                                                         90°        3.5                                                                                                                                                                              1.5
+                                                                                             ±2°                                                                                                                         2-R0.8 A C B             5-ø1 hole
+                                                                                                                      90°                                                                                                 1.55                      2-R0.8 A C B
+                                                             8±0.1                                                        ±2°                                                                                                                                                    5-ø1 hole
+                                                                           0.1           8±0.1                                           D                E                                                                      5                   1.55
+                                                                                                   15°
+
+
+
+
+                                                                                                         0.1                                                                D                 E                                                             5
+                                                                                                                                  15°
+                                                                                             ∅
+                                                                          3
+
+
+
+                                                                                             8±
+                                                                        0.0
+
+
+
+
+                                                                                                                          ∅
+                                                                                               0.0
+
+
+
+
+                       EC11G       EC11M
+                                                                                                        3
+
+
+
+                                                                                                                           8±
+                                                                    9±
+
+
+
+
+                                                                                                    0.0
+                                                                                                  5
+                                                                   ∅
+
+
+
+
+                                                                                                                              0.0
+                                                                                                   9±
+
+
+
+
+                                                                                                                                  5
+                                                                                               ∅
+
+
+
+
+      264
+                                                                                                                                   EC11／11mm Size Metal Shaft Type
+
+
+
+
+ Dimensions                                                                                                                                                                                                             Unit:mm
+
+                                                                                                                                                          PC board mounting hole dimensions
+No.              Photo                                                                    形状
+                                                                                                                                                            （Viewed from mounting side）
+
+
+
+
+                                                                                                                                                                                                                                           Encoders
+      EC11K
+      Vertical                                      Mounting                                                                                                  EC11K09
+                                                    surface                                   24.5                                                            Type only                                    1.6
+                                                                                                                                                                                       12.6                 2-R0.8
+                                              Dummy                             4.5             (20)
+                                              Mounting 3.5
+                                              terminal                                                                                  13.1                  ø2.1hole
+                                                                                                                                                                                        6                  1.55
+                                              surface                            24.5 10                                                11.7                                            5                 12.5
+                                                                                                         7
+
+
+
+
+                                                                                                          ø5.975
+
+
+
+
+                                                                                                                                                                           1.9
+                                        Dummy             4.5                      (20)                                               D         E                                  D               E
+                                                   3.5
+
+
+
+
+                                                                                                          4.45
+                                        terminal                                                                                  13.1
+                                                                                10               7                                11.7
+
+
+
+
+                                                                                                                                                                       7
+                                                                                                     ø5.975
+
+
+
+
+                                                                                                                                                                 4.5 4.5
+                                                                                                                                                    6
+                                                                                                                                D      E
+11
+
+
+
+
+                                                                                                                                                                                                                10
+                                                                                                     4.45
+
+
+
+
+                                                                                                                                                                                                                 5
+                                                                                                                                                                7.5
+                                                                                                                                                    6
+                                                                     2.5
+                                                                                              C1                     C1                                                                            B
+
+
+
+
+                                                                                                                                            6
+
+
+
+
+                                                                                                                                                                                                          2.65
+                                                        (Switch01)               1.2                                                                                               A
+
+
+
+
+                                                                                                                                                                           1.9
+                                                                                           ø8.975                                      ACB                                                 C
+
+
+
+
+                                                                                                                                            6
+                                                                    3.5                                                                                               1.6                                     5-ø1.05 hole
+
+
+
+
+                                                          2.5
+                                                                                        C1R0.5 C1
+                                                                                                                                                             EC11K15                       5                  2-R0.8
+
+
+
+
+                                                                                                                                                                                                                                           Metal
+                                                                                                                                                                                                                                           Shaft
+                                            (Switch01)                 1.2            ø8.975                                     ACB                         Type only
+                                                         3.5
+                                                                                                                                                              Black part : Do not solder and
+                                                                                                                                                              no wiring for electrical contact.
+
+
+       EC11K                                                                                                                 Switch travel
+
+
+
+
+                                                                                                                                                                                                                                           Insulated
+                                                                                                                                                                                                                                             Shaft
+       Vertical                                    Mounting                          0.5or1.5                                                                  EC11K09
+                                                                                                                                                               Type only                                    1.6
+       with push-on switch                         surface             24.5            Switch travel                                                                                    12.6                 2-R0.8
+                                                                4.5       (20)
+      （travel 0.5mm / 1.5mm）                   Mounting
+                                                        3.5
+                                                                                 0.5or1.5
+                                                                                                  13.1
+                                                                                                  11.7
+                                                                                                                                                               ø2.1hole
+                                                                                                                                                                                         6
+                                                                                                                                                                                         5
+                                                                                                                                                                                                            1.55
+                                                                      10
+                                                                   24.5        7                                                                                                                           12.5
+
+
+
+
+                                                                                                             ø5.975
+                                               surface
+                                                (Switch02)
+
+
+
+
+                                                                                                                                                                             1.9
+                                                                                                D      E                                                                           D                E
+
+
+
+                                                                                                             4.45
+                                                    3.5     4.5      (20)                    13.1
+
+
+
+
+                                                                                                                                                                       7
+                                                                                             11.7
+
+
+
+
+                                                                                                                                                                 4.5 4.5
+
+
+
+
+                                                                                                                                                                                                                                           Shaft Type
+                                                                                                                                                6
+                                                                  10        7
+                                                                                                     ø5.975
+                                             (Switch02)
+
+
+
+
+                                                                                                                                                                                                                                            Through
+                                                                                                                                                                                                                 10
+12                                                                                         D       E
+
+
+
+
+                                                                                                                                                                                                                  5
+                                                                                                     4.45
+
+
+
+
+                                                                                                                                                                7.5
+                                                                                                                                                6
+                                                                 2.5
+
+
+
+
+                                                                                            C1      C1                                                                                              B
+
+
+
+
+                                                                                                                                                                                                           2.65
+                                                                                                                                        6
+                                                   (Switch01)                   1.2                                                                                                 A
+
+
+
+
+                                                                                                                                                                             1.9
+                                                                                          ø8.975                                    ACB                                                     C
+                                                                                                                                                                             1.6
+
+
+
+
+                                                                                                                                        6
+                                                                3.5                     R0.5                                                                                                                 5-ø1.05 hole
+                                                          2.5
+
+
+
+
+                                                                                        C1       C1                                                                                         5
+                                             (Switch01)                                                                                                      EC11K15                                         2-R0.8
+                                                                          1.2         ø8.975                                    ACB                          Type only
+                                                          3.5
+                                                                                                                                                              Black part : Do not solder and
+
+
+
+
+                                                                                                                                                                                                                                           Type
+                                                                                                                                                                                                                                           Ring
+                                                                                                                                                              no wiring for electrical contact.
+
+
+      EC11J                                                                                                                                                               13
+                                                                                                                                                                                 EC11J09
+                                                                                                                                                                               EC11J09
+                                                                                                                                                                        13            only
+                                                                                                                                                                                 Typeonly
+                                                                                                                                                                               Type
+      Reflow                    Mounting
+                                                        Mounting                      24.5                                                                      0.5
+                                                                                                                                                                         12.5
+                                                                                                                                                                   0.5 12.5
+                                                        surface24.5                                                                                            2-R0.65 7.57.5  1.3
+                                surface                                    4.5          (20)                                                                2-R0.65       6.3 1.3
+
+
+
+
+                                                                                                                                                                                                                             5-2.4
+                                                    4.5
+                                                    (Dummy (20)                                                                         15                    ø2.1Hole 6.3
+
+
+
+
+                                                                                                                                                                                                                           5-2.4
+                                                                                                           ø5.975
+
+
+
+
+                                                                                                                          15
+
+
+
+
+                                                                                                                                                                                                                            5.05
+                                (Dummy              terminal)                         10             7                                                     ø2.1Hole
+
+
+
+
+                                                                                                                                                                                                                            1.8
+                                                                                           ø5.975
+
+
+
+
+                                                                                                                                       D E                               D E
+
+
+
+
+                                                                                                                                                                                                                          5.05
+                                terminal)                       10               7
+
+
+
+
+                                                                                                                                                                                                                          1.8
+                                                                                                                         D E                                           D E
+                                                                                                          4.45
+                                                                 1.95
+
+
+
+
+                                                                                          4.45
+
+
+
+
+                                                                                                                                                                                                             8.58.5 8.28.2
+                                           1.95
+
+
+
+                                                              1.45
+
+
+
+
+                                                                                                                                                          5.512.6
+                                                                                                                                                           4 5.5
+                                                                                                                                                    18
+
+
+
+
+                                                                                                                                                          10 19
+                                                                                                                                                              10
+                                                                                                                             3
+
+
+
+
+                                                                                                                                                                      4
+                                        1.45
+
+
+
+
+                                                                                                                                                         12.6
+
+
+
+13
+                                                                                                                                       18
+
+
+
+
+                                                                                                                                                          19
+
+
+
+
+                                                                                                                                                                                        A
+                                                                                                         3
+
+
+
+
+                                                                                               C1                   C1
+                                                    (Switch01)                              ø8.975                                     A CB                                        A CB
+                                                                         C1
+
+
+
+                                                                                                                                                                                                           1.9
+                                                                                                                                                                                                       4.5 4.5
+                                                                           1.2              C1                                                                    5-1.3
+                                (Switch01)                                                 R0.5                                                                     1.6
+                                                                       ø8.975                                            A CB           8.1                                         CB
+
+                                                                                                                                                                                                        1.9
+                                                        1.2                                                                                                    5-1.3                        5                  EC11J15
+                                                                                                                                       11.7                   2-R0.8
+                                                                                                                                                                 1.6
+                                                                                                                          8.1                                                               9                  Type only
+                                                                                                                         11.7                             2-R0.8             516.5     EC11J15
+                                                                                                                                                                             9         Type only
+                                                                                                                                                              slant：はんだラ
+                                                                                                                                                            A斜線部             ン ド
+                                                                                                                                                                     line part:The
+                                                                                                                                                                            16.5     solder land
+                                                                                                                                                             黒塗り部
+                                                                                                                                                            Black    ：配線禁止エ
+                                                                                                                                                                   part:           リア and wiring
+                                                                                                                                                                         Do not solder
+                                                                                                                                                                electrical
+                                                                                                                                                            for PC         contact
+                                                                                                                                                                    board mounting detail
+                                                                                                                          Switch travel                         A slant line part hows
+       EC11J                                                                                             Switch travel                                          the solder land13
+                                                                                                                                                                                   blackEC11J09
+                                                                                                                                                                                         part:
+                                                                                                                                                                                          EC11J09
+                                                                                                                                                                                        Type only
+       Reflow                                       Mounting                                                 0.5or1.5                                                0.5 solder
+                                                                                                                                                                Do not       12.5and wiring
+                                                                                                                                                                                 13       Type only
+                                       Mounting surface                               24.5 0.5or1.5                                                                            12.5
+                                                                                                                                                                              7.5
+                                                                                                                                                                for electrical
+                                                                                                                                                               2-R0.650.5       contact
+                                                                                                                                                                                      1.3
+       with push-on switch             surface                         24.5
+                                                                         4.5            (20)                                                                    2-R0.65         7.5
+                                                                                                                                                                              6.3       1.3
+                                                                                                                                                                                                                             1.8 5-2.4
+
+
+
+
+                                                                                                                                       15                     ø2.1hole
+      （travel 0.5mm / 1.5mm）                       4.5                   (20)                                                                                                   6.3
+                                                                                                          ø5.975
+
+
+
+
+                                                                                                                                                                                                                                5.05
+                                                                                                                                                                                                                              5-2.4
+
+
+
+
+                                                   (Switch02)                        10              7                    15                                   ø2.1hole
+                                                                                                                                                                                                        1.8
+
+
+
+
+                                                                                                                             D              E                                       D E
+                                                                                               ø5.975
+
+
+
+
+                                                                                                                                                                                                                          8.25.05
+
+
+
+
+                                       (Switch02)                    10               7
+                                                                                                         4.45
+
+
+
+
+                                                                                                                         D E                                                            D E
+                                                              1.95
+
+
+
+
+                                                                                              4.45
+                                               1.95
+
+                                                           1.45
+
+
+
+
+                                                                                                                                                              12.6
+
+
+
+
+                                                                                                                                                                                                                       8.2
+                                                                                                                                                            5.5 5.5
+                                                                                                                                                    18
+
+
+
+
+                                                                                                                                                            19 19
+                                                                                                                                                            10 10
+                                                                                                                          3
+
+
+
+
+                                                                                                                                                             4 4
+                                            1.45
+
+
+
+
+14
+                                                                                                                                                           12.6
+                                                                                                                                        18
+
+
+
+
+                                                                                                                                                                                                                   8.5
+
+
+
+
+                                                                                                                                                                                    A
+                                                                                                         3
+
+
+
+
+                                                                                      C1                      C1
+                                                                                                                                                                                                                8.5
+
+
+
+
+                                                   (Switch01)                                                                                                                              A
+                                                                                   ø8.975                                     A CB                                                      CB
+                                                                            1.2C1
+                                                                                                                                                                                                          1.9
+                                                                                                                                                                                                                   4.5
+
+
+
+
+                                                                                       C1                                                                        5-1.3
+                                       (Switch01)                          ø8.975 R0.5                                   A CB  8.1                                 1.6                         CB
+                                                                                                                                                                                                              1.9
+                                                                                                                                                                                                            4.5
+
+
+
+
+                                                           1.2                                                                                                    5-1.3              5                       EC11J15
+                                                                                                                          8.1 11.7                           2-R0.8 1.6
+                                                                                                                                                                                     9                       Type only
+                                                                                                                          11.7                               2-R0.8                    5
+                                                                                                                                                                                    16.5
+                                                                                                                                                                                                                 EC11J15
+                                                                                                                                                                                               9                 Type only
+                                                                                                                                                              slant：
+                                                                                                                                                            A斜線部    はんだラ
+                                                                                                                                                                   line     ン ド solder land
+                                                                                                                                                                             16.5
+                                                                                                                                                                         part:The
+                                                                                                                                                             黒塗り部
+                                                                                                                                                            Black   ：配線禁止エ
+                                                                                                                                                                  part:         リア and wiring
+                                                                                                                                                                        Do not solder
+                                                                                                                         D         E                               PC board
+                                                                                                                                                            for electrical     mounting detail
+                                                                                                                                                                           contact
+                                                                                                                                                                   A slant line part hows
+                                                                                                  Total travel                                                     the solder land black part:
+      EC11E152T                                     3.5                     25
+                                                                                                                                                                   Do not solder and wiring
+      Push-lock mechanism          Dummy terminal                5.1                      9
+                                                                                                 Lock travel             11.7                                      for electrical contact
+                                                                                                                                                                                   12.5
+      with push-lock switch                                                               8
+                                                                                                         7.5 max.
+
+
+
+
+                                                                                                                                                               ø5                      5                    Dummy
+                                              2.5
+
+
+
+
+                                                                                                                                                                 .4
+                                                                                                                                                                      ho                                     1.5
+                                                                                                                                    6
+
+
+
+
+                                                                                                                                                                        le
+                                                                                                                                    6
+
+
+
+
+                                              (Switch01)                                                                 ACB
+                                                                                                                                                              7
+
+
+
+
+15                                                                   3.5
+                                                                                          20 teeth Serrated               9.2
+                                                                                                                                                              7.5
+
+
+
+
+                                             20 teeth Serrated
+                                                                                                                                                                                                         2.6
+
+
+
+
+                               8±0.1                          90˚
+                                                                 ±2˚                                                                                                           ACB
+                                                  0.1
+                                                                                                                                                                                                          5-ø1 hole
+                                                                    15˚
+
+
+
+
+                                                                                                                                                                                       5
+                                                 5
+
+
+                                                                ø8
+                                              .0
+
+
+
+                                                                  ±0
+                                             ±0
+
+
+
+
+                                                                    .0
+                                            ø9
+
+
+
+
+                                                                      5
+
+
+
+
+                                                                                                                                                                                                                                         265
+                EC11               11mm Size Metal Shaft Type
+
+
+
+               Dimensions                                                                                                                                                                                                            Unit:mm
+
+                                                                                                                                                                                       PC board mounting hole dimensions
+              No.                Photo                                                                          Style
+                                                                                                                                                                                         （Viewed from mounting side）
+   Encoders
+
+
+
+
+                     EC11E152U                                                3.5                    26.4
+                                                                                                                           Total travel
+
+                     Push-lock mechanism                                                                         9
+                                                                                                                           Lock travel        11.7
+                                                                                                                                                                                                        12.5
+                                                                                          6.5
+                     with push-lock switch                                                                       8
+
+
+
+
+                                                                                                                               7.5 max.
+                                                                         (Switch02)                                                       D         E
+                                                                                                                                                                                                           5
+
+
+
+
+                                                                          2.5
+                                                                                                                                                                                                                               1.5
+
+
+
+
+                                                                                                                                                                6
+                                                                                                                                                                                                   D                E
+
+
+
+
+                                                                                                                                                                6
+                                                                         (Switch01)                                                           ACB
+
+
+
+
+                                                                                                                                                                                            7
+              16                                                                               3.5
+                                                                                                                 20 teeth Serrated            9.2
+
+
+
+
+                                                                                                                                                                                            7.5
+
+
+
+
+                                                                                                                                                                                                                             2.6
+                                                                         20 teeth Serrated
+                                                                                      90˚                                                 D           E
+                                                       8±0.1                               ±2˚                                                                                                      ACB
+                                                                            0.1
+Metal
+Shaft
+
+
+
+
+                                                                                                                                                                                                                             5-ø1 hole
+
+
+
+
+                                                                                               15˚
+                                                                                                                                                                                                            5
+
+
+                                                                           05
+
+
+
+                                                                                          ø8
+                                                                            .
+
+
+
+                                                                                             ±0
+                                                                         ±0
+
+
+
+
+                                                                                                .0
+                                                                    ø9
+
+
+
+
+                                                                                                   5
+                     EC111
+Insulated
+  Shaft
+
+
+
+
+                     Self-return switch
+                                                                                                                                                                                                       12.5
+                                                                                                                                                                                                                             Dummy
+                                                                                                                                                                                                        5
+
+                                                                                                                                                                                                                            1.5
+Shaft Type
+
+
+
+
+                                                                                                                                                                                           7
+ Through
+
+
+
+
+              17
+
+
+
+
+                                                                                                                                                                                           7.5
+
+
+
+
+                                                                                                                                                                                                                              2.6
+                                                                                                                                                                                                   ACB
+                                                                                                                                                                                                                            5-ø1 hole
+                                                                                                                                                                                                        5
+Type
+Ring
+
+
+
+
+                     EC111
+                     Self-return switch
+                     with push-on switch                                                                                                                                                               12.5
+                    （travel 0.5mm / 1.5mm）                                                                                                                                                                 5
+
+                                                                                                                                                                                                   D                E
+                                                                                                                                                                                                                             1.5
+              18
+                                                                                                                                                                                           7
+                                                                                                                                                                                           7.5
+
+
+
+
+                                                                                                                                                                                                                               2.6
+                                                                                                                                                                                                   ACB
+                                                                                                                                                                                                                            5-ø1 hole
+                                                                                                                                                                                                           5
+
+
+
+
+                     EC11E
+                     Dual-shaft type
+                                                                                                                                                                                                           12.5
+                     with push-on switch                                                                                                                                                                    5
+                    （travel 0.5mm）                                                                                                                                                                                             1.5
+                                                                                                                                                                                             2.5
+
+
+
+
+                     Inner shaft: encoder                                                                                                                                                              A' C' B'
+
+                     Outer shaft: encoder                                                                                                                                                              D                E
+                                                                                                                                                                                             7
+
+
+
+
+              19
+                                                                                                                                                                                             7.5
+
+
+
+
+                                                                                                                                                                                                                              2.6
+
+
+
+
+                                                                                                                                                                                                       ACB
+                                                                                                                                                                                                                5             8-ø1 hole
+
+
+
+
+                     EC11E
+                     Dual-shaft type                      3.5             8.5                  25
+                                                                                                                       Switch travel                                                                       12.5
+                                                                                                                                                                                                            5
+                     with push-on switch                                                  15
+                                                                                                                                                                        11.7                                                  1.5
+                                                                                                                                                                                             2.5
+
+
+
+
+                    （travel 1.5mm）                                                    7          5          7                                                                                       A' C' B'
+                                                                        (Switch01)                                   1.5                                            A' C' B'
+                     Inner shaft: encoder
+                                                                                                                                                                                                    D               E
+                                                                                                                 ø3.5
+
+
+
+
+                     Outer shaft: self-return switch   (Switch03)
+                                                                                     ø8
+
+
+
+
+                                                                                                                 2.5
+
+                                                                                                                 ø6
+
+
+
+
+                                                                                                                                                                                             7
+                                                                                                                                                     7
+
+
+
+
+                                                                                                                                                                                   6
+
+
+
+
+              20
+                                                        2.5
+
+
+
+
+                                                                                                                                                                                             7.5
+
+
+
+
+                                                                                                                                                                                                                              2.6
+                                                                                                                                                                                   6
+                                                                                            2
+
+
+
+
+                                                                                                                                                                                                       ACB
+                                                                                                                                                     7.5 max.
+
+
+
+
+                                                           (Switch02)                                                 C0.5                                          ACB
+                                                                                                       C0.5                                                                                                                  8-ø1 hole
+                                                                                                                                                                     9.2                                       5
+                                                                          3.5
+
+
+                                                                                                                                                                    D          E
+
+
+
+
+      266
+                                                                                                  EC11／11mm Size Metal Shaft Type
+
+
+
+
+  Output Wave
+
+              EC11B / EC11E / EC11G / EC11N / EC11M                                                   EC11E / EC11J / EC11K
+
+
+
+
+                                                                                                                                                                         Encoders
+                                                                                               Detent stability position cannot be specified for B signal.
+                   EC11B, EC11E, EC11G,
+                   EC11N, EC11M         30 detents, 15 pulse                                   EC11E 18 detents 9 pulse
+                                                                                               EC11E 36 detents 18 pulse
+                                                                                               EC11J, EC11K
+                   A signal OFF      ON
+                                                                                                A signal     OFF    ON
+                   B signal    OFF       ON
+                                                                                                B signal        OFF      ON
+
+
+                       Detent stability position
+
+
+
+
+                                                                                                                                                                         Metal
+                                                                                                                                                                         Shaft
+                          CW direction                                                          CW direction Detent stability position
+
+
+
+
+  Sliding Noise
+
+
+
+
+                                                                                                                                                                         Insulated
+                                                                                                                                                                           Shaft
+                                                                                                                              V1=V2=1.5V max.
+                                                                                                                              At R ＝ 5kΩ
+                    Test circuit                               Output waveform                             EC11B
+
+
+
+
+                                                                                                                                                                         Shaft Type
+                                                                                                                              Chattering：2ms max.
+
+
+
+
+                                                                                                                                                                          Through
+                                          5V DC
+                                                                    t         t                                               Bounce ：2ms max.
+               R                     R
+                                                                                        V1                                    V1=V2=1.5V max.
+                      Terminal A          Terminal B                                               EC11E/EC11G/               At R ＝ 5kΩ
+                                                         5V
+
+
+
+
+                                                                                                   EC11N/EC11M                Chattering：3ms max.
+                                                                                        V2
+                                                                                                                              Bounce ：2ms max.
+                                         Encoder
+                                                               ON       OFF       ON                                          V1=V2=2.5V max.
+
+
+
+
+                                                                                                                                                                         Type
+                                                                                                                                                                         Ring
+                                                                    Sliding direction                                         At R ＝ 5kΩ
+                                          Terminal C                                              EC11J / EC11K
+                                                                                                                              Chattering：3ms max.
+                                                                                                                              Bounce ：2ms max.
+        ˚/s                                             t : Masking time to avoid chattering
+
+
+
+
+  Circuit Diagram
+
+ EC111/EC11E0B
+
+
+
+
+                   11mm Size Metal Shaft Type / Attached Parts
+
+The following parts are included with the product.
+  EC11B Series
+                                                                                                                                                             Unit:mm
+
+                                     Nut                                                                           Washer
+
+
+
+
+                                                                                                       ø12                              0.5
+                                                                                                      ø7.2
+
+
+
+
+                                                                                                                                                                       267
+                               11mm Size Metal Shaft Type / Product Varieties
+
+                 Shaft Dimensions
+              1. Single-shaft Type
+              1）Serrated Type                                                                                                                                                 Unit:mm
+
+               EC11                                                         L1
+                                                                                                                                   ● Detailed dimensions
+              Style（Shaft diameter：φ6）                         LB                                 18 teeth Serrated
+                                                                                                                                                       ℓ1       ℓ2
+   Encoders
+
+
+
+
+              Not applicable for EC11E and EC11G                                 ℓ2    ℓ1
+                                                                                                                                     L1        LB                             S1
+              with push-lock mechanism                                                 0.5 or 1
+                                                                                                                                     20        7            6   1              7
+                                                                                                                               ※     25        10          10   2             11
+
+
+
+
+                                                                                                  ø6
+                                                                                                                                   ※LB=7 for EC11B.
+
+
+
+
+                                                                                              1
+                                                                                       S1
+
+                                                                      ø7 ※                            C1
+
+                                                                    ※M7 for EC11B.
+
+               EC11K / EC11J                                                L1                                                     ● Detailed dimensions
+               Style（Shaft diameter：φ6）
+Metal
+Shaft
+
+
+
+
+                                                               LB                                     18 teeth Serrated
+                                                                                                                                          L1               LB            ℓ1
+                                                                                       ℓ1
+                                                                                                                                          15                7            5
+                                                                            0.5
+                                                                                                                                          20               10            6
+
+
+
+
+                                                                                                  ø6
+                                                                                             1
+Insulated
+  Shaft
+
+
+
+
+                                                                                      1.6
+
+                                                                      ø8.975                          C1
+
+
+
+               EC11G                                                             L
+                                                                                                                                   ● Detailed dimensions
+Shaft Type
+
+
+
+
+               Style（Shaft diameter：φ9）                       4.5                     L1
+ Through
+
+
+
+
+                                                                       LB                         8                                      L             L1            LB
+                                                                                                                                        18            13.5            5
+                                                                                                                                        25            20.5            7
+                                                                                                                                        28            23.5           10
+                                                                                                                   9
+Type
+Ring
+
+
+
+
+                                                                                                            C
+                                                                     ∅7
+
+
+
+
+                                                                                                             0.
+                                                                                                              5
+
+
+
+
+              2）Flat Type                                                                                                                                                     Unit:mm
+
+               EC11
+                                                                                                                               ● Detailed dimensions
+               Style（Shaft diameter：φ6）
+                                                                                                                                 L1             LB            ℓ
+                                                                                                                          ※1     15              5            7
+                                                                          R
+                                                                                                                                 15              7          5（6）
+                                                                                                                                 20              7         10（12）
+                                                                                                                          ※2     25             10           12
+                                                                                                                             ※1 Does not comply with EC111
+                                                                                                                             ※2 LB=7 for EC11B.
+                                                                                                                               Values in parentheses apply to products
+                                                              ※M7 for EC11B.                                                   without push-on switch.
+
+               EC11K / EC11J
+               Style（Shaft diameter：φ5.975）                                                                                    ● Detailed dimensions
+                                                                                                                                      L1              LB             ℓ
+                                                                          R
+                                                                                                                                      15               7             5
+                                                                                                                                      20              10             7
+
+
+
+
+              Notes
+              1. The          highlighted figures in shaft types refer to Product Specifications in P.261 and P.262.
+              2. Other varieties are also available. Please inquire.
+
+
+
+
+      268
+                 11mm Size Metal Shaft Type / Product Varieties
+
+   Shaft Dimensions
+1. Single-shaft Type
+3）Slotted Type                                                                                                                  Unit:mm
+
+  EC11
+  Style（Shaft diameter：φ6）
+                                                                                          ● Detailed dimensions
+
+
+
+
+                                                                                                                                            Encoders
+                                                                                                   L1                 LB
+                                                                                                   15                  7
+                                                                                                   20                  7
+                                                                                      ※            25                 10
+                                                               ※
+                                                                                          ※LB=7 for EC11B
+                                                         ※M7 for EC11B.
+  EC11K / EC11J                                                                           ● Detailed dimensions
+  Style（Shaft diameter：φ5.975）
+                                                                                                   L1                 LB
+
+
+
+
+                                                                                                                                            Metal
+                                                                                                                                            Shaft
+                                                                                                   15                  7
+                                                                                                   20                 10
+
+
+
+
+                                                                                                                                            Insulated
+                                                                                                                                              Shaft
+2. Standard Dimensions and Configuration of Dual-shaft Type
+Flat Type
+
+
+
+
+                                                                                                                                            Shaft Type
+                                                                                                                                Unit:mm
+
+
+
+
+                                                                                                                                             Through
+ EC11E
+ Style（Inner-shaft :φ3.5        Outer-shaft :φ6）                                          ● Detailed dimensions
+                                                                                            L1      L2      LB    ℓ1       ℓ2
+                          L1
+                                                                                            20      10       5    7        4
+                     L2                                                                     25      15       7    7        5
+
+
+
+
+                                                                                                                                            Type
+                                                                                                                                            Ring
+                LB
+                                                                                            30      20      10    7        5
+                                             ø3.5
+                                       2.5
+
+
+
+                                                    ø6
+                          2
+
+
+
+
+                                C0.5    C0.5
+
+
+                          ø8※
+                                                              ※⌀7 for type with inner / outer shaft encoders (EC11EBB)
+
+
+
+Notes
+1. The          highlighted figures in shaft types refer to Product Specifications in P.261 and P.262.
+2. Other varieties are also available. Please inquire.
+
+
+
+
+                                                                                                                                          269
+                               11mm Size Metal Shaft Type / Switch Specifications
+
+              1. EC11B Series
+                        Switch type                                              Momentary push switch
+                    Contact arrangement                                    Single pole and single throw（Push-on）
+                       Travel（mm）                                ＋ 0.4
+                                                             0.5 − 0.3                                             1.5±0.5
+                      Operating force                         6±3N                                                 5±2N
+                       Operating life                      25,000 times                                         20,000 times
+   Encoders
+
+
+
+
+                                        Rating                           0.1A 5V DC (500μA 5V DC min. ratings）
+
+                  Electrical       Contact resistance        100mΩ max. for initial period, 200mΩ max. after operating life.
+                 performance      Insulation resistance                           100MΩ min. 250V DC
+                                   Voltage proof                    300V AC for 1 minute or 360V AC for 2 second
+
+
+              2. EC11E/EC11N/EC111 Series
+                        Switch type                                              Momentary push switch
+                    Contact arrangement                                    Single pole and single throw（Push-on）
+Metal
+Shaft
+
+
+
+
+                       Travel（mm）                            0.5±0.3                                               1.5±0.5
+                      Operating force                          6＋ 2.5
+                                                                −2 N                                               4±2N
+                       Operating life                                                 20,000 times
+                                        Rating                           0.1A 5V DC (500μA 5V DC min. ratings）
+Insulated
+  Shaft
+
+
+
+
+                  Electrical       Contact resistance        100mΩ max. for initial period, 200mΩ max. after operating life.
+                 performance      Insulation resistance                           100MΩ min. 250V DC
+                                   Voltage proof                    300V AC for 1 minute or 360V AC for 2 second
+Shaft Type
+
+
+
+
+              3. EC11G/EC11M Series
+ Through
+
+
+
+
+                        Switch type                                              Momentary push switch
+                    Contact arrangement                                    Single pole and single throw（Push-on）
+                       Travel（mm）                                                       1.5±0.35
+                      Operating force                                                    5±2N
+Type
+Ring
+
+
+
+
+                       Operating life                                                 20,000 times
+                                        Rating                           0.15A 5V DC (500μA 5V DC min. ratings）
+
+                  Electrical       Contact resistance        100mΩ max. for initial period, 200mΩ max. after operating life.
+                 performance      Insulation resistance                           100MΩ min. 250V DC
+                                   Voltage proof                    300V AC for 1 minute or 360V AC for 2 second
+
+
+              4. EC11K/EC11J Series
+                        Switch type                                              Momentary push switch
+                    Contact arrangement                                    Single pole and single throw（Push-on）
+                        Travel（mm）                           0.5±0.3                                               1.5±0.5
+                      Operating force                         5±2N                                                 4±2N
+                       Operating life                     1,000,000 times                                      100,000 times
+                                        Rating                            0.1A 5V DC (0.1mA 5V DC min. ratings）
+
+                  Electrical       Contact resistance        100mΩ max. for initial period, 200mΩ max. after operating life.
+                 performance      Insulation resistance                           100MΩ min. 250V DC
+                                   Voltage proof                    300V AC for 1 minute or 360V AC for 1 second
+
+
+              5. EC11E152U Series
+                        Switch type                                            Push lock mechanism switch
+                    Contact arrangement                                    Single pole and single throw（Push-on）
+                        Travel（mm）                                                       8±0.8
+                      Operating force                                                    8N max.
+                       Operating life                                                 10,000 times
+                                        Rating                           0.1A 5V DC (500μA 5V DC min. ratings）
+
+                  Electrical       Contact resistance        100mΩ max. for initial period, 200mΩ max. after operating life.
+                 performance      Insulation resistance                           100MΩ min. 250V DC
+                                   Voltage proof                    300V AC for 1 minute or 360V AC for 2 second
+
+
+
+
+      270
+Encoders
+List of Varieties
+
+                                                                                               Metal shaft
+              Type
+                                            9mm size                                                          11mm size
+
+              Series                        EC09E                    EC11B                                     EC11E                                 EC11N
+
+
+              Photo
+
+
+
+
+                                                                                                                                                                         Encoders
+              Output                                                                Incremental（Two phase A and B ）
+
+           Shaft types                                                  Single-shaft                                         Dual-shaft            Single-shaft
+
+       Operating direction                   Vertical               Horizontal                                            Vertical
+                                                                                                            9/18
+        Number of pulse /
+                                                          15/30                                        15/30 or without                               15/30
+        Number of detent
+                                                                                                       18/36 or without
+
+                                                                                            Without detent
+
+
+
+
+                                                                                                                                                                         Metal
+                                                                                                                                                                         Shaft
+            Features                            —                         —                                                          —                      —
+                                                                                         Push-lock mechanism
+
+                           W                                                                                    11.7
+                                               9.5
+   Dimensions
+                            D                                         13.75                                                 12
+     （mm）
+
+
+
+
+                                                                                                                                                                         Insulated
+                            H                  4.5                 5.5/6.7/7.75                      4.5                          8/8.5                   4.5
+
+
+
+
+                                                                                                                                                                           Shaft
+  Operating temperature range                                                               −40℃ to ＋85℃
+
+          Operating life                                                                       15,000 cycles
+
+
+
+
+                                                                                                                                                                         Shaft Type
+                                                                                                                                                                          Through
+        Automotive use                          ●                         ●                                      ●                                          ●
+
+
+     Life cycle (availability)
+
+                       Rating                                                                    10mA 5V DC
+
+              Max./min. operating
+
+
+
+
+                                                                                                                                                                         Type
+                                                                                                                                                                         Ring
+                                                                                                 10mA /1mA
+ Electrical current（Resistive load）
+performance
+            Insulation resistance                                                        100MΩ min. 250V DC
+
+                                        300V AC for 1 minute
+                 Voltage proof                                                            300V AC for 1 minute or 360V AC for 2s
+                                         or 360V AC for 1s
+               Rotational torque                —                         —                        ＋3
+                                                                                                  7− 4 mN・m                          —                      —
+               （Without detent）
+Mechanical
+                 Detent torque             8±5mN・m                 12±7mN・m                                             10±7mN・m
+performance
+               Push-pull strength                                                                  100N
+                                                                                                                           Inner-shaft：Flat
+       Shaft configuration                     Flat                            Flat, Slotted, Serrated                                                    Flat
+                                                                                                                           Outer-shaft：Slotted
+
+          Terminal type                                                                           Insertion
+
+                                                                                                              Push-lock
+                  Switch type                                     Push-on switch                              mechanism                  Push-on switch
+                                                                                                               switch ※
+                     Contact
+                                                                                 Single pole and single throw（Push-on）
+                  arrangement
+
+                                                          ＋ 0.4
+                  Travel（mm）          0.5±0.3 1.5±0.5 0.5 − 0.3           1.5±0.5 0.5±0.3 1.5±0.5              8±0.8      0.5±0.3 1.5±0.5 0.5±0.3 1.5±0.5
+
+   Switch                           ＋ 2.5                                                ＋ 2.5                               ＋ 2.5                  ＋ 2.5
+               Operating force（N） 6 −                 4±2         6±3         5±2       6− 2        4±2        8 max.      6− 2          4±2      6 −2           4±2
+Specifications                        2
+
+
+                                         10mA 5V DC
+                       Rating                                                             0.1A 5V DC（500μA 5V DC min. ratings）
+                                      （1mA 5V DC min. ratings）
+
+              Contact resistance                                   100mΩ max. for initial period; 200mΩ max. after operating life.
+
+                                                                 25,000                                        10,000
+                 Operating life          10,000 times                               20,000 times                                          20,000 times
+                                                                  times                                         times
+
+              Page                             259                                                              261
+
+
+Encoders Soldering Conditions ・ ・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・ 299
+Encoders Cautions・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・ 300
+
+Notes
+1. ※marked specification is only applicable to EC11E152U402.
+2. ●Indicates applicability to all products in the series.
+
+
+
+
+                                                                                                                                                                       253
+              Encoders
+              List of Varieties
+
+                                                                                                          Metal shaft
+                             Type
+                                                                                                            11mm size
+
+                            Series                       EC11G              EC11M                EC111                   EC11K                EC11J                     EM11B
+
+
+                             Photo
+   Encoders
+
+
+
+
+                            Output                     Incremental（Two phase A and B）       Self-return switch                  Incremental（Two phase A and B）
+
+                         Shaft types                                                                       Single-shaft
+
+                      Operating direction                                                                    Vertical
+
+                      Number of pulse /                          15/30                                                               9/18
+                                                                                                      —                                                                  16/16
+                      Number of detent                          15/without                                                          15/30
+Metal
+Shaft
+
+
+
+
+                                                                                                                                             Surface
+                           Features                          Less shaft wobble                        —                    —                                      Magnetic type
+                                                                                                                                            Mount type
+
+                                          W                                                       11.7                                                                     10.8
+                  Dimensions
+                                           D                        12                             13                      12                     15.3                      11
+                    （mm）
+Insulated
+
+
+
+
+                                           H
+  Shaft
+
+
+
+
+                                                                    4.5                               5                               4.5                                   7.5
+
+                Operating temperature range                                                 −40℃ to +85℃                                                         −30℃ to +85℃
+
+                        Operating life                                    15,000 cycles                                         100,000 cycles                   1,000,000 cycles
+Shaft Type
+ Through
+
+
+
+
+                       Automotive use                       ●                  ●                      ●                    ●                       ●                         ●
+
+
+                    Life cycle (availability)
+
+                                     Rating                                                   10mA 5V DC                                                          10mA 5V±5% DC
+
+                               Max./min. operating
+Type
+Ring
+
+
+
+
+                                                                                              10mA /1mA                                                               15mA / －
+               Electrical    current（Resistive load）
+              performance Insulation resistance                                           100MΩ min. 250V DC                                                    100MΩ min.100V DC
+
+                                                                                                                           300V AC for 1 minute                 250V AC for 1 minute
+                                Voltage proof               300V AC for 1 minute or 360V AC for 2s
+                                                                                                                            or 360V AC for 1s                    or 300V AC for 2s
+                              Rotational torque                 8.5±5mN・m                     3 to 30mN･m                  —                       —                         —
+                              （Without detent）
+              Mechanical                                                                                                                 12±5mN･m（Initial）
+                                Detent torque                   12±7mN・m                              —              12±5mN･m                                        10±5mN･m
+              performance                                                                                                              10±4mN･m（After reflow）
+
+                              Push-pull strength                                                              100N
+
+                      Shaft configuration                        Serrated                                       Flat, Slotted, Serrated                                    Flat
+
+                        Terminal type                                                Insertion                                                Reflow                   Insertion
+
+                                 Switch type                                                              Push-on switch
+
+                                    Contact
+                                                                                           Single pole and single throw（Push-on）
+                                 arrangement
+
+                                                                                                                                                                            ＋ 0.3
+                                 Travel（mm）                      1.5±0.35                   0.5±0.3 1.5±0.5 0.5±0.3 1.5±0.5 0.5±0.3 1.5±0.5                             0.5 − 0.2
+
+
+
+                 Switch      Operating force（N）                    5±2                        ＋ 2.5
+                                                                                             6− 2         4±2       5±2         4±2         5±2          4±2             5.5±3
+              Specifications
+                                                                      0.1A 5V DC                                               0.1A 5V DC                         5mA 5V DC
+                                     Rating
+                                                                （500μA 5V DC min. ratings）                              （0.1mA 5V DC min. ratings）             （50mA 12V DC max. ratings）
+
+                                                                                    100mΩ max. for initial period,                                              500mΩ max. for initial period,
+                             Contact resistance
+                                                                                   200mΩ max. after operating life.                                             5mΩ max. after operating life.
+
+                                                                                                                  1,000,000 100,000 1,000,000 100,000
+                                Operating life                            20,000 times                                                                          1,000,000 times
+                                                                                                                     times   times     times   times
+
+                             Page                                                                 261                                                                      271
+
+
+              Encoders Soldering Conditions ・ ・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・ 299
+              Encoders Cautions・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・・ 300
+
+               Note
+              ● Indicates applicability to all products in the series.
+
+
+
+
+      254
+                                                     Encoders / Soldering Conditions
+
+
+   Reference for Manual Soldering
+                   Series                                                    Tip temperature                             Soldering time                         No. of solders
+
+ EC05E, EC09E, EC10E, EC111, EC11B, EC11E,
+ EC11G, EC11K, EC11M, EC11N, EC12D, EC12E,
+ EC18A, EC21A, EC28A, EC35A, EC35AH, EC40A,                                     350℃ max.                                    3s max.                               1 time
+
+
+
+
+                                                                                                                                                                                         Encoders
+ EC45A, EC50A, EC60B, EM11B, EC21C, EC28C,
+ EC35CH
+
+ EC11J                                                                           350±10℃                                      3 ＋1
+                                                                                                                                 0
+                                                                                                                                   s                               2 times
+
+
+
+
+   Reference for Dip Soldering
+                                                                                      Preheating                                        Dip soldering
+
+
+
+
+                                                                                                                                                                                         Metal
+                   Series
+
+
+
+
+                                                                                                                                                                                         Shaft
+                                                                                                                                                                      No. of solders
+                                                                  Soldering surfacetemperature      Heating time        Soldering temperature     Soldering time
+ EC09E, EC11B, EC111, EC11E, EC11G, EC11K,
+ EC11M, EC11N, EC18A, EC21A, EC28A, EC35A,                            100℃ max.                     2 min. max.             260±5℃                      5±1s          2 times max.
+ EC35AH, EC50A, EC60B
+
+
+
+
+                                                                                                                                                                                         Insulated
+                                                                                                                                                                                           Shaft
+ EM11B                                                                 100℃ max.                    1 min. max.           260℃ max.                  3s max.          2 times max.
+
+ EC10E, EC12D, EC12E                                                   100℃ max.                    1 min. max.             260±5℃                      3±1s          2 times max.
+
+ EC40A                                                                 110℃ max.                    1 min. max.           260℃ max.                 10s max.              1 time
+
+
+
+
+                                                                                                                                                                                         Shaft Type
+                                                                                                                                                                                          Through
+ EC45A                                                                 100℃ max.                    2 min. max.           260℃ max.                  5s max.          2 times max.
+
+
+
+
+   Example of Reflow Soldering Condition
+
+
+
+
+                                                                                                                                                                                         Type
+                                                                                                                                                                                         Ring
+Temperature profile
+
+
+                                                     300
+                                                                                                                                    A
+
+                                                                                                                                    B
+                                 Temperature (˚C )
+
+
+
+
+                                                     200
+                                                                                                                                    C
+                                                                                                                                    D
+
+                                                     100
+
+                                Room
+                                temperature                                                                                                          Time (s)
+
+
+                                                                            Pre-heating
+                                                                              E max.                               F max.
+
+                                                                                                                   G max.
+
+
+
+                                                                                           H max.
+
+
+
+
+        Series              A                               B          C              D               E            F               G                H              No. of reflows
+
+ EC11J                  260℃                               230℃    180℃           150℃           2 min. max.       3s            40s            4 min. max.        2 times max.
+
+ EC05E                250℃ min.                       230℃ min.    180℃           150℃           60s to 120s       ー        30s to 40s              ー              2 times max.
+
+ EC21C               230℃ to 245℃                          220℃    200℃           150℃           60s to 120s       ー        25s to 60s          300s max.          1 time max.
+
+ EC28C, EC35CH          260℃                               230℃    180℃           150℃           2 min. min.       3s            40s            230s max.          1 time max.
+
+
+Notes
+1. When using an infrared reflow oven, solder may sometimes not be applied. Be sure to use a hot air reflow oven or a
+   type that uses infrared rays in combination with hot air.
+2. The temperatures given above are the maximum temperatures at the terminals of the encoder when
+   employing a hot air reflow method. The temperature of the PC board and the surface temperature of the
+   encoder may vary greatly depending on the PC board material, its size and thickness. Ensure that the surface
+   temperature of the encoder does not rise to 250℃ or greater.
+3. Conditions vary to some extent depending on the type of reflow bath used. Be sure to give due consideration to this
+   prior to use.
+
+
+
+                                                                                                                                                                                       299
+
