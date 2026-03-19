@@ -12527,6 +12527,16 @@
 			"TkSuQmCC"
 		)
 	)
+	(label "TODO: Ajouter un potentiomètre"
+		(at 231.14 119.38 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "775fdb67-4e98-4320-8f10-7d0f3fc3baee")
+	)
 	(sheet
 		(at 77.47 73.66)
 		(size 54.61 48.26)

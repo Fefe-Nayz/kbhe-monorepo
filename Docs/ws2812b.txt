@@ -1,0 +1,738 @@
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+XL-5050RGBC-WS2812B-S                                                                                             Technical Data
+
+Sheet
+5050 幻彩透明 贴片式发光二极管
+              haracteristics
+ * 外观尺寸（L/W/H）:5.0*5.0*1.6mm
+ outline Dimensions (L / w / h): 5.0*5.0*1.6mm
+                                                                                                             模型图仅供参考
+ * 发光颜色及胶体: 七彩幻彩/透明胶体
+ Luminous color and colloid: Colorful magic/Transparent colloid
+ * 环保工艺符合 ROHS 要求
+ Environmental protection products Complied With ROHS Directive
+ * 湿气敏感性等级（MSL）:5 级
+ Moisture sensitivity level（MSL） : 5 levels
+ * EIA 规范标准包装
+ EIA standard packaging
+ * 适用于 SMT 贴片自动化生产
+ Suitable for SMT automatic production
+ * 适用于红外线回流焊制程
+
+
+
+
+                    roduct application
+* LED 全彩发光字灯串
+Led full-color luminous word lamp string,
+* LED 全彩模组
+led full-color module
+* LED 幻彩软硬灯条，LED 护栏管
+Led magic color soft and hard light strip, LED guardrail tube
+* LED 外观，情景照明
+Led appearance, scene lighting
+* LED 异性屏
+Led heterosexual screen
+* 各种电子产品，电器设备跑马灯
+All kinds of electronic products, electrical equipment, runninglights
+
+
+
+
+                                                                                                                         1
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+ WS2812b 功能特点/Ws2812b Functional characteristics：
+ 1.5050 灯珠内部集成高质量外控单线级联恒流 IC 和优质 RGB LED 芯片，体积小巧，外围简单。
+ The 5050ball interior integrates high-quality external single-line cascade IC and high-quality RGB
+ LED chips, which are small in size and simple on the periphery.
+ 2.内置 IC 恒流精度高，内部 RGB 芯片预先分光处理。发光高度一致，白光效果纯正。
+ BUILT-IN IC constant current high precision, internal RGB chip pre-optical processing. High Degree
+ of uniformity of light, white light effect pure.
+ 3.整形转发强化技术，单线数据传输，可无限级联。
+ Plastic forwarding enhancement technology, single-line data transmission, can be cascaded.
+ 4.数据传输频率 800Kbps/秒，可实现画面刷新速率 30 帧 / 秒时，不小于 1024 点。
+ The data transmission frequency is 800Kbps per second, and the screen refresh rate can be achieved at
+ 30 frames per second, not less than 1024 points.
+ 5.输出端口 PWM 控制能够实现 256 级灰度调节，端口扫描频率 1.5KHz / s。
+ The output port PWM control can achieve 256 levels of grayscale adjustment, and the port scan
+ frequency is 1.5 KHz / S.
+ 6.采用优化预置 12mA/通道恒流模式，低压驱动级联数量最大化。高恒流精度，片内误差<1.5%，
+ 片间误差<3%。Optimized preset 12mA / channel constant current mode is adopted to maximize the
+ number of low-voltage drive cascades. High constant current accuracy, intraslice error & lt; 1.5 %,
+ interslice error & lt; 3 %.
+ 7.内置低压强化模块，VDD 在 4.5-5.5V 以上 100%正常工作。
+ With the built-in low-pressure reinforcement module, VDD is 100 % functional above 4.5-5.5 V.
+ 8.超强数据整形能力：接受完本单元数据自动将后续数据整形输出。
+ Super data shaping ability: accept this unit data automatically will follow the data shaping output.
+
+
+
+
+                                                                                                                         2
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+            Catalogue
+
+
+
+
+   Electrical Characteristics...........................................................................................................................3
+
+
+
+   Typical Characteristic Curves.................................................................................................................9
+
+
+
+
+   Reliability Test Items And Conditions.....................................................................................................10
+
+
+
+   Outline Dimensions...................................................................................................................................11
+
+
+
+
+   Packaging....................................................................................................................................................12
+
+
+
+
+   Guideline for Soldering.............................................................................................................................14
+
+
+
+
+   Precautions...................................................................................................................................................16
+
+
+
+
+                                                                                                                                                                      3
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+极限参数（Ta=25℃）Absolute Maximum Rating(ta=25 ℃)
+                  电气参数                                 符号                    极限范围                            单位
+           Electrical parameters                      Symbol               limit range                       Unit
+
+                  供电电压
+                                                        VDD                      3.5-5.5                          V
+                Supply Voltage
+
+                逻辑输入电压
+                                                         VDI               -0.5～VDD+5.5                           V
+              Logic input Voltage
+         RGB 输出端口耐压
+       RGB Output port withstand                        VOUT                       7                              V
+               voltage
+              RGB 输出电流
+                                                        Lol1                       12                          mA
+            RGB Output current
+
+                  工作温度
+                                                         Topr                                -40 ~ +85℃
+            Operating Temperature
+
+                  存储温度
+                                                         Tstg                                -40 ~ +85℃
+             Storage Temperature
+
+                 回流焊温度
+                                                         Tsol                            260°C For    6 Seconds
+          Circle solder Temperature
+
+                 抗静电能力
+                                                         ESD                                 2000V HBM
+                ESD Sensitivity
+
+光电特性参数（Ta=25℃） Optical-electrical parameter(ta=25 ℃)
+      参数名称                颜色               符 号 测 试 条 件                           最小值            典型值           最大值             单位
+      Parameter           Colour          Symbol Test conditions                 Min             Typ          Max             Unit
+                          红 red                                                    400                -           600
+      光强
+                         绿 green             IV                                   1000                -           1400        mcd
+ light intensity
+                         蓝 blue                                                    200                -           400
+                          红 red                                                    620                -           630
+    主波长
+                         绿 green                                IF=12mA            515                -           525         nm
+ Main wavelength                            λD
+                         蓝 blue                                                    465                -           475
+                          红 red                                                    620                -           625
+   峰值波长
+                         绿 green                                                   520                -           525         nm
+Peak wavelength                              λP
+                         蓝 blue                                                    465                -           470
+  半光强视角
+                              -             2θ1/2                                    -               120              -       Deg
+ Half light angle
+
+
+
+                                                                                                                          4
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+  电气参数 : Electrical parameters (ta=25 ℃):
+
+              参数                       符号              最小                典型            最大              单位            测试条件
+           Parameter                  Symbol           Min               Typ.          Max             Unit         Test conditions
+        芯片电源电压
+                                        VDD             3.5              5.0               5.5          V                   -
+   Chip power supply voltage
+        RGB 输出电流
+                                        Lol1             -                12                -          mA                   -
+       RGB output current
+        高电平输入电压
+                                        VIH            0.7Vdd             -                 -           V             DIN，SET
+     High level input voltage
+       低电平输入电压
+                                        VIL              -                -            0.3Vdd           V             DIN，SET
+     Low level input voltage
+          PWM 频率
+                                       FPWM              -                4                 -          KHZ                  -
+         PWM frequency
+           静态功耗
+                                        LDD              -               0.6                -          mA                   -
+  Static power onsumption
+
+
+
+
+  开关特性 : Switching characteristics (ta=-40 ~ +85 ℃):
+
+             参数                     符号          最小            典型               最大               单位                  测试条件
+         Parameter               Symbol         Min           Typ              Max              Unit             Test conditions
+
+          振荡频率
+                                    FOSC           -            800            1100             KHZ                     -
+          Frequency
+      传输延迟时间
+                                    Tflz           -             -             500               ns                     -
+  Transmission delay time
+
+
+
+动态参数 :dynamic parameter
+
+                                    符号                                                                                      测试条件
+             参数                                 最小              典型                    最大                单位
+                                   Symb                                                                                    Test
+        Parameter                               Min             Typ                   Max               Unit
+                                     ol                                                                                 conditions
+    数据传输速度                                                                                                             占空比 67%
+                                    fDIN          -             800                    -                KHZ
+Data transmission speed                                                                                                （数 据 1）
+  DOUT 传输延迟                        TPLH           -                  -                500                   ns
+ DOUT transmission                                                                                                     DIN→DOUT
+          delay                    TPHL           -                  -                500                   ns
+      Iout 上升间
+                                      Tr          -             100                    -                    ns          VDS=1.5V
+  Iout rising interval
+
+
+
+                                                                                                                                5
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+芯片级联方法:Chip cascade method:
+
+
+
+
+数据传输方式：Date transmission mode
+
+
+
+
+注：其中 D1 为 MCU 端发送的数据，D2、D3、D4 为级联电路自动整形转发的数据
+Note: D1 refers to the data sent by MCU, and D2, D3 and D4 refer to the data automatically
+shaped and forwarded by cascade circuit
+
+24bit 数据结构：24bit data structure：
+
+
+
+注：高位先发，按照 GRB 的顺序发送数据
+Note: high order first send, send data in the order of GrB
+
+
+
+
+                                                                                                                         6
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+数据时序波形图 Time sequence waveform:
+
+
+
+
+数据传输定义:Signal transmission definition
+                参数                             符号             最小值                典型               最大值                 单位
+              Parameter                       Symbol           Min               Typ               Max                Unit
+      输入 0 码高电平时间
+                                   Tin0h       0.20          0.3          0.4           us
+ Input 0 code high level time
+      输入 1 码高电平时间
+                                   Tin1h       0.55          0.6          1.2           us
+ Input 1 code high level time
+      输入 0 码低电平时间
+                                    T0L        0.55          0.6          1.2           us
+  Input 0 code low level time
+      输入 1 码低电平时间
+                                    T1L         0.2          0.3          0.4           us
+  Input 1 code low level time
+          0 码/1 码周期
+                                   T0/T1        0.9           -             -           us
+     0 code /1 code cycle
+       RESET 码低电平时间
+                                   reset         80           -             -           us
+   Reset code low level time
+注/Note:
+ a：LED 灯珠主要根据高电平时间判断“0”码和“1”码。高电平时间介于 200ns~410ns,IC 判断为“0”
+码,高电平时间介于 640ns~1000ns,判断为“1”码。 “0”码和“1”码的低电平代表此码结束，准备接
+收下一数据码。 a: LED is mainly based on high-voltage flat time to determine "0" code and
+"1" code. The high power level time is between 200ns ~ 410ns, IC is judged to be "0" code,
+high power level time is between 640ns ~ 1000ns, and it is judged to be "1" code. The low levels
+of the "0" code and the "1" code represent the end of this code and are ready to receive the
+next data code.
+b：低电平复位时间最小为 100us，为了留有余度，一帧数据传输过程中(包括 24bit 和 24bit 之间、bit
+和 bit 之间)不要中断超过 35us，否则可能会被 IC 认为是 RESET。中断时间在 35us 之内，控制器可以
+进行正常数据传输等其他操作。b: The low flat reset time is a minimum of 100us. In order to leave
+a margin, do not interrupt more than 35us during a frame data transmission(including between
+24bit and 24bit, between bit and bit), otherwise it may be considered by IC as RESET. The
+interrupt time is within 35us, and the controller can perform other operations such as normal
+data transmission.
+
+
+
+
+                                                                                                                         7
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+ 应用线路图：Application circuit diagram:
+ 1. 不加电容电阻线路示意图
+
+
+
+
+ 2. 加电容电阻线路示意图
+
+
+
+
+ 3. 过认证线路示意图
+
+
+
+
+  注：R1用450~700 欧电阻，电容C1 C2根据成品调试选用合适电容
+
+
+
+
+                                                                                                                         8
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+                                                                                                                         9
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+*可靠性实验项目 Reliability Test Project
+    描述                    项目                      测试标准                        测试条件                 测试时间         数量      失效数量
+  Description             Item                   Testcriterion              Testcondition          Testtime     Qty      Failqty
+  寿命测试                常温寿命测试
+                                                  JIS7021:B4          Ta=25℃±5℃，IF=12mA            1000Hrs       22         0
+   Lifetest     Lifetest(roomtemperature)
+                                                 JIS7021:B10
+                        高温存储
+                                              MIL-STD-202:210A             Ta=85℃±5℃               1000Hrs       22         0
+                  Hightemperaturestore
+                                              MIL-STD-750:2031
+                      低温存储
+                                                 JIS7021:B12               Ta=-35℃±5℃              1000Hrs       22         0
+                Low temperature store
+                     高温高湿测试
+                                                 JIS7021:B11               Ta=85℃±5℃
+                    High temperature/                                                              1000Hrs       22         0
+                                              MIL-STD-202:103D                RH=85%
+  环境测试                 humidity test
+  Ambience                                                                     30min
+    test                                         JIS7021::B4
+                     冷热冲击测试                                           -10℃±5℃←→100℃±
+                                              MIL-STD-202:107D                                     100Cycles     22         0
+                Cold / Heat strike test                                      5℃
+                                              MIL-STD-750:1026
+                                                                        5min    5min
+                                                                         5min 5min 5min
+                    冷热循环测试                       JIS7021:A3            -35℃～25℃～85℃～
+                 Cold and heat cycle          MIL-STD-202:107D              -35℃                   100Cycles     22         0
+                        test                  MIL-STD-705:105E       30min   5min  30min
+                                                                     5min
+
+
+
+*判断标准 Judging criterion:
+
+                                                     实验条件                                     判断标准
+           项目                     符号
+                                                    Experiment                                 Criteria
+           Item                  Symbol
+                                                     condition                      Min.                        Max.
+   Forward Voltage
+                                    VF               IF=12mA                         ----                 Initial Datex1.1
+      正向电压
+   Reverse Current
+                                    IR                 VR=5V                         ----                       1μA
+      反向电流
+  Luminous Intensity
+                                    IV               IF=12mA                 Initial Datex0.7                    ----
+      发光强度
+
+
+
+
+                                                                                                                        10
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+ 备注：          1.以上尺寸单位均为 mm
+ Remarks: All dimensions are in millimeters.
+ 2.未特别标注公差的尺寸公差均为±0.25mm
+ Tolerance is ±0.25mm unless otherwise noted
+
+
+
+
+ 引脚电路图及引脚功能：
+      序号                      符号                                              功能描述
+ Serial number               Symbol                                      Function description
+                                                                         内部IC电源正及RGB正极
+          1                    VDD
+                                                               Internal IC power positive and RGB positive
+                                                                             显示数据级联输出
+          2                     DO
+                                                                        Display data cascade output
+                                                                              信号地及电源地
+          3                    GND
+                                                                      Signal ground and power ground
+                                                                               显示数据输入
+          4                     DI
+                                                                             Display data input
+
+
+
+
+                                                                                                                       11
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+                                   Belt and disk dimensions
+
+
+
+
+   备注：         1.以上尺寸单位均为 mm
+   Remarks: All dimensions are in millimeters.
+   2.未特别标注公差的尺寸公差均为±0.25mm
+   Tolerance is ±0.25mm unless otherwise noted
+
+
+
+
+                                                                                                                       12
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+                                                                                                                       13
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+  1.
+
+  Hand Soldering
+
+  只建议在修理和重工的情况下使用手工焊接；推荐使用功率低于 3 0 W 的烙铁，焊接时烙铁的温度必须
+
+  保 持在 300℃以下，且每个电极只能进行一次焊接，每次焊接的持续时间不得超过 3 秒。
+
+  人手焊接过程中的不慎操作易引起 LED 产品的损坏，应当小心谨慎。
+
+  Manual welding is recommended only for repair and heavy industry situations. A soldering iron of less than
+
+  30W is recommended to be used in Hand Soldering. Please keep the temperature of the soldering iron under
+
+  300℃ while soldering. Each terminal of the LED is to go for less than 3 second and for one time only.
+
+  Be careful because the damage of the product is often started at the time of the hand soldering.
+
+  2.                 推荐使用以下无铅回流焊接温度图进行。
+
+  Reflow Soldering: Use the conditions shown in the under Figure of Pb -Free Reflow Soldering.
+
+
+
+
+           有铅制程 Lead process                                                            无铅制程 lead free
+
+
+       回流焊接最多只能进行两次，二次回流焊间隔时间控制在 8H 内完成。
+
+       Reflow soldering should not be done more than two times The interval between secondary reflow
+       soldering should be controlled to be completed within 8H.
+
+       在回流焊接升温过程中，请不要对 LED 施加任何压力。
+
+       Stress on the LEDs should be avoided during heating in soldering process.
+
+       在焊接完成后，待产品温度下降到室温之后，再进行其他处理。
+
+       After soldering, do not deal with the product before its temperature drop down to room temperature.
+
+       产品最佳的最高焊接温度建议控制在 240±5℃/6S
+       The recommended maximum welding temperature for the product is 240±5 ℃/6s
+
+
+
+                                                                                                                       14
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+   3.
+
+   Cleaning
+
+        在焊接后推荐使用酒精进行清洗，在温度不高于 30℃的条件下持续 3 分钟， 不高于 50℃的条件下持
+
+   续 30 秒。
+
+        使用其他类似溶剂清洗前，请先确认使用的溶剂不会对 LED 的封装和环氧树脂部分造成损伤。
+
+   超声波清洗也是有效的方法，一般最大功率不应超过 300W ，否则可能对 LED 造成损伤。请根据
+
+   具体的 情况预先测试清洗条件是否会对 LED 造成损伤。
+
+        It is recommended that alcohol be used as a solvent for cleaning after soldering. Cleaning is to go under
+
+   30℃ for 3 minutes or 50℃ for 30 seconds. When using other solvents, it should be confirmed beforehand
+
+   whether the solvents will dissolve the package and the resin or not.
+
+        Ultrasonic    cleaning is    also an     effective way      for cleaning. But the       influence     of Ultrasonic
+
+   cleaning     on LED depends on factors such as ultrasonic power. Generally, the ultrasonic power should not
+
+   be higher than 300W. Before cleaning, a pretest should be done to confirm whether any damage to LEDs will
+
+   occur.
+
+
+
+                     此一般指导原则并不适用于所有 PCB                        设计和焊接设备的配置。具体工艺受到诸多因素的影
+   响， 请根据特定的 PCB 设计和焊接设备来确定焊接方案。
+
+         Note: This general guideline may not apply to all PCB designs and configurations of all soldering
+   equipment. The technics in practise is influenced by many factors, it should be specialized base on the PCB
+   designs and configurations of the soldering equipment..
+
+
+
+
+                                                                                                                       15
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+  1.
+
+  Storage
+
+  ·本产品使用密封防潮抗静电袋包装，并附有干燥剂，未开封的产品有三个月的保存时间。
+  This product is packaged in a sealed, moisture-proof, and anti-static bag, and comes with a desiccant. The shelf life of
+  unopened products is three months
+
+  · 开封前，产品须存放在温度不高于 30℃，湿度不高于 60%RH 的环境中。
+
+  Before opening the package, the product should be kept at 30℃ or less and umidity less than 60% RH, and be
+  used within a year.
+
+  · 开封后，产品须存放在温度不高于 30℃，湿度不高于 40%RH 的环境中，且应该在 24 小时（1 天） 内
+
+  使 用完。建议工作环境为温度不高于 30℃，湿度不高于 60%RH。
+
+  After opening the package, the product should be stored at 30℃ or less and humidity less than 40%RH, and be
+
+  soldered within 24 hours (1 days). It is recommended that the product be operated at the workshop condition of
+
+  30℃ or less and humidity less than 60%RH.
+
+  · 对于尚未焊接的 LED ，如果吸湿剂或包装失效，或者产品没有符合以上有效存储条件，烘焙可以起到一定
+
+               60±5）℃，持续24 小时。
+  的性能恢复效果。烘焙条件：（
+
+  If the moisture absorbent material has fade away or the LEDs have exceeded the storage time, baking treatment
+
+  should be performed based on the following condition: (60±5)℃ for 24 hours.
+
+
+
+  2.
+
+  Static Electricity
+
+  静电和电涌会导致产品特性发生改变，例如正向电压降低等，如果情况严重甚至会损毁产品。所以在使用时必须采取有效的
+  防静电措施。所有相关的设备和机器都应该正确接地，同时必须采取其他防止静电和电涌的措施。使用防静电
+  手环，防静电垫子，防静电工作服、工作鞋、手套，防静电容器，都是有效的防止静电和电涌的措施。
+
+       Static electricity or surge voltage damages the LEDs. Damaged LEDs will show some unusual characteristic
+
+  such as the forward voltage becomes lower, or the LEDs do not light at the low current. even not light.
+
+  All devices, equipment and machinery must be properly grounded. At the same time, it is recommended that
+
+  wrist bands or anti-electrostatic gloves, anti-electrostatic containers be used when dealing with the LEDs.
+
+
+
+
+                                                                                                                       16
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+ 3.
+
+ Design Consideration
+
+
+
+
+      在实际应用电路中，为防止产品在测试时带电插拔产生的瞬间高压损伤 IC 内部电源及 信号输入输出脚，应在信
+
+ 号输入及输出端串接保护电阻。此外，为了使各 IC 芯片间更 稳定工作，各灯珠间的退偶电容则必不可少；
+
+ 1.产品两端所并的退偶电容一般不建议省略；
+
+ 2.产品的信号输入及输出端必需串接保护电阻 R1/R2,因线材及传输距离不同，在信号线两端串接的保护电阻会略有
+
+ 不同； R1/R2 的大小取决于级联灯珠的数量，级联数量越多，则 R1/R2 越小，灯珠间传输距离长，一般建议在 20-2K
+
+ Ω之间取值，建议通常建议取值 在 500 欧左右；以实际使用情况定；R2 可接地。
+
+      In practical application circuits,To prevent instantaneous high voltage generated by live plugging during
+
+ product testing Damage to IC internal power supply and signal input/output pins Protective resistors should be
+
+ connected in series at the signal input and output terminals .In addition, in order to ensure more stable operation
+
+ between IC chips The decoupling capacitance between each lamp bead is essential:
+
+ 1、It is generally not recommended to omit the decoupling capacitors connected at both ends of the pr... ；
+
+ 2、The signal input and output terminals of the product must be connected in series with protective r...；Due to
+
+ differences in wire material and transmission distance；The size of r1/r2 depends on the number of cascaded lamp
+
+ beads ， The more cascades, the smaller r1/r2 ； Long transmission distance between lamp beads ， Generally
+
+ recommended between 20-2k ω Value between，The recommended value is usually around 500 euros; Based on
+
+ actual usage；R2 can be grounded .
+
+
+
+
+                                                                                                                       17
+▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉ ▉
+
+
+
+
+  4.
+
+  Others
+
+  直接用手拿取产品不但会污染封装树脂表面，也可能由于静电等因素导致产品性能的改变。过度的压力也可能直接影响封装内
+  部的管芯和金线，因此请勿对产品施加过度压力，特别当产品处于高温状态下，例如在回流焊接过程中。
+
+       When handling the product, touching the encapsulant with bare hands will not only contaminate its surface,
+
+  but also affect on its optical characteristics. Excessive force to the encapsulant might result in catastrophic
+
+  failure of the LEDs due to die breakage or wire deformation. For this reason, please do not put excessive stress
+
+  on LEDs, especially when the LEDs are heated such as during Reflow Soldering.
+
+
+
+
+       LED 的环氧树脂封装部分相当脆弱，请勿用坚硬、尖锐的物体刮、擦封装树脂部分。在用镊子夹取的时
+
+  候也应当小心注意。
+
+  The epoxy resin of encapsulant is fragile, so please avoid scratch or friction over the epoxy resin surface.
+
+  While handling the product with tweezers, do not hold by the epoxy resin, be careful.
+
+  5.
+
+  Safety Advice For Human Eyes
+
+         LED 发光时，请勿直视发光光源，特别是对于一些光强较高的 LED ，强光可能伤害你的眼睛。
+
+  Viewing direct to the light emitting center of the LEDs, especially those of great Luminous Intensity, will cause
+  great hazard to human eyes. Please be careful.
+
+
+
+
+  规格书如有修改，不另行通知
+  If there are any modifications to the specification sheet, no further notice will be given
+
+
+
+                                                                                                                       18
+

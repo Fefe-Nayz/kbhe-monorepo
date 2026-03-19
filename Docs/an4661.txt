@@ -1,0 +1,2803 @@
+                                                                            AN4661
+                                                                   Application note
+ Getting started with STM32F7 Series MCU hardware development
+
+
+            Introduction
+            This application note is intended for system designers who require an hardware
+            implementation overview of the development board, with a focus on the features:
+            • Power supply,
+            • Package selection,
+            • Clock management,
+            • Reset control,
+            • Boot mode settings,
+            • Debug management.
+            This document describes the minimum hardware resources required to develop an
+            application based on the STM32F7 Series devices.
+
+            Reference documents
+            The following documents are available on www.st.com:
+            • Oscillator design guide for STM8S, STM8A and STM32 microcontrollers
+                application note (AN2867),
+            • STM32 microcontroller system memory boot mode application note (AN2606).
+
+
+
+
+February 2017                                DocID027559 Rev 5                                     1/54
+                                                                                              www.st.com   1
+Contents                                                                                                                     AN4661
+
+
+Contents
+
+1          Power supplies . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+           1.1      Introduction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+                    1.1.1       Independent A/D converter supply and reference voltage . . . . . . . . . . . . 7
+                    1.1.2       Independent USB transceivers supply . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+                    1.1.3       Independent SDMMC2 supply for STM32F767xx/STM32F777xx
+                                and STM32F72xxx/STM32F73xxx devices . . . . . . . . . . . . . . . . . . . . . . . 9
+                    1.1.4       Independent DSI supply for STM32F769xx/STM32F779xx devices . . . 10
+                    1.1.5       Battery backup domain . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+                    1.1.6       Voltage regulator . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+           1.2      Power supply scheme . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .11
+           1.3      Reset & power supply supervisor . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+                    1.3.1       Power-on reset (POR)/power-down reset (PDR) . . . . . . . . . . . . . . . . . . 17
+                    1.3.2       Programmable voltage detector (PVD) . . . . . . . . . . . . . . . . . . . . . . . . . 17
+                    1.3.3       System reset . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+                    1.3.4       Internal reset ON . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+                    1.3.5       Internal reset OFF . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+                    1.3.6       Regulator OFF mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+                    1.3.7       Regulator ON/OFF and internal reset ON/OFF availability . . . . . . . . . . 22
+
+
+2          Alternate function mapping to pins . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+
+3          Clocks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+           3.1      HSE OSC clock . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+                    3.1.1       External user clock (HSE bypass) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+                    3.1.2       External crystal/ceramic resonator (HSE crystal) . . . . . . . . . . . . . . . . . 25
+           3.2      LSE OSC clock . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+                    3.2.1       External clock (LSE bypass) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+                    3.2.2       External crystal/ceramic resonator (LSE crystal) . . . . . . . . . . . . . . . . . . 26
+           3.3      Clock security system (CSS) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+
+4          Boot configuration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+           4.1      Boot mode selection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+           4.2      Boot pin connection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+           4.3      System bootloader mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+
+
+2/54                                             DocID027559 Rev 5
+AN4661                                                                                                                       Contents
+
+
+5        Debug management . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+         5.1      Introduction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+         5.2      SWJ debug port (serial wire and JTAG) . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+         5.3      Pinout and debug port pins . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+                  5.3.1       SWJ debug port pins . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+                  5.3.2       Flexible SWJ-DP pin assignment . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+                  5.3.3       Internal pull-up and pull-down on JTAG pins . . . . . . . . . . . . . . . . . . . . . 31
+                  5.3.4       SWJ debug port connection with standard JTAG connector . . . . . . . . . 32
+
+
+6        Recommendations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+         6.1      Printed circuit board . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+         6.2      Component position . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+         6.3      Ground and power supply (VSS,VDD) . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+         6.4      Decoupling . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+         6.5      Other signals . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+         6.6      Unused I/Os and features . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+         6.7      Recommendations for the WLCSP180 package in the
+                  STM32F769Ax/STM32F768Ax devices . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+
+7        Reference design . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+         7.1      Description         . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+                  7.1.1       Clocks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+                  7.1.2       Reset . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+                  7.1.3       Boot mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+                  7.1.4       SWJ interface . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+                  7.1.5       Power supply . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+         7.2      Component references . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+
+8        Recommended PCB routing guidelines for
+         STM32F7 Series devices . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+         8.1      PCB stack-up . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+         8.2      Crystal oscillator . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
+         8.3      Power supply decoupling . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
+         8.4      High speed signal layout . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44
+                  8.4.1       SDMMC bus interface . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44
+                  8.4.2       Flexible memory controller (FMC) interface . . . . . . . . . . . . . . . . . . . . . . 45
+
+
+                                                DocID027559 Rev 5                                                                     3/54
+                                                                                                                                               4
+Contents                                                                                                        AN4661
+
+
+                    8.4.3       Quadrature serial parallel interface (Quad-SPI) . . . . . . . . . . . . . . . . . . 46
+                    8.4.4       Embedded trace macrocell (ETM) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+           8.5      Package layout recommendation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+                    8.5.1       BGA 216 0.8 mm pitch design example . . . . . . . . . . . . . . . . . . . . . . . . 47
+                    8.5.2       WLCSP143 0.4 mm pitch design example . . . . . . . . . . . . . . . . . . . . . . 49
+
+
+9          Conclusion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51
+
+10         Revision history . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+
+
+
+
+4/54                                           DocID027559 Rev 5
+AN4661                                                                                                                       List of tables
+
+
+List of tables
+
+Table 1.    Regulator ON/OFF and internal reset ON/OFF availability. . . . . . . . . . . . . . . . . . . . . . . . . 22
+Table 2.    Boot modes. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+Table 3.    STM32F7 Series bootloader communication peripherals . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+Table 4.    SWJ debug port pins . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30
+Table 5.    Flexible SWJ-DP assignment . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+Table 6.    Mandatory components . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+Table 7.    Optional components . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+Table 8.    Reference connection for all packages. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 39
+Table 9.    BGA 216 0.8 mm pitch package information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+Table 10.   Wafer level chip scale package information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+Table 11.   Document revision history . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
+
+
+
+
+                                                        DocID027559 Rev 5                                                                   5/54
+                                                                                                                                                     5
+List of figures                                                                                                                         AN4661
+
+
+List of figures
+
+Figure 1.    VDDUSB connected to VDD power supply . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+Figure 2.    VDDUSB connected to external power supply. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+Figure 3.    VDDSDMMC connected to external power supply . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+Figure 4.    Power supply overview (STM32F74xxx/STM32F75xxx) . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+Figure 5.    STM32F769xx/STM32F779xx power supply scheme . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+Figure 6.    STM32F767xx/STM32F777xx power supply scheme . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+Figure 7.    STM32F7x2xx power supply scheme . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+Figure 8.    STM32F7x3xx power supply scheme . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+Figure 9.    Power on reset/power down reset waveform . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+Figure 10.   PVD threshold. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 18
+Figure 11.   Reset circuit . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+Figure 12.   Power supply supervisor interconnection with internal reset OFF . . . . . . . . . . . . . . . . . . . 19
+Figure 13.   NRST circuitry timing example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+Figure 14.   BYPASS_REG supervisor reset connection. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+Figure 15.   STM32CubeMX example screen-shot . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+Figure 16.   HSE external clock . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+Figure 17.   HSE crystal/ceramic resonators . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+Figure 18.   LSE external clock . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+Figure 19.   LSE crystal/ceramic resonators . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+Figure 20.   Boot mode selection implementation example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+Figure 21.   Host to board connection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+Figure 22.   JTAG connector implementation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32
+Figure 23.   Typical layout for VDD/VSS pair . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+Figure 24.   STM32F756NGH6 reference schematic . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 38
+Figure 25.   Four layer PCB stack-up example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+Figure 26.   Six layer PCB stack-up example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
+Figure 27.   Example of bypass cap placed underneath the STM32F7 Series . . . . . . . . . . . . . . . . . . . 44
+Figure 28.   BGA 0.8mm pitch example of fan-out . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+Figure 29.   Via fan-out . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+Figure 30.   FMC signal fan-out routing example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+Figure 31.   143-bumps WLCSP, 0.40 mm pitch routing example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50
+
+
+
+
+6/54                                                     DocID027559 Rev 5
+AN4661                                                                              Power supplies
+
+
+1        Power supplies
+
+1.1      Introduction
+         The device requires a 1.8 to 3.6 V operating voltage supply (VDD), which can be reduced
+         down to 1.7 V with PDR OFF, as detailed in the product datasheets. The embedded linear
+         voltage regulator is used to supply the internal 1.2 V digital power.
+         The real-time clock (RTC), the RTC backup registers, and the backup SRAM (BKP SRAM)
+         can be powered from the VBAT voltage when the main VDD supply is powered off.
+
+1.1.1    Independent A/D converter supply and reference voltage
+         To improve the conversion accuracy, the ADC has an independent power supply which can
+         be separately filtered and shielded from noise on the PCB.
+         •   The ADC voltage supply input is available on a separate VDDA pin.
+         •   An isolated supply ground connection is provided on the pin VSSA.
+         To ensure a better accuracy of low voltage inputs, the user can connect a separate external
+         reference voltage ADC input on VREF. The voltage on VREF ranges from 1.8 V to VDDA.
+         When available (depending on package), VREF– must be externally tied to VSSA.
+
+1.1.2    Independent USB transceivers supply
+         The USB transceivers are supplied from a separated VDDUSB power supply pin.
+         The VDDUSB supply can be connected either to VDD or an external independent power
+         supply (3.0 to 3.6V) for the USB transceivers (refer to Figure 1 and Figure 2). For example,
+         when the device is powered at 1.8V, an independent power supply 3.3V can be connected
+         to VDDUSB. When the VDDUSB is connected to a separated power supply, it is independent
+         from VDD or VDDA but it must be the last supply to be provided and the first to disappear.
+         The following VDDUSB conditions must be respected:
+         •   During the power-on phase (VDD < VDD_MIN), VDDUSB should be always lower than
+             VDD.
+         •   During the power-down phase (VDD < VDD_MIN), VDDUSB should be always lower than
+             VDD.
+         •   The VDDSUB rising and falling time rate specifications must be respected (refer to
+             operating conditions at power-up / power-down (regulator ON) table and operating
+             conditions at power-up / power-down (regulator OFF) table provided in the product
+             datasheet).
+         •   In operating mode phase, VDDUSB could be lower or higher than VDD:
+             –    If USB (USB OTG_HS/OTG_FS) is used, the associated GPIOs powered by
+                  VDDUSB are operating between VDDUSB_MIN and VDDUSB_MAX.
+             –    The VDDUSB supplies both USB transceivers (USB OTG_HS and USB OTG_FS).
+                  If only one USB transceiver is used in the application, the GPIOs associated to the
+                  other USB transceiver are still supplied by VDDUSB.
+             –    If USB (USB OTG_HS/OTG_FS) is not used, the associated GPIOs powered by
+                  VDDUSB are operating between VDD_MIN and VDD_MAX.
+
+
+
+
+                                       DocID027559 Rev 5                                          7/54
+                                                                                                         53
+Power supplies                                                                                      AN4661
+
+
+                                      Figure 1. VDDUSB connected to VDD power supply
+                 9''
+
+
+
+              9''B0$;
+
+
+
+
+                                                      9'' 9''$ 9''86%
+
+              9''B0,1
+
+
+
+
+                                                                                  3RZHUGRZQ         WLPH
+                           3RZHURQ                   2SHUDWLQJPRGH
+
+                                                                                                    069
+
+
+
+                                 Figure 2. VDDUSB connected to external power supply.
+
+           9''86%B0$;
+                                                    86% IXQFWLRQDODUHD
+                                                          9''86%
+
+              9''86%B0,1
+                             86%QRQ                                                   86% QRQ
+                             IXQFWLRQDO                    9''     9''$                IXQFWLRQDO
+                             DUHD                                                      DUHD
+               9''B0,1
+
+
+
+
+                                                                                   3RZHUGRZQ          WLPH
+                             3RZHURQ                   2SHUDWLQJPRGH
+
+
+                                                                                                    069
+
+
+          In the STM32F7x3xx devices, the USB PHY HS sub-system uses an additional power
+          supply pin:
+          •      The VDD12OTGHS pin is the output of the PHY HS regulator (1.2 V). An external
+                 capacitor of 2.2 µF must be connected on the VDD12OTGHS pin.
+Note:     The PHY HS has another OTG_HS_REXT pin needed for calibration. This pin must be
+          connected to gnd via an external precise resistor (3 Kohm +/- 1%).
+
+
+
+
+8/54                                           DocID027559 Rev 5
+AN4661                                                                             Power supplies
+
+
+1.1.3    Independent SDMMC2 supply for STM32F767xx/STM32F777xx
+         and STM32F72xxx/STM32F73xxx devices
+         The VDDSDMMC is an independent power supply for SDMMC2 peripheral IOs (PD6, PD7,
+         PG9..12). It can be connected either to VDD or an external independent power supply.
+         For example, when the device is powered at 1.8V, an independent power supply 3.3V can
+         be connected to VDDSDMMC. When the VDDSDMMC is connected to a separated power
+         supply, it is independent from VDD and VDDA but it must be the last supply to be provided
+         and the first to disappear. The following VDDSDMMC conditions must be respected:
+         •    During the power-on phase (VDD < VDD_MIN), VDDSDMMC should be always lower than
+              VDD.
+         •    During the power-down phase (VDD < VDD_MIN), VDDSDMMC should be always lower
+              than VDD.
+         •    The VDDSDMMC rising and falling time rate specifications must be respected.
+         •    In the operating mode phase, VDDSDMMC could be lower or higher than VDD: the
+              associated GPIOs (PD6, PD7, PG9..12) powered by VDDSDMMC are operating between
+              VDDSDMMC_MIN and VDDSDMMC_MAX. If VDDSDMMC = VDD, the associated GPIOs
+              powered by VDDSDMMC are operating between VDD_MIN and VDD_MAX.
+
+                          Figure 3. VDDSDMMC connected to external power supply
+
+
+         9''6'00&B0$;
+                                             6'00&IXQFWLRQDODUHD
+                                                  9''6'00&
+
+         9''6'00&B0,1
+                        6'00&QRQ                                               6'00&QRQ
+                        IXQFWLRQDO                 9''   9''$                   IXQFWLRQDO
+                        DUHD                                                    DUHD
+             9''B0,1
+
+
+
+
+                                                                                3RZHUGRZQ      WLPH
+                        3RZHURQ                 2SHUDWLQJPRGH
+
+
+                                                                                             069
+
+
+
+
+                                       DocID027559 Rev 5                                          9/54
+                                                                                                         53
+Power supplies                                                                                 AN4661
+
+
+1.1.4     Independent DSI supply for STM32F769xx/STM32F779xx devices
+          The DSI (Display Serial Interface) sub-system uses several power supply pins which are
+          independent from the other supply pins:
+          •      The VDDDSI is an independent DSI power supply dedicated for DSI Regulator and MIPI
+                 DPHY. This supply must be connected to global VDD.
+          •      The VCAPDSI pin is the output of DSI Regulator (1.2V) which must be connected
+                 externally to VDD12DSI.
+          •       The VDD12DSI pin is used to supply the MIPI D-PHY, and to supply the clock and data
+                 lanes pins. An external capacitor of 2.2 uF must be connected on VDD12DSI pin.
+          •      The VDDDSI pin is an isolated supply ground used for DSI sub-system.
+          If the DSI functionality is not used at all, then:
+          •      The VDDDSI pin must be connected to global VDD.
+          •       The VCAPDSI pin must be connected externally to VDD12DSI but the external capacitor
+                 is no more needed.
+          •      The VSSDSI pin must be grounded.
+
+1.1.5     Battery backup domain
+          Backup domain description
+          To retain the content of the RTC backup registers, backup SRAM, and supply the RTC when
+          VDD is turned off, VBAT pin can be connected to an optional standby voltage supplied by a
+          battery or by another source.
+          When the backup domain is supplied by VBAT (analog switch connected to VBAT because
+          VDD is not present), the following functions are available:
+          •      PC14 and PC15 can be used as LSE pins only.
+          •      PC13 can be used as tamper pin (TAMP1).
+          •      PI8 can be used as tamper pin (TAMP2).
+
+1.1.6     Voltage regulator
+          The voltage regulator is always enabled after reset. It works in three different modes
+          depending on the application modes.
+          •      In Run mode, the regulator supplies full power to the 1.2 V domain (core, memories
+                 and digital peripherals).
+          •      In Stop mode, the regulator supplies low power to the 1.2 V domain, preserving the
+                 contents of the registers and SRAM.
+          •      In Standby mode, the regulator is powered down. The contents of the registers and
+                 SRAM are lost except for those concerned with the standby circuitry and the backup
+                 domain.
+Note:     Depending on the selected package, there are specific pins that should be connected either
+          to VSS or VDD to activate or deactivate the voltage regulator. Refer to the voltage regulator
+          section in the datasheet for more details.
+
+
+
+
+10/54                                      DocID027559 Rev 5
+AN4661                                                                                Power supplies
+
+
+1.2      Power supply scheme
+         •   VDD = 1.7 to 3.6 V: external power supply for I/Os and the internal regulator (when
+             enabled), provided externally through VDD pins. The VDD pins must be connected to
+             VDD with external decoupling capacitors: one single tantalum or ceramic capacitor
+             (min. 4.7 μF) for the package + one 100 nF ceramic capacitor for each VDD pin.
+         •   VSSA, VDDA = 1.7 to 3.6 V: external analog power supplies for ADC, DAC, Reset
+             blocks, RCs and PLL. VDDA and VSSA must be connected to VDD and VSS, respectively.
+             The VDDA pin must be connected to two external decoupling capacitors (100 nF
+             ceramic + 1 μF tantalum or ceramic).
+         •   VDDUSB can be connected either to VDD or an external independent power supply (3.0
+             to 3.6V) for USB transceivers. For example, when the device is powered at 1.8V, an
+             independent power supply 3.3V can be connected to VDDUSB.
+             The VDDUSB pin must be connected to two external decoupling capacitors (100 nF
+             ceramic + 1 μF tantalum or ceramic).
+         •   VBAT = 1.65 to 3.6 V: power supply for the RTC, the external clock 32 kHz oscillator and
+             backup registers (through power switch) when VDD is not present.
+             The VBAT pin can be connected to the external battery (1.65 V < VBAT < 3.6 V). If no
+             external battery is used, it is recommended to connect this pin to VDD with a 100 nF
+             external ceramic decoupling capacitor.
+Note:    VDD/VDDA minimum value of 1.7 V is obtained when the internal reset is OFF (refer to
+         Section 1.3.5: Internal reset OFF).
+         •   The VREF+ pin can be connected to the VDDA external power supply. If a separate,
+             external reference voltage is applied on VREF+, a 100 nF and a 1 μF capacitors must be
+             connected on this pin. In all cases, VREF+ must be kept between (VDDA-1.2 V) and
+             VDDA with minimum of 1.7 V.
+         •   Additional precautions can be taken to filter analog noise:
+             –    VDDA can be connected to VDD through a ferrite bead.
+             –    The VREF+ pin can be connected to VDDA through a resistor (typ. 47 Ω).
+         •   For the voltage regulator configuration, there is a specific BYPASS_REG pin (not
+             available on all the packages) that should be connected either to VSS or VDD to activate
+             or deactivate the voltage regulator specific.
+Note:    Refer to the voltage regulator section of the related device datasheet for more details.
+         •   When the voltage regulator is enabled, VCAP1 and VCAP2 pins must be connected to
+             2*2.2 μF low ESR < 2 Ω ceramic capacitor. In the STM32F7x2Rx devices, only the
+             VCAP1 pin is available and must be connected to 4.7 µF low ESR between 0.1 Ω and
+             0.2 Ω ceramic capacitor.
+
+
+
+
+                                        DocID027559 Rev 5                                           11/54
+                                                                                                            53
+Power supplies                                                                                                                  AN4661
+
+
+                           Figure 4. Power supply overview (STM32F74xxx/STM32F75xxx)
+                                                  9%$7
+
+                                                                                                    %DFNXSFLUFXLWU\
+                        9%$7                                   3RZHUVZLWFK                         26&.57&
+                       WR9                                                                 :DNHXSORJLF
+                                                                                                    %DFNXSUHJLVWHUV
+                                                                                                    EDFNXS5$0
+
+
+
+
+                                                                               /HYHOVKLIWHU
+                                                                    287
+                                                                                                ,2
+                                               *3 ,2V                                         /RJLF
+                                                                     ,1                                       .HUQHOORJLF
+                                                                                                                 &38
+                                                  9&$3B
+                                                  9&$3B                                                        GLJLWDO
+                                  î)                                                                     5$0 
+                                9''
+                                                     9''       9ROWDJH
+                                             
+                                                               UHJXODWRU
+                 îQ)                      966
+                 î)                
+
+
+                                        %<3$66B5(*                                                           )ODVKPHPRU\
+                          9''86%
+                                               9''86%
+                                                                27*)6
+                 Q)                                         3+<
+                  )
+                                                                5HVHW
+                                              3'5B21           FRQWUROOHU
+                    9''
+                                                 9''$
+
+                                      95()
+                                                95()
+
+                           Q)                                                               $QDORJ
+              Q)                             95()          $'&                            5&V3//
+              )       )
+                                                                                                  
+                                                  966$
+
+
+                                                                                                                               06Y9
+
+          1. Optional. If a separate, external reference voltage is connected on VREF+, the two capacitors (100 nF and 1
+             μF) must be connected.
+          2. VREF+ is either connected to VREF+ or to VDDA (depending on package).
+          3. VREF- is either connected to VREF- or to VSSA (depending on package).
+          4. 19 is the number of VDD and VSS inputs.
+          5. Refer to Section 1.3.7: Regulator ON/OFF and internal reset ON/OFF availability to connect
+             BYPASS_REG and PDR_ON pins.
+
+
+
+
+12/54                                                DocID027559 Rev 5
+AN4661                                                                                                                    Power supplies
+
+
+                 Figure 5. STM32F769xx/STM32F779xx power supply scheme
+                                                 9%$7
+
+                                                                                                      %DFNXSFLUFXLWU\
+                       9%$7                                    3RZHUVZLWFK                           26&.57&
+                      WR9                                                                    :DNHXSORJLF
+                                                                                                      %DFNXSUHJLVWHUV
+                                                                                                      EDFNXS5$0
+
+
+
+
+                                                                               /HYHOVKLIWHU
+                                                                    287
+                                                                                                ,2
+                                              *3 ,2V                                          /RJLF
+                                                                    ,1
+
+
+                                           9''6'00&
+
+
+
+
+                                                                               /HYHOVKLIWHU
+                                                                    287
+                                                                                                 ,2
+                                    3*>@3'>@
+                                                                                                /RJLF
+                                                                    ,1                                          .HUQHOORJLF
+                                                                                                                    &38
+                                                 9&$3B
+                                                 9&$3B                                                            GLJLWDO
+                                î)                                                                         5$0 
+                              9''
+                                                    9''       9ROWDJH
+                                            
+                                                              UHJXODWRU
+               îQ)                       966
+               î)                 
+
+
+                                       %<3$66B5(*                                                              )ODVKPHPRU\
+                        9''86%
+                                               9''86%
+                                                                27*)6
+               Q)                                           3+<
+                )
+                                             9'''6,
+                                                                  '6,
+                                             9&$3'6,
+                                                                YROWDJH
+                                                               UHJXODWRU
+
+                                             9'''6,
+                                                                 '6,
+                         )                                 3+<
+                                             966'6,
+
+                                                                5HVHW
+                                              3'5B21           FRQWUROOHU
+                  9''
+                                                 9''$
+
+                                    95()
+                                               95()
+
+                         Q)                                                                 $QDORJ
+             Q)                             95()           $'&                            5&V3//
+             )      )
+                                                                                                  
+                                                 966$
+
+
+
+                                                                                                                                 06Y9
+         1. The two 2.2 µF ceramic capacitors should be replaced by two 100 nF decoupling capacitors when the
+            voltage regulator is OFF.
+         2. The 4.7 µF ceramic capacitor must be connected to one of the VDD pin.
+         3. VDDA=VDD and VSSA=VSS.
+
+
+
+
+                                                     DocID027559 Rev 5                                                                13/54
+                                                                                                                                              53
+Power supplies                                                                                                                           AN4661
+
+
+                         Figure 6. STM32F767xx/STM32F777xx power supply scheme
+                                                          9 %$7
+
+                                                                                                               EDFNXSFLUFXLWU\
+                                                                        3RZHUVZLWFK                            26&.57&
+                                 9%$7
+                                WR9                                                                   :DNHXSORJLF
+                                                                                                               %DFNXSUHJLVWHUV
+                                                                                                               EDFNXS5$0
+
+
+
+
+                                                                                       /HYHOVKLIWHU
+                                                                           287
+                                                                                                        ,2
+                                                       *3 ,2 V                                        /RJLF
+                                  9                                         ,1
+                                   ''6'00&
+                                                     9
+                                                      ''6'00&
+                         Q)
+
+
+
+
+                                                                                       /HYHOVKLIWHU
+                         )                                            287
+                                                3*>@3'>@
+                                                                                                         ,2
+
+                                                                            ,1
+                                                                                                       /RJLF
+
+
+
+
+                                                                                       /HYHOVKLIWHU
+                                                                           287
+                                               3$>@3%>@
+                                                                                                        ,2
+                                   9 ''86%
+                                                                            ,1
+                                                                                                       /RJLF
+                                                         9''86%
+
+                         Q)
+                         )
+                                                                        27*)6
+                                                                        3+<                                            .HUQHOORJLF
+
+                                                          9 &$3B
+                                                                                                                            &38
+                                                          9 &$3B                                                          GLJLWDO
+                                          î)
+                                                                                                                           5$0 
+                                   9 ''
+                                                             9 ''
+                                                     
+                                                                      9ROWDJH
+                                                                      UHJXODWRU
+                    îQ)                            9 66
+                    î)                     
+
+
+                                                 %<3$66B5(*                                                           )ODVKPHPRU\
+
+
+                                                                       5HVHW
+                                                       3'5B21         FRQWUROOHU
+
+                           9 ''
+                                                         9 ''$
+
+                                             9 5()
+                                                        9 5()
+
+                                    Q)                                                              $QDORJ
+                       Q)                            9 5()         $'&
+                       )       )                                                             5&V3//
+                                                                                                          
+
+                                                          9 66$
+
+
+
+                                                                                                                                         06Y9
+
+          1. The two 2.2 µF ceramic capacitors should be replaced by two 100 nF decoupling capacitors when the
+             voltage regulator is OFF.
+          2. The 4.7 µF ceramic capacitor must be connected to one of the VDD pin.
+          3. VDDA=VDD and VSSA=VSS.
+
+
+
+
+14/54                                                DocID027559 Rev 5
+AN4661                                                                                                                     Power supplies
+
+
+                           Figure 7. STM32F7x2xx power supply scheme
+                                                    9%$7
+
+                                                                                                       %DFNXSFLUFXLWU\
+                            9%$7                                3RZHUVZLWFK                           26&.57&
+                           WR9                                                                :DNHXSORJLF
+                                                                                                       %DFNXSUHJLVWHUV
+                                                                                                       EDFNXS5$0
+
+
+
+
+                                                                                /HYHOVKLIWHU
+                                                                     287
+                                                                                                 ,2
+                                                   *3 ,2V                                      /RJLF
+                             9                                        ,1
+                              ''6'00&
+                                               9
+                                                ''6'00&
+
+                    Q)
+
+
+
+
+                                                                                /HYHOVKLIWHU
+                    )                                           287
+                                           3*>@3'>@
+                                                                                                  ,2
+                                                                                                 /RJLF
+                                                                      ,1                                         .HUQHOORJLF
+                                                                                                                    &38
+                                                    9&$3B
+                                                    9&$3B                                                         GLJLWDO
+                                    î)                                                                      5$0 
+                                  9''
+                                                       9''      9ROWDJH
+                                               
+                                                                UHJXODWRU
+                   îQ)                      966
+                   î)                
+
+
+                                          %<3$66B5(*                                                            )ODVKPHPRU\
+                             9''86%
+                                                   9''86%
+                                                                 27*)6
+                    Q)                                       3+<
+                     )
+                                                                 5HVHW
+                                                3'5B21          FRQWUROOHU
+                      9''
+                                                    9''$
+
+                                        95()
+                                                   95()
+
+                              Q)                                                             $QDORJ
+                  Q)                            95()        $'&                            5&V3//
+                  )      )
+                                                                                                   
+                                                    966$
+
+
+                                                                                                                                  06Y9
+
+         1. The two 2.2 µF ceramic capacitors should be replaced by two 100 nF decoupling capacitors when the
+            voltage regulator is OFF.
+         2. The 4.7 µF ceramic capacitor must be connected to one of the VDD pin.
+         3. VDDA=VDD and VSSA=VSS.
+
+
+
+
+                                                    DocID027559 Rev 5                                                                 15/54
+                                                                                                                                               53
+Power supplies                                                                                                                        AN4661
+
+
+                            Figure 8. STM32F7x3xx power supply scheme
+                                                       9%$7
+
+                                                                                                           %DFNXSFLUFXLWU\
+                             9%$7                                   3RZHUVZLWFK                           26&.57&
+                            WR9                                                                   :DNHXSORJLF
+                                                                                                           %DFNXSUHJLVWHUV
+                                                                                                           EDFNXS5$0
+
+
+
+
+                                                                                    /HYHOVKLIWHU
+                                                                        287
+                                                                                                     ,2
+                                                    *3 ,2V                                         /RJLF
+                                9                                        ,1
+                                 ''6'00&
+                                                   9''6'00&
+
+                      Q)
+
+
+
+
+                                                                                    /HYHOVKLIWHU
+                      )                                            287
+                                              3*>@3'>@
+                                                                                                      ,2
+
+                                                                         ,1
+                                                                                                     /RJLF
+
+
+
+
+                                                                                    /HYHOVKLIWHU
+                                                                        287
+                                            3$>@3%>@
+                                                                                                      ,2
+                                9''86%
+                                                                         ,1
+                                                                                                    /RJLF
+                                                     9''86%
+                      Q)
+                      )
+                                                                    27*)6
+                                                                    3+<                                             .HUQHOORJLF
+                                                                                                                         &38
+                                                       s Wͺϭ
+                                                                                                                        GLJLWDO
+                                         î) s WͺϮ
+                                                                                                                        5$0 
+                                9''
+                                                          s      9ROWDJH
+                                                  ϭͬϮͬ͘͘͘ϭϭͬϭϮ
+                                                                   UHJXODWRU
+                 îQ)
+                                                        s66
+                 î)                    ϭͬϮͬ͘͘͘ϭϭͬϭϮ
+
+
+                                             %<3$66B5(*                                                             )ODVKPHPRU\
+
+
+
+                                                                   27*+63+<
+                                                                      YROWDJH
+                                                                     UHJXODWRU
+
+                                              9''27*+6
+                                                                   27*+63+<
+                                )
+                                              27*B+6B5(;7
+
+                                               .RKP         5HVHW
+                                                   3'5B21          FRQWUROOHU
+                        9''
+                                                      9''$
+
+                                          95()
+                                                     95()
+
+                                 Q)                                                              $QDORJ
+                   Q)                             95()          $'&                            5&V3//
+                   )        )
+                                                                                                       
+                                                       966$
+
+
+                                                                                                                                      06Y9
+
+          1. The VDDUSB allows supplying the PHY FS in PA11/PA12 and the PHY HS on PB14/PB15.
+
+
+
+16/54                                                 DocID027559 Rev 5
+AN4661                                                                                             Power supplies
+
+
+         2. The two 2.2 µF ceramic capacitors should be replaced by two 100 nF decoupling capacitors when the
+            voltage regulator is OFF.
+         3. The 4.7 µF ceramic capacitor must be connected to one of the VDD pin.
+         4. VDDA=VDD and VSSA=VSS.
+
+
+
+1.3      Reset & power supply supervisor
+
+1.3.1    Power-on reset (POR)/power-down reset (PDR)
+         The device has an integrated POR/PDR circuitry that allows a proper operation starting from
+         1.8 V.
+         The device remains in reset mode when VDD/VDDA is below a specified threshold,
+         VPOR/PDR, without the need for an external reset circuit. For more details concerning the
+         power on/power-down reset threshold, refer to the electrical characteristics of the
+         datasheet.
+
+                               Figure 9. Power on reset/power down reset waveform
+
+                    9''9''$
+
+
+
+
+            93253'5                     3'5
+            ULVLQJHGJH
+                                                         P9
+            93253'5                                    K\VWHUHVLV                          3'5
+            IDOOLQJHGJH
+
+
+
+
+                                                       7HPSRUL]DWLRQ
+                                                       W5677(032
+
+
+
+
+                       5HVHW
+                                                                                                          069
+
+         1. tRSTTEMPO is approximately 2.6 ms. VPOR/PDR rising edge is 1.74 V (typ.) and VPOR/PDR falling edge
+            is 1.70 V (typ.). Refer to the product datasheets for the actual value.
+         On the packages embedding the PDR_ON pin, the power supply supervisor is enabled by
+         holding PDR_ON high. On the other packages, the power supply supervisor is always
+         enabled.
+
+1.3.2    Programmable voltage detector (PVD)
+         The PVD can be used to monitor the VDD power supply by comparing it to a threshold
+         selected by the PLS[2:0] bits in the PWR power control register (PWR_CR1).
+         The PVD is enabled by setting the PVDE bit.
+
+
+
+
+                                             DocID027559 Rev 5                                                  17/54
+                                                                                                                        53
+Power supplies                                                                                   AN4661
+
+
+          A PVDO flag is available, in the PWR power control/status register (PWR_CSR1), to
+          indicate if VDD is higher or lower than the PVD threshold. This event is internally connected
+          to the EXTI line16 and can generate an interrupt if enabled through the EXTI registers.
+          The PVD output interrupt can be generated when VDD drops below the PVD threshold
+          and/or when VDD rises above the PVD threshold depending on EXTI line16 rising/falling
+          edge configuration. As an example the service routine could perform emergency shutdown
+          tasks.
+
+                                            Figure 10. PVD threshold
+                         9''
+
+
+
+
+           939'
+           ULVLQJHGJH
+                                                      39'WKUHVKROG              P9
+           939'                                                                 K\VWHUHVLV
+           IDOOLQJHGJH
+
+
+
+
+                  39'RXWSXW
+
+
+                                                                                                 069
+
+
+
+1.3.3     System reset
+          A system reset sets all the registers to their reset values except the reset flags in the clock
+          controller CSR register and the registers in the backup domain (see Figure 11).
+          A system reset is generated when one of the following events occurs:
+          1.     A low level on the NRST pin (external reset).
+          2.     Window watchdog end of count condition (WWDG reset).
+          3.     Independent watchdog end of count condition (IWDG reset).
+          4.     A software reset (Software reset).
+          5.     A low-power management reset.
+
+
+
+
+18/54                                     DocID027559 Rev 5
+AN4661                                                                                                         Power supplies
+
+
+                                                          Figure 11. Reset circuit
+
+                                                     9''9''$
+
+
+                                                          538
+              ([WHUQDO                                                                                         6\VWHPUHVHW
+               UHVHW                                                        )LOWHU
+                         1567
+
+                                                                                              ::'*UHVHW
+                                                                 3XOVH
+                                                                                              ,:'*UHVHW
+                                                                JHQHUDWRU
+                                                                                              3RZHUUHVHW
+                                                                PLQV
+                                                                                              6RIWZDUHUHVHW
+                                                                                              /RZSRZHUPDQDJHPHQWUHVHW
+
+                                                                                                                              DLF
+
+
+
+1.3.4    Internal reset ON
+         On the packages embedding the PDR_ON pin, the power supply supervisor is enabled by
+         holding PDR_ON high. On the other packages, the power supply supervisor is always
+         enabled.
+         For more details about the internal reset ON, refer to the datasheets (DS10915, DS10916).
+
+1.3.5    Internal reset OFF
+         This feature is available only on the packages featuring the PDR_ON pin. The internal
+         power-on reset (POR) / power-down reset (PDR) circuitry is disabled through the PDR_ON
+         pin.
+         An external power supply supervisor should monitor VDD and NRST and should maintain
+         the device in reset mode as long as VDD is below a specified threshold. PDR_ON should be
+         connected to VSS. Refer to Figure 12: Power supply supervisor interconnection with internal
+         reset OFF.
+
+              Figure 12. Power supply supervisor interconnection with internal reset OFF
+
+                                                9W\S 9PLQ
+                         9ROWDJHUHJXODWRU
+                                                                                           9''9''$     9%$7
+
+
+
+
+                                                                  3'5B21                    5HVHW
+                                                                                           FRQWUROOHU
+
+
+                                                                                     9''
+                              6701
+                           9ROWDJHVXSHUYLVRU                                          Nȍ
+                                                                      1567
+                                                 287
+                         DFWLYHORZ RSHQGUDLQRXWSXW
+                                                                                                    670)
+                                                                      )
+                                                                                           966966$
+
+                                                                                                                       06Y9
+
+
+
+
+                                                    DocID027559 Rev 5                                                          19/54
+                                                                                                                                         53
+Power supplies                                                                                                                  AN4661
+
+
+          The supply ranges which never go below 1.8V minimum should be better managed by the
+          internal circuitry (no additional component needed, thanks to the fully embedded reset
+          controller).
+          When the internal reset is OFF, the following integrated features are no more supported:
+          •      The integrated power-on reset (POR) / power-down reset (PDR) circuitry is disabled.
+          •      The brownout reset (BOR) circuitry must be disabled.
+          •      The embedded programmable voltage detector (PVD) is disabled.
+          •      VBAT functionality is no more available and VBAT pin should be connected to VDD.
+          All the packages, except for the LQFP64 and the LQFP100, allow to disable the internal
+          reset through the PDR_ON signal when connected to VSS.
+
+                                               Figure 13. NRST circuitry timing example
+
+                  9''
+                                                         9''GXULQJRSHUDWLRQNHSWDERYH9
+                        VXSHUYLVRU
+                        KLJKWULSSRLQW
+                 9
+                        VXSHUYLVRU
+                        ORZWULSSRLQW
+
+
+
+
+                                          3RZHU2QSKDVH                          2SHUDWLRQ         3RZHU'RZQSKDVH                     WLPH
+
+
+                 1567                                              7VXSHUYLVRU!75677(032
+                 9''
+                                                                                        5HVHWE\
+                                                                                        LQWHUQDO
+                                                                                        VRXUFHV
+                                                   7VXSHUYLVRU
+
+                                                 75677(032
+
+
+                          7VXSHUYLVRU75677(032
+                                                                                                                                         WLPH
+                                    1567.HSWORZE\      1567.HSWORZE\                              1567IRUFHGORZE\H[WHUQDO
+                                    LQWHUQDOFLUFXLWU\     H[WHUQDOVXSHUYLVRU                            VXSHUYLVRU
+                                                                                                                                 069
+
+
+
+
+20/54                                                    DocID027559 Rev 5
+AN4661                                                                                                Power supplies
+
+
+1.3.6    Regulator OFF mode
+         Refer to Voltage regulator section in the datasheet for details.
+         •     When BYPASS_REG = VDD, the core power supply should be provided through VCAP1
+               and VCAP2 pins connected together.
+               –     The two VCAP ceramic capacitors should be replaced by two 100 nF decoupling
+                     capacitors.
+               –     Since the internal voltage scaling is not managed internally, the external voltage
+                     value must be aligned with the targeted maximum frequency.
+               –     When the internal regulator is OFF, there is no more internal monitoring on V12.
+                     An external power supply supervisor should be used to monitor the V12 of the
+                     logic power domain (VCAP).
+                     PA0 pin should be used for this purpose, and act as power-on reset on V12 power
+                     domain.
+         •     In regulator OFF mode, the following features are no more supported:
+               –     PA0 cannot be used as a GPIO pin since it allows to reset a part of the V12 logic
+                     power domain which is not reset by the NRST pin.
+               –     As long as PA0 is kept low, the debug mode cannot be used under power-on
+                     reset. As a consequence, PA0 and NRST pins must be managed separately if the
+                     debug connection under reset or pre-reset is required.
+               –     The over-drive and under-drive modes are not available.
+               –     The Standby mode is not available.
+
+                              Figure 14. BYPASS_REG supervisor reset connection
+
+                                     9       ([WHUQDO9&$3BSRZHU
+                                                  VXSSO\VXSHUYLVRU
+                                              ([WUHVHWFRQWUROOHUDFWLYH      $SSOLFDWLRQUHVHW
+                                               ZKHQ9&$3B0LQ9           VLJQDO RSWLRQDO
+
+
+
+                                                                         3$           1567
+
+
+
+                                                                     %<3$66B5(*
+                                                  9
+                                    [Q)                        9&$3
+                                    [Q)                        9&$3
+                                           9''
+                                                            9''
+                                                         1
+                          1î Q)
+                          î)
+                                                                         966
+                                                                      1
+
+                                                                                                                069
+
+         1. VCAP2 is not available on all packages. In that case, a single 100 nF decoupling capacitor is connected to
+            VCAP1.
+
+
+
+
+                                                 DocID027559 Rev 5                                                  21/54
+                                                                                                                            53
+Power supplies                                                                                                    AN4661
+
+
+          The following conditions must be respected:
+          •      VDD should always be higher than VCAP to avoid a current injection between power
+                 domains.
+          •      If the time for VCAP to reach V12 minimum value is smaller than the time for VDD to
+                 reach 1.7 V, then PA0 should be kept low to cover both conditions: until VCAP reaches
+                 V12 minimum value and until VDD reaches 1.7 V.
+          •      Otherwise, if the time for VCAP to reach V12 minimum value is smaller than the time for
+                 VDD to reach 1.7 V, then PA0 could be asserted low externally.
+          •      If VCAP goes below V12 minimum value and VDD is higher than 1.7 V, then PA0 must
+                 be asserted low externally.
+
+1.3.7     Regulator ON/OFF and internal reset ON/OFF availability
+
+                       Table 1. Regulator ON/OFF and internal reset ON/OFF availability
+                                                                                                        Internal reset
+                  Package          Regulator ON          Regulator OFF         Internal reset ON
+                                                                                                             OFF
+
+               LQFP64(1)
+               LQFP100                                                                 Yes                       No
+              WLCSP100(2)                Yes                     No
+                  LQFP144,
+                 LQFP208(3)
+                LQFP176,                                                            Yes                    Yes
+                                       Yes            Yes
+              WLCSP143(4),                                                      PDR_ON set to          PDR_ON set to
+                                 BYPASS_REG set BYPASS_REG set                      VDD                    VSS
+               UFBGA176,
+                                     to VSS         to VDD
+              TFBGA216(3)
+                 WLCSP180                           Yes(5)
+          1. Available only on the STM32F7x2xx devices.
+          2. Available only on the STM32F7x3xx devices.
+          3. Not available on the STM32F72xxx/73xxx devices.
+          4. Available only on the STM32F767xx/STM32F777xx devices.
+          5. Available only on dedicated part numbers. Refer to ordering information section of the datasheet.
+
+
+
+
+22/54                                          DocID027559 Rev 5
+AN4661                                                           Alternate function mapping to pins
+
+
+2        Alternate function mapping to pins
+
+         In order to easily explore the peripheral alternate functions mapping to the pins it is
+         recommended to use the STM32CubeMX tool available on www.st.com.
+
+                              Figure 15. STM32CubeMX example screen-shot
+
+
+
+
+                                        DocID027559 Rev 5                                          23/54
+                                                                                                           53
+Clocks                                                                                            AN4661
+
+
+3          Clocks
+
+           Three different clock sources can be used to drive the system clock (SYSCLK):
+           •     HSI oscillator clock.
+           •     HSE oscillator clock.
+           •     Main PLL (PLL) clock.
+           The devices have the two following secondary clock sources:
+           •     32 kHz low-speed internal RC (LSI RC) which drives the independent watchdog and,
+                 optionally, the RTC used for Auto-wakeup from the Stop/Standby mode.
+           •     32.768 kHz low-speed external crystal (LSE crystal) which optionally drives the RTC
+                 clock (RTCCLK).
+           Each clock source can be switched on or off independently when it is not used, to optimize
+           power consumption.
+           Refer to the RM0385 reference manual for the description of the clock tree.
+
+
+3.1        HSE OSC clock
+           The high speed external clock signal (HSE) can be generated from two possible clock
+           sources:
+           •     HSE external user clock (see Figure 16).
+           •     HSE external crystal/ceramic resonator (see Figure 17).
+           The resonator and the load capacitors have to be placed as close as possible to the
+           oscillator pins in order to minimize the output distortion and startup stabilization time. The
+           loading capacitance values must be adjusted according to the selected oscillator.
+
+         Figure 16. HSE external clock                    Figure 17. HSE crystal/ceramic resonators
+
+                                                                    26&B,1        26&B287
+
+               26&B,1       26&B287
+
+
+                               +,=                                &/                     &/
+                                                                             /RDG
+               ([WHUQDO
+                                                                           FDSDFLWRUV
+                VRXUFH
+                                         06Y9                                        06Y9
+
+
+
+3.1.1      External user clock (HSE bypass)
+           In this mode, an external clock source must be provided. The user selects this mode by
+           setting the HSEBYP and HSEON bits in the RCC clock control register (RCC_CR). The
+           external clock signal (square, sinus or triangle) with ~50% duty cycle has to drive the
+           OSC_IN pin while the OSC_OUT pin should be left HI-Z.
+
+
+
+
+24/54                                          DocID027559 Rev 5
+AN4661                                                                                                          Clocks
+
+
+3.1.2      External crystal/ceramic resonator (HSE crystal)
+           The external oscillator frequency ranges from 4 to 26 MHz. The external oscillator has the
+           advantage of producing a very accurate rate on the main clock. The associated hardware
+           configuration is shown in Figure 17. Using a 25 MHz oscillator frequency is a good choice to
+           get accurate Ethernet, USB OTG high-speed peripheral, I2S and SAI.
+           The resonator and the load capacitors have to be connected as close as possible to the
+           oscillator pins in order to minimize the output distortion and startup stabilization time. The
+           load capacitance values must be adjusted according to the selected oscillator.
+           For CL1 and CL2 it is recommended to use high-quality ceramic capacitors in the 5 pF-to-
+           25 pF range (typ.), designed for high-frequency applications and selected to meet the
+           requirements of the crystal or resonator. CL1 and CL2, are usually the same value. The
+           crystal manufacturer typically specifies a load capacitance that is the series combination of
+           CL1 and CL2. The PCB and MCU pin capacitances must be included when sizing CL1 and
+           CL2 (10 pF can be used as a rough estimate of the combined pin and board capacitance).
+           The HSERDY flag in the RCC clock control register (RCC_CR) indicates if the high-speed
+           external oscillator is stable or not. At startup, the clock is not released until this bit is set by
+           hardware. An interrupt can be generated if enabled in the RCC clock interrupt register
+           (RCC_CIR).
+           The HSE crystal can be switched on and off using the HSEON bit in the RCC clock control
+           register (RCC_CR).
+
+
+3.2        LSE OSC clock
+           The low-speed external clock signal (LSE) can be generated from two possible clock
+           sources:
+           •     LSE user external clock (see Figure 18).
+           •     LSE external crystal/ceramic resonator (see Figure 19).
+
+         Figure 18. LSE external clock                       Figure 19. LSE crystal/ceramic resonators
+
+                                                                          26&B,1          26&B287
+
+               26&B,1       26&B287
+
+
+                                +,=                                     &/                        &/
+                                                                                    /RDG
+               ([WHUQDO
+                                                                                  FDSDFLWRUV
+                VRXUFH
+                                        06Y9                                                  06Y9
+
+           1. Figure 19: LSE crystal/ceramic resonators:
+              To avoid exceeding the maximum value of CL1 and CL2 (15 pF) it is strongly recommended to use a
+              resonator with a load capacitance CL ≤ 7 pF.
+           2. Figure 18: LSE external clock and Figure 19: LSE crystal/ceramic resonators:
+              OSC32_IN and OSC32_OUT pins can be used also as GPIO, but it is recommended not to use them as
+              both RTC and GPIO pins in the same application.
+           The LSE oscillator is switched on and off using the LSEON bit in RCC backup domain
+           control register (RCC_BDCR).
+
+
+
+
+                                              DocID027559 Rev 5                                                  25/54
+                                                                                                                         53
+Clocks                                                                                            AN4661
+
+
+         The LSE oscillator includes new modes and has a configurable drive using the LSEDRV
+         [1:0] in RCC_BDCR register:
+         •    00: Low drive.
+         •    10: Medium low drive.
+         •    01: Medium high drive.
+         •    11: High drive.
+         The LSERDY flag in the RCC backup domain control register (RCC_BDCR) indicates if the
+         LSE crystal is stable or not. At startup, the LSE crystal output clock signal is not released
+         until this bit is set by hardware. An interrupt can be generated if enabled in the RCC clock
+         interrupt register (RCC_CIR).
+
+3.2.1    External clock (LSE bypass)
+         In this mode, an external clock source must be provided. It must have a frequency up to
+         1 MHz. The user selects this mode by setting the LSEBYP and LSEON bits in the RCC
+         backup domain control register (RCC_BDCR). The external clock signal (square, sinus or
+         triangle) with ~50% duty cycle has to drive the OSC32_IN pin while the OSC32_OUT pin
+         should be left HI-Z. See Figure 18.
+
+3.2.2    External crystal/ceramic resonator (LSE crystal)
+         The LSE crystal is a 32.768 kHz low-speed external crystal or ceramic resonator. It has the
+         advantage of providing a low-power, but highly accurate clock source to the real-time clock
+         peripheral (RTC) for clock/calendar or other timing functions.
+         The resonator and the load capacitors have to be connected as close as possible to the
+         oscillator pins in order to minimize the output distortion and startup stabilization time. The
+         load capacitance values must be adjusted according to the selected oscillator.
+
+
+3.3      Clock security system (CSS)
+         The clock security system can be activated by software. In this case, the clock detector is
+         enabled after the HSE oscillator startup delay, and disabled when this oscillator is stopped.
+         •    If a failure is detected on the HSE clock, this oscillator is automatically disabled, a clock
+              failure event is sent to the break inputs of advanced-control timers TIM1 and TIM8, and
+              an interrupt is generated to inform the software about the failure (clock security system
+              interrupt CSSI), allowing the MCU to perform rescue operations. The CSSI is linked to
+              the Cortex®-M7 NMI (non-maskable interrupt) exception vector.
+         •    If the HSE oscillator is used directly or indirectly as the system clock (indirectly
+              meaning that it is directly used as PLL input clock, and that PLL clock is the system
+              clock) and a failure is detected, then the system clock switches to the HSI oscillator and
+              the HSE oscillator is disabled.
+         •    If the HSE oscillator clock was the clock source of PLL used as the system clock when
+              the failure occurred, PLL is also disabled. In this case, if the PLLI2S or PLLSAI was
+              enabled, it is also disabled when the HSE fails.
+
+
+
+
+26/54                                    DocID027559 Rev 5
+AN4661                                                                           Boot configuration
+
+
+4        Boot configuration
+
+4.1      Boot mode selection
+         In the STM32F7 Series, two different boot spaces can be selected through the BOOT pin
+         and the boot base address programmed in the BOOT_ADD0 or BOOT_ADD1 option bytes
+         as shown in the Table 2.
+
+                                           Table 2. Boot modes
+              Boot mode selection
+                                                                Boot space
+             BOOT     Boot address
+              pin     option bytes
+
+                                       – Boot address defined by the user option byte BOOT_ADD0[15:0]
+              0     BOOT_ADD0 [15:0]
+                                         - ST programmed value: Flash on ITCM at 0x0020 0000
+                                       – Boot address defined by the user option byte BOOT_ADD1[15:0]
+              1     BOOT_ADD1 [15:0]
+                                         - ST programmed value: System bootloader at 0x0010 0000
+
+
+         The BOOT_ADD0 and BOOT_ADD1 address option bytes allow to program any boot
+         memory address from 0x0000 0000 to 0x2004 FFFF which include:
+         •    All the Flash memory address space mapped on ITCM or AXIM interface.
+         •    All the RAM address space: ITCM, DTCM RAMs and SRAMs mapped on AXIM
+              interface.
+         •    The system memory bootloader.
+         The BOOT_ADD0 / BOOT_ADD1 option bytes can be modified after the reset in order to
+         boot from any other boot address after the next reset.
+         If the programmed boot memory address is out of the memory mapped area or a reserved
+         area, the default boot fetch address is programmed as follows:
+         •    Boot address 0: ITCM-FLASH at 0x0020 0000
+         •    Boot address 1: ITCM-RAM at 0x0000 0000
+         When the Flash level 2 protection is enabled, only boot from the Flash memory (on ITCM or
+         AXIM interface) or the system bootloader will be available. If the already programmed boot
+         address in the BOOT_ADD0 and/or BOOT_ADD1 option bytes is out of the memory range
+         of the RAM address (on ITCM or AXIM), the default fetch will be forced from the Flash
+         memory on ITCM interface at the address 0x00200000.
+
+
+
+
+                                       DocID027559 Rev 5                                        27/54
+                                                                                                        53
+Boot configuration                                                                                       AN4661
+
+
+4.2        Boot pin connection
+           Figure 20 shows the external connection required to select the boot memory of the
+           STM32F7 Series.
+
+                              Figure 20. Boot mode selection implementation example
+
+
+                                                                      670)[[[[
+
+
+                         9''
+
+                                        NRKPV
+                                                                     %227
+
+
+                                9''
+
+                                                NRKPV
+                                                                     %227
+
+
+
+
+                                                                                                        069
+
+           1. Resistor values are given only as a typical example.
+
+
+
+4.3        System bootloader mode
+           The embedded bootloader code is located in the system memory. It is programmed by ST
+           during production. It is used to reprogram the Flash memory using one of the following serial
+           interfaces.
+           Table 3 shows the supported communication peripherals by the system bootloader.
+
+                        Table 3. STM32F7 Series bootloader communication peripherals
+                Bootloader peripherals                                    STM32F7 Series
+
+                           DFU                                USB OTG FS (PA11 / PA12) in device mode
+
+                         USART1                                              PA9 / PA10
+
+                         USART3                                      PB10 / PB11 and PC10 / PC11
+
+                         CAN1(1)                                              PB8/PB9
+
+                         CAN2(2)                                             PB5 / PB13
+
+                           I2C1                                              PB6 / PB9
+
+                           I2C2                                               PF0 / PF1
+
+
+
+
+28/54                                           DocID027559 Rev 5
+AN4661                                                                                   Debug management
+
+
+              Table 3. STM32F7 Series bootloader communication peripherals (continued)
+              Bootloader peripherals                                  STM32F7 Series
+
+                        I2C3                                             PA8 / PC9
+
+                        SPI1                                       PA4 / PA5 / PA6 / PA7
+
+                        SPI2                                         PI0 / PI1 / PI2 / PI3
+
+                        SPI4                                     PE11 / PE12 / PE13 / PE14
+
+         1. Available on the STM32F72xxx/73xxx devices.
+         2. Available on the STM32F7 Series devices except the STM32F72xxx/73xxx devices.
+
+
+
+
+5        Debug management
+
+5.1      Introduction
+         The host/target interface is the hardware equipment that connects the host to the application
+         board. This interface is made of three components: a hardware debug tool, a JTAG or SW
+         connector and a cable connecting the host to the debug tool. Figure 21 shows the
+         connection of the host to the evaluation board.
+
+                                       Figure 21. Host to board connection
+
+
+
+
+                                                    $EBUG TOOL                    *4!'37 CONNECTOR
+
+
+
+
+                           (OST 0#                                                           0OWER SUPPLY
+                                                    %VALUATION BOARD
+
+                                                                                                       069
+
+
+
+
+5.2      SWJ debug port (serial wire and JTAG)
+         The core of the STM32F7 Series integrates the Serial Wire / JTAG Debug Port (SWJ-DP). It
+         is an ARM® standard CoreSight debug port that combines a JTAG-DP (5-pin) interface and
+         a SW-DP (2-pin) interface.
+         •    The JTAG Debug Port (JTAG-DP) provides a 5-pin standard JTAG interface to the
+              AHP-AP port.
+         •    The Serial Wire Debug Port (SW-DP) provides a 2-pin (clock + data) interface to the
+              AHP-AP port.
+
+
+                                           DocID027559 Rev 5                                                29/54
+                                                                                                                    53
+Debug management                                                                                AN4661
+
+
+         In the SWJ-DP, the two JTAG pins of the SW-DP are multiplexed with some of the five JTAG
+         pins of the JTAG-DP.
+         For more details on the SWJ debug port refer to RM0385 SWJ debug port section (serial
+         wire and JTAG).
+
+
+5.3      Pinout and debug port pins
+         The STM32F7 Series devices are available in various packages with different numbers of
+         available pins. As a result, some functionality related to the pin availability (TPIU parallel
+         output interface) may differ between the packages.
+
+5.3.1    SWJ debug port pins
+         Five pins are used as outputs from the STM32F7 Series for the SWJ-DP as alternate
+         functions of general-purpose I/Os. These pins are available on all packages.
+
+                                        Table 4. SWJ debug port pins
+                                    JTAG debug port                 SW debug port
+                                                                                               Pin
+          SWJ-DP pin name
+                                                                                           assignment
+                              Type       Description         Type    Debug assignment
+
+                                        JTAG test mode                 Serial wire data
+            JTMS/SWDIO          I                             IO                              PA13
+                                           Selection                    input/output
+
+
+            JTCK/SWCLK          I       JTAG test clock       I        Serial wire clock      PA14
+
+                JTDI            I     JTAG test data input    -                -              PA15
+                                        JTAG test data               TRACESWO if async
+          JTDO/TRACESWO         O                             -                                PB3
+                                           output                      trace is enabled
+               NJTRST           I      JTAG test nReset       -                -               PB4
+
+
+5.3.2    Flexible SWJ-DP pin assignment
+         After RESET (SYSRESETn or PORESETn), all the five pins used for the SWJ-DP are
+         assigned as dedicated pins immediately usable by the debugger host (note that the trace
+         outputs are not assigned except if explicitly programmed by the debugger host).
+         However, the STM32F7 Series devices offer the possibility of disabling some or all of the
+         SWJ-DP ports and so, of releasing the associated pins for general-purpose IO (GPIO)
+         usage.
+
+
+
+
+30/54                                   DocID027559 Rev 5
+AN4661                                                                             Debug management
+
+
+         Table 5 shows the different possibilities to release some pins.
+
+                                   Table 5. Flexible SWJ-DP assignment
+                                                                      SWJ IO pin assigned
+
+                                                                    PA14 /
+                      Available debug ports                PA13 /
+                                                                    JTCK /   PA15 /       PB3 /    PB4 /
+                                                          JTMS /
+                                                                    SWCL      JTDI        JTDO    NJTRST
+                                                          SWDIO
+                                                                     K
+
+             Full SWJ (JTAG-DP + SW-DP) - reset state        X        X        X           X        X
+             Full SWJ (JTAG-DP + SW-DP) but without
+                                                             X        X        X           X
+                            NJTRST                                                                   -
+              JTAG-DP disabled and SW-DP enabled             X        X               -
+              JTAG-DP disabled and SW-DP disabled                            Released
+
+
+         For more details on how to disable SWJ-DP port pins, please refer to RM0385 I/O pin
+         alternate function multiplexer and mapping section.
+
+5.3.3    Internal pull-up and pull-down on JTAG pins
+         It is necessary to ensure that the JTAG input pins are not floating since they are directly
+         connected to flip-flops to control the debug mode features. A special care must be taken
+         with the SWCLK/TCK pin which is directly connected to the clock of some of these flip-flops.
+         To avoid any uncontrolled IO levels, the device embeds internal pull-ups and pull-downs on
+         the JTAG input pins:
+         •   NJTRST: internal pull-up.
+         •   JTDI: internal pull-up.
+         •   JTMS/SWDIO: internal pull-up.
+         •   TCK/SWCLK: internal pull-down.
+         Once a JTAG IO is released by the user software, the GPIO controller takes control again.
+         The reset states of the GPIO control registers put the I/Os in the equivalent state:
+         •   NJTRST: AF input pull-up.
+         •   JTDI: AF input pull-up.
+         •   JTMS/SWDIO: AF input pull-up.
+         •   JTCK/SWCLK: AF input pull-down.
+         •   JTDO: AF output floating.
+         The software can then use these I/Os as standard GPIOs.
+Note:    The JTAG IEEE standard recommends to add pull-ups on TDI, TMS and nTRST but there is
+         no special recommendation for TCK. However, for JTCK, the device needs an integrated
+         pull-down.
+         Having embedded pull-ups and pull-downs removes the need to add external resistors.
+
+
+
+
+                                         DocID027559 Rev 5                                           31/54
+                                                                                                             53
+Debug management                                                                               AN4661
+
+
+5.3.4    SWJ debug port connection with standard JTAG connector
+         Figure 22 shows the connection between the STM32F7 Series and a standard JTAG
+         connector.
+
+                               Figure 22. JTAG connector implementation
+
+                                                                  -7$*FRQQHFWRU&1
+                                                           9''                           9''
+                                                                             î 
+                                                                  &RQQHFWRU
+                   670)
+
+                                                                    975()           
+                    Q-7567                                          Q7567           
+                       -7',                                         7',             
+                -6706:',2                                          706             
+                -7&.6:&/.                                          7&.            
+                                                                    57&.          
+                       -7'2                                         7'2           
+                      Q567,1                                        Q6567         
+                                                                    '%*54         
+                                             N                  '%*$&.        
+                                                         N
+                                                                 N                   966
+
+
+                                                                                           069
+
+
+
+
+32/54                                DocID027559 Rev 5
+AN4661                                                                             Recommendations
+
+
+6        Recommendations
+
+6.1      Printed circuit board
+         For technical reasons, it is best to use a multilayer printed circuit board (PCB) with a
+         separate layer dedicated to the ground (VSS) and another dedicated to the VDD supply. This
+         provides a good decoupling and a good shielding effect. For many applications, economical
+         reasons prohibit the use of this type of board. In this case, the major requirement is to
+         ensure a good structure for the ground and for the power supply.
+
+
+6.2      Component position
+         A preliminary layout of the PCB must separate the different circuits according to their EMI
+         contribution in order to reduce the cross-coupling on the PCB, that is noisy, high-current
+         circuits, low-voltage circuits, and digital components.
+
+
+6.3      Ground and power supply (VSS,VDD)
+         Every block (noisy, low-level sensitive, digital, etc.) should be grounded individually and all
+         ground returns should be to a single point. Loops must be avoided or have a minimum area.
+         The power supply should be implemented close to the ground line to minimize the area of
+         the supply loop. This is due to the fact that the supply loop acts as an antenna, and is
+         therefore the main transmitter and receiver of EMI. All component-free PCB areas must be
+         filled with additional grounding to create a kind of shielding (especially when using single-
+         layer PCBs).
+
+
+6.4      Decoupling
+         All the power supply and ground pins must be properly connected to the power supplies.
+         These connections, including pads, tracks and vias should have as low impedance as
+         possible. This is typically achieved with thick track widths and, preferably, the use of
+         dedicated power supply planes in multilayer PCBs.
+         In addition, each power supply pair should be decoupled with filtering ceramic capacitors
+         (100 nF) and one single tantalum or ceramic capacitor (min. 4.7 μF) connected in parallel.
+         These capacitors need to be placed as close as possible to, or below, the appropriate pins
+         on the underside of the PCB. Typical values are 10 nF to 100 nF, but the exact values
+         depend on the application needs. Figure 23 shows the typical layout of such a VDD/VSS pair.
+
+
+
+
+                                        DocID027559 Rev 5                                          33/54
+                                                                                                           53
+Recommendations                                                                                 AN4661
+
+
+                                  Figure 23. Typical layout for VDD/VSS pair
+
+                                  9LDWR9''                       9LDWR966
+
+                                                      &DS
+                                                      &DS
+
+
+
+
+                                                   9''966
+
+                                         670)[
+
+
+
+
+                                                                                              06Y9
+
+
+
+
+6.5      Other signals
+         When designing an application, the EMC performance can be improved by closely studying:
+         •    Signals for which a temporary disturbance affects the running process permanently
+              (the case of interrupts and handshaking strobe signals, and not the case for LED
+              commands). For these signals, a surrounding ground trace, shorter lengths and the
+              absence of noisy and sensitive traces nearby (crosstalk effect) improve the EMC
+              performance. For digital signals, the best possible electrical margin must be reached
+              for the two logical states and slow Schmitt triggers are recommended to eliminate
+              parasitic states.
+         •    Noisy signals (clock, etc.).
+         •    Sensitive signals (high impedance, etc.).
+
+
+6.6      Unused I/Os and features
+         All the microcontrollers are designed for a variety of applications and often a particular
+         application does not use 100% of the MCU resources. To increase the EMC performance,
+         unused clocks, counters or I/Os, should not be left free, e.g. I/Os should be set to “0” or “1”
+         (pull-up or pull-down to the unused I/O pins.) and unused features should be “frozen” or
+         disabled.
+
+
+
+
+34/54                                    DocID027559 Rev 5
+AN4661                                                                          Recommendations
+
+
+6.7      Recommendations for the WLCSP180 package in the
+         STM32F769Ax/STM32F768Ax devices
+         These recommendations are required for the WLCSP180 package in the
+         STM32F769Ax/STM32F768Ax devices:
+         1.   The NC (not-connected) balls must not be connected to GND nor to VDD.
+         2.   The NC (not-connected) pins are not bounded. They must be configured by software to
+              output push-pull and forced to 0 in the output data register to avoid an extra current
+              consumption in low-power modes.
+              The list of NC pins is: PI8, PI12, PI13, PI14, PF6, PF7, PF8, PF9, PC2, PC3, PC4,
+              PC5, PI15, PJ0, PJ1, PJ2, PJ3, PJ4, PJ5, PH6, PH7, PJ12, PJ13, PJ14, PJ15, PG14,
+              PK3, PK4, PK5, PK6 and PK7.
+
+
+
+
+                                       DocID027559 Rev 5                                       35/54
+                                                                                                       53
+Reference design                                                                          AN4661
+
+
+7         Reference design
+
+7.1       Description
+          The reference design shown in Figure 24, is based on the STM32F756NGH6, a highly
+          integrated microcontroller running at 216 MHz, that combines the Cortex®-M7 32-bit RISC
+          CPU core with 1 Mbyte of embedded Flash memory and system SRAM up to 320 Kbytes
+          (including Data TCM RAM 64 Kbytes), 16 Kbytes of instruction RAM (ITCM-RAM) and 4
+          Kbytes of backup SRAM.
+
+7.1.1     Clocks
+          Two clock sources are used for the microcontroller:
+          •   LSE: X2– 32.768 kHz crystal for the embedded RTC.
+          •   HSE: X1– 25 MHz crystal.
+          Refer to Section 3: Clocks on page 24.
+
+7.1.2     Reset
+          The reset signal of STM32F74xxx/STM32F75xxx devices is low active and the reset
+          sources include:
+          •   Reset button B1
+          •   Debugging Tools from JTAG/SWD connector CN15 and ETM trace connector CN12
+          Refer to Section 1.3: Reset & power supply supervisor on page 17.
+
+7.1.3     Boot mode
+          The STM32F74xxx/STM32F75xxx devices can boot from any region from 0x0000 0000 to
+          0x2004 FFFF.
+          The boot space is configured by setting BOOT pin and the boot base address programmed
+          in the BOOT_ADD0 and BOOT_ADD1 option bytes.
+          For more details refer to Section 4: Boot configuration on page 27.
+Note:     In the Low-power mode (more specially in Standby mode), the boot mode is mandatory to
+          be able to connect to tools (the device should boot from the SRAM).
+
+7.1.4     SWJ interface
+          Refer to Section 5: Debug management on page 29.
+
+7.1.5     Power supply
+          Refer to Section 1: Power supplies on page 7.
+
+
+
+
+36/54                                   DocID027559 Rev 5
+AN4661                                                                                       Reference design
+
+
+7.2      Component references
+                                          Table 6. Mandatory components
+          Id     Component name               Reference          Quantity                 Comments
+
+          1        Microcontroller         STM32F756NGH6             1         TFBGA216 package
+                                                                               Ceramic capacitors
+          2          Capacitor                 100 nF                19
+                                                                               (decoupling capacitors)
+                                                                               Ceramic capacitor
+          3          Capacitor                  4.7 µF               1
+                                                                               (decoupling capacitor)
+
+
+                                           Table 7. Optional components
+               Components
+          Id                  Reference       Quantity                         Comments
+                 name
+
+                                                         Pull-up and pull-down for JTAG, BOOT pin, PDR and
+          1     Resistor          10 kΩ          6
+                                                         bypass regulator
+                                                         – Used as star connection point between VDDA and
+                                                           VREF+
+          2     Resistor             0Ω
+                                                 2       – Used as star connection point between VDD_MCU
+                                                           and VDDUSB
+          3     Capacitor        100 nF          5       Ceramic capacitor.
+                                                         Used for LSE: the value depends on the crystal
+          4     Capacitor        1.5 pF          2
+                                                         characteristics.
+          5     Capacitor         1 μF           3       Used for VDDA and VREF and VDDUSB.
+          6     Capacitor        2.2 μF          2       Used for internal regulator when it is on.
+                                                         Used for HSE: the value depends on the crystal
+          7     Capacitor         20 pF          2
+                                                         characteristics.
+          8      Quartz          25 MHz          1       Used for HSE.
+          9      Quartz       32.768 kHz         1       Used for LSE.
+                  JTAG
+          10                     HE10-20         1                                   -
+                connector
+                                                         If no external battery is used in the application, it is
+          11     Battery             3V          1
+                                                         recommended to connect VBAT externally to VDD.
+          12     Switch           SPDT           1       Used to select the right boot mode.
+          13   Push-button           B1          1       Reset button
+          14     Jumper           3 pins         2       Used to select VBAT source, and BYPASS_REG pin.
+                              FCM1608KF
+          15   Ferrite bead                      1       Additional decoupling for VDDA
+                               -601T03
+
+
+
+
+                                           DocID027559 Rev 5                                                  37/54
+                                                                                                                      53
+38/54
+                                                                                                                                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                                                                                                                                                                                                   Reference design
+
+
+
+
+                                                                                                                                                                                                                                  *)'               *2")
+                                                                                                                                                      )
+                                                                                                                                         #                                     "                                      &7B:BC?A >?C 8:CC76
+                                                                                                                                                          % + )%               %                                                                            &
+                         #                                                                                                                      #                                      "
+                                                                                                                                                          %               % + )%
+                         (                                               *                                                                 %                                      "                                                                                                       )
+                                                                                                                                                          % + )%               %
+                                                                                                                                                 &                                      !                                                                                                                                           
+                                                                                                                                                          %                    %                                                                                                              *)'                  *''
+                                                                                                                                                 #                                     #                                                                                                                                         
+                                                                                                                                                         %                    %                                                                           *2")                            *                     *''                                                   
+                                                                                                                                                %                                     %                                                                                                                                        
+                                                                                                     (&'(                                                 %                    %                                                                                                              *                     *''
+                                                                                                                                                %                                                                                                                                                                                
+                                                                                                                                                          %                    %                                                                                                              *                     *''
+                                                                                                                                                &                                                                                                                                                                             
+                                                                                                     (                                                  %                    %                                                                                                              *                     *''
+                                                                                                                                                                                                                                                                                 !                                              
+                                                                                                                                                          %                    %                                                                                                              *                     *''
+                                                                                                                                                                                                                                                                                 !                                              
+                                                                                                     ("' '+$                                            %                    %                                                                                                              *                     *''
+                                                                                                                                                                                                                                                                                                                              
+                                                                                                                                                          %                    %                                                                                                                *                     *''
+                                                                                                                                                                                                                                                                                !                                              
+                                                                                                     (    '+!                                           %                    %                                                                                                                *                     *''
+                                                                                                                                                                                                                                                                                                                               
+                                                                                                                                                          %                    %                                                                                                                *                     *''
+                                                                                   &                                                                                                                                          *2")                                                                                          
+                                                                                                                         ("' '+$                        %             % + )%                                                                                                               *                     *''
+                                                                                                                                                                                                                                                                                                                                
+                                                                                                                         ( '+!                          %                                                                                                                                     *                     *''
+                                                                                                                                                                                                                                                                                                                               
+                                                                                                            ($ '+$      (                              %                                                                                                                                     *                     *''
+                                                                                                                                                                                                                                          !
+                                                                                                                                                                                                                                                                                                  *                     *''
+                                                                                                                                                &                                                                                      "                  (                                                      
+                                                                                                            &'(                                        %                     %                                                                                                               *                     *''
+                                                                                                                                                &                                                                                                                                                                             
+                                                                                                                                                          %                     %                                                                                                               *                     *''
+                                                                                  &                                                           "                                                                                          *                                    
+                                                                                                                                                          %                     %                                                                                                               *
+                                                                                                                                                                                                                                                                                  !                                            !
+                                                                                                                         ($ '+$                          %                    %                                                                                                              *                     *''
+                                                                                  &                                                                                                                                                                                                                                          
+                                                                                                                         (&'(                             %                    %                                                               &                                             *                     *''
+                                                                                                                                                                                      
+                                                                                                                                                          %                    %
+                                                                                                                                                                                                                                                                                    &                                           "
+                                                                                                                                                         %                    %                                                                                                              *                 *''                                                     
+                                                                                                                                                                                                                                                                                    %                                           #
+                                                                                                                                                          %                    %                                                 *&                                                        *&                *&
+                                                                                                                                                                                      
+                                                                                                                                                          %              %+ )%
+                                                                                                                                                                                                                                                                                                                               !
+                                                                                                                                                          %                    %                                                                                                             *(                 *%
+                                                                                                                                                %                                                                                                                                     !                                          
+                                                                                                                                                          %                    %                                             >                                                                 -%''&           *%
+                                                                                                                                                &                                      
+                                                                                                                                                          %              % + )%                              *                                                                &
+                                                                                                                                                !                                                                                                                                             '(" 
+                                                                                                                                                          %                    %
+                                                                                                                                                                                                                                                                                                                                                            
+                                                                                                                                                          %                   % 
+                                                                                                                                                &                                                                                                                                                                                                D             D
+                                                                                                                                                          %                   % 
+                                                                                                                                                &                                                                                 (                       %
+                                                                                                                                                          %                   % 
+                                                                                                                                                                                                                                     &         9?<67A
+                                                                                                                             % $' 2#      
+
+
+
+
+DocID027559 Rev 5
+                                                                                                                                                          % 
+                                                                                                                              % $' 2$)(                                                                                                                                                                                             7A3=:5 53@35:C?A !?F '&
+                                                                                                                                                          %                   %
+                                                                                                                                                                                        
+                                                                                                                                                                                %
+                                                                                             ,                                    % $'2#                                            
+                                                                                                                                                          %                    %
+                                                                                                                                  % $'2$)(                                          
+                                                                                                                                                          %                    %   
+                                                                      #,    '  .,'         ")                                                                            
+                                                                                                                                                                                %   
+                                                                                                                                      &'(                                          
+                                                                                                                                                          #&'(                  %   
+                                                                                                                                       $$(                                           
+                                                                                                                                                          $$(                  %   
+                                                                                                                                                                                        
+                                                                                                                                                                               %                                                                                                                                                                                              
+                                                                                                                             &                  
+                                                                                                                                                          %&2$#
+                                                                                                                                                                                               *2")                                                                                                              *&                          *
+                                                                                                                                                      '(" 
+                                                                                          ,
+                                                                                                                                                                                                                                                                                                                                                                
+                                                                            "HF:C9 B?5;7C                                '+                     &                                                                                                                                           
+                                                                                                                                                                        *                                                                                                                                               D                   >         D              >
+                                                                                                                                                                                                        >      >         >           >             >             >             >             >        >
+
+
+
+
+                        ?A    E3<D7B A787A C? # 
+                                                                                                                                              &7B:BC?A >?C 8:CC76
+                                                                        
+
+
+
+
+                                                                                                                         
+                                                                      (   /&'(1
+                                                                                                                                                                                              *2")                                                                                                                   *2")                 *)'
+                                                                                                                      *
+                                                                                                                                                                                                                                                                                                                                                                                    Figure 24. STM32F756NGH6 reference schematic
+
+
+
+
+                                                                                                
+                                                                                                                                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                  D                   D           >
+                                                                                                                                                                                                   >        >         >        >           >              >            >                >          >      >
+
+
+                                                                                            >
+                                                                                                                                                                                                                                                                (:C<7
+                                                                                                                                                                                                                                                                              '(" # A787A7>57 B597=3C:5                                                              
+
+                                                                                                                                                                                                                                                                ':H7             #D=47A                                                              &7E:B:?>
+                                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                3C7                                                         '977C    ?8
+                                                                                                                                                                                                                                                                :<7          0'(" 0 0'977C '59?5                        A3F> G
+                                                                                                                                                                                                                                                                                                                                       
+                                                                                                                                                                                                                                                                                                                                                                                                                                   AN4661
+AN4661                                                                                           Reference design
+
+
+                           Table 8. Reference connection for all packages
+
+
+
+
+                                                       WLCSP143
+
+
+
+
+                                                                            UFBGA176
+
+
+
+
+                                                                                                              TFBGA216
+                                             LQFP100
+
+
+
+
+                                                                  LQFP144
+
+
+
+
+                                                                                       LQFP176
+
+
+
+                                                                                                    LQFP208
+                 Pin Name
+
+
+
+
+            PA13 (JTMS-SWDIO)                72        D3         105       A15        124          147       A15
+            PA14 (JTCK-SWCLK)                76        B1         109       A14        137          159       A14
+                PA15 (JTDI)                  77        C2         110       A13        138          160       A13
+           PB3 (JTDO/TRACESWO)               89        B7         133       A10        161          192       A10
+               PB4 (NJTRST)                  90        C7         134       A9         162          193       A9
+         PC14 (PC14-OSC32_IN)(1)(2)            8       D11          8       E1           9            9       E1
+                                    (1)(2)
+         PC15 (PC15-OSC32_OUT)                 9       E11          9       F1         10            10       F1
+                              (2)
+            PH0 (PH0-OSC_IN)                 12        J11        23        G1         29            32       G1
+           PH1 (PH1-OSC_OUT)(2)              13        H10        24        H1         30            33       H1
+                   BOOT                      94        C9         138       D6         166          197       E6
+                   NRST                      14        H9         25        J1         31            34       J1
+               BYPASS_REG                      -       N11          -       L4         48             -       L5
+                 PDR_ON                        -       A11        143       C6         171          203       E5
+                   VBAT                        6       C11          6       C1           6            6       C1
+                   VDDA                      21        L10        33        R1         39            42       R1
+                   VREF+                     20        L11        32        P1         38            41       P1
+                   VSSA                      19        K10        31        M1         37            40       M1
+                   VREF-                       -          -         -       N1           -            -       N1
+                   VCAP1                     48        N2         71        M10        81            92       L11
+                   VCAP2                     73        D1         106       F13        125          148       E11
+                    VDD                      50        J6         72        N10        82            94       L10
+                    VDD                      75        C1         108       G13        127          150       F11
+                    VDD                      100       D7         144       C5         172          204       E7
+                  VDDUSB                       -       G1         95        H13        114          137       G11
+                    VDD                      27        J8         39        K4         49            52       K5
+                    VDD                      11           -       17        G3         23            26       H5
+                    VDD                        -          -       52        N8         62            73       L8
+                    VDD                        -       J5         62        N9         72            83       L9
+                    VDD                        -       L1         84        J13        103          115       J11
+                    VDD                        -       C5         121       C8         149          171       E9
+                    VDD                        -       E6         131       C7         159          185       E8
+
+
+
+
+                                         DocID027559 Rev 5                                                     39/54
+                                                                                                                         53
+Reference design                                                                                       AN4661
+
+
+                      Table 8. Reference connection for all packages (continued)
+
+
+
+
+                                                   WLCSP143
+
+
+
+
+                                                                        UFBGA176
+
+
+
+
+                                                                                                        TFBGA216
+                                         LQFP100
+
+
+
+
+                                                              LQFP144
+
+
+
+
+                                                                                   LQFP176
+
+
+
+                                                                                             LQFP208
+                    Pin Name
+
+
+
+
+                      VDD                  -       G7         30        G3         36        39          J5
+                      VDD                  -       E10          -       F3         15        15         F4
+                      VDD                  -          -         -       J12        91        103        K11
+                      VDD                  -       A1           -       C9         136       158        E10
+                      VDD                  -          -         -          -         -         -        F5
+                      VDD                  -          -         -          -         -         -        G5
+                      VDD                  -       J7           -          -         -       59          L7
+                      VDD                  -          -         -          -         -       124        H11
+                      VSS                49        H2           -          -         -       93         K9
+                   PA0-WKUP(3)           22        K9         34        N3         40        43         N3
+                     PC13(1)               7       D10          7       D1           8         8        D1
+                      PI8(1)               -          -         -       D2           7         7        C2
+                      VSS                74        D2         107       F12        126       149        F10
+                      VSS                99           -         -       D5           -       202        F6
+                      VSS                26           -       38           -         -       51         K6
+                      VSS                10        H7         16        G2         22        25         H6
+                      VSS                  -          -       51        M8         61        72         K7
+                      VSS                  -       H3         61        M9         71        82         K8
+                      VSS                  -          -       83           -       102       114        J10
+                      VSS                  -       D2         94        G12        113       136        G10
+                      VSS                  -          -       120       D8         148       170        F8
+                      VSS                  -          -       130       D7         158       184        F7
+                      VSS                  -          -         -          -         -         -         J6
+                      VSS                  -          -         -          -         -         -        F2
+                      VSS                  -          -         -       H12        90          -        K10
+                      VSS                  -       F5           -       D9         135         -        F9
+                      VSS                  -          -         -          -         -         -        G6
+                      VSS                  -          -         -          -         -         -        F2
+                      VSS                  -          -         -
+                      VSS                  -          -         -          -         -       125        H10
+
+
+
+
+40/54                               DocID027559 Rev 5
+AN4661                                                                                          Reference design
+
+
+         1. PC13, PC14, PC15 and PI8 are supplied through the power switch. Since the switch only sinks a limited
+            amount of current (3 mA), the use of GPIOs PC13 to PC15 and PI8 in output mode is limited:
+         - The speed should not exceed 2 MHz with a maximum load of 30 pF.
+         - These I/Os must not be used as a current source (e.g. to drive an LED).
+         2. 5 V tolerant except when in analog mode or oscillator mode for PC14, PC15, PH0 and PH1.
+         3. If the device is delivered in an WLCSP143, UFBGA176, LQFP176 or TFBGA216 package, and the
+            BYPASS_REG pin is set to VDD (Regulator OFF/internal reset ON mode), then PA0-WKUP is used as an
+            internal reset (active low).
+
+
+
+
+                                              DocID027559 Rev 5                                                     41/54
+                                                                                                                            53
+Recommended PCB routing guidelines for STM32F7 Series devices                                AN4661
+
+
+8         Recommended PCB routing guidelines for
+          STM32F7 Series devices
+
+8.1       PCB stack-up
+          In order to reduce the reflections on high speed signals, it is necessary to match the
+          impedance between the source, sink and transmission lines. The impedance of a signal
+          trace depends on its geometry and its position with respect to any reference planes.
+          The trace width and spacing between differential pairs for a specific impedance requirement
+          is dependent on the chosen PCB stack-up. As there are limitations in the minimum trace
+          width and spacing which depend on the type of PCB technology and cost requirements, a
+          PCB stack-up needs to be chosen which allows all the required impedances to be realized.
+          The minimum configuration that can be used is 4 or 6 layers stack-up. An 8 layers boards
+          may be required for a very dense PCBs that have multiple SDRAM/SRAM/NOR/LCD
+          components.
+          The following stack-ups are intended as examples which can be used as a starting point for
+          helping in a stack-up evaluation and selection. These stack-up configurations are using a
+          GND plane adjacent to the power plane to increase the capacitance and reduce the gap
+          between GND and power plane. So high speed signals on top layer will have a solid GND
+          reference plane which helps to reduce the EMC emissions, as going up in number of layers
+          and having a GND reference for each PCB signal layer will improve further the radiated
+          EMC performance.
+
+                                  Figure 25. Four layer PCB stack-up example
+
+                                                         6ROGHU0DVN
+                         /D\HUB 7RS               +LJK6SHHG6LJQDOV*1'
+                                                           3UHSHJ
+                         /D\HUB ,QQHU                  *1'3ODQH
+
+                                                            &RUH
+
+                         /D\HUB ,QQHU                 3RZHU3ODQH
+                                                           3UHSHJ
+                         /D\HUB %RWWRP            +LJK6SHHG6LJQDOV*1'
+                                                         6ROGHU0DVN
+
+
+                                                                                            06Y9
+
+
+
+
+42/54                                      DocID027559 Rev 5
+AN4661                       Recommended PCB routing guidelines for STM32F7 Series devices
+
+
+                                   Figure 26. Six layer PCB stack-up example
+
+
+                                                         6ROGHU0DVN
+                        /D\HUB 7RS                +LJK6SHHG6LJQDOV*1'
+                                                           3UHSHJ
+                        /D\HUB ,QQHU                   *1'3ODQH
+
+                                                            &RUH
+
+                        /D\HUB ,QQHU                  3RZHU3ODQH
+                                                           3UHSHJ
+                        /D\HUB ,QQHU               /RZ6SHHG6LJQDOV
+
+                                                            &RUH
+
+                                                          *1'3ODQH
+                        /D\HUB ,QQHU
+                                                           3UHSHJ
+                        /D\HUB %RWWRP             +LJK6SHHG6LJQDOV*1'
+                                                         6ROGHU0DVN
+
+
+                                                                                             06Y9
+
+
+
+
+8.2      Crystal oscillator
+         Use the application note: Oscillator design guide for STM8S, STM8A and STM32
+         microcontrollers (AN2867), for further guidance on how to layout and route crystal oscillator
+         circuits.
+
+
+8.3      Power supply decoupling
+         An adequate power decoupling for STM32F7 Series is necessary to prevent an excessive
+         power noise and ground bounce noise. Please refer to Section 1.2: Power supply scheme.
+         Figure 27 shows an example of placing bypass capacitors underneath STM32F7 Series
+         closer to pins and with less vias:
+
+
+
+
+                                          DocID027559 Rev 5                                      43/54
+                                                                                                          53
+Recommended PCB routing guidelines for STM32F7 Series devices                              AN4661
+
+
+                Figure 27. Example of bypass cap placed underneath the STM32F7 Series
+
+
+                                            sŝĂ            ǇƉĂƐƐ      'ďĂůů
+                                                            ĂƉ
+
+
+
+
+                                                                                          06Y9
+
+          •   Place the bypass capacitors as close as possible to the power and ground pins of the
+              MCU.
+          •   Add the recommended bypass capacitors for as many VDD/GND pairs as possible.
+          •   Connect the bypass capacitor pad to the power and ground plane with a wider, short
+              trace/via to reduce the serie inductance, allow a maximum current flow and reduce the
+              transient voltage drops from the power plane. Which also reduces the possibility of
+              ground bounce.
+
+
+8.4       High speed signal layout
+
+8.4.1     SDMMC bus interface
+          Interface connectivity
+          The SD/SDIO MMC card host interface (SDMMC) provides an interface between the APB2
+          peripheral bus and Multi Media Cards (MMCs), SD memory cards and SDIO cards. The
+          SDMMC interface is a serial data bus interface, that consists of a clock (CK), command
+          signal (CMD) and 8 data lines (D[0:7]).
+
+
+
+
+44/54                                  DocID027559 Rev 5
+AN4661                      Recommended PCB routing guidelines for STM32F7 Series devices
+
+
+         Interface signal layout guidelines:
+         •   Reference the plane using GND or PWR (if PWR, add 10nf switching cap between
+             PWR and GND)
+         •   Trace the impedance: 50Ω ± 10%
+         •   The skew being introduced into the clock system by unequal trace lengths and loads,
+             minimize the board skew, keep the trace lengths equal between the data and clock.
+         •   The maximum skew between data and clock should be below 250 ps @ 10mm
+         •   The maximum trace length should be below 120mm. If the signal trace exceeds this
+             trace-length/speed criterion, then a termination should be used
+         •   The trace capacitance should not exceed 20 pF at 3.3V and 15pF at 1.8V
+         •   The maximum signal trace inductance should be less than 16nH
+         •   Use the recommended pull-up resistance for CMD and data signals to prevent bus
+             floating.
+         •   The mismatch within data bus, data and CK or CK and CMD should be below 10mm.
+         •   Keep the same number of vias between the data signals
+Note:    The total capacitance of the SD memory card bus is the sum of the bus master capacitance
+         CHOST, the bus capacitance CBUS itself and the capacitance CCARD of each card connected
+         to this line. The total bus capacitance is CL= CHost + CBus + N*CCard where Host is
+         STM32F7 Series, bus is all the signals and Card is SD card.
+
+8.4.2    Flexible memory controller (FMC) interface
+         Interface connectivity
+         The FMC controller and in particular SDRAM memory controller which has many signals,
+         most of them have a similar functionality and work together. The controller I/O signals could
+         be splitted in four groups as follow:
+         •   An address group which consists of row/column address and bank address
+         •   A command group which includes the row address strobe (NRAS), the column address
+             strobe (NCAS), and the write enable (SDWE)
+         •   A control group which includes a chip select bank1 and bank2 (SDNE0/1), a clock
+             enable bank1 and bank2 (SDCKE0/1), and an output byte mask for the write access
+             (DQM).
+         •   A data group/lane which contains 8 signals (a): the eight D (D7–D0) and the data mask
+             (DQM).
+
+
+
+
+         a.It depends of the used memory: SDRAM with x8 bus widths have only one data group,
+         while x16 and x32 bus-width SDRAM have two and four lanes, respectively.
+
+
+
+                                       DocID027559 Rev 5                                         45/54
+                                                                                                         53
+Recommended PCB routing guidelines for STM32F7 Series devices                                  AN4661
+
+
+          Interface signal layout guidelines:
+          •   Reference the plane using GND or PWR (if PWR, add 10nf stitching cap between PWR
+              and GND
+          •   Trace the impedance: 50Ω ± 10%
+          •   The maximum trace length should be below 120mm. If the signal trace exceeds this
+              trace-length/speed criterion, then a termination should be used
+          •   Reduce the crosstalk, place data tracks on the different layers from the address and
+              control lanes, if possible. However, when the data and address/control tracks coexist
+              on the same layer they must be isolated from each other by at least 5 mm.
+          •   Match the trace lengths for the data group within ± 10 mm of each other to diminish the
+              skew. Serpentine traces (back and forth traces in an “S” pattern to increase trace
+              length) can be used to match the lengths.
+          •   Placing the clock (SDCLK) signal on an internal layer, minimizes the noise (EMI).
+              Route the clock signal at least 3x of the trace away from others signals. Use as less
+              vias as possible to avoid impedance change and reflection. Avoid using serpentine
+              routing.
+          •   Match the clock traces to the data/address group traces within ±10mm.
+          •   Match the clock traces to each signal trace in the address and command groups to
+              within ±10mm (with maximum of <= 20mm).
+          •   Trace the capacitances:
+              –    At 3.3 V keep the trace within 20 pF with overall capacitive loading (including Data,
+                   Address, SDCLK and Control) no more than 30pF.
+              –    At 1.8 V keep the trace within 15 pF with overall capacitive loading (including Data,
+                   Address, SDCLK and Control) no more than 20pF.
+
+8.4.3     Quadrature serial parallel interface (Quad-SPI)
+          Interface connectivity
+          The Quad-SPI is a specialized communication interface targeting single, dual or Quad-SPI
+          FLASH memories. The Quad-SPI interface is a serial data bus interface, that consists of a
+          clock (SCLK), a chip select signal (nCS) and 4 data lines (IO[0:3]).
+
+          Interface signal layout guidelines
+          •   Reference the plane using GND or PWR (if PWR, add 10nf stitching cap between PWR
+              and GND
+          •   Trace the impedance: 50Ω ± 10%
+          •   The maximum trace length should be below 120mm. If the signal trace exceeds this
+              trace-length/speed criterion, then a termination should be used
+          •   Avoid using multiple signal layers for the data signal routing.
+          •   Route the clock signal at least 3x of the trace away from other signals. Use as less vias
+              as possible to avoid the impedance change and reflection. Avoid using a serpentine
+              routing.
+          •   Match the trace lengths for the data group within ± 10 mm of each other to diminish
+              skew. Serpentine traces (back and forth traces in an “S” pattern to increase trace
+              length) can be used to match the lengths.
+
+
+
+
+46/54                                   DocID027559 Rev 5
+AN4661                        Recommended PCB routing guidelines for STM32F7 Series devices
+
+
+         •    Avoid using a serpentine routing for the clock signal and as less via(s) as possible for
+              the whole path. a via alters the impedance and adds a reflection to the signal.
+
+8.4.4    Embedded trace macrocell (ETM)
+         Interface connectivity
+         The ETM enables the reconstruction of the program execution. The data are traced using
+         the data watchpoint and trace (DWT) component or the instruction trace macrocell (ITM)
+         whereas instructions are traced using the embedded trace macrocell (ETM). The ETM
+         interface is synchronous with the data bus of 4 lines D[0:3] and the clock signal CLK.
+
+         Interface signals layout guidelines
+         •    Reference the plane using GND or PWR (if PWR, add 10nf stitching cap between PWR
+              and GND
+         •    Trace the impedance: 50Ω ± 10%
+         •    All the data trace should be as short as possible (<=25 mm),
+         •    Trace the lines which should run on the same layer with a solid ground plane
+              underneath it without a via.
+         •    Trace the clock which should have only point-to-point connection. Any stubs should be
+              avoided.
+         •    It is strongly recommended also for other (data) lines to be point-to-point only. If any
+              stubs are needed, they should be as short as possible. If longer are required, there
+              should be a possibility to optionally disconnect them (e.g. by jumpers).
+
+
+8.5      Package layout recommendation
+
+8.5.1    BGA 216 0.8 mm pitch design example
+
+                             Table 9. BGA 216 0.8 mm pitch package information
+             Package information (mm)                         Design parameters (mm)
+
+                   Ball pitch : 0.8        Via size : hole size ∅= 0.2, pad size: 0.45, plane clearance: 0.65
+                   Ball size : 0.4                             Trace width : 0.10/0.125
+          Number of rows/columns : 15x15                    Trace/trace space : 0.10/0.125
+             Package solder Pad: SMD              BGA land size (Ball pad): ∅= 0.4, solder mask: 0.5
+
+
+         With 0.8 mm pitch BGA balls, fan-out vias are needed to route the balls to other layers on
+         the PCB. Through-vias are used in this example, which cost less than blind, buried vias. For
+         four adjacent BGA land pads, it is possible to have only one via as showing in Figure 28 and
+         Figure 29. The traces are routed of two first row and two first colon without fan-out via. The
+         current pitch size allows to route only one trace between two adjacent BGA land pads.
+         Figure 30 shows an example of ideal SDRAM signals fan-out vias with power and gnd
+         signals. These signals can be optimized to achieve the routing and length matching in an
+         another layer before connecting to an SDRAM IC.
+
+
+
+                                        DocID027559 Rev 5                                               47/54
+                                                                                                                53
+Recommended PCB routing guidelines for STM32F7 Series devices                                                                AN4661
+
+
+                           Figure 28. BGA 0.8mm pitch example of fan-out
+
+                                                                                                     
+
+
+
+                                            $
+
+
+                                            %
+
+
+                                            &
+
+
+                                            '
+
+
+                                            (
+
+
+
+                                                                                                                            06Y9
+
+
+
+                                                    Figure 29. Via fan-out
+                                                                         PP
+
+                                    7UDFH
+                                                                        PP                       3DG
+
+                                                                        3DGWRYLD
+                                                                         VSDFH
+
+
+                                                PP                                   9LD'ULOO             PP
+
+
+                                                                          9LD
+
+                                                            PP
+
+
+
+
+                                                                    6XUIDFH/DQG3DG
+
+                                                                                                                            06Y9
+
+
+
+                               Figure 30. FMC signal fan-out routing example
+                                                                                    
+
+
+
+                           $
+                                                                                                                      *1'
+                           %
+
+                           &
+                                                                                                                      3:5
+                           '                                                                                          )0&
+                           (
+                           )
+                           *
+
+                           +
+
+                           -
+                           .
+
+                           /
+
+                           0
+
+                           1
+                           3
+
+                           5
+
+
+
+                                                                                                                            06Y9
+
+
+
+
+48/54                                       DocID027559 Rev 5
+AN4661                      Recommended PCB routing guidelines for STM32F7 Series devices
+
+
+8.5.2    WLCSP143 0.4 mm pitch design example
+
+                          Table 10. Wafer level chip scale package information
+                Package information (mm)                        Design parameters (mm)
+
+                      Bump pitch : 0.4                 Microvia size : hole size ∅= 0.1, via land: 0.2
+                     Bump size : 0.25                   Trace width/space : 0.07/0.05 or 0.07/0.07
+              Number of rows/columns : 13x11         Bump pad size ∅= 0.26 max – 0.22 recommended
+           Non-solder mask defined via underbump      Solder mask opening bump ∅=0.3 min (for 0.26
+                          allowed                                    diameter pad)
+
+
+         A better way to route this package and the fan-out signals is to use a through microvia
+         technology. Microvia will route out internal bumps to a buried layers inside the PCB. To
+         achieve this, the WLCSP package pads have to be connected to this internal layer through
+         microvia. In case of four layers PCB, the first layer is WLCSP component, the second layer
+         will be used as a signal layer, the third layer as the power and ground and the bottom layer
+         for a signal layout. Figure 31 shows an example of the layout for four layers PCB.
+
+
+
+
+                                         DocID027559 Rev 5                                               49/54
+                                                                                                                 53
+Recommended PCB routing guidelines for STM32F7 Series devices                               AN4661
+
+
+                               Figure 31. 143-bumps WLCSP, 0.40 mm pitch routing example
+                  /D\HU 7RS
+                                   
+
+                                                                       /D\HU
+                                                     *1'
+ $                                                                                            *1'
+ %                                                    3:5
+                                                     6LJQDOV                                   3:5
+ &
+ '                                                   0LFURYLD                                6LJQDOV
+ (
+ )
+ *
+ +
+ -
+ .
+
+ /
+
+ 0
+
+ 1
+
+
+
+
+                      /D\HU 3:5*1'                                      /D\HU
+
+                                                     *1'                                     6LJQDOV
+                                                      3:5
+                                                    6LJQDOV
+
+
+
+
+                                                                                           06Y9
+
+
+
+
+50/54                                              DocID027559 Rev 5
+AN4661                                                                                  Conclusion
+
+
+9        Conclusion
+
+         This application note should be used as a starting reference for a new design with the
+         STM32F7 Series devices.
+
+
+
+
+                                       DocID027559 Rev 5                                          51/54
+                                                                                                          53
+Revision history                                                                                  AN4661
+
+
+10         Revision history
+
+                                      Table 11. Document revision history
+                   Date    Revision                                 Changes
+
+             24-Mar-2015      1         Initial release.
+                                        Added Section 8: Recommended PCB routing guidelines for
+                                        STM32F7 Series devices.
+                                        Updated title and the whole document changing
+                                        STM32F746xx/STM32F756xx by STM32F74xxx/STM32F75xxx.
+                                        Updated Applicable products table adding STM32F745xx RPNs.
+                                        Updated Section 1.1.2: Independent USB transceivers supply similar
+                                        to the corresponding datasheet.
+                                        Updated Section 1.3.6: Regulator OFF mode.
+                                        Updated Figure 14: BYPASS_REG supervisor reset connection and
+                                        the whole document changing BOOT0 by BOOT.
+             08-Jun-2015      2         Updated Section 1.1.1: Independent A/D converter supply and
+                                        reference voltage.
+                                        Updated Section 1.1.3: Independent SDMMC2 supply for
+                                        STM32F767xx/STM32F777xx and STM32F72xxx/STM32F73xxx
+                                        devices.
+                                        Updated Section 1.2: Power supply scheme adding a note.
+                                        Updated Section 1.3.5: Internal reset OFF adding a paragraph,
+                                        modifying Figure 12: Power supply supervisor interconnection with
+                                        internal reset OFF and adding Figure 13: NRST circuitry timing
+                                        example.
+                                        Updated Section 7.1: Description changing the frequency at 216
+                                        MHz.
+                                        Updated whole document with STM32F7 Series Root Part Number.
+                                        Updated cover page adding reference documents.
+                                        Added Section 1.1.3: Independent SDMMC2 supply for
+                                        STM32F767xx/STM32F777xx and STM32F72xxx/STM32F73xxx
+                                        devices.
+             13-Apr-2016      3         Added Section 1.1.4: Independent DSI supply for
+                                        STM32F769xx/STM32F779xx devices.
+                                        Updated Figure 20: Boot mode selection implementation example.
+                                        Added Figure 5: STM32F769xx/STM32F779xx power supply
+                                        scheme and Figure 6: STM32F767xx/STM32F777xx power supply
+                                        scheme.
+
+
+
+
+52/54                                    DocID027559 Rev 5
+AN4661                                                                         Revision history
+
+
+                         Table 11. Document revision history (continued)
+            Date       Revision                              Changes
+
+                                  Updated Table 1: Regulator ON/OFF and internal reset ON/OFF
+                                  availability adding the WLCSP180 package and notes.
+                                  Added Figure 3: VDDSDMMC connected to external power supply.
+         09-May-2016      4       Updated Section 1.1.4: Independent DSI supply for
+                                  STM32F769xx/STM32F779xx devices: VSSDSI pin must be
+                                  grounded.
+                                  Added Section 6.7: Recommendations for the WLCSP180 package
+                                  in the STM32F769Ax/STM32F768Ax devices.
+                                  Updated Section 1.1.2: Independent USB transceivers supply.
+                                  Updated Section 1.2: Power supply scheme.
+                                  Added Figure 7: STM32F7x2xx power supply scheme.
+         03-Feb-2017      5       Added Figure 8: STM32F7x3xx power supply scheme.
+                                  Updated Table 1: Regulator ON/OFF and internal reset ON/OFF
+                                  availability adding the LQFP64 and WLCSP100 packages and notes.
+                                  Updated Table 3: STM32F7 Series bootloader communication
+                                  peripherals adding peripherals.
+
+
+
+
+                                   DocID027559 Rev 5                                        53/54
+                                                                                                    53
+                                                                                                                                  AN4661
+
+
+
+
+                                           IMPORTANT NOTICE – PLEASE READ CAREFULLY
+
+
+STMicroelectronics NV and its subsidiaries (“ST”) reserve the right to make changes, corrections, enhancements, modifications, and
+improvements to ST products and/or to this document at any time without notice. Purchasers should obtain the latest relevant information on
+ST products before placing orders. ST products are sold pursuant to ST’s terms and conditions of sale in place at the time of order
+acknowledgement.
+
+
+Purchasers are solely responsible for the choice, selection, and use of ST products and ST assumes no liability for application assistance or
+the design of Purchasers’ products.
+
+
+No license, express or implied, to any intellectual property right is granted by ST herein.
+
+
+Resale of ST products with provisions different from the information set forth herein shall void any warranty granted by ST for such product.
+
+
+ST and the ST logo are trademarks of ST. All other product or service names are the property of their respective owners.
+
+
+Information in this document supersedes and replaces information previously supplied in any prior versions of this document.
+
+
+                                               © 2017 STMicroelectronics – All rights reserved
+
+
+
+
+54/54                                                      DocID027559 Rev 5
+
