@@ -33,7 +33,7 @@
 					(justify left top)
 				)
 			)
-			(property "Footprint" "1812L190SLPR"
+			(property "Footprint" "1812L300_24SLER:1812L190SLPR"
 				(at 13.97 -96.19 0)
 				(effects
 					(font
@@ -7107,6 +7107,320 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "SW-TH_SK-12D02VG3:SK-12D02"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "SW"
+				(at 0 8.89 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "SK-12D02"
+				(at 0 -7.62 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "SW-TH_SK-12D02VG3:SW-TH_SK-12D02VG3"
+				(at 0 -10.16 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://lcsc.com/product-detail/Toggle-Switches_SK-12D02-X-3mm_C131374.html"
+				(at 0 -12.7 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "LCSC Part" "C131374"
+				(at 0 -15.24 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "SK-12D02_0_1"
+				(rectangle
+					(start -7.62 0)
+					(end 8.89 -6.35)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(polyline
+					(pts
+						(xy -3.81 -1.27) (xy -3.81 -3.05) (xy -4.06 -1.78)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -3.81 -1.27) (xy 1.27 -1.27) (xy 1.27 -3.05) (xy 1.02 -1.78)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center -3.81 -3.81)
+					(radius 0.76)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 1.27 -3.81)
+					(radius 0.76)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.52 -0.51) (xy 1.27 -0.51) (xy 1.27 -1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 2.54 -0.51) (xy 1.78 -0.51)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 3.81 -0.51) (xy 3.05 -0.51)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 5.08 -0.51) (xy 4.32 -0.51)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 6.35 -1.27) (xy 6.35 -1.78)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 6.35 -1.27) (xy 6.35 -0.51) (xy 5.59 -0.51)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 6.35 -2.03) (xy 6.35 -2.54)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 6.35 -2.79) (xy 6.35 -3.05) (xy 6.1 -1.78)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 6.35 -3.81)
+					(radius 0.76)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin unspecified line
+					(at -12.7 -2.54 0)
+					(length 5.08)
+					(name "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at -3.81 3.81 270)
+					(length 5.08)
+					(name "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at 1.27 3.81 270)
+					(length 5.08)
+					(name "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at 6.35 3.81 270)
+					(length 5.08)
+					(name "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin unspecified line
+					(at 13.97 -2.54 180)
+					(length 5.08)
+					(name "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "SamacSys_Parts:EC11E15244B2"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -7129,7 +7443,7 @@
 					(justify left top)
 				)
 			)
-			(property "Footprint" "EC11E15244B2"
+			(property "Footprint" "EC11E15244B2:EC11E15244B2"
 				(at 21.59 -87.3 0)
 				(effects
 					(font
@@ -7875,320 +8189,6 @@
 						)
 					)
 					(number "6"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "easyeda2kicad:SK-12D02"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "SW"
-				(at 0 8.89 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "SK-12D02"
-				(at 0 -7.62 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "easyeda2kicad:SW-TH_SK-12D02VG3"
-				(at 0 -10.16 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "https://lcsc.com/product-detail/Toggle-Switches_SK-12D02-X-3mm_C131374.html"
-				(at 0 -12.7 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "LCSC Part" "C131374"
-				(at 0 -15.24 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "SK-12D02_0_1"
-				(rectangle
-					(start -7.62 0)
-					(end 8.89 -6.35)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.81 -1.27) (xy -3.81 -3.05) (xy -4.06 -1.78)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -3.81 -1.27) (xy 1.27 -1.27) (xy 1.27 -3.05) (xy 1.02 -1.78)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(circle
-					(center -3.81 -3.81)
-					(radius 0.76)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(circle
-					(center 1.27 -3.81)
-					(radius 0.76)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.52 -0.51) (xy 1.27 -0.51) (xy 1.27 -1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 -0.51) (xy 1.78 -0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 3.81 -0.51) (xy 3.05 -0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 5.08 -0.51) (xy 4.32 -0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 6.35 -1.27) (xy 6.35 -1.78)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 6.35 -1.27) (xy 6.35 -0.51) (xy 5.59 -0.51)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 6.35 -2.03) (xy 6.35 -2.54)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 6.35 -2.79) (xy 6.35 -3.05) (xy 6.1 -1.78)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(circle
-					(center 6.35 -3.81)
-					(radius 0.76)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin unspecified line
-					(at -12.7 -2.54 0)
-					(length 5.08)
-					(name "4"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "4"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at -3.81 3.81 270)
-					(length 5.08)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 1.27 3.81 270)
-					(length 5.08)
-					(name "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 6.35 3.81 270)
-					(length 5.08)
-					(name "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin unspecified line
-					(at 13.97 -2.54 180)
-					(length 5.08)
-					(name "5"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "5"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -11651,28 +11651,6 @@
 			)
 		)
 	)
-	(global_label "USB_FS_D+"
-		(shape input)
-		(at 243.84 182.88 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "1f81213f-9dc3-4ac7-a138-4ca079fc4043")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 229.9691 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "M2_OUT"
 		(shape input)
 		(at 242.57 82.55 0)
@@ -11739,28 +11717,6 @@
 			)
 		)
 	)
-	(global_label "USB_FS_D-"
-		(shape input)
-		(at 243.84 185.42 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "2e4bda7d-1607-4e48-81dd-dbe04a0d71a0")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 229.9691 185.42 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "ENCODER_WAVE_1"
 		(shape input)
 		(at 283.21 147.32 180)
@@ -11774,6 +11730,28 @@
 		(uuid "3cbb037c-8669-4762-8b43-99bdf49a1a64")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 263.5335 147.32 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "USB_HS_D+"
+		(shape input)
+		(at 243.84 182.88 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "3e27cf8c-60c5-4567-8369-f9dbf8710d07")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 229.7272 182.88 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11801,6 +11779,28 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "USB_FS_D+"
+		(shape input)
+		(at 243.84 187.96 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "53a8b314-821d-4f4f-9236-7db5c546fffb")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 229.9691 187.96 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 				(hide yes)
 			)
 		)
@@ -11845,6 +11845,28 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "USB_FS_D-"
+		(shape input)
+		(at 243.84 190.5 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "7da7dc97-b04a-4d6e-b75d-cfffd8d655de")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 229.9691 190.5 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 				(hide yes)
 			)
 		)
@@ -11939,7 +11961,7 @@
 	)
 	(global_label "USB_HS_D-"
 		(shape input)
-		(at 243.84 190.5 180)
+		(at 243.84 185.42 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -11947,9 +11969,9 @@
 			)
 			(justify right)
 		)
-		(uuid "892f8567-6ddb-4766-bdfc-83a7fcfadf0f")
+		(uuid "981236c3-9f4e-49c1-99a3-80a5e1a116f1")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 229.7272 190.5 0)
+			(at 229.7272 185.42 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12175,28 +12197,6 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "USB_HS_D+"
-		(shape input)
-		(at 243.84 187.96 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "e50cb917-e432-4e35-a818-eb75ce5f84eb")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 229.7272 187.96 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
 				(hide yes)
 			)
 		)
@@ -12467,7 +12467,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "R?")
+					(reference "R5")
 					(unit 1)
 				)
 			)
@@ -12669,14 +12669,14 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C1")
 					(unit 1)
 				)
 			)
 		)
 	)
 	(symbol
-		(lib_id "easyeda2kicad:SK-12D02")
+		(lib_id "SW-TH_SK-12D02VG3:SK-12D02")
 		(at 77.47 74.93 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -12703,7 +12703,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "easyeda2kicad:SW-TH_SK-12D02VG3"
+		(property "Footprint" "SW-TH_SK-12D02VG3:SW-TH_SK-12D02VG3"
 			(at 67.31 74.93 0)
 			(effects
 				(font
@@ -12763,7 +12763,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "SW?")
+					(reference "SW1")
 					(unit 1)
 				)
 			)
@@ -12992,7 +12992,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "R?")
+					(reference "R8")
 					(unit 1)
 				)
 			)
@@ -13194,7 +13194,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C15")
 					(unit 1)
 				)
 			)
@@ -13266,7 +13266,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR034")
 					(unit 1)
 				)
 			)
@@ -13357,7 +13357,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "U?")
+					(reference "U4")
 					(unit 1)
 				)
 			)
@@ -13521,7 +13521,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "IC?")
+					(reference "IC1")
 					(unit 1)
 				)
 			)
@@ -13593,7 +13593,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR017")
 					(unit 1)
 				)
 			)
@@ -13795,7 +13795,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C11")
 					(unit 1)
 				)
 			)
@@ -13997,7 +13997,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C18")
 					(unit 1)
 				)
 			)
@@ -14069,7 +14069,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR031")
 					(unit 1)
 				)
 			)
@@ -14101,7 +14101,7 @@
 				)
 			)
 		)
-		(property "Footprint" "1812L190SLPR"
+		(property "Footprint" "1812L300_24SLER:1812L190SLPR"
 			(at 367.03 329.87 0)
 			(effects
 				(font
@@ -14195,7 +14195,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "F?")
+					(reference "F1")
 					(unit 1)
 				)
 			)
@@ -14397,7 +14397,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C5")
 					(unit 1)
 				)
 			)
@@ -14469,7 +14469,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR027")
 					(unit 1)
 				)
 			)
@@ -14541,7 +14541,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR032")
 					(unit 1)
 				)
 			)
@@ -14613,7 +14613,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR036")
 					(unit 1)
 				)
 			)
@@ -14686,7 +14686,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR018")
 					(unit 1)
 				)
 			)
@@ -14914,7 +14914,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "R?")
+					(reference "R6")
 					(unit 1)
 				)
 			)
@@ -15142,7 +15142,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "R?")
+					(reference "R7")
 					(unit 1)
 				)
 			)
@@ -15215,7 +15215,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR08")
 					(unit 1)
 				)
 			)
@@ -15287,7 +15287,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR022")
 					(unit 1)
 				)
 			)
@@ -15489,7 +15489,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C17")
 					(unit 1)
 				)
 			)
@@ -15691,7 +15691,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C9")
 					(unit 1)
 				)
 			)
@@ -15893,7 +15893,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C10")
 					(unit 1)
 				)
 			)
@@ -16095,7 +16095,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C8")
 					(unit 1)
 				)
 			)
@@ -16238,7 +16238,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR06")
 					(unit 1)
 				)
 			)
@@ -16309,7 +16309,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR07")
 					(unit 1)
 				)
 			)
@@ -16380,7 +16380,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR011")
 					(unit 1)
 				)
 			)
@@ -16452,7 +16452,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR024")
 					(unit 1)
 				)
 			)
@@ -16654,7 +16654,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C20")
 					(unit 1)
 				)
 			)
@@ -16743,7 +16743,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "X?")
+					(reference "X1")
 					(unit 1)
 				)
 			)
@@ -16886,7 +16886,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -16958,7 +16958,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR037")
 					(unit 1)
 				)
 			)
@@ -17160,7 +17160,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C19")
 					(unit 1)
 				)
 			)
@@ -17395,7 +17395,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "D?")
+					(reference "D1")
 					(unit 1)
 				)
 			)
@@ -17705,7 +17705,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "SW_RST?")
+					(reference "SW_RST1")
 					(unit 1)
 				)
 			)
@@ -17907,7 +17907,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C16")
 					(unit 1)
 				)
 			)
@@ -18007,7 +18007,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "U?")
+					(reference "U2")
 					(unit 1)
 				)
 			)
@@ -18200,7 +18200,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C7")
 					(unit 1)
 				)
 			)
@@ -18427,7 +18427,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "R?")
+					(reference "R4")
 					(unit 1)
 				)
 			)
@@ -18499,7 +18499,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR029")
 					(unit 1)
 				)
 			)
@@ -18800,7 +18800,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR023")
 					(unit 1)
 				)
 			)
@@ -18872,7 +18872,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR030")
 					(unit 1)
 				)
 			)
@@ -19074,7 +19074,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C12")
 					(unit 1)
 				)
 			)
@@ -19146,7 +19146,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR09")
 					(unit 1)
 				)
 			)
@@ -19218,7 +19218,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR014")
 					(unit 1)
 				)
 			)
@@ -19290,7 +19290,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR035")
 					(unit 1)
 				)
 			)
@@ -19362,7 +19362,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR013")
 					(unit 1)
 				)
 			)
@@ -19434,7 +19434,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR019")
 					(unit 1)
 				)
 			)
@@ -19708,7 +19708,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C6")
 					(unit 1)
 				)
 			)
@@ -19780,7 +19780,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR021")
 					(unit 1)
 				)
 			)
@@ -19852,7 +19852,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR033")
 					(unit 1)
 				)
 			)
@@ -20054,7 +20054,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C21")
 					(unit 1)
 				)
 			)
@@ -20425,7 +20425,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "U?")
+					(reference "U1")
 					(unit 1)
 				)
 			)
@@ -20627,7 +20627,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C4")
 					(unit 1)
 				)
 			)
@@ -20698,7 +20698,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR038")
 					(unit 1)
 				)
 			)
@@ -20770,7 +20770,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR012")
 					(unit 1)
 				)
 			)
@@ -20890,7 +20890,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "J?")
+					(reference "J1")
 					(unit 1)
 				)
 			)
@@ -20962,7 +20962,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR020")
 					(unit 1)
 				)
 			)
@@ -21263,7 +21263,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR015")
 					(unit 1)
 				)
 			)
@@ -21456,7 +21456,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C3")
 					(unit 1)
 				)
 			)
@@ -21658,7 +21658,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C14")
 					(unit 1)
 				)
 			)
@@ -21730,7 +21730,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR039")
 					(unit 1)
 				)
 			)
@@ -21762,7 +21762,7 @@
 				)
 			)
 		)
-		(property "Footprint" "EC11E15244B2"
+		(property "Footprint" "EC11E15244B2:EC11E15244B2"
 			(at 308.61 215.57 0)
 			(effects
 				(font
@@ -21871,7 +21871,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "U?")
+					(reference "U3")
 					(unit 1)
 				)
 			)
@@ -21943,7 +21943,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR010")
 					(unit 1)
 				)
 			)
@@ -22145,7 +22145,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C2")
 					(unit 1)
 				)
 			)
@@ -22217,7 +22217,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR016")
 					(unit 1)
 				)
 			)
@@ -22289,7 +22289,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR028")
 					(unit 1)
 				)
 			)
@@ -22361,7 +22361,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR025")
 					(unit 1)
 				)
 			)
@@ -22563,7 +22563,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "C?")
+					(reference "C13")
 					(unit 1)
 				)
 			)
@@ -22635,7 +22635,7 @@
 			)
 			(project "mcu"
 				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "#PWR?")
+					(reference "#PWR026")
 					(unit 1)
 				)
 			)

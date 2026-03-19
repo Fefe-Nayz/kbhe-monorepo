@@ -1781,7 +1781,7 @@
 					)
 				)
 			)
-			(property "Footprint" "RGW0020A-IPC_A"
+			(property "Footprint" "TPS7A4701RGWR:RGW0020A-IPC_A"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3460,7 +3460,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR02")
 					(unit 1)
 				)
 			)
@@ -3542,7 +3542,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "U?")
+					(reference "U2")
 					(unit 1)
 				)
 			)
@@ -3614,7 +3614,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR04")
 					(unit 1)
 				)
 			)
@@ -3686,7 +3686,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR08")
 					(unit 1)
 				)
 			)
@@ -3888,7 +3888,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "C?")
+					(reference "C3")
 					(unit 1)
 				)
 			)
@@ -3960,7 +3960,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR01")
 					(unit 1)
 				)
 			)
@@ -4162,7 +4162,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "C?")
+					(reference "C2")
 					(unit 1)
 				)
 			)
@@ -4234,7 +4234,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR09")
 					(unit 1)
 				)
 			)
@@ -4306,7 +4306,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR010")
 					(unit 1)
 				)
 			)
@@ -4378,7 +4378,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR06")
 					(unit 1)
 				)
 			)
@@ -4450,7 +4450,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR07")
 					(unit 1)
 				)
 			)
@@ -4652,7 +4652,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "C?")
+					(reference "C5")
 					(unit 1)
 				)
 			)
@@ -4724,7 +4724,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -4926,7 +4926,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "C?")
+					(reference "C1")
 					(unit 1)
 				)
 			)
@@ -5128,7 +5128,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "C?")
+					(reference "C4")
 					(unit 1)
 				)
 			)
@@ -5166,7 +5166,7 @@
 				)
 			)
 		)
-		(property "Footprint" "RGW0020A-IPC_A"
+		(property "Footprint" "TPS7A4701RGWR:RGW0020A-IPC_A"
 			(at 82.55 106.68 0)
 			(effects
 				(font
@@ -5270,7 +5270,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "U?")
+					(reference "U1")
 					(unit 1)
 				)
 			)
@@ -5743,7 +5743,7 @@
 		(instances
 			(project "power_supply"
 				(path "/092c92d2-76d4-44c2-8c00-1353e9f14223"
-					(reference "#PWR?")
+					(reference "#PWR03")
 					(unit 1)
 				)
 			)

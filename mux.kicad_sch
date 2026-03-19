@@ -287,7 +287,7 @@
 					)
 				)
 			)
-			(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+			(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 				(at 0 0 0)
 				(effects
 					(font
@@ -4993,6 +4993,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C8")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5059,6 +5065,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR015")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5122,6 +5134,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0213")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR020")
 					(unit 1)
 				)
 			)
@@ -5321,6 +5339,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C1")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5387,6 +5411,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR02")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5415,7 +5445,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 185.42 0)
 			(effects
 				(font
@@ -5499,6 +5529,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M8")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5565,6 +5601,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR07")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5593,7 +5635,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 29.21 0)
 			(effects
 				(font
@@ -5673,6 +5715,12 @@
 		(instances
 			(project ""
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M1")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "M1")
 					(unit 1)
 				)
@@ -5873,6 +5921,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C10")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5939,6 +5993,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR03")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -5967,7 +6027,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 29.21 0)
 			(effects
 				(font
@@ -6051,6 +6111,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M5")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6079,7 +6145,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 133.35 0)
 			(effects
 				(font
@@ -6163,6 +6229,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M3")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6229,6 +6301,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR05")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6257,7 +6335,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 196.85 29.21 0)
 			(effects
 				(font
@@ -6337,6 +6415,12 @@
 		(instances
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M9")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "M9")
 					(unit 1)
 				)
@@ -6537,6 +6621,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C6")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6603,6 +6693,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR017")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6631,7 +6727,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 81.28 0)
 			(effects
 				(font
@@ -6715,6 +6811,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M6")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6778,6 +6880,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0195")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR01")
 					(unit 1)
 				)
 			)
@@ -6847,6 +6955,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR013")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6913,6 +7027,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR012")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -6976,6 +7096,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0211")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR019")
 					(unit 1)
 				)
 			)
@@ -7175,6 +7301,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C9")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -7203,7 +7335,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 133.35 0)
 			(effects
 				(font
@@ -7287,6 +7419,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M7")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -7353,6 +7491,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR08")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -7381,7 +7525,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 185.42 0)
 			(effects
 				(font
@@ -7465,6 +7609,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M4")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -7493,7 +7643,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 81.28 0)
 			(effects
 				(font
@@ -7573,6 +7723,12 @@
 		(instances
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M2")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "M2")
 					(unit 1)
 				)
@@ -7773,6 +7929,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C7")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -7836,6 +7998,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0214")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR021")
 					(unit 1)
 				)
 			)
@@ -8035,6 +8203,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C3")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -8098,6 +8272,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0206")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR014")
 					(unit 1)
 				)
 			)
@@ -8297,6 +8477,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C2")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -8363,6 +8549,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR010")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -8426,6 +8618,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0198")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR04")
 					(unit 1)
 				)
 			)
@@ -8625,6 +8823,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C5")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -8818,6 +9022,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "C204")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C4")
 					(unit 1)
 				)
 			)
@@ -9017,6 +9227,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "C11")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -9080,6 +9296,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0203")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR011")
 					(unit 1)
 				)
 			)
@@ -9149,6 +9371,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR022")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -9212,6 +9440,12 @@
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
 					(reference "#PWR0208")
+					(unit 1)
+				)
+			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR016")
 					(unit 1)
 				)
 			)
@@ -9281,6 +9515,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR09")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -9347,6 +9587,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR06")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -9375,7 +9621,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 196.85 133.35 0)
 			(effects
 				(font
@@ -9459,6 +9705,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M11")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -9525,6 +9777,12 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "#PWR018")
+					(unit 1)
+				)
+			)
 		)
 	)
 	(symbol
@@ -9553,7 +9811,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 196.85 81.28 0)
 			(effects
 				(font
@@ -9637,6 +9895,18 @@
 					(unit 1)
 				)
 			)
+			(project "mux"
+				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
+					(reference "M10")
+					(unit 1)
+				)
+			)
 		)
 	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
 )
