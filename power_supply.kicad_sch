@@ -2792,17 +2792,6 @@
 		)
 		(uuid "66683d28-c921-4193-9162-d8f32d094823")
 	)
-	(text "Alimentation:\n\nAlimentation 3.3V:\n\nAlimentation (4V)\n\nTPS62913 (1.53$)\n2 x 10uF (0.011$)\n2.2nF (0.0011$)\n470uF (0.0072$)\n5 x 22uF (0.024$)\nFB (0.077$)\nR1 (0.037$)\nR2 (0.0012$)\n\nTOTAL = 1.8$\n\n\nAnalogique:\n\nTPS7A4701RGWR (1.71$)\n\nNumérique:\n\nLDL1117S33R (0.12$)"
-		(exclude_from_sim no)
-		(at 239.014 51.308 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "969e240c-2d59-497e-8071-b402cd252516")
-	)
 	(text "MCU POWER SUPPLY (3.3V)"
 		(exclude_from_sim no)
 		(at 151.892 95.758 0)

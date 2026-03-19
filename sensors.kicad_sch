@@ -39764,7 +39764,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "625b36d7-24a3-413d-9924-e2b4b1617e28")
 		(property "Reference" "K1"
 			(at 35.56 30.4799 0)
@@ -62925,7 +62924,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "c65b745c-6af7-4936-8256-8086193536fd")
 		(property "Reference" "K29"
 			(at 240.03 142.2399 0)
