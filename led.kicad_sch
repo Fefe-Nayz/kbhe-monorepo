@@ -17604,7 +17604,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6dde7772-3e14-4404-9417-e805f0158c1c")
-		(property "Reference" "R?"
+		(property "Reference" "R290"
 			(at 34.29 39.37 90)
 			(effects
 				(font
@@ -17816,7 +17816,7 @@
 			)
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/84df50b8-8ca3-419c-821a-323741d71109"
-					(reference "R?")
+					(reference "R290")
 					(unit 1)
 				)
 			)

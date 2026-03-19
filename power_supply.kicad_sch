@@ -5292,7 +5292,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "afafb788-aa50-40f9-8cf8-0601c0254a2a")
-		(property "Reference" "R?"
+		(property "Reference" "R289"
 			(at 266.7 126.9999 0)
 			(effects
 				(font
@@ -5505,7 +5505,7 @@
 			)
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
-					(reference "R?")
+					(reference "R289")
 					(unit 1)
 				)
 			)
@@ -5520,7 +5520,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "c0c73584-6b3f-430c-ab30-e125bbc971f6")
-		(property "Reference" "D?"
+		(property "Reference" "D267"
 			(at 255.27 116.586 90)
 			(effects
 				(font
@@ -5677,7 +5677,7 @@
 			)
 			(project "75he"
 				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/f26c38a6-65b7-4d4b-b531-bf41915dd707"
-					(reference "D?")
+					(reference "D267")
 					(unit 1)
 				)
 			)
