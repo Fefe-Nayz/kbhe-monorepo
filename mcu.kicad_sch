@@ -577,6 +577,248 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "EC11E15244B2:EC11E15244B2"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "U"
+				(at 21.59 15.24 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Value" "EC11E15244B2"
+				(at 21.59 12.7 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Footprint" "EC11E15244B2"
+				(at 21.59 -87.3 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "https://tech.alpsalpine.com/e/products/detail/EC11E15244B2/"
+				(at 21.59 -187.3 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Description" "Rotary Encoder Mechanical 15 Quadrature (Incremental) Vertical"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Height" "24.5"
+				(at 21.59 -387.3 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Mouser Part Number" "688-EC11E15244B2"
+				(at 21.59 -487.3 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Alps-Alpine/EC11E15244B2?qs=m0BA540hBPfDpUEkDmFV5A%3D%3D"
+				(at 21.59 -587.3 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer_Name" "ALPS Electric"
+				(at 21.59 -687.3 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(property "Manufacturer_Part_Number" "EC11E15244B2"
+				(at 21.59 -787.3 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+					(hide yes)
+				)
+			)
+			(symbol "EC11E15244B2_1_1"
+				(rectangle
+					(start 5.08 10.16)
+					(end 20.32 -7.62)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin passive line
+					(at 0 0 0)
+					(length 5.08)
+					(name "MH1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 10.16 15.24 270)
+					(length 5.08)
+					(name "COM"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "D1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 10.16 -12.7 90)
+					(length 5.08)
+					(name "A1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "A1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 12.7 15.24 270)
+					(length 5.08)
+					(name "NO"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "E1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 12.7 -12.7 90)
+					(length 5.08)
+					(name "C1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "C1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 15.24 -12.7 90)
+					(length 5.08)
+					(name "B1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "B1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 25.4 0 180)
+					(length 5.08)
+					(name "MH2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "MCU_ST_STM32F7:STM32F723VETx"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -7543,248 +7785,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "SamacSys_Parts:EC11E15244B2"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "U"
-				(at 21.59 15.24 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Value" "EC11E15244B2"
-				(at 21.59 12.7 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-				)
-			)
-			(property "Footprint" "EC11E15244B2:EC11E15244B2"
-				(at 21.59 -87.3 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "https://tech.alpsalpine.com/e/products/detail/EC11E15244B2/"
-				(at 21.59 -187.3 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Description" "Rotary Encoder Mechanical 15 Quadrature (Incremental) Vertical"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Height" "24.5"
-				(at 21.59 -387.3 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Mouser Part Number" "688-EC11E15244B2"
-				(at 21.59 -487.3 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Alps-Alpine/EC11E15244B2?qs=m0BA540hBPfDpUEkDmFV5A%3D%3D"
-				(at 21.59 -587.3 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Manufacturer_Name" "ALPS Electric"
-				(at 21.59 -687.3 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Manufacturer_Part_Number" "EC11E15244B2"
-				(at 21.59 -787.3 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(symbol "EC11E15244B2_1_1"
-				(rectangle
-					(start 5.08 10.16)
-					(end 20.32 -7.62)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(pin passive line
-					(at 0 0 0)
-					(length 5.08)
-					(name "MH1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 10.16 15.24 270)
-					(length 5.08)
-					(name "COM"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "D1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 10.16 -12.7 90)
-					(length 5.08)
-					(name "A1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "A1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 12.7 15.24 270)
-					(length 5.08)
-					(name "NO"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "E1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 12.7 -12.7 90)
-					(length 5.08)
-					(name "C1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "C1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 15.24 -12.7 90)
-					(length 5.08)
-					(name "B1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "B1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 25.4 0 180)
-					(length 5.08)
-					(name "MH2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "SamacSys_Parts:SN74AHCT1G125DBVR"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -9301,12 +9301,6 @@
 		(uuid "0c46c21e-90d8-4c13-8c07-acba9a3b7f72")
 	)
 	(junction
-		(at 392.43 167.64)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "0d7be2ef-e7f5-418b-a1cc-79635e1338e4")
-	)
-	(junction
 		(at 154.94 76.2)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -9449,6 +9443,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "a0dee212-3bbc-41e7-b1d2-b722784dfb7d")
+	)
+	(junction
+		(at 392.43 167.64)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "a28deb73-75f4-4618-bf26-8c140c487176")
 	)
 	(junction
 		(at 193.04 67.31)
@@ -10950,16 +10950,6 @@
 	)
 	(wire
 		(pts
-			(xy 392.43 167.64) (xy 402.59 167.64)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a0b1eec8-99a3-466f-b311-293d4d694973")
-	)
-	(wire
-		(pts
 			(xy 172.72 59.69) (xy 180.34 59.69)
 		)
 		(stroke
@@ -11367,6 +11357,16 @@
 			(type default)
 		)
 		(uuid "eed65466-f37f-43c0-9d0b-8f3ae8226624")
+	)
+	(wire
+		(pts
+			(xy 392.43 167.64) (xy 402.59 167.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ef266d93-7515-4f0e-8f19-faff107924f0")
 	)
 	(wire
 		(pts
@@ -19280,6 +19280,120 @@
 		)
 	)
 	(symbol
+		(lib_id "PCM_JLCPCB-Extended:Connector, USB-TYPE-C-16P")
+		(at 384.81 190.5 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "b30a406e-0406-4789-ada0-1ebd1d94fdb6")
+		(property "Reference" "J1"
+			(at 396.24 190.4999 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Connector, USB-TYPE-C-16P"
+			(at 382.27 189.23 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:TYPE-C-SMD_HX-TYPE-C-16PIN"
+			(at 384.81 180.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://atta.szlcsc.com/upload/public/pdf/source/20220920/0EF8F885FCCEA71F60E9E85152155021.pdf"
+			(at 387.096 190.627 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+		(property "Description" "3A 1 Horizontal attachment 16P Female -25℃~+85℃ Type-C SMD USB Connectors ROHS"
+			(at 382.27 191.77 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2927039"
+			(at 382.27 191.77 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "B8"
+			(uuid "8a13c765-e12e-467c-aadf-121444076978")
+		)
+		(pin "S1"
+			(uuid "7a27861e-0fe4-4a2d-b203-199be73b3f4d")
+		)
+		(pin "A12B1"
+			(uuid "b8056c9c-0fcb-42aa-ba35-36141bd9c014")
+		)
+		(pin "B12A1"
+			(uuid "c9af0fe3-4a4c-478c-aea3-e6eac2023541")
+		)
+		(pin "B7"
+			(uuid "fd3031c3-e61e-40fc-8b47-ea2407121722")
+		)
+		(pin "A9B4"
+			(uuid "24e35373-1086-4290-982a-f8c14dd56700")
+		)
+		(pin "A7"
+			(uuid "da57d49a-2ed6-4d92-9678-116807361606")
+		)
+		(pin "A5"
+			(uuid "c9ee263a-b7bd-4520-a4dd-8b14ec6c3161")
+		)
+		(pin "A6"
+			(uuid "8d4cda88-ba0f-4d6e-bd5d-0c80c4d24e9e")
+		)
+		(pin "B9A4"
+			(uuid "0285bd59-107a-4fd7-b46d-5d830121ef5d")
+		)
+		(pin "B5"
+			(uuid "c5170f6a-aad3-4add-9c88-314ca7054078")
+		)
+		(pin "B6"
+			(uuid "5659d898-1a28-4933-97c1-d649bf81cacf")
+		)
+		(pin "A8"
+			(uuid "45a27813-7a6a-4395-a354-9b3b70a62efd")
+		)
+		(instances
+			(project ""
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
+					(reference "J1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 193.04 67.31 0)
 		(unit 1)
@@ -21322,126 +21436,6 @@
 		)
 	)
 	(symbol
-		(lib_id "PCM_JLCPCB-Extended:Connector, USB-TYPE-C-16P")
-		(at 384.81 190.5 180)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "e2a73db1-a84e-4828-bd10-95a36063d380")
-		(property "Reference" "J1"
-			(at 396.24 190.4999 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "Connector, USB-TYPE-C-16P"
-			(at 382.27 189.23 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Footprint" "Connector_USB:USB_C_Receptacle_XKB_U262-16XN-4BVC11"
-			(at 384.81 180.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-					(italic yes)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://atta.szlcsc.com/upload/public/pdf/source/20220920/0EF8F885FCCEA71F60E9E85152155021.pdf"
-			(at 387.096 190.627 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-		(property "Description" "3A 1 Horizontal attachment 16P Female -25℃~+85℃ Type-C SMD USB Connectors ROHS"
-			(at 382.27 191.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "LCSC" "C2927039"
-			(at 382.27 191.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "B5"
-			(uuid "26a3d83e-d00d-4791-95c9-cc79a689a150")
-		)
-		(pin "A6"
-			(uuid "154a53bc-9dba-4d34-9c30-64aadf77846e")
-		)
-		(pin "A12B1"
-			(uuid "189a5746-15d4-4f38-8515-a33bffecba90")
-		)
-		(pin "B12A1"
-			(uuid "dd390201-f44c-49ce-879a-9e9ae9cd203b")
-		)
-		(pin "A5"
-			(uuid "310f4397-0ef4-491c-a571-4c6b7fcbb1f5")
-		)
-		(pin "B7"
-			(uuid "94eba015-9fc5-4d23-a365-80655f2e4845")
-		)
-		(pin "A7"
-			(uuid "d0f2a562-0209-4982-a784-c0310b5e5560")
-		)
-		(pin "A8"
-			(uuid "ffdb3950-78e3-4a6e-8a88-29d4a200bbc7")
-		)
-		(pin "B8"
-			(uuid "6c48d79a-1a95-4118-a497-d69c7a3c6588")
-		)
-		(pin "S1"
-			(uuid "277b4545-39f9-489b-9be0-0d88ab7c5f87")
-		)
-		(pin "A9B4"
-			(uuid "f11a6cd1-931a-4363-86df-bd4c206622e3")
-		)
-		(pin "B9A4"
-			(uuid "84039275-92b3-4b9a-86e9-1652916840c3")
-		)
-		(pin "B6"
-			(uuid "b8cfa800-4f97-4234-9d92-82acf5cc4718")
-		)
-		(instances
-			(project ""
-				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/e7ec310e-33d9-421e-aaaf-42ca5ffe1b35"
-					(reference "J1")
-					(unit 1)
-				)
-			)
-			(project "mcu"
-				(path "/acaa5f6a-1300-4933-89e6-4f1ff2a3a17e"
-					(reference "J1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Connector:Conn_01x01_Pin")
 		(at 88.9 187.96 180)
 		(unit 1)
@@ -22478,7 +22472,7 @@
 		)
 	)
 	(symbol
-		(lib_id "SamacSys_Parts:EC11E15244B2")
+		(lib_id "EC11E15244B2:EC11E15244B2")
 		(at 275.59 111.76 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -22503,7 +22497,7 @@
 				)
 			)
 		)
-		(property "Footprint" "EC11E15244B2:EC11E15244B2"
+		(property "Footprint" "EC11E15244B2"
 			(at 297.18 199.06 0)
 			(effects
 				(font
