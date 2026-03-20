@@ -32,8 +32,6 @@ fp-info-cache
 *.xml
 *.svg
 *.dxf
-*.step
-*.stp
 *.pdf
 
 # Fichiers Netlist (généralement pas nécessaires si vous avez le schématique)
