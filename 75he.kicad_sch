@@ -1,7 +1,7 @@
 (kicad_sch
-	(version 20250114)
+	(version 20260306)
 	(generator "eeschema")
-	(generator_version "9.0")
+	(generator_version "10.0")
 	(uuid "0edb4e17-93a4-4f7b-ad91-3a5c72b69d23")
 	(paper "A4")
 	(title_block
@@ -243,11 +243,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "21c445b4-dc4d-4bcf-b531-909ea3586348")
 		(property "Sheetname" "Switch"
 			(at 77.47 72.9484 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -257,6 +259,8 @@
 		)
 		(property "Sheetfile" "switch.kicad_sch"
 			(at 77.47 122.5046 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -285,11 +289,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "6cd62204-e1e2-4b31-86d5-519042c12041")
 		(property "Sheetname" "Multiplexers"
 			(at 17.78 75.4884 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -299,6 +305,8 @@
 		)
 		(property "Sheetfile" "mux.kicad_sch"
 			(at 17.78 119.9646 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -327,11 +335,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "79a7e965-7423-4472-8532-0afc280c9eed")
 		(property "Sheetname" "Mounting Holes"
 			(at 232.41 92.6334 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -341,6 +351,8 @@
 		)
 		(property "Sheetfile" "screws.kicad_sch"
 			(at 232.41 132.0296 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -369,11 +381,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "84df50b8-8ca3-419c-821a-323741d71109")
 		(property "Sheetname" "LED"
 			(at 231.14 27.2284 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -383,6 +397,8 @@
 		)
 		(property "Sheetfile" "led.kicad_sch"
 			(at 231.14 67.8946 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -411,11 +427,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "cc106f55-974e-4568-8ba3-6f2939da5059")
 		(property "Sheetname" "HE Sensors"
 			(at 74.93 15.7984 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -425,6 +443,8 @@
 		)
 		(property "Sheetfile" "sensors.kicad_sch"
 			(at 74.93 64.0846 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -453,11 +473,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "e7ec310e-33d9-421e-aaaf-42ca5ffe1b35")
 		(property "Sheetname" "MCU"
 			(at 16.51 15.7984 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -467,6 +489,8 @@
 		)
 		(property "Sheetfile" "mcu.kicad_sch"
 			(at 16.51 66.6246 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -495,11 +519,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "f26c38a6-65b7-4d4b-b531-bf41915dd707")
 		(property "Sheetname" "Power Supply"
 			(at 21.59 131.3684 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -509,6 +535,8 @@
 		)
 		(property "Sheetfile" "power_supply.kicad_sch"
 			(at 21.59 180.9246 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
