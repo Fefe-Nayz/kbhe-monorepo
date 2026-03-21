@@ -11050,7 +11050,7 @@
 			)
 		)
 	)
-	(global_label "K58_OUT"
+	(global_label "K60_OUT"
 		(shape input)
 		(at 213.36 290.83 90)
 		(fields_autoplaced yes)
@@ -11074,7 +11074,7 @@
 			)
 		)
 	)
-	(global_label "K45_OUT"
+	(global_label "K75_OUT"
 		(shape input)
 		(at 60.96 365.76 90)
 		(fields_autoplaced yes)
@@ -11098,7 +11098,7 @@
 			)
 		)
 	)
-	(global_label "K51_OUT"
+	(global_label "K43_OUT"
 		(shape input)
 		(at 162.56 217.17 90)
 		(fields_autoplaced yes)
@@ -11170,7 +11170,7 @@
 			)
 		)
 	)
-	(global_label "K73_OUT"
+	(global_label "K63_OUT"
 		(shape input)
 		(at 367.03 290.83 90)
 		(fields_autoplaced yes)
@@ -11194,7 +11194,7 @@
 			)
 		)
 	)
-	(global_label "K64_OUT"
+	(global_label "K69_OUT"
 		(shape input)
 		(at 265.43 328.93 90)
 		(fields_autoplaced yes)
@@ -11218,7 +11218,7 @@
 			)
 		)
 	)
-	(global_label "K65_OUT"
+	(global_label "K79_OUT"
 		(shape input)
 		(at 265.43 365.76 90)
 		(fields_autoplaced yes)
@@ -11266,7 +11266,7 @@
 			)
 		)
 	)
-	(global_label "K81_OUT"
+	(global_label "K73_OUT"
 		(shape input)
 		(at 480.06 344.17 90)
 		(fields_autoplaced yes)
@@ -11458,7 +11458,7 @@
 			)
 		)
 	)
-	(global_label "K46_OUT"
+	(global_label "K42_OUT"
 		(shape input)
 		(at 111.76 217.17 90)
 		(fields_autoplaced yes)
@@ -11482,7 +11482,7 @@
 			)
 		)
 	)
-	(global_label "K47_OUT"
+	(global_label "K50_OUT"
 		(shape input)
 		(at 111.76 254 90)
 		(fields_autoplaced yes)
@@ -11530,7 +11530,7 @@
 			)
 		)
 	)
-	(global_label "K50_OUT"
+	(global_label "K76_OUT"
 		(shape input)
 		(at 111.76 365.76 90)
 		(fields_autoplaced yes)
@@ -11578,7 +11578,7 @@
 			)
 		)
 	)
-	(global_label "K57_OUT"
+	(global_label "K52_OUT"
 		(shape input)
 		(at 213.36 254 90)
 		(fields_autoplaced yes)
@@ -11626,7 +11626,7 @@
 			)
 		)
 	)
-	(global_label "K63_OUT"
+	(global_label "K61_OUT"
 		(shape input)
 		(at 265.43 290.83 90)
 		(fields_autoplaced yes)
@@ -11650,7 +11650,7 @@
 			)
 		)
 	)
-	(global_label "K74_OUT"
+	(global_label "K71_OUT"
 		(shape input)
 		(at 367.03 328.93 90)
 		(fields_autoplaced yes)
@@ -11674,7 +11674,7 @@
 			)
 		)
 	)
-	(global_label "K79_OUT"
+	(global_label "K72_OUT"
 		(shape input)
 		(at 417.83 328.93 90)
 		(fields_autoplaced yes)
@@ -11746,7 +11746,7 @@
 			)
 		)
 	)
-	(global_label "K76_OUT"
+	(global_label "K48_OUT"
 		(shape input)
 		(at 417.83 217.17 90)
 		(fields_autoplaced yes)
@@ -11770,7 +11770,7 @@
 			)
 		)
 	)
-	(global_label "K55_OUT"
+	(global_label "K77_OUT"
 		(shape input)
 		(at 162.56 365.76 90)
 		(fields_autoplaced yes)
@@ -11818,7 +11818,7 @@
 			)
 		)
 	)
-	(global_label "K60_OUT"
+	(global_label "K78_OUT"
 		(shape input)
 		(at 213.36 365.76 90)
 		(fields_autoplaced yes)
@@ -11866,7 +11866,7 @@
 			)
 		)
 	)
-	(global_label "K43_OUT"
+	(global_label "K57_OUT"
 		(shape input)
 		(at 60.96 290.83 90)
 		(fields_autoplaced yes)
@@ -11890,7 +11890,7 @@
 			)
 		)
 	)
-	(global_label "K56_OUT"
+	(global_label "K44_OUT"
 		(shape input)
 		(at 213.36 217.17 90)
 		(fields_autoplaced yes)
@@ -11914,7 +11914,7 @@
 			)
 		)
 	)
-	(global_label "K69_OUT"
+	(global_label "K70_OUT"
 		(shape input)
 		(at 316.23 328.93 90)
 		(fields_autoplaced yes)
@@ -11938,7 +11938,7 @@
 			)
 		)
 	)
-	(global_label "K80_OUT"
+	(global_label "K82_OUT"
 		(shape input)
 		(at 417.83 365.76 90)
 		(fields_autoplaced yes)
@@ -11962,7 +11962,7 @@
 			)
 		)
 	)
-	(global_label "K68_OUT"
+	(global_label "K62_OUT"
 		(shape input)
 		(at 316.23 290.83 90)
 		(fields_autoplaced yes)
@@ -12130,7 +12130,7 @@
 			)
 		)
 	)
-	(global_label "K61_OUT"
+	(global_label "K45_OUT"
 		(shape input)
 		(at 265.43 217.17 90)
 		(fields_autoplaced yes)
@@ -12346,7 +12346,7 @@
 			)
 		)
 	)
-	(global_label "K71_OUT"
+	(global_label "K47_OUT"
 		(shape input)
 		(at 367.03 217.17 90)
 		(fields_autoplaced yes)
@@ -12370,7 +12370,7 @@
 			)
 		)
 	)
-	(global_label "K70_OUT"
+	(global_label "K80_OUT"
 		(shape input)
 		(at 316.23 365.76 90)
 		(fields_autoplaced yes)
@@ -12382,7 +12382,7 @@
 		)
 		(uuid "b4ec0319-3c42-4154-a739-7007b8246ebb")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 316.23 356.9086 90)
+			(at 316.23 354.4896 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12442,7 +12442,7 @@
 			)
 		)
 	)
-	(global_label "K75_OUT"
+	(global_label "K81_OUT"
 		(shape input)
 		(at 367.03 365.76 90)
 		(fields_autoplaced yes)
@@ -12466,7 +12466,7 @@
 			)
 		)
 	)
-	(global_label "K44_OUT"
+	(global_label "K65_OUT"
 		(shape input)
 		(at 60.96 328.93 90)
 		(fields_autoplaced yes)
@@ -12586,7 +12586,7 @@
 			)
 		)
 	)
-	(global_label "K77_OUT"
+	(global_label "K56_OUT"
 		(shape input)
 		(at 417.83 254 90)
 		(fields_autoplaced yes)
@@ -12610,7 +12610,7 @@
 			)
 		)
 	)
-	(global_label "K67_OUT"
+	(global_label "K54_OUT"
 		(shape input)
 		(at 316.23 254 90)
 		(fields_autoplaced yes)
@@ -12634,7 +12634,7 @@
 			)
 		)
 	)
-	(global_label "K62_OUT"
+	(global_label "K53_OUT"
 		(shape input)
 		(at 265.43 254 90)
 		(fields_autoplaced yes)
@@ -12658,7 +12658,7 @@
 			)
 		)
 	)
-	(global_label "K52_OUT"
+	(global_label "K51_OUT"
 		(shape input)
 		(at 162.56 254 90)
 		(fields_autoplaced yes)
@@ -12706,7 +12706,7 @@
 			)
 		)
 	)
-	(global_label "K53_OUT"
+	(global_label "K59_OUT"
 		(shape input)
 		(at 162.56 290.83 90)
 		(fields_autoplaced yes)
@@ -12730,7 +12730,7 @@
 			)
 		)
 	)
-	(global_label "K59_OUT"
+	(global_label "K68_OUT"
 		(shape input)
 		(at 213.36 328.93 90)
 		(fields_autoplaced yes)
@@ -12754,7 +12754,7 @@
 			)
 		)
 	)
-	(global_label "K72_OUT"
+	(global_label "K55_OUT"
 		(shape input)
 		(at 367.03 254 90)
 		(fields_autoplaced yes)
@@ -12778,7 +12778,7 @@
 			)
 		)
 	)
-	(global_label "K82_OUT"
+	(global_label "K74_OUT"
 		(shape input)
 		(at 539.75 344.17 90)
 		(fields_autoplaced yes)
@@ -12802,7 +12802,7 @@
 			)
 		)
 	)
-	(global_label "K54_OUT"
+	(global_label "K67_OUT"
 		(shape input)
 		(at 162.56 328.93 90)
 		(fields_autoplaced yes)
@@ -12826,7 +12826,7 @@
 			)
 		)
 	)
-	(global_label "K48_OUT"
+	(global_label "K58_OUT"
 		(shape input)
 		(at 111.76 290.83 90)
 		(fields_autoplaced yes)
@@ -12850,7 +12850,7 @@
 			)
 		)
 	)
-	(global_label "K49_OUT"
+	(global_label "K66_OUT"
 		(shape input)
 		(at 111.76 328.93 90)
 		(fields_autoplaced yes)
@@ -12874,7 +12874,7 @@
 			)
 		)
 	)
-	(global_label "K78_OUT"
+	(global_label "K64_OUT"
 		(shape input)
 		(at 417.83 290.83 90)
 		(fields_autoplaced yes)
@@ -12946,7 +12946,7 @@
 			)
 		)
 	)
-	(global_label "K42_OUT"
+	(global_label "K49_OUT"
 		(shape input)
 		(at 60.96 254 90)
 		(fields_autoplaced yes)
