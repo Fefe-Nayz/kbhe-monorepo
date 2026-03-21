@@ -40,3 +40,5 @@ fp-info-cache
 # --- Fichiers OS (classique) ---
 .DS_Store
 Thumbs.db
+
+/.history
