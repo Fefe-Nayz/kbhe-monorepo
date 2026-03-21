@@ -12562,7 +12562,7 @@
 			)
 		)
 	)
-	(global_label "K66_OUT"
+	(global_label "K46_OUT"
 		(shape input)
 		(at 316.23 217.17 90)
 		(fields_autoplaced yes)
