@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP SN74AHCT1G125DBVR
+D 74AHCT Single Tri-state Bus Buffer SOT23 SN74AHCT1G125DBVR, Bus Buffer, HCT, 8.5 ns@ 50 pF, 8mA 4.5 ??? 5.5 V 5-Pin SOT-23
+K
+F http://www.ti.com/lit/ds/symlink/sn74ahct1g125.pdf
+$ENDCMP
+#
+#End Doc Library
