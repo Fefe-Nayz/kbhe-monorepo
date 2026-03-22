@@ -1206,7 +1206,7 @@
 		(uuid "10fa470d-d8ed-483c-88fb-f345e6dc06de")
 	)
 	(junction
-		(at 74.93 97.79)
+		(at 342.9 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "123b3df6-796e-4904-be39-71403c748322")
@@ -1284,19 +1284,19 @@
 		(uuid "2f19c545-83ed-4694-b1fe-be0aac174c5c")
 	)
 	(junction
-		(at 110.49 97.79)
+		(at 378.46 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "2f456b2e-dd82-44eb-853a-57bac278aead")
 	)
 	(junction
-		(at 252.73 97.79)
+		(at 520.7 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "2fecb7a7-b4a9-4343-99a8-f3b6357835a3")
 	)
 	(junction
-		(at 217.17 97.79)
+		(at 485.14 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "35c7de92-7051-42b8-90cc-12148a65bc84")
@@ -1308,7 +1308,7 @@
 		(uuid "36313a6f-a2d8-4140-97bd-fc9ca2c807a4")
 	)
 	(junction
-		(at 181.61 134.62)
+		(at 449.58 106.68)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "3c0a4275-de60-4074-b9f9-c0ae5e7e70c7")
@@ -1440,7 +1440,7 @@
 		(uuid "96c1fc6e-083c-4d17-bdb3-7ab88994d7a6")
 	)
 	(junction
-		(at 251.46 60.96)
+		(at 519.43 33.02)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "99bc87ad-40e2-40ca-bb02-5e0dee3bfea7")
@@ -1452,19 +1452,19 @@
 		(uuid "9c900bde-e271-4ad3-9017-013552aadfee")
 	)
 	(junction
-		(at 288.29 97.79)
+		(at 556.26 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "9cfad123-8082-4aeb-98e4-a2522614c96d")
 	)
 	(junction
-		(at 146.05 97.79)
+		(at 414.02 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "a4704ad2-168c-4e69-8ec4-38f0bba69ea3")
 	)
 	(junction
-		(at 146.05 134.62)
+		(at 414.02 106.68)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "a7648c07-c798-47bc-ba73-fd860076e7e8")
@@ -1476,7 +1476,7 @@
 		(uuid "a7b1c736-7209-4069-8149-a92da4a1fafa")
 	)
 	(junction
-		(at 181.61 97.79)
+		(at 449.58 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "aa8cc17f-f01c-4722-9a0a-8e017305165f")
@@ -1578,13 +1578,13 @@
 		(uuid "d116557d-9cc3-4ce4-86c8-c883c485386c")
 	)
 	(junction
-		(at 39.37 134.62)
+		(at 307.34 106.68)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "d37581ec-34f9-497a-9ddc-7e99ff5d984b")
 	)
 	(junction
-		(at 39.37 97.79)
+		(at 307.34 69.85)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "d3f62335-ae5a-48fc-be7d-55b6c5208a7d")
@@ -1608,7 +1608,7 @@
 		(uuid "d8168775-2586-46b1-8cb9-085930d64f4a")
 	)
 	(junction
-		(at 74.93 134.62)
+		(at 342.9 106.68)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "d8c3ac65-d325-4b1d-823c-c02ef79cf6e8")
@@ -1620,7 +1620,7 @@
 		(uuid "db7064e8-5e2c-44a1-a93c-2a0f3ecb6d38")
 	)
 	(junction
-		(at 110.49 134.62)
+		(at 378.46 106.68)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "e54a0e94-4218-478f-a5fd-4e3d8656dab3")
@@ -1638,7 +1638,7 @@
 		(uuid "f30cae77-675f-4494-919e-aebd95cec479")
 	)
 	(junction
-		(at 287.02 60.96)
+		(at 554.99 33.02)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "f9a72ba3-2dd7-486d-9e3c-f4dee2746db5")
@@ -1650,8 +1650,8 @@
 		(uuid "fbc42e1a-a323-4d8a-b902-02eead903523")
 	)
 	(no_connect
-		(at 382.27 372.11)
-		(uuid "9658c1b3-8d56-473e-b4a2-8c6b004e0b15")
+		(at 43.18 372.11)
+		(uuid "c83144ab-cc0b-4511-8470-b92776f42026")
 	)
 	(wire
 		(pts
@@ -1665,7 +1665,7 @@
 	)
 	(wire
 		(pts
-			(xy 49.53 143.51) (xy 49.53 134.62)
+			(xy 317.5 115.57) (xy 317.5 106.68)
 		)
 		(stroke
 			(width 0)
@@ -1685,6 +1685,16 @@
 	)
 	(wire
 		(pts
+			(xy 114.3 295.91) (xy 114.3 306.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0587e7b2-7ba9-46f5-9a50-7a13c4e47076")
+	)
+	(wire
+		(pts
 			(xy 346.71 372.11) (xy 367.03 372.11)
 		)
 		(stroke
@@ -1695,7 +1705,7 @@
 	)
 	(wire
 		(pts
-			(xy 262.89 106.68) (xy 262.89 97.79)
+			(xy 530.86 78.74) (xy 530.86 69.85)
 		)
 		(stroke
 			(width 0)
@@ -1705,7 +1715,7 @@
 	)
 	(wire
 		(pts
-			(xy 297.18 69.85) (xy 297.18 60.96)
+			(xy 565.15 41.91) (xy 565.15 33.02)
 		)
 		(stroke
 			(width 0)
@@ -1755,7 +1765,7 @@
 	)
 	(wire
 		(pts
-			(xy 31.75 151.13) (xy 41.91 151.13)
+			(xy 299.72 123.19) (xy 309.88 123.19)
 		)
 		(stroke
 			(width 0)
@@ -1765,7 +1775,7 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 97.79) (xy 146.05 97.79)
+			(xy 424.18 69.85) (xy 414.02 69.85)
 		)
 		(stroke
 			(width 0)
@@ -1815,7 +1825,7 @@
 	)
 	(wire
 		(pts
-			(xy 120.65 106.68) (xy 120.65 97.79)
+			(xy 388.62 78.74) (xy 388.62 69.85)
 		)
 		(stroke
 			(width 0)
@@ -1872,6 +1882,16 @@
 			(type default)
 		)
 		(uuid "16c55699-a07c-4750-bd8c-03bcee5b6986")
+	)
+	(wire
+		(pts
+			(xy 163.83 222.25) (xy 180.34 222.25)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "174d399a-9b29-478c-b421-d446d05482ef")
 	)
 	(wire
 		(pts
@@ -1965,7 +1985,7 @@
 	)
 	(wire
 		(pts
-			(xy 163.83 151.13) (xy 184.15 151.13)
+			(xy 431.8 123.19) (xy 452.12 123.19)
 		)
 		(stroke
 			(width 0)
@@ -2075,7 +2095,7 @@
 	)
 	(wire
 		(pts
-			(xy 191.77 97.79) (xy 181.61 97.79)
+			(xy 459.74 69.85) (xy 449.58 69.85)
 		)
 		(stroke
 			(width 0)
@@ -2095,7 +2115,7 @@
 	)
 	(wire
 		(pts
-			(xy 261.62 60.96) (xy 251.46 60.96)
+			(xy 529.59 33.02) (xy 519.43 33.02)
 		)
 		(stroke
 			(width 0)
@@ -2335,7 +2355,7 @@
 	)
 	(wire
 		(pts
-			(xy 120.65 134.62) (xy 110.49 134.62)
+			(xy 388.62 106.68) (xy 378.46 106.68)
 		)
 		(stroke
 			(width 0)
@@ -2355,7 +2375,7 @@
 	)
 	(wire
 		(pts
-			(xy 57.15 114.3) (xy 77.47 114.3)
+			(xy 325.12 86.36) (xy 345.44 86.36)
 		)
 		(stroke
 			(width 0)
@@ -2385,7 +2405,7 @@
 	)
 	(wire
 		(pts
-			(xy 297.18 60.96) (xy 287.02 60.96)
+			(xy 565.15 33.02) (xy 554.99 33.02)
 		)
 		(stroke
 			(width 0)
@@ -2435,7 +2455,7 @@
 	)
 	(wire
 		(pts
-			(xy 306.07 114.3) (xy 306.07 130.81)
+			(xy 574.04 86.36) (xy 574.04 102.87)
 		)
 		(stroke
 			(width 0)
@@ -2565,7 +2585,7 @@
 	)
 	(wire
 		(pts
-			(xy 120.65 97.79) (xy 110.49 97.79)
+			(xy 388.62 69.85) (xy 378.46 69.85)
 		)
 		(stroke
 			(width 0)
@@ -2615,7 +2635,7 @@
 	)
 	(wire
 		(pts
-			(xy 92.71 151.13) (xy 113.03 151.13)
+			(xy 360.68 123.19) (xy 381 123.19)
 		)
 		(stroke
 			(width 0)
@@ -2655,7 +2675,7 @@
 	)
 	(wire
 		(pts
-			(xy 49.53 134.62) (xy 39.37 134.62)
+			(xy 317.5 106.68) (xy 307.34 106.68)
 		)
 		(stroke
 			(width 0)
@@ -2755,13 +2775,23 @@
 	)
 	(wire
 		(pts
-			(xy 304.8 93.98) (xy 31.75 93.98)
+			(xy 572.77 66.04) (xy 299.72 66.04)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "5a71c87b-5357-44d2-bfae-ea51c7db5d47")
+	)
+	(wire
+		(pts
+			(xy 93.98 295.91) (xy 109.22 295.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5b134cc9-273c-497a-89fd-461cf9219108")
 	)
 	(wire
 		(pts
@@ -2792,6 +2822,16 @@
 			(type default)
 		)
 		(uuid "5ee15197-54f9-42be-883b-c8558ee3c5d7")
+	)
+	(wire
+		(pts
+			(xy 382.27 372.11) (xy 400.05 372.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5ee3b1a9-bc18-48fb-9f0c-b81be3c3a0da")
 	)
 	(wire
 		(pts
@@ -2835,7 +2875,7 @@
 	)
 	(wire
 		(pts
-			(xy 92.71 114.3) (xy 113.03 114.3)
+			(xy 360.68 86.36) (xy 381 86.36)
 		)
 		(stroke
 			(width 0)
@@ -2845,7 +2885,7 @@
 	)
 	(wire
 		(pts
-			(xy 85.09 134.62) (xy 74.93 134.62)
+			(xy 353.06 106.68) (xy 342.9 106.68)
 		)
 		(stroke
 			(width 0)
@@ -2865,7 +2905,7 @@
 	)
 	(wire
 		(pts
-			(xy 191.77 106.68) (xy 191.77 97.79)
+			(xy 459.74 78.74) (xy 459.74 69.85)
 		)
 		(stroke
 			(width 0)
@@ -2885,23 +2925,13 @@
 	)
 	(wire
 		(pts
-			(xy 234.95 114.3) (xy 255.27 114.3)
+			(xy 502.92 86.36) (xy 523.24 86.36)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "69309a4d-452e-4b7b-8ab7-054aff01f746")
-	)
-	(wire
-		(pts
-			(xy 129.54 295.91) (xy 149.86 295.91)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6ae57cd8-ab2b-4c61-b47f-ad617476b849")
 	)
 	(wire
 		(pts
@@ -2985,6 +3015,16 @@
 	)
 	(wire
 		(pts
+			(xy 307.34 335.28) (xy 328.93 335.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6d7ca55b-30b4-401d-8300-a17cc26b313a")
+	)
+	(wire
+		(pts
 			(xy 200.66 372.11) (xy 220.98 372.11)
 		)
 		(stroke
@@ -2995,7 +3035,7 @@
 	)
 	(wire
 		(pts
-			(xy 261.62 69.85) (xy 261.62 60.96)
+			(xy 529.59 41.91) (xy 529.59 33.02)
 		)
 		(stroke
 			(width 0)
@@ -3005,7 +3045,7 @@
 	)
 	(wire
 		(pts
-			(xy 191.77 143.51) (xy 191.77 134.62)
+			(xy 459.74 115.57) (xy 459.74 106.68)
 		)
 		(stroke
 			(width 0)
@@ -3025,7 +3065,7 @@
 	)
 	(wire
 		(pts
-			(xy 85.09 143.51) (xy 85.09 134.62)
+			(xy 353.06 115.57) (xy 353.06 106.68)
 		)
 		(stroke
 			(width 0)
@@ -3045,7 +3085,7 @@
 	)
 	(wire
 		(pts
-			(xy 57.15 151.13) (xy 77.47 151.13)
+			(xy 325.12 123.19) (xy 345.44 123.19)
 		)
 		(stroke
 			(width 0)
@@ -3095,7 +3135,7 @@
 	)
 	(wire
 		(pts
-			(xy 262.89 97.79) (xy 252.73 97.79)
+			(xy 530.86 69.85) (xy 520.7 69.85)
 		)
 		(stroke
 			(width 0)
@@ -3155,7 +3195,7 @@
 	)
 	(wire
 		(pts
-			(xy 269.24 77.47) (xy 289.56 77.47)
+			(xy 537.21 49.53) (xy 557.53 49.53)
 		)
 		(stroke
 			(width 0)
@@ -3195,7 +3235,7 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 143.51) (xy 156.21 134.62)
+			(xy 424.18 115.57) (xy 424.18 106.68)
 		)
 		(stroke
 			(width 0)
@@ -3222,16 +3262,6 @@
 			(type default)
 		)
 		(uuid "879b8159-067c-4fe6-80aa-a449b54d156c")
-	)
-	(wire
-		(pts
-			(xy 31.75 351.79) (xy 31.75 372.11)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "880e7f4a-07d6-4c13-a855-847570ff6d8a")
 	)
 	(wire
 		(pts
@@ -3262,16 +3292,6 @@
 			(type default)
 		)
 		(uuid "8a776027-710a-4b76-9bc7-e23ab5d7b953")
-	)
-	(wire
-		(pts
-			(xy 93.98 295.91) (xy 114.3 295.91)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8cbf1ed6-bff4-499b-b630-d5353761f090")
 	)
 	(wire
 		(pts
@@ -3325,13 +3345,23 @@
 	)
 	(wire
 		(pts
-			(xy 49.53 106.68) (xy 49.53 97.79)
+			(xy 317.5 78.74) (xy 317.5 69.85)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "91fc072d-c125-4f2c-820f-a8a596920974")
+	)
+	(wire
+		(pts
+			(xy 184.15 222.25) (xy 184.15 229.87)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9221a17c-2038-4e1a-aa00-cd6fdf235991")
 	)
 	(wire
 		(pts
@@ -3385,7 +3415,7 @@
 	)
 	(wire
 		(pts
-			(xy 191.77 134.62) (xy 181.61 134.62)
+			(xy 459.74 106.68) (xy 449.58 106.68)
 		)
 		(stroke
 			(width 0)
@@ -3485,7 +3515,7 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 106.68) (xy 156.21 97.79)
+			(xy 424.18 78.74) (xy 424.18 69.85)
 		)
 		(stroke
 			(width 0)
@@ -3495,7 +3525,7 @@
 	)
 	(wire
 		(pts
-			(xy 298.45 106.68) (xy 298.45 97.79)
+			(xy 566.42 78.74) (xy 566.42 69.85)
 		)
 		(stroke
 			(width 0)
@@ -3515,7 +3545,7 @@
 	)
 	(wire
 		(pts
-			(xy 270.51 114.3) (xy 290.83 114.3)
+			(xy 538.48 86.36) (xy 558.8 86.36)
 		)
 		(stroke
 			(width 0)
@@ -3545,7 +3575,7 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 134.62) (xy 146.05 134.62)
+			(xy 424.18 106.68) (xy 414.02 106.68)
 		)
 		(stroke
 			(width 0)
@@ -3595,7 +3625,7 @@
 	)
 	(wire
 		(pts
-			(xy 304.8 77.47) (xy 304.8 93.98)
+			(xy 572.77 49.53) (xy 572.77 66.04)
 		)
 		(stroke
 			(width 0)
@@ -3665,7 +3695,7 @@
 	)
 	(wire
 		(pts
-			(xy 306.07 130.81) (xy 31.75 130.81)
+			(xy 574.04 102.87) (xy 299.72 102.87)
 		)
 		(stroke
 			(width 0)
@@ -3725,6 +3755,16 @@
 	)
 	(wire
 		(pts
+			(xy 233.68 77.47) (xy 266.7 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bcfea0d8-92a9-44dd-8da6-38a12f92b7cd")
+	)
+	(wire
+		(pts
 			(xy 297.18 26.67) (xy 287.02 26.67)
 		)
 		(stroke
@@ -3765,7 +3805,7 @@
 	)
 	(wire
 		(pts
-			(xy 85.09 97.79) (xy 74.93 97.79)
+			(xy 353.06 69.85) (xy 342.9 69.85)
 		)
 		(stroke
 			(width 0)
@@ -3775,13 +3815,23 @@
 	)
 	(wire
 		(pts
-			(xy 120.65 143.51) (xy 120.65 134.62)
+			(xy 388.62 115.57) (xy 388.62 106.68)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "c297d811-2eaf-4856-b8d9-06146fc3068b")
+	)
+	(wire
+		(pts
+			(xy 114.3 306.07) (xy 93.98 306.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c38625ac-35fd-4152-912f-83da0c14c636")
 	)
 	(wire
 		(pts
@@ -3802,16 +3852,6 @@
 			(type default)
 		)
 		(uuid "c89e0fe4-adec-49ec-b47c-1df275eb923a")
-	)
-	(wire
-		(pts
-			(xy 163.83 222.25) (xy 184.15 222.25)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c8da28ca-a6bc-4a15-97de-2eb614b97cee")
 	)
 	(wire
 		(pts
@@ -3855,7 +3895,7 @@
 	)
 	(wire
 		(pts
-			(xy 31.75 130.81) (xy 31.75 151.13)
+			(xy 299.72 102.87) (xy 299.72 123.19)
 		)
 		(stroke
 			(width 0)
@@ -3865,7 +3905,7 @@
 	)
 	(wire
 		(pts
-			(xy 128.27 151.13) (xy 148.59 151.13)
+			(xy 396.24 123.19) (xy 416.56 123.19)
 		)
 		(stroke
 			(width 0)
@@ -3875,7 +3915,7 @@
 	)
 	(wire
 		(pts
-			(xy 49.53 97.79) (xy 39.37 97.79)
+			(xy 317.5 69.85) (xy 307.34 69.85)
 		)
 		(stroke
 			(width 0)
@@ -3905,7 +3945,7 @@
 	)
 	(wire
 		(pts
-			(xy 31.75 93.98) (xy 31.75 114.3)
+			(xy 299.72 66.04) (xy 299.72 86.36)
 		)
 		(stroke
 			(width 0)
@@ -3932,26 +3972,6 @@
 			(type default)
 		)
 		(uuid "d6659e52-8f29-41db-a734-b669b1627bef")
-	)
-	(wire
-		(pts
-			(xy 199.39 151.13) (xy 219.71 151.13)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d8d0843f-7aa0-4bd5-a404-e2ac20bded2a")
-	)
-	(wire
-		(pts
-			(xy 307.34 335.28) (xy 307.34 351.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d8e165cb-4f82-4061-82f4-b1c56c8721a9")
 	)
 	(wire
 		(pts
@@ -4025,7 +4045,7 @@
 	)
 	(wire
 		(pts
-			(xy 31.75 114.3) (xy 41.91 114.3)
+			(xy 299.72 86.36) (xy 309.88 86.36)
 		)
 		(stroke
 			(width 0)
@@ -4155,16 +4175,6 @@
 	)
 	(wire
 		(pts
-			(xy 307.34 351.79) (xy 31.75 351.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e60f85a2-56c5-4f9e-b5a1-134dac5a993e")
-	)
-	(wire
-		(pts
 			(xy 121.92 251.46) (xy 121.92 242.57)
 		)
 		(stroke
@@ -4182,6 +4192,16 @@
 			(type default)
 		)
 		(uuid "e7fc2d96-eaa0-4ec1-8e5a-8f92e40b28b5")
+	)
+	(wire
+		(pts
+			(xy 167.64 229.87) (xy 184.15 229.87)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e839fd5f-4deb-439c-9e16-eb8feb25766b")
 	)
 	(wire
 		(pts
@@ -4205,17 +4225,7 @@
 	)
 	(wire
 		(pts
-			(xy 233.68 77.47) (xy 254 77.47)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "eb090fce-68e8-4e93-a2c5-0d9b929d967c")
-	)
-	(wire
-		(pts
-			(xy 85.09 106.68) (xy 85.09 97.79)
+			(xy 353.06 78.74) (xy 353.06 69.85)
 		)
 		(stroke
 			(width 0)
@@ -4235,7 +4245,7 @@
 	)
 	(wire
 		(pts
-			(xy 128.27 114.3) (xy 148.59 114.3)
+			(xy 396.24 86.36) (xy 416.56 86.36)
 		)
 		(stroke
 			(width 0)
@@ -4265,13 +4275,23 @@
 	)
 	(wire
 		(pts
-			(xy 227.33 106.68) (xy 227.33 97.79)
+			(xy 495.3 78.74) (xy 495.3 69.85)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "ee7a3711-3ae4-4a32-8b5a-30e289aa26dd")
+	)
+	(wire
+		(pts
+			(xy 499.11 49.53) (xy 521.97 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ee94333f-e2b2-4045-b08c-8e6ecb389d9a")
 	)
 	(wire
 		(pts
@@ -4285,7 +4305,7 @@
 	)
 	(wire
 		(pts
-			(xy 227.33 97.79) (xy 217.17 97.79)
+			(xy 495.3 69.85) (xy 485.14 69.85)
 		)
 		(stroke
 			(width 0)
@@ -4295,17 +4315,17 @@
 	)
 	(wire
 		(pts
-			(xy 31.75 372.11) (xy 43.18 372.11)
+			(xy 467.36 123.19) (xy 485.14 123.19)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "f373f54b-a274-4d00-9ddd-8499308116a0")
+		(uuid "f31cb0e9-a692-483f-831f-0862449d5ce9")
 	)
 	(wire
 		(pts
-			(xy 298.45 97.79) (xy 288.29 97.79)
+			(xy 566.42 69.85) (xy 556.26 69.85)
 		)
 		(stroke
 			(width 0)
@@ -4315,7 +4335,7 @@
 	)
 	(wire
 		(pts
-			(xy 199.39 114.3) (xy 219.71 114.3)
+			(xy 467.36 86.36) (xy 487.68 86.36)
 		)
 		(stroke
 			(width 0)
@@ -4375,7 +4395,7 @@
 	)
 	(wire
 		(pts
-			(xy 163.83 114.3) (xy 184.15 114.3)
+			(xy 431.8 86.36) (xy 452.12 86.36)
 		)
 		(stroke
 			(width 0)
@@ -4392,6 +4412,16 @@
 			(type default)
 		)
 		(uuid "fbd8afe9-ac9d-4c98-8ae4-c1b14794889d")
+	)
+	(wire
+		(pts
+			(xy 200.66 151.13) (xy 219.71 151.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fc5c449a-0405-481b-81e2-0fccf8f80dec")
 	)
 	(wire
 		(pts
@@ -4412,6 +4442,16 @@
 			(type default)
 		)
 		(uuid "fd05d857-3a98-44d5-acd9-fdb67d975733")
+	)
+	(wire
+		(pts
+			(xy 129.54 295.91) (xy 149.86 295.91)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fdb06405-f37a-4535-b7b4-dfc311a3a22f")
 	)
 	(wire
 		(pts
@@ -4442,6 +4482,106 @@
 			(type default)
 		)
 		(uuid "ffb21526-aad3-4117-88dc-cefbf8612f55")
+	)
+	(label "LED_DATA_OUT_1"
+		(at 266.7 77.47 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "0ae506bc-99a3-4410-87ea-30166e5e5f47")
+	)
+	(label "LED_DATA_OUT_4"
+		(at 328.93 335.28 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "0f076f44-e5ad-4190-82c9-9dffa6e83cb4")
+	)
+	(label "LED_DATA_OUT_3"
+		(at 180.34 222.25 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "18ea3953-fa55-480e-8317-ff11b590e1ec")
+	)
+	(label "LED_DATA_OUT_2"
+		(at 200.66 151.13 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "2049563e-490c-4073-a0e5-3921a69e97ff")
+	)
+	(label "LED_DATA_OUT_3"
+		(at 109.22 295.91 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "4353a715-cc28-440b-af9b-6d06b68d5235")
+	)
+	(label "LED_DATA_OUT_4"
+		(at 400.05 372.11 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "47f70600-286e-47dd-8a15-93e92d18a7b5")
+	)
+	(label "LED_DATA_OUT_1"
+		(at 485.14 123.19 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "529c3a52-d35c-47c0-ae4f-cdea1ef05036")
+	)
+	(label "LED_DATA_OUT_4"
+		(at 167.64 229.87 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "c8347abd-0e58-4cbe-b7c5-ec2b471d9b83")
+	)
+	(label "LED_DATA_OUT_4"
+		(at 93.98 306.07 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "ce045f31-703c-4e04-b4d0-5e02f2477cc8")
+	)
+	(label "LED_DATA_OUT_2"
+		(at 499.11 49.53 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "dcd38ef3-acb9-4e3c-9c7d-91ab3f90ef5a")
 	)
 	(global_label "LED_DATA_5V"
 		(shape input)
@@ -4957,7 +5097,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 191.77 151.13 0)
+		(at 459.74 123.19 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -4965,10 +5106,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "0218af7a-9940-4382-b08e-b217dbdb331f")
 		(property "Reference" "D29"
-			(at 203.2 144.7098 0)
+			(at 448.31 116.7698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4978,7 +5118,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 203.2 147.2498 0)
+			(at 448.31 119.3098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -4988,7 +5128,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 193.04 158.75 0)
+			(at 458.47 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5000,7 +5140,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 194.31 160.655 0)
+			(at 457.2 132.715 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5012,7 +5152,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 191.77 151.13 0)
+			(at 459.74 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5023,7 +5163,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 191.77 151.13 0)
+			(at 459.74 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5062,7 +5202,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 252.73 97.79 0)
+		(at 520.7 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -5073,7 +5213,7 @@
 		(fields_autoplaced yes)
 		(uuid "02c9c012-d94f-4b6c-bced-34697a0f2a5a")
 		(property "Reference" "#PWR0292"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5084,7 +5224,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 252.73 92.71 0)
+			(at 520.7 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5094,7 +5234,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 252.73 97.79 0)
+			(at 520.7 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5105,7 +5245,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 252.73 97.79 0)
+			(at 520.7 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5116,7 +5256,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 252.73 97.79 0)
+			(at 520.7 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5550,7 +5690,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 287.02 68.58 0)
+		(at 554.99 40.64 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -5561,7 +5701,7 @@
 		(fields_autoplaced yes)
 		(uuid "05534a68-594f-4160-b861-510896194b8e")
 		(property "Reference" "#PWR0277"
-			(at 287.02 74.93 0)
+			(at 554.99 46.99 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5572,7 +5712,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 287.02 73.66 0)
+			(at 554.99 45.72 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5582,7 +5722,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 287.02 68.58 0)
+			(at 554.99 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5593,7 +5733,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 287.02 68.58 0)
+			(at 554.99 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5604,7 +5744,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 287.02 68.58 0)
+			(at 554.99 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5635,6 +5775,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 339.09 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -5642,10 +5783,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "058ff94f-6993-44cc-848d-1dd6d9990c7e")
 		(property "Reference" "D81"
-			(at 350.52 365.6898 0)
+			(at 327.66 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5655,7 +5795,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 350.52 368.2298 0)
+			(at 327.66 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -5665,7 +5805,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 340.36 379.73 0)
+			(at 337.82 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5677,7 +5817,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 341.63 381.635 0)
+			(at 336.55 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6236,7 +6376,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 191.77 121.92 0)
+		(at 459.74 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6247,7 +6387,7 @@
 		(fields_autoplaced yes)
 		(uuid "08e67399-d8a4-4dd8-916b-c533fbfa5a72")
 		(property "Reference" "#PWR0306"
-			(at 191.77 128.27 0)
+			(at 459.74 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6258,7 +6398,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 191.77 127 0)
+			(at 459.74 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6268,7 +6408,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 191.77 121.92 0)
+			(at 459.74 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6279,7 +6419,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 191.77 121.92 0)
+			(at 459.74 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6290,7 +6430,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 191.77 121.92 0)
+			(at 459.74 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7171,7 +7311,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 251.46 68.58 0)
+		(at 519.43 40.64 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -7182,7 +7322,7 @@
 		(fields_autoplaced yes)
 		(uuid "0dfd010b-6d8a-4b37-abc5-285e3b576c0d")
 		(property "Reference" "#PWR0276"
-			(at 251.46 74.93 0)
+			(at 519.43 46.99 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7193,7 +7333,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 251.46 73.66 0)
+			(at 519.43 45.72 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7203,7 +7343,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 251.46 68.58 0)
+			(at 519.43 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7214,7 +7354,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 251.46 68.58 0)
+			(at 519.43 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7225,7 +7365,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 251.46 68.58 0)
+			(at 519.43 40.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7660,6 +7800,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 262.89 222.25 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -7667,10 +7808,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "131dd5b0-8ea0-41a4-a5fe-118440540163")
 		(property "Reference" "D47"
-			(at 274.32 215.8298 0)
+			(at 251.46 215.8298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7680,7 +7820,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 274.32 218.3698 0)
+			(at 251.46 218.3698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7690,7 +7830,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 264.16 229.87 0)
+			(at 261.62 229.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7702,7 +7842,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 265.43 231.775 0)
+			(at 260.35 231.775 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7764,7 +7904,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 49.53 151.13 0)
+		(at 317.5 123.19 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -7772,10 +7913,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "14003c08-9d63-45be-bcc4-b34f3faff5c5")
 		(property "Reference" "D25"
-			(at 60.96 144.7098 0)
+			(at 306.07 116.7698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7785,7 +7925,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 60.96 147.2498 0)
+			(at 306.07 119.3098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7795,7 +7935,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 50.8 158.75 0)
+			(at 316.23 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7807,7 +7947,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 52.07 160.655 0)
+			(at 314.96 132.715 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7819,7 +7959,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 49.53 151.13 0)
+			(at 317.5 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7830,7 +7970,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 49.53 151.13 0)
+			(at 317.5 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7869,7 +8009,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 120.65 151.13 0)
+		(at 388.62 123.19 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -7877,10 +8018,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "142e935a-2789-4e9e-a207-0901bac9fc29")
 		(property "Reference" "D27"
-			(at 132.08 144.7098 0)
+			(at 377.19 116.7698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7890,7 +8030,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 132.08 147.2498 0)
+			(at 377.19 119.3098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7900,7 +8040,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 121.92 158.75 0)
+			(at 387.35 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7912,7 +8052,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 123.19 160.655 0)
+			(at 386.08 132.715 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7924,7 +8064,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 120.65 151.13 0)
+			(at 388.62 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7935,7 +8075,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 120.65 151.13 0)
+			(at 388.62 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8058,7 +8198,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 39.37 105.41 0)
+		(at 307.34 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -8069,7 +8209,7 @@
 		(fields_autoplaced yes)
 		(uuid "15191bad-8ec0-4b9d-8329-ecf43c2c1f17")
 		(property "Reference" "#PWR0294"
-			(at 39.37 111.76 0)
+			(at 307.34 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8080,7 +8220,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 39.37 110.49 0)
+			(at 307.34 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8090,7 +8230,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 39.37 105.41 0)
+			(at 307.34 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8101,7 +8241,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 39.37 105.41 0)
+			(at 307.34 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8112,7 +8252,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 39.37 105.41 0)
+			(at 307.34 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8220,7 +8360,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 261.62 77.47 0)
+		(at 529.59 49.53 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -8228,10 +8369,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "181810fd-0787-400e-a5ff-d441866a75e5")
 		(property "Reference" "D15"
-			(at 273.05 71.0498 0)
+			(at 518.16 43.1098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8241,7 +8381,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 273.05 73.5898 0)
+			(at 518.16 45.6498 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8251,7 +8391,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 262.89 85.09 0)
+			(at 528.32 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8263,7 +8403,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 264.16 86.995 0)
+			(at 527.05 59.055 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8275,7 +8415,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 261.62 77.47 0)
+			(at 529.59 49.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8286,7 +8426,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 261.62 77.47 0)
+			(at 529.59 49.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8325,7 +8465,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 156.21 114.3 0)
+		(at 424.18 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -8333,10 +8474,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "1846f86b-283d-4798-96c7-966b3af83ecd")
 		(property "Reference" "D20"
-			(at 167.64 107.8798 0)
+			(at 412.75 79.9398 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8346,7 +8486,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 167.64 110.4198 0)
+			(at 412.75 82.4798 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8356,7 +8496,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 157.48 121.92 0)
+			(at 422.91 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8368,7 +8508,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 158.75 123.825 0)
+			(at 421.64 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8380,7 +8520,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 156.21 114.3 0)
+			(at 424.18 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8391,7 +8531,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 156.21 114.3 0)
+			(at 424.18 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9181,7 +9321,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 156.21 151.13 0)
+		(at 424.18 123.19 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9189,10 +9330,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "1a3b51e2-0803-412e-8ba8-388a8d2f870c")
 		(property "Reference" "D28"
-			(at 167.64 144.7098 0)
+			(at 412.75 116.7698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9202,7 +9342,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 167.64 147.2498 0)
+			(at 412.75 119.3098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9212,7 +9352,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 157.48 158.75 0)
+			(at 422.91 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9224,7 +9364,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 158.75 160.655 0)
+			(at 421.64 132.715 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9236,7 +9376,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 156.21 151.13 0)
+			(at 424.18 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9247,7 +9387,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 156.21 151.13 0)
+			(at 424.18 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9690,7 +9830,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 110.49 101.6 0)
+		(at 378.46 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9701,7 +9841,7 @@
 		(fields_autoplaced yes)
 		(uuid "1be5fd18-1cb5-4e7f-9a9d-131b9a14d88d")
 		(property "Reference" "C220"
-			(at 113.03 99.0599 0)
+			(at 381 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9712,7 +9852,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 113.03 101.6 0)
+			(at 381 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9723,7 +9863,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 108.712 101.6 90)
+			(at 376.682 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9734,7 +9874,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9745,7 +9885,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9756,7 +9896,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9767,7 +9907,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9778,7 +9918,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9789,7 +9929,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9800,7 +9940,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9811,7 +9951,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9822,7 +9962,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9833,7 +9973,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9844,7 +9984,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9855,7 +9995,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9866,7 +10006,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 113.03 104.14 0)
+			(at 381 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9877,7 +10017,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9888,7 +10028,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9899,7 +10039,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9932,7 +10072,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 227.33 114.3 0)
+		(at 495.3 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -9940,10 +10081,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "1d2dfb20-8789-4071-8172-744861bbcd40")
 		(property "Reference" "D22"
-			(at 238.76 107.8798 0)
+			(at 483.87 79.9398 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9953,7 +10093,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 238.76 110.4198 0)
+			(at 483.87 82.4798 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9963,7 +10103,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 228.6 121.92 0)
+			(at 494.03 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9975,7 +10115,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 229.87 123.825 0)
+			(at 492.76 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9987,7 +10127,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 227.33 114.3 0)
+			(at 495.3 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9998,7 +10138,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 227.33 114.3 0)
+			(at 495.3 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10037,7 +10177,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 146.05 138.43 0)
+		(at 414.02 110.49 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10048,7 +10188,7 @@
 		(fields_autoplaced yes)
 		(uuid "1de4e153-d920-473e-9edc-9fe1a8eff849")
 		(property "Reference" "C229"
-			(at 148.59 135.8899 0)
+			(at 416.56 107.9499 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10059,7 +10199,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 148.59 138.43 0)
+			(at 416.56 110.49 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10070,7 +10210,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 144.272 138.43 90)
+			(at 412.242 110.49 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10081,7 +10221,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10092,7 +10232,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10103,7 +10243,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10114,7 +10254,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10125,7 +10265,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10136,7 +10276,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10147,7 +10287,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10158,7 +10298,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10169,7 +10309,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10180,7 +10320,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10191,7 +10331,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10202,7 +10342,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10213,7 +10353,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 148.59 140.97 0)
+			(at 416.56 113.03 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10224,7 +10364,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10235,7 +10375,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10246,7 +10386,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12235,7 +12375,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 252.73 105.41 0)
+		(at 520.7 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -12246,7 +12386,7 @@
 		(fields_autoplaced yes)
 		(uuid "283da4b9-1649-4d50-9314-9d72f1898bd5")
 		(property "Reference" "#PWR0300"
-			(at 252.73 111.76 0)
+			(at 520.7 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12257,7 +12397,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 252.73 110.49 0)
+			(at 520.7 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -12267,7 +12407,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 252.73 105.41 0)
+			(at 520.7 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12278,7 +12418,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 252.73 105.41 0)
+			(at 520.7 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12289,7 +12429,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 252.73 105.41 0)
+			(at 520.7 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13070,7 +13210,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 297.18 85.09 0)
+		(at 565.15 57.15 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -13081,7 +13221,7 @@
 		(fields_autoplaced yes)
 		(uuid "2bae565b-32a6-4b85-9cc3-fa3f72f33a68")
 		(property "Reference" "#PWR0285"
-			(at 297.18 91.44 0)
+			(at 565.15 63.5 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13092,7 +13232,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 297.18 90.17 0)
+			(at 565.15 62.23 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13102,7 +13242,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 297.18 85.09 0)
+			(at 565.15 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13113,7 +13253,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 297.18 85.09 0)
+			(at 565.15 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13124,7 +13264,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 297.18 85.09 0)
+			(at 565.15 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13553,7 +13693,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 39.37 138.43 0)
+		(at 307.34 110.49 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -13564,7 +13704,7 @@
 		(fields_autoplaced yes)
 		(uuid "3144a350-9c06-4f58-bbb4-05dfba723dc3")
 		(property "Reference" "C226"
-			(at 41.91 135.8899 0)
+			(at 309.88 107.9499 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13575,7 +13715,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 41.91 138.43 0)
+			(at 309.88 110.49 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13586,7 +13726,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 37.592 138.43 90)
+			(at 305.562 110.49 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13597,7 +13737,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13608,7 +13748,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13619,7 +13759,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13630,7 +13770,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13641,7 +13781,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13652,7 +13792,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13663,7 +13803,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13674,7 +13814,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13685,7 +13825,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13696,7 +13836,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13707,7 +13847,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13718,7 +13858,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13729,7 +13869,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 41.91 140.97 0)
+			(at 309.88 113.03 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13740,7 +13880,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13751,7 +13891,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13762,7 +13902,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14965,7 +15105,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 39.37 97.79 0)
+		(at 307.34 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -14976,7 +15116,7 @@
 		(fields_autoplaced yes)
 		(uuid "3870d606-091d-4dfd-b858-b5ceed35372d")
 		(property "Reference" "#PWR0286"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14987,7 +15127,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 39.37 92.71 0)
+			(at 307.34 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -14997,7 +15137,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 39.37 97.79 0)
+			(at 307.34 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15008,7 +15148,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 39.37 97.79 0)
+			(at 307.34 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15019,7 +15159,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 39.37 97.79 0)
+			(at 307.34 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15049,7 +15189,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 120.65 158.75 0)
+		(at 388.62 130.81 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15060,7 +15200,7 @@
 		(fields_autoplaced yes)
 		(uuid "3a556c4b-a4df-4891-9571-cdcac4b1ad4d")
 		(property "Reference" "#PWR0328"
-			(at 120.65 165.1 0)
+			(at 388.62 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15071,7 +15211,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 120.65 163.83 0)
+			(at 388.62 135.89 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15081,7 +15221,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 120.65 158.75 0)
+			(at 388.62 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15092,7 +15232,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 120.65 158.75 0)
+			(at 388.62 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15103,7 +15243,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 120.65 158.75 0)
+			(at 388.62 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15400,7 +15540,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 298.45 114.3 0)
+		(at 566.42 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15408,10 +15549,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "3d96d960-2433-4bd3-a954-84ac2625fb4f")
 		(property "Reference" "D24"
-			(at 309.88 107.8798 0)
+			(at 554.99 79.9398 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15421,7 +15561,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 309.88 110.4198 0)
+			(at 554.99 82.4798 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15431,7 +15571,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 299.72 121.92 0)
+			(at 565.15 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15443,7 +15583,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 300.99 123.825 0)
+			(at 563.88 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15455,7 +15595,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 298.45 114.3 0)
+			(at 566.42 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15466,7 +15606,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 298.45 114.3 0)
+			(at 566.42 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15694,7 +15834,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 39.37 101.6 0)
+		(at 307.34 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15705,7 +15845,7 @@
 		(fields_autoplaced yes)
 		(uuid "3eea079a-bd8f-417d-9198-e34275fdb18f")
 		(property "Reference" "C218"
-			(at 41.91 99.0599 0)
+			(at 309.88 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15716,7 +15856,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 41.91 101.6 0)
+			(at 309.88 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15727,7 +15867,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 37.592 101.6 90)
+			(at 305.562 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15738,7 +15878,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15749,7 +15889,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15760,7 +15900,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15771,7 +15911,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15782,7 +15922,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15793,7 +15933,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15804,7 +15944,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15815,7 +15955,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15826,7 +15966,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15837,7 +15977,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15848,7 +15988,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15859,7 +15999,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15870,7 +16010,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 41.91 104.14 0)
+			(at 309.88 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15881,7 +16021,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15892,7 +16032,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15903,7 +16043,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 39.37 101.6 0)
+			(at 307.34 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16340,7 +16480,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 49.53 158.75 0)
+		(at 317.5 130.81 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -16351,7 +16491,7 @@
 		(fields_autoplaced yes)
 		(uuid "414cf5e7-31e0-4967-bd0b-f60e3b2e374c")
 		(property "Reference" "#PWR0326"
-			(at 49.53 165.1 0)
+			(at 317.5 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16362,7 +16502,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 49.53 163.83 0)
+			(at 317.5 135.89 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -16372,7 +16512,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 49.53 158.75 0)
+			(at 317.5 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16383,7 +16523,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 49.53 158.75 0)
+			(at 317.5 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16394,7 +16534,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 49.53 158.75 0)
+			(at 317.5 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17122,7 +17262,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 85.09 114.3 0)
+		(at 353.06 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -17130,10 +17271,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "4453077d-25e9-457e-a221-cc15fc0e1f4d")
 		(property "Reference" "D18"
-			(at 96.52 107.8798 0)
+			(at 341.63 79.9398 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17143,7 +17283,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 96.52 110.4198 0)
+			(at 341.63 82.4798 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17153,7 +17293,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 86.36 121.92 0)
+			(at 351.79 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17165,7 +17305,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 87.63 123.825 0)
+			(at 350.52 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17177,7 +17317,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 85.09 114.3 0)
+			(at 353.06 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17188,7 +17328,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 85.09 114.3 0)
+			(at 353.06 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17469,7 +17609,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 110.49 134.62 0)
+		(at 378.46 106.68 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -17480,7 +17620,7 @@
 		(fields_autoplaced yes)
 		(uuid "4840b026-dfd2-40b6-a009-e1da880c67aa")
 		(property "Reference" "#PWR0312"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17491,7 +17631,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 110.49 129.54 0)
+			(at 378.46 101.6 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17501,7 +17641,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 110.49 134.62 0)
+			(at 378.46 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17512,7 +17652,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 110.49 134.62 0)
+			(at 378.46 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17523,7 +17663,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 110.49 134.62 0)
+			(at 378.46 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17637,7 +17777,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 251.46 60.96 0)
+		(at 519.43 33.02 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -17648,7 +17788,7 @@
 		(fields_autoplaced yes)
 		(uuid "492d0327-d5a3-4cff-9f31-c678b17ce3f1")
 		(property "Reference" "#PWR0268"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17659,7 +17799,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 251.46 55.88 0)
+			(at 519.43 27.94 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17669,7 +17809,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 251.46 60.96 0)
+			(at 519.43 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17680,7 +17820,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 251.46 60.96 0)
+			(at 519.43 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17691,7 +17831,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 251.46 60.96 0)
+			(at 519.43 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17721,7 +17861,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 288.29 105.41 0)
+		(at 556.26 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -17732,7 +17872,7 @@
 		(fields_autoplaced yes)
 		(uuid "49a58e24-bbaa-43cf-a635-95165f1eac35")
 		(property "Reference" "#PWR0301"
-			(at 288.29 111.76 0)
+			(at 556.26 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17743,7 +17883,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 288.29 110.49 0)
+			(at 556.26 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17753,7 +17893,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 288.29 105.41 0)
+			(at 556.26 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17764,7 +17904,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 288.29 105.41 0)
+			(at 556.26 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17775,7 +17915,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 288.29 105.41 0)
+			(at 556.26 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18451,7 +18591,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 191.77 158.75 0)
+		(at 459.74 130.81 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -18462,7 +18602,7 @@
 		(fields_autoplaced yes)
 		(uuid "4a71bfc7-1df9-45a8-9ca1-f5658a3f3f67")
 		(property "Reference" "#PWR0330"
-			(at 191.77 165.1 0)
+			(at 459.74 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18473,7 +18613,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 191.77 163.83 0)
+			(at 459.74 135.89 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -18483,7 +18623,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 191.77 158.75 0)
+			(at 459.74 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18494,7 +18634,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 191.77 158.75 0)
+			(at 459.74 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18505,7 +18645,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 191.77 158.75 0)
+			(at 459.74 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18620,6 +18760,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 157.48 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -18627,10 +18768,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "4b86a05d-237b-4a0c-90ab-dd9033a47545")
 		(property "Reference" "D76"
-			(at 168.91 365.6898 0)
+			(at 146.05 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -18640,7 +18780,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 168.91 368.2298 0)
+			(at 146.05 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -18650,7 +18790,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 158.75 379.73 0)
+			(at 156.21 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18662,7 +18802,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 160.02 381.635 0)
+			(at 154.94 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18718,7 +18858,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 262.89 114.3 0)
+		(at 530.86 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -18726,10 +18867,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "4c5bb758-5122-40f5-8642-fceb44776151")
 		(property "Reference" "D23"
-			(at 274.32 107.8798 0)
+			(at 519.43 79.9398 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -18739,7 +18879,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 274.32 110.4198 0)
+			(at 519.43 82.4798 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -18749,7 +18889,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 264.16 121.92 0)
+			(at 529.59 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18761,7 +18901,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 265.43 123.825 0)
+			(at 528.32 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18773,7 +18913,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 262.89 114.3 0)
+			(at 530.86 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18784,7 +18924,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 262.89 114.3 0)
+			(at 530.86 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19800,6 +19940,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 264.16 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -19807,10 +19948,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "53418402-1a75-4f1d-8401-c8b236769ce6")
 		(property "Reference" "D55"
-			(at 275.59 252.6598 0)
+			(at 252.73 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -19820,7 +19960,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 275.59 255.1998 0)
+			(at 252.73 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -19830,7 +19970,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 265.43 266.7 0)
+			(at 262.89 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19842,7 +19982,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 266.7 268.605 0)
+			(at 261.62 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19904,7 +20044,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 85.09 151.13 0)
+		(at 353.06 123.19 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -19912,10 +20053,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "53489073-bd7c-4b84-8d36-58b80be1b5f6")
 		(property "Reference" "D26"
-			(at 96.52 144.7098 0)
+			(at 341.63 116.7698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -19925,7 +20065,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 96.52 147.2498 0)
+			(at 341.63 119.3098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -19935,7 +20075,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 86.36 158.75 0)
+			(at 351.79 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19947,7 +20087,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 87.63 160.655 0)
+			(at 350.52 132.715 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19959,7 +20099,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 85.09 151.13 0)
+			(at 353.06 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -19970,7 +20110,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 85.09 151.13 0)
+			(at 353.06 123.19 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20088,6 +20228,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 299.72 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -20095,10 +20236,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "534dea6d-7986-4cc1-8e0b-f1fe933e26a1")
 		(property "Reference" "D56"
-			(at 311.15 252.6598 0)
+			(at 288.29 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -20108,7 +20248,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 311.15 255.1998 0)
+			(at 288.29 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -20118,7 +20258,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 300.99 266.7 0)
+			(at 298.45 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -20130,7 +20270,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 302.26 268.605 0)
+			(at 297.18 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21337,7 +21477,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 120.65 114.3 0)
+		(at 388.62 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -21345,10 +21486,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "5c10f3f4-d8be-4ace-b14e-a7b2244d52b5")
 		(property "Reference" "D19"
-			(at 132.08 107.8798 0)
+			(at 377.19 79.9398 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -21358,7 +21498,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 132.08 110.4198 0)
+			(at 377.19 82.4798 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -21368,7 +21508,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 121.92 121.92 0)
+			(at 387.35 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21380,7 +21520,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 123.19 123.825 0)
+			(at 386.08 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21392,7 +21532,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 120.65 114.3 0)
+			(at 388.62 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21403,7 +21543,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 120.65 114.3 0)
+			(at 388.62 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21443,6 +21583,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 193.04 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -21450,10 +21591,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "5c6a02d4-a9ff-4547-b9cc-bf1ea6b017e2")
 		(property "Reference" "D77"
-			(at 204.47 365.6898 0)
+			(at 181.61 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -21463,7 +21603,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 204.47 368.2298 0)
+			(at 181.61 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -21473,7 +21613,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 194.31 379.73 0)
+			(at 191.77 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -21485,7 +21625,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 195.58 381.635 0)
+			(at 190.5 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22664,6 +22804,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 157.48 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -22671,10 +22812,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "60f0037c-16a1-4d95-a336-b81fc32da458")
 		(property "Reference" "D52"
-			(at 168.91 252.6598 0)
+			(at 146.05 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -22684,7 +22824,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 168.91 255.1998 0)
+			(at 146.05 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -22694,7 +22834,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 158.75 266.7 0)
+			(at 156.21 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22706,7 +22846,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 160.02 268.605 0)
+			(at 154.94 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22930,7 +23070,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 181.61 134.62 0)
+		(at 449.58 106.68 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -22941,7 +23081,7 @@
 		(fields_autoplaced yes)
 		(uuid "625c4fe9-6ddf-4ab2-bd08-b88ded9b42a7")
 		(property "Reference" "#PWR0314"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22952,7 +23092,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 181.61 129.54 0)
+			(at 449.58 101.6 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -22962,7 +23102,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 181.61 134.62 0)
+			(at 449.58 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22973,7 +23113,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 181.61 134.62 0)
+			(at 449.58 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22984,7 +23124,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 181.61 134.62 0)
+			(at 449.58 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23098,7 +23238,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 217.17 105.41 0)
+		(at 485.14 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -23109,7 +23249,7 @@
 		(fields_autoplaced yes)
 		(uuid "630aa0d2-2962-4e0e-8fcd-69238c2edd23")
 		(property "Reference" "#PWR0299"
-			(at 217.17 111.76 0)
+			(at 485.14 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23120,7 +23260,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 217.17 110.49 0)
+			(at 485.14 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -23130,7 +23270,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 217.17 105.41 0)
+			(at 485.14 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23141,7 +23281,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 217.17 105.41 0)
+			(at 485.14 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23152,7 +23292,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 217.17 105.41 0)
+			(at 485.14 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23832,7 +23972,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 181.61 138.43 0)
+		(at 449.58 110.49 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -23843,7 +23983,7 @@
 		(fields_autoplaced yes)
 		(uuid "66a00f20-9a46-4359-b850-5d304c813655")
 		(property "Reference" "C230"
-			(at 184.15 135.8899 0)
+			(at 452.12 107.9499 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -23854,7 +23994,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 184.15 138.43 0)
+			(at 452.12 110.49 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -23865,7 +24005,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 179.832 138.43 90)
+			(at 447.802 110.49 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23876,7 +24016,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23887,7 +24027,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23898,7 +24038,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23909,7 +24049,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23920,7 +24060,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23931,7 +24071,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23942,7 +24082,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23953,7 +24093,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23964,7 +24104,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23975,7 +24115,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23986,7 +24126,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -23997,7 +24137,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24008,7 +24148,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 184.15 140.97 0)
+			(at 452.12 113.03 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -24019,7 +24159,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24030,7 +24170,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24041,7 +24181,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 181.61 138.43 0)
+			(at 449.58 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24158,7 +24298,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 146.05 142.24 0)
+		(at 414.02 114.3 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -24169,7 +24309,7 @@
 		(fields_autoplaced yes)
 		(uuid "67ed125a-2380-42e8-8d10-d813790f78e1")
 		(property "Reference" "#PWR0321"
-			(at 146.05 148.59 0)
+			(at 414.02 120.65 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24180,7 +24320,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 146.05 147.32 0)
+			(at 414.02 119.38 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -24190,7 +24330,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 146.05 142.24 0)
+			(at 414.02 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24201,7 +24341,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 146.05 142.24 0)
+			(at 414.02 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24212,7 +24352,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 146.05 142.24 0)
+			(at 414.02 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24411,6 +24551,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 50.8 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -24418,10 +24559,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "6a2e3cfb-670d-4858-b515-fdac4faca392")
 		(property "Reference" "D49"
-			(at 62.23 252.6598 0)
+			(at 39.37 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -24431,7 +24571,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 62.23 255.1998 0)
+			(at 39.37 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -24441,7 +24581,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 52.07 266.7 0)
+			(at 49.53 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24453,7 +24593,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 53.34 268.605 0)
+			(at 48.26 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24862,7 +25002,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 181.61 105.41 0)
+		(at 449.58 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -24873,7 +25013,7 @@
 		(fields_autoplaced yes)
 		(uuid "6b6c5f07-2f8f-4e24-a505-0083f32b90af")
 		(property "Reference" "#PWR0298"
-			(at 181.61 111.76 0)
+			(at 449.58 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24884,7 +25024,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 181.61 110.49 0)
+			(at 449.58 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -24894,7 +25034,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 181.61 105.41 0)
+			(at 449.58 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24905,7 +25045,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 181.61 105.41 0)
+			(at 449.58 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24916,7 +25056,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 181.61 105.41 0)
+			(at 449.58 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25408,7 +25548,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 262.89 121.92 0)
+		(at 530.86 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -25419,7 +25559,7 @@
 		(fields_autoplaced yes)
 		(uuid "6f4bd252-1cf4-4946-8e77-ba33b1aa548c")
 		(property "Reference" "#PWR0308"
-			(at 262.89 128.27 0)
+			(at 530.86 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25430,7 +25570,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 262.89 127 0)
+			(at 530.86 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -25440,7 +25580,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 262.89 121.92 0)
+			(at 530.86 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25451,7 +25591,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 262.89 121.92 0)
+			(at 530.86 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25462,7 +25602,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 262.89 121.92 0)
+			(at 530.86 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26091,7 +26231,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 288.29 101.6 0)
+		(at 556.26 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -26102,7 +26242,7 @@
 		(fields_autoplaced yes)
 		(uuid "7482d925-4154-4168-b073-0322ed0fb40a")
 		(property "Reference" "C225"
-			(at 290.83 99.0599 0)
+			(at 558.8 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26113,7 +26253,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 290.83 101.6 0)
+			(at 558.8 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26124,7 +26264,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 286.512 101.6 90)
+			(at 554.482 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26135,7 +26275,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26146,7 +26286,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26157,7 +26297,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26168,7 +26308,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26179,7 +26319,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26190,7 +26330,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26201,7 +26341,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26212,7 +26352,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26223,7 +26363,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26234,7 +26374,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26245,7 +26385,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26256,7 +26396,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26267,7 +26407,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 290.83 104.14 0)
+			(at 558.8 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26278,7 +26418,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26289,7 +26429,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26300,7 +26440,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26438,7 +26578,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 287.02 64.77 0)
+		(at 554.99 36.83 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -26449,7 +26589,7 @@
 		(fields_autoplaced yes)
 		(uuid "77be0761-495a-46c0-b652-e43c8a275610")
 		(property "Reference" "C217"
-			(at 289.56 62.2299 0)
+			(at 557.53 34.2899 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26460,7 +26600,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 289.56 64.77 0)
+			(at 557.53 36.83 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26471,7 +26611,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 285.242 64.77 90)
+			(at 553.212 36.83 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26482,7 +26622,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26493,7 +26633,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26504,7 +26644,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26515,7 +26655,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26526,7 +26666,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26537,7 +26677,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26548,7 +26688,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26559,7 +26699,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26570,7 +26710,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26581,7 +26721,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26592,7 +26732,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26603,7 +26743,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26614,7 +26754,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 289.56 67.31 0)
+			(at 557.53 39.37 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26625,7 +26765,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26636,7 +26776,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26647,7 +26787,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26680,7 +26820,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 120.65 121.92 0)
+		(at 388.62 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -26691,7 +26831,7 @@
 		(fields_autoplaced yes)
 		(uuid "77f74868-995e-4c5e-aa97-eb0db2fc726d")
 		(property "Reference" "#PWR0304"
-			(at 120.65 128.27 0)
+			(at 388.62 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26702,7 +26842,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 120.65 127 0)
+			(at 388.62 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26712,7 +26852,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 120.65 121.92 0)
+			(at 388.62 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26723,7 +26863,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 120.65 121.92 0)
+			(at 388.62 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26734,7 +26874,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 120.65 121.92 0)
+			(at 388.62 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26764,7 +26904,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 261.62 85.09 0)
+		(at 529.59 57.15 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -26775,7 +26915,7 @@
 		(fields_autoplaced yes)
 		(uuid "7814d9d5-8530-401d-ab27-003dd9bc8c48")
 		(property "Reference" "#PWR0284"
-			(at 261.62 91.44 0)
+			(at 529.59 63.5 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26786,7 +26926,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 261.62 90.17 0)
+			(at 529.59 62.23 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26796,7 +26936,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 261.62 85.09 0)
+			(at 529.59 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26807,7 +26947,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 261.62 85.09 0)
+			(at 529.59 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26818,7 +26958,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 261.62 85.09 0)
+			(at 529.59 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26848,7 +26988,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 110.49 142.24 0)
+		(at 378.46 114.3 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -26859,7 +26999,7 @@
 		(fields_autoplaced yes)
 		(uuid "7824e993-2f7c-44aa-b0d6-4b938af49cf8")
 		(property "Reference" "#PWR0320"
-			(at 110.49 148.59 0)
+			(at 378.46 120.65 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26870,7 +27010,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 110.49 147.32 0)
+			(at 378.46 119.38 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26880,7 +27020,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 110.49 142.24 0)
+			(at 378.46 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26891,7 +27031,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 110.49 142.24 0)
+			(at 378.46 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26902,7 +27042,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 110.49 142.24 0)
+			(at 378.46 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27362,6 +27502,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 227.33 222.25 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -27369,10 +27510,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "7d0ed27b-4ed6-437a-ba72-233924bba1c5")
 		(property "Reference" "D46"
-			(at 238.76 215.8298 0)
+			(at 215.9 215.8298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -27382,7 +27522,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 238.76 218.3698 0)
+			(at 215.9 218.3698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -27392,7 +27532,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 228.6 229.87 0)
+			(at 226.06 229.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27404,7 +27544,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 229.87 231.775 0)
+			(at 224.79 231.775 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28032,7 +28172,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 146.05 134.62 0)
+		(at 414.02 106.68 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -28043,7 +28183,7 @@
 		(fields_autoplaced yes)
 		(uuid "7ff73340-8575-4f0f-982e-530985694ad3")
 		(property "Reference" "#PWR0313"
-			(at 146.05 138.43 0)
+			(at 414.02 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28054,7 +28194,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 146.05 129.54 0)
+			(at 414.02 101.6 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -28064,7 +28204,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 146.05 134.62 0)
+			(at 414.02 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28075,7 +28215,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 146.05 134.62 0)
+			(at 414.02 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28086,7 +28226,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 146.05 134.62 0)
+			(at 414.02 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28791,7 +28931,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 287.02 60.96 0)
+		(at 554.99 33.02 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -28802,7 +28942,7 @@
 		(fields_autoplaced yes)
 		(uuid "8325a905-0373-45ae-9524-00b6a83ebb7b")
 		(property "Reference" "#PWR0269"
-			(at 287.02 64.77 0)
+			(at 554.99 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28813,7 +28953,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 287.02 55.88 0)
+			(at 554.99 27.94 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -28823,7 +28963,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 287.02 60.96 0)
+			(at 554.99 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28834,7 +28974,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 287.02 60.96 0)
+			(at 554.99 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -28845,7 +28985,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 287.02 60.96 0)
+			(at 554.99 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29043,7 +29183,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 298.45 121.92 0)
+		(at 566.42 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -29054,7 +29194,7 @@
 		(fields_autoplaced yes)
 		(uuid "8526f691-3a01-4d81-930e-264d90ed12bc")
 		(property "Reference" "#PWR0309"
-			(at 298.45 128.27 0)
+			(at 566.42 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29065,7 +29205,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 298.45 127 0)
+			(at 566.42 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -29075,7 +29215,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 298.45 121.92 0)
+			(at 566.42 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29086,7 +29226,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 298.45 121.92 0)
+			(at 566.42 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29097,7 +29237,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 298.45 121.92 0)
+			(at 566.42 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29127,7 +29267,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 251.46 64.77 0)
+		(at 519.43 36.83 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -29138,7 +29278,7 @@
 		(fields_autoplaced yes)
 		(uuid "85e8fd6e-508e-48e4-9a90-fcdb11fecee5")
 		(property "Reference" "C216"
-			(at 254 62.2299 0)
+			(at 521.97 34.2899 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -29149,7 +29289,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 254 64.77 0)
+			(at 521.97 36.83 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -29160,7 +29300,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 249.682 64.77 90)
+			(at 517.652 36.83 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29171,7 +29311,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29182,7 +29322,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29193,7 +29333,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29204,7 +29344,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29215,7 +29355,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29226,7 +29366,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29237,7 +29377,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29248,7 +29388,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29259,7 +29399,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29270,7 +29410,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29281,7 +29421,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29292,7 +29432,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29303,7 +29443,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 254 67.31 0)
+			(at 521.97 39.37 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -29314,7 +29454,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29325,7 +29465,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -29336,7 +29476,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 251.46 64.77 0)
+			(at 519.43 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30342,6 +30482,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 50.8 295.91 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -30349,10 +30490,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "887a9d5e-92f0-402d-bb53-81b7efe8a1fb")
 		(property "Reference" "D57"
-			(at 62.23 289.4898 0)
+			(at 39.37 289.4898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -30362,7 +30502,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 62.23 292.0298 0)
+			(at 39.37 292.0298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -30372,7 +30512,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 52.07 303.53 0)
+			(at 49.53 303.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -30384,7 +30524,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 53.34 305.435 0)
+			(at 48.26 305.435 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31354,7 +31494,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 39.37 142.24 0)
+		(at 307.34 114.3 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -31365,7 +31505,7 @@
 		(fields_autoplaced yes)
 		(uuid "8fa17b12-09b9-43ab-a19c-4e39a41e5ad9")
 		(property "Reference" "#PWR0318"
-			(at 39.37 148.59 0)
+			(at 307.34 120.65 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31376,7 +31516,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 39.37 147.32 0)
+			(at 307.34 119.38 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -31386,7 +31526,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 39.37 142.24 0)
+			(at 307.34 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31397,7 +31537,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 39.37 142.24 0)
+			(at 307.34 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31408,7 +31548,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 39.37 142.24 0)
+			(at 307.34 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31947,7 +32087,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 74.93 138.43 0)
+		(at 342.9 110.49 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -31958,7 +32098,7 @@
 		(fields_autoplaced yes)
 		(uuid "92471e28-a027-4415-88d3-c51d716a3205")
 		(property "Reference" "C227"
-			(at 77.47 135.8899 0)
+			(at 345.44 107.9499 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -31969,7 +32109,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 77.47 138.43 0)
+			(at 345.44 110.49 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -31980,7 +32120,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 73.152 138.43 90)
+			(at 341.122 110.49 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -31991,7 +32131,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32002,7 +32142,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32013,7 +32153,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32024,7 +32164,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32035,7 +32175,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32046,7 +32186,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32057,7 +32197,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32068,7 +32208,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32079,7 +32219,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32090,7 +32230,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32101,7 +32241,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32112,7 +32252,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32123,7 +32263,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 77.47 140.97 0)
+			(at 345.44 113.03 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -32134,7 +32274,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32145,7 +32285,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32156,7 +32296,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32189,7 +32329,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 74.93 101.6 0)
+		(at 342.9 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -32200,7 +32340,7 @@
 		(fields_autoplaced yes)
 		(uuid "93e08f06-44f6-46a7-821b-c7fefe0c7249")
 		(property "Reference" "C219"
-			(at 77.47 99.0599 0)
+			(at 345.44 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -32211,7 +32351,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 77.47 101.6 0)
+			(at 345.44 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -32222,7 +32362,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 73.152 101.6 90)
+			(at 341.122 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32233,7 +32373,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32244,7 +32384,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32255,7 +32395,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32266,7 +32406,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32277,7 +32417,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32288,7 +32428,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32299,7 +32439,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32310,7 +32450,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32321,7 +32461,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32332,7 +32472,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32343,7 +32483,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32354,7 +32494,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32365,7 +32505,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 77.47 104.14 0)
+			(at 345.44 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -32376,7 +32516,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32387,7 +32527,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32398,7 +32538,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33177,7 +33317,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 85.09 121.92 0)
+		(at 353.06 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -33188,7 +33328,7 @@
 		(fields_autoplaced yes)
 		(uuid "9b3dbf93-56e8-463f-acf9-479c8571d5fc")
 		(property "Reference" "#PWR0303"
-			(at 85.09 128.27 0)
+			(at 353.06 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33199,7 +33339,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 85.09 127 0)
+			(at 353.06 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -33209,7 +33349,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 85.09 121.92 0)
+			(at 353.06 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33220,7 +33360,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 85.09 121.92 0)
+			(at 353.06 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33231,7 +33371,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 85.09 121.92 0)
+			(at 353.06 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33261,7 +33401,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 297.18 77.47 0)
+		(at 565.15 49.53 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -33269,10 +33410,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "9c782211-52a5-4777-97ff-18fd41af6061")
 		(property "Reference" "D16"
-			(at 308.61 71.0498 0)
+			(at 553.72 43.1098 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -33282,7 +33422,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 308.61 73.5898 0)
+			(at 553.72 45.6498 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -33292,7 +33432,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 298.45 85.09 0)
+			(at 563.88 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33304,7 +33444,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 299.72 86.995 0)
+			(at 562.61 59.055 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33316,7 +33456,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 297.18 77.47 0)
+			(at 565.15 49.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -33327,7 +33467,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 297.18 77.47 0)
+			(at 565.15 49.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35528,7 +35668,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 39.37 134.62 0)
+		(at 307.34 106.68 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -35539,7 +35679,7 @@
 		(fields_autoplaced yes)
 		(uuid "a93fc881-04ca-4b53-b7fe-3b52611e981b")
 		(property "Reference" "#PWR0310"
-			(at 39.37 138.43 0)
+			(at 307.34 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35550,7 +35690,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 39.37 129.54 0)
+			(at 307.34 101.6 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -35560,7 +35700,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 39.37 134.62 0)
+			(at 307.34 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35571,7 +35711,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 39.37 134.62 0)
+			(at 307.34 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35582,7 +35722,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 39.37 134.62 0)
+			(at 307.34 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35696,7 +35836,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 181.61 142.24 0)
+		(at 449.58 114.3 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -35707,7 +35847,7 @@
 		(fields_autoplaced yes)
 		(uuid "a9b79f66-eb59-4185-b36a-1bd4b57f102c")
 		(property "Reference" "#PWR0322"
-			(at 181.61 148.59 0)
+			(at 449.58 120.65 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35718,7 +35858,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 181.61 147.32 0)
+			(at 449.58 119.38 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -35728,7 +35868,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 181.61 142.24 0)
+			(at 449.58 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35739,7 +35879,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 181.61 142.24 0)
+			(at 449.58 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35750,7 +35890,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 181.61 142.24 0)
+			(at 449.58 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35780,7 +35920,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 252.73 101.6 0)
+		(at 520.7 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -35791,7 +35931,7 @@
 		(fields_autoplaced yes)
 		(uuid "a9b87c11-ddbc-407c-b121-7572a00f3dbf")
 		(property "Reference" "C224"
-			(at 255.27 99.0599 0)
+			(at 523.24 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -35802,7 +35942,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 255.27 101.6 0)
+			(at 523.24 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -35813,7 +35953,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 250.952 101.6 90)
+			(at 518.922 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35824,7 +35964,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35835,7 +35975,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35846,7 +35986,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35857,7 +35997,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35868,7 +36008,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35879,7 +36019,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35890,7 +36030,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35901,7 +36041,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35912,7 +36052,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35923,7 +36063,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35934,7 +36074,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35945,7 +36085,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35956,7 +36096,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 255.27 104.14 0)
+			(at 523.24 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -35967,7 +36107,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35978,7 +36118,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35989,7 +36129,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 252.73 101.6 0)
+			(at 520.7 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36448,6 +36588,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 121.92 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -36455,10 +36596,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "ac48eb51-405a-456e-ab13-683fbf61a0b8")
 		(property "Reference" "D75"
-			(at 133.35 365.6898 0)
+			(at 110.49 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -36468,7 +36608,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 133.35 368.2298 0)
+			(at 110.49 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -36478,7 +36618,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 123.19 379.73 0)
+			(at 120.65 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -36490,7 +36630,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 124.46 381.635 0)
+			(at 119.38 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37030,7 +37170,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 146.05 101.6 0)
+		(at 414.02 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -37041,7 +37181,7 @@
 		(fields_autoplaced yes)
 		(uuid "ae2d22ed-3a32-49e4-b11b-b516d090bcf3")
 		(property "Reference" "C221"
-			(at 148.59 99.0599 0)
+			(at 416.56 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -37052,7 +37192,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 148.59 101.6 0)
+			(at 416.56 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -37063,7 +37203,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 144.272 101.6 90)
+			(at 412.242 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37074,7 +37214,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37085,7 +37225,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37096,7 +37236,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37107,7 +37247,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37118,7 +37258,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37129,7 +37269,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37140,7 +37280,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37151,7 +37291,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37162,7 +37302,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37173,7 +37313,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37184,7 +37324,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37195,7 +37335,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37206,7 +37346,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 148.59 104.14 0)
+			(at 416.56 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -37217,7 +37357,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37228,7 +37368,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37239,7 +37379,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37928,7 +38068,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 146.05 105.41 0)
+		(at 414.02 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -37939,7 +38079,7 @@
 		(fields_autoplaced yes)
 		(uuid "b7dfc4bd-248b-4fc9-903d-0b29417fd3d1")
 		(property "Reference" "#PWR0297"
-			(at 146.05 111.76 0)
+			(at 414.02 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37950,7 +38090,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 146.05 110.49 0)
+			(at 414.02 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -37960,7 +38100,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 146.05 105.41 0)
+			(at 414.02 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37971,7 +38111,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 146.05 105.41 0)
+			(at 414.02 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -37982,7 +38122,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 146.05 105.41 0)
+			(at 414.02 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38096,7 +38236,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 49.53 114.3 0)
+		(at 317.5 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -38104,10 +38245,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "b8599c17-cb81-4678-8d2c-ee81017d308c")
 		(property "Reference" "D17"
-			(at 60.96 107.8798 0)
+			(at 306.07 79.9398 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38117,7 +38257,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 60.96 110.4198 0)
+			(at 306.07 82.4798 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38127,7 +38267,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 50.8 121.92 0)
+			(at 316.23 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38139,7 +38279,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 52.07 123.825 0)
+			(at 314.96 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38151,7 +38291,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 49.53 114.3 0)
+			(at 317.5 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38162,7 +38302,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 49.53 114.3 0)
+			(at 317.5 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38279,7 +38419,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 217.17 97.79 0)
+		(at 485.14 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -38290,7 +38430,7 @@
 		(fields_autoplaced yes)
 		(uuid "b9ac5cc3-1dd3-4f9f-8157-bd8786a01ff7")
 		(property "Reference" "#PWR0291"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38301,7 +38441,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 217.17 92.71 0)
+			(at 485.14 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38311,7 +38451,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 217.17 97.79 0)
+			(at 485.14 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38322,7 +38462,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 217.17 97.79 0)
+			(at 485.14 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38333,7 +38473,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 217.17 97.79 0)
+			(at 485.14 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38925,7 +39065,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 217.17 101.6 0)
+		(at 485.14 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -38936,7 +39076,7 @@
 		(fields_autoplaced yes)
 		(uuid "bdb97899-95c1-47e2-b639-cd002b9a5b03")
 		(property "Reference" "C223"
-			(at 219.71 99.0599 0)
+			(at 487.68 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38947,7 +39087,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 219.71 101.6 0)
+			(at 487.68 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -38958,7 +39098,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 215.392 101.6 90)
+			(at 483.362 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38969,7 +39109,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38980,7 +39120,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -38991,7 +39131,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39002,7 +39142,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39013,7 +39153,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39024,7 +39164,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39035,7 +39175,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39046,7 +39186,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39057,7 +39197,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39068,7 +39208,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39079,7 +39219,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39090,7 +39230,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39101,7 +39241,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 219.71 104.14 0)
+			(at 487.68 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -39112,7 +39252,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39123,7 +39263,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39134,7 +39274,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 217.17 101.6 0)
+			(at 485.14 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39488,6 +39628,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 86.36 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -39495,10 +39636,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "bf4bfd1d-5f8c-4f71-ab5b-8ffd5aaf459f")
 		(property "Reference" "D74"
-			(at 97.79 365.6898 0)
+			(at 74.93 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -39508,7 +39648,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 97.79 368.2298 0)
+			(at 74.93 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -39518,7 +39658,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 87.63 379.73 0)
+			(at 85.09 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -39530,7 +39670,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 88.9 381.635 0)
+			(at 83.82 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40081,6 +40221,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 228.6 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -40088,10 +40229,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "c16bb1ae-ec62-40a0-894a-582e5c140da4")
 		(property "Reference" "D54"
-			(at 240.03 252.6598 0)
+			(at 217.17 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -40101,7 +40241,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 240.03 255.1998 0)
+			(at 217.17 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -40111,7 +40251,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 229.87 266.7 0)
+			(at 227.33 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40123,7 +40263,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 231.14 268.605 0)
+			(at 226.06 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40270,6 +40410,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 228.6 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -40277,10 +40418,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "c28a3f83-6e5e-4407-93e7-97f7839951c9")
 		(property "Reference" "D78"
-			(at 240.03 365.6898 0)
+			(at 217.17 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -40290,7 +40430,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 240.03 368.2298 0)
+			(at 217.17 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -40300,7 +40440,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 229.87 379.73 0)
+			(at 227.33 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40312,7 +40452,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 231.14 381.635 0)
+			(at 226.06 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40934,7 +41074,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 288.29 97.79 0)
+		(at 556.26 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -40945,7 +41085,7 @@
 		(fields_autoplaced yes)
 		(uuid "c543d354-7a77-4948-8b4f-1cc8cbd41569")
 		(property "Reference" "#PWR0293"
-			(at 288.29 101.6 0)
+			(at 556.26 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40956,7 +41096,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 288.29 92.71 0)
+			(at 556.26 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -40966,7 +41106,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 288.29 97.79 0)
+			(at 556.26 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40977,7 +41117,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 288.29 97.79 0)
+			(at 556.26 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -40988,7 +41128,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 288.29 97.79 0)
+			(at 556.26 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41103,6 +41243,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 191.77 222.25 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -41110,10 +41251,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "c5c2ea30-7b7b-479d-9137-06adc60c7bf1")
 		(property "Reference" "D45"
-			(at 203.2 215.8298 0)
+			(at 180.34 215.8298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -41123,7 +41263,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 203.2 218.3698 0)
+			(at 180.34 218.3698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -41133,7 +41273,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 193.04 229.87 0)
+			(at 190.5 229.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41145,7 +41285,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 194.31 231.775 0)
+			(at 189.23 231.775 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41449,7 +41589,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 110.49 138.43 0)
+		(at 378.46 110.49 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -41460,7 +41600,7 @@
 		(fields_autoplaced yes)
 		(uuid "c873138b-0005-4d38-a53b-d5319c986a99")
 		(property "Reference" "C228"
-			(at 113.03 135.8899 0)
+			(at 381 107.9499 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -41471,7 +41611,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 113.03 138.43 0)
+			(at 381 110.49 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -41482,7 +41622,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 108.712 138.43 90)
+			(at 376.682 110.49 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41493,7 +41633,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41504,7 +41644,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41515,7 +41655,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41526,7 +41666,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41537,7 +41677,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41548,7 +41688,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41559,7 +41699,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41570,7 +41710,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41581,7 +41721,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41592,7 +41732,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41603,7 +41743,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41614,7 +41754,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41625,7 +41765,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 113.03 140.97 0)
+			(at 381 113.03 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -41636,7 +41776,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41647,7 +41787,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41658,7 +41798,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 110.49 138.43 0)
+			(at 378.46 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41776,6 +41916,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 86.36 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -41783,10 +41924,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "ca1dc488-ba5e-4cf4-8119-9eec3bf62a5e")
 		(property "Reference" "D50"
-			(at 97.79 252.6598 0)
+			(at 74.93 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -41796,7 +41936,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 97.79 255.1998 0)
+			(at 74.93 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -41806,7 +41946,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 87.63 266.7 0)
+			(at 85.09 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41818,7 +41958,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 88.9 268.605 0)
+			(at 83.82 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -41985,7 +42125,8 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
-		(at 191.77 114.3 0)
+		(at 459.74 86.36 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -41993,10 +42134,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "cb9cdfa4-6e96-4a39-bbef-97dbbf91eb52")
 		(property "Reference" "D21"
-			(at 203.2 107.8798 0)
+			(at 466.1602 74.93 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -42006,7 +42146,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 203.2 110.4198 0)
+			(at 463.6202 74.93 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -42016,7 +42156,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 193.04 121.92 0)
+			(at 458.47 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42028,7 +42168,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 194.31 123.825 0)
+			(at 457.2 95.885 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42040,7 +42180,7 @@
 			)
 		)
 		(property "Description" "RGB LED with integrated controller"
-			(at 191.77 114.3 0)
+			(at 459.74 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42051,7 +42191,7 @@
 			)
 		)
 		(property "LCSC" "C22461793"
-			(at 191.77 114.3 0)
+			(at 459.74 86.36 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42450,7 +42590,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 49.53 121.92 0)
+		(at 317.5 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -42461,7 +42601,7 @@
 		(fields_autoplaced yes)
 		(uuid "cea19bd5-e543-4314-822a-e31a55472ea1")
 		(property "Reference" "#PWR0302"
-			(at 49.53 128.27 0)
+			(at 317.5 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42472,7 +42612,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 49.53 127 0)
+			(at 317.5 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -42482,7 +42622,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 49.53 121.92 0)
+			(at 317.5 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42493,7 +42633,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 49.53 121.92 0)
+			(at 317.5 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -42504,7 +42644,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 49.53 121.92 0)
+			(at 317.5 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43061,7 +43201,6 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "d12839f7-e3d6-4ff6-b3f6-d60209c2c967")
 		(property "Reference" "D59"
 			(at 133.35 289.4898 0)
@@ -43668,6 +43807,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 50.8 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -43675,10 +43815,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "d21c13da-1cb6-44db-9db1-abb525801af7")
 		(property "Reference" "D73"
-			(at 62.23 365.6898 0)
+			(at 39.37 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -43688,7 +43827,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 62.23 368.2298 0)
+			(at 39.37 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -43698,7 +43837,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 52.07 379.73 0)
+			(at 49.53 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43710,7 +43849,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 53.34 381.635 0)
+			(at 48.26 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43766,7 +43905,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 156.21 158.75 0)
+		(at 424.18 130.81 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -43777,7 +43916,7 @@
 		(fields_autoplaced yes)
 		(uuid "d2735fb8-5d88-4cdd-b3fb-a3b86fb70856")
 		(property "Reference" "#PWR0329"
-			(at 156.21 165.1 0)
+			(at 424.18 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43788,7 +43927,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 156.21 163.83 0)
+			(at 424.18 135.89 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -43798,7 +43937,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 156.21 158.75 0)
+			(at 424.18 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43809,7 +43948,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 156.21 158.75 0)
+			(at 424.18 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43820,7 +43959,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 156.21 158.75 0)
+			(at 424.18 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43850,7 +43989,7 @@
 	)
 	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 181.61 101.6 0)
+		(at 449.58 73.66 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -43861,7 +44000,7 @@
 		(fields_autoplaced yes)
 		(uuid "d280712e-9074-45bb-8a82-0d0b62b066e3")
 		(property "Reference" "C222"
-			(at 184.15 99.0599 0)
+			(at 452.12 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -43872,7 +44011,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 184.15 101.6 0)
+			(at 452.12 73.66 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -43883,7 +44022,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 179.832 101.6 90)
+			(at 447.802 73.66 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43894,7 +44033,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43905,7 +44044,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43916,7 +44055,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43927,7 +44066,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43938,7 +44077,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43949,7 +44088,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43960,7 +44099,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43971,7 +44110,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43982,7 +44121,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -43993,7 +44132,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44004,7 +44143,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44015,7 +44154,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44026,7 +44165,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 184.15 104.14 0)
+			(at 452.12 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -44037,7 +44176,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44048,7 +44187,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44059,7 +44198,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44345,6 +44484,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 264.16 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -44352,10 +44492,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "d4b04698-38df-45a4-a204-e5f378181133")
 		(property "Reference" "D79"
-			(at 275.59 365.6898 0)
+			(at 252.73 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -44365,7 +44504,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 275.59 368.2298 0)
+			(at 252.73 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -44375,7 +44514,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 265.43 379.73 0)
+			(at 262.89 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44387,7 +44526,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 266.7 381.635 0)
+			(at 261.62 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44690,6 +44829,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 193.04 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -44697,10 +44837,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "d7220924-3abc-48a6-8dce-856ac469c16a")
 		(property "Reference" "D53"
-			(at 204.47 252.6598 0)
+			(at 181.61 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -44710,7 +44849,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 204.47 255.1998 0)
+			(at 181.61 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -44720,7 +44859,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 194.31 266.7 0)
+			(at 191.77 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -44732,7 +44871,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 195.58 268.605 0)
+			(at 190.5 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45630,6 +45769,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 374.65 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -45637,10 +45777,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "daf0ef1b-3409-495a-ab12-24639859d98f")
 		(property "Reference" "D82"
-			(at 386.08 365.6898 0)
+			(at 363.22 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -45650,7 +45789,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 386.08 368.2298 0)
+			(at 363.22 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -45660,7 +45799,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 375.92 379.73 0)
+			(at 373.38 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -45672,7 +45811,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 377.19 381.635 0)
+			(at 372.11 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46860,7 +46999,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 110.49 105.41 0)
+		(at 378.46 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -46871,7 +47010,7 @@
 		(fields_autoplaced yes)
 		(uuid "df92bfca-7733-4033-b1f8-02f9bfeb3a52")
 		(property "Reference" "#PWR0296"
-			(at 110.49 111.76 0)
+			(at 378.46 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46882,7 +47021,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 110.49 110.49 0)
+			(at 378.46 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -46892,7 +47031,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 110.49 105.41 0)
+			(at 378.46 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46903,7 +47042,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 110.49 105.41 0)
+			(at 378.46 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46914,7 +47053,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 110.49 105.41 0)
+			(at 378.46 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46944,7 +47083,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 74.93 97.79 0)
+		(at 342.9 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -46955,7 +47094,7 @@
 		(fields_autoplaced yes)
 		(uuid "e00ea5a6-9366-44f9-8a5b-31c255c02f21")
 		(property "Reference" "#PWR0287"
-			(at 74.93 101.6 0)
+			(at 342.9 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46966,7 +47105,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 74.93 92.71 0)
+			(at 342.9 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -46976,7 +47115,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 74.93 97.79 0)
+			(at 342.9 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46987,7 +47126,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 74.93 97.79 0)
+			(at 342.9 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -46998,7 +47137,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 74.93 97.79 0)
+			(at 342.9 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -47926,7 +48065,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 146.05 97.79 0)
+		(at 414.02 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -47937,7 +48076,7 @@
 		(fields_autoplaced yes)
 		(uuid "e5c13d02-15da-4d15-858c-258f9a040334")
 		(property "Reference" "#PWR0289"
-			(at 146.05 101.6 0)
+			(at 414.02 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -47948,7 +48087,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 146.05 92.71 0)
+			(at 414.02 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -47958,7 +48097,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 146.05 97.79 0)
+			(at 414.02 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -47969,7 +48108,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 146.05 97.79 0)
+			(at 414.02 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -47980,7 +48119,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 146.05 97.79 0)
+			(at 414.02 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48540,7 +48679,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 85.09 158.75 0)
+		(at 353.06 130.81 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -48551,7 +48690,7 @@
 		(fields_autoplaced yes)
 		(uuid "e74340b8-dbc6-4bc9-8c97-7a6c568f5f7a")
 		(property "Reference" "#PWR0327"
-			(at 85.09 165.1 0)
+			(at 353.06 137.16 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48562,7 +48701,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 85.09 163.83 0)
+			(at 353.06 135.89 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -48572,7 +48711,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 85.09 158.75 0)
+			(at 353.06 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48583,7 +48722,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 85.09 158.75 0)
+			(at 353.06 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48594,7 +48733,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 85.09 158.75 0)
+			(at 353.06 130.81 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48944,7 +49083,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 74.93 142.24 0)
+		(at 342.9 114.3 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -48955,7 +49094,7 @@
 		(fields_autoplaced yes)
 		(uuid "e9d6e808-a824-4be8-85ef-0cd163bf74d7")
 		(property "Reference" "#PWR0319"
-			(at 74.93 148.59 0)
+			(at 342.9 120.65 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48966,7 +49105,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 74.93 147.32 0)
+			(at 342.9 119.38 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -48976,7 +49115,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 74.93 142.24 0)
+			(at 342.9 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48987,7 +49126,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 74.93 142.24 0)
+			(at 342.9 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -48998,7 +49137,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 74.93 142.24 0)
+			(at 342.9 114.3 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49112,7 +49251,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 181.61 97.79 0)
+		(at 449.58 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -49123,7 +49262,7 @@
 		(fields_autoplaced yes)
 		(uuid "eaca560f-536b-40cc-a580-3627ddb9ef91")
 		(property "Reference" "#PWR0290"
-			(at 181.61 101.6 0)
+			(at 449.58 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49134,7 +49273,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 181.61 92.71 0)
+			(at 449.58 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -49144,7 +49283,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 181.61 97.79 0)
+			(at 449.58 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49155,7 +49294,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 181.61 97.79 0)
+			(at 449.58 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49166,7 +49305,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 181.61 97.79 0)
+			(at 449.58 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49359,6 +49498,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 298.45 222.25 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -49366,10 +49506,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "ebedb956-f45c-47dc-8af5-de98a5aab77b")
 		(property "Reference" "D48"
-			(at 309.88 215.8298 0)
+			(at 287.02 215.8298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -49379,7 +49518,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 309.88 218.3698 0)
+			(at 287.02 218.3698 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -49389,7 +49528,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 299.72 229.87 0)
+			(at 297.18 229.87 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49401,7 +49540,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 300.99 231.775 0)
+			(at 295.91 231.775 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49626,6 +49765,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 86.36 295.91 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -49633,10 +49773,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "ee5f5531-867a-4dce-998a-a8307d54247a")
 		(property "Reference" "D58"
-			(at 97.79 289.4898 0)
+			(at 74.93 289.4898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -49646,7 +49785,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 97.79 292.0298 0)
+			(at 74.93 292.0298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -49656,7 +49795,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 87.63 303.53 0)
+			(at 85.09 303.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -49668,7 +49807,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 88.9 305.435 0)
+			(at 83.82 305.435 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50165,7 +50304,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 74.93 105.41 0)
+		(at 342.9 77.47 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -50176,7 +50315,7 @@
 		(fields_autoplaced yes)
 		(uuid "f0ea13b6-fcaf-4126-a79d-b23bbf765800")
 		(property "Reference" "#PWR0295"
-			(at 74.93 111.76 0)
+			(at 342.9 83.82 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50187,7 +50326,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 74.93 110.49 0)
+			(at 342.9 82.55 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -50197,7 +50336,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 74.93 105.41 0)
+			(at 342.9 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50208,7 +50347,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 74.93 105.41 0)
+			(at 342.9 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50219,7 +50358,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 74.93 105.41 0)
+			(at 342.9 77.47 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50334,6 +50473,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 299.72 372.11 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -50341,10 +50481,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "f1aa9744-ebc6-4347-8581-dd9cf92576ec")
 		(property "Reference" "D80"
-			(at 311.15 365.6898 0)
+			(at 288.29 365.6898 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -50354,7 +50493,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 311.15 368.2298 0)
+			(at 288.29 368.2298 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -50364,7 +50503,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 300.99 379.73 0)
+			(at 298.45 379.73 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50376,7 +50515,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 302.26 381.635 0)
+			(at 297.18 381.635 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50758,7 +50897,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 110.49 97.79 0)
+		(at 378.46 69.85 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -50769,7 +50908,7 @@
 		(fields_autoplaced yes)
 		(uuid "f2e0e1b9-c542-4798-918a-f17281b2281f")
 		(property "Reference" "#PWR0288"
-			(at 110.49 101.6 0)
+			(at 378.46 73.66 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50780,7 +50919,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 110.49 92.71 0)
+			(at 378.46 64.77 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -50790,7 +50929,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 110.49 97.79 0)
+			(at 378.46 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50801,7 +50940,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 110.49 97.79 0)
+			(at 378.46 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -50812,7 +50951,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 110.49 97.79 0)
+			(at 378.46 69.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -51078,7 +51217,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 74.93 134.62 0)
+		(at 342.9 106.68 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -51089,7 +51228,7 @@
 		(fields_autoplaced yes)
 		(uuid "f39b78b2-f0e7-4a94-adbf-68a5f828239a")
 		(property "Reference" "#PWR0311"
-			(at 74.93 138.43 0)
+			(at 342.9 110.49 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -51100,7 +51239,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 74.93 129.54 0)
+			(at 342.9 101.6 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -51110,7 +51249,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 74.93 134.62 0)
+			(at 342.9 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -51121,7 +51260,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 74.93 134.62 0)
+			(at 342.9 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -51132,7 +51271,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 74.93 134.62 0)
+			(at 342.9 106.68 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52397,7 +52536,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 227.33 121.92 0)
+		(at 495.3 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -52408,7 +52547,7 @@
 		(fields_autoplaced yes)
 		(uuid "f7c93e5d-af35-4e51-a6b6-40a3264df9f4")
 		(property "Reference" "#PWR0307"
-			(at 227.33 128.27 0)
+			(at 495.3 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52419,7 +52558,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 227.33 127 0)
+			(at 495.3 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -52429,7 +52568,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 227.33 121.92 0)
+			(at 495.3 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52440,7 +52579,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 227.33 121.92 0)
+			(at 495.3 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52451,7 +52590,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 227.33 121.92 0)
+			(at 495.3 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52727,7 +52866,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 156.21 121.92 0)
+		(at 424.18 93.98 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -52738,7 +52877,7 @@
 		(fields_autoplaced yes)
 		(uuid "fb099aec-a5c6-4907-b71a-5284e2226733")
 		(property "Reference" "#PWR0305"
-			(at 156.21 128.27 0)
+			(at 424.18 100.33 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52749,7 +52888,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 156.21 127 0)
+			(at 424.18 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -52759,7 +52898,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 156.21 121.92 0)
+			(at 424.18 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52770,7 +52909,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 156.21 121.92 0)
+			(at 424.18 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52781,7 +52920,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 156.21 121.92 0)
+			(at 424.18 93.98 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52890,6 +53029,7 @@
 	(symbol
 		(lib_id "PCM_JLCPCB-Extended:LED, WS2812B, 5050")
 		(at 121.92 259.08 0)
+		(mirror y)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -52897,10 +53037,9 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "fd1a3216-2c55-4356-b516-1d92e74ece22")
 		(property "Reference" "D51"
-			(at 133.35 252.6598 0)
+			(at 110.49 252.6598 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -52910,7 +53049,7 @@
 			)
 		)
 		(property "Value" "WS2812B"
-			(at 133.35 255.1998 0)
+			(at 110.49 255.1998 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -52920,7 +53059,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm"
-			(at 123.19 266.7 0)
+			(at 120.65 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -52932,7 +53071,7 @@
 			)
 		)
 		(property "Datasheet" "https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2406131538_XINGLIGHT-XL-5050RGBC-WS2812B-S_C22461793.pdf"
-			(at 124.46 268.605 0)
+			(at 119.38 268.605 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
