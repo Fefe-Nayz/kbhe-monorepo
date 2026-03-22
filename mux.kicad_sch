@@ -6343,7 +6343,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 185.42 0)
 			(hide yes)
 			(show_name no)
@@ -6558,7 +6558,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 29.21 0)
 			(hide yes)
 			(show_name no)
@@ -7014,7 +7014,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 29.21 0)
 			(hide yes)
 			(show_name no)
@@ -7144,7 +7144,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 133.35 0)
 			(hide yes)
 			(show_name no)
@@ -7358,7 +7358,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 196.85 29.21 0)
 			(hide yes)
 			(show_name no)
@@ -7814,7 +7814,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 81.28 0)
 			(hide yes)
 			(show_name no)
@@ -8522,7 +8522,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 116.84 133.35 0)
 			(hide yes)
 			(show_name no)
@@ -8736,7 +8736,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 185.42 0)
 			(hide yes)
 			(show_name no)
@@ -8866,7 +8866,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 29.21 81.28 0)
 			(hide yes)
 			(show_name no)
@@ -11204,7 +11204,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 196.85 133.35 0)
 			(hide yes)
 			(show_name no)
@@ -11418,7 +11418,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT-23-THIN16_DYY_TEX"
+		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
 			(at 196.85 81.28 0)
 			(hide yes)
 			(show_name no)

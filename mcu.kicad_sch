@@ -25146,7 +25146,7 @@
 				)
 			)
 		)
-		(property "Footprint" "EC11E15244B2"
+		(property "Footprint" "EC11E15244B2:EC11E15244B2"
 			(at 297.18 199.06 0)
 			(hide yes)
 			(show_name no)

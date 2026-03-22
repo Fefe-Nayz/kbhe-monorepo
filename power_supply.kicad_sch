@@ -3846,7 +3846,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOT223_STM"
+		(property "Footprint" "LDL1117S33R:SOT223_STM"
 			(at 189.23 124.46 0)
 			(hide yes)
 			(show_name no)
