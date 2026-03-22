@@ -13037,6 +13037,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 194.31 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "19bf81bd-6769-41df-b3d3-bf1b5259a4fb")
 		)
@@ -13528,6 +13539,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 92.71 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 92.71 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -14197,6 +14219,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 246.38 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "d747ef40-dd22-4ed6-8687-f0305e94b9da")
 		)
@@ -14362,6 +14395,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 347.98 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 347.98 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -14977,6 +15021,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 347.98 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "d7f3cc93-fe77-445b-a18f-aeda1b7f2168")
 		)
@@ -15058,6 +15113,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 105.41 0)
 			(hide yes)
 			(show_name no)
@@ -16617,6 +16683,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 92.71 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 92.71 254 0)
 			(hide yes)
 			(show_name no)
@@ -18868,6 +18945,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "8c4dc9e4-7f7e-4b57-a740-d6ddbe5306e9")
 		)
@@ -19275,6 +19363,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 143.51 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 143.51 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -19776,6 +19875,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 143.51 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 143.51 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -21933,6 +22043,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "a416526b-51a4-45aa-b5de-14c5be3de12f")
 		)
@@ -22464,6 +22585,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "656b76b1-4ed1-44f8-8931-c6ff3fa86013")
 		)
@@ -22955,6 +23087,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 92.71 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 92.71 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -24390,6 +24533,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "655143c8-870d-4f07-baff-3e49fc1dea7e")
 		)
@@ -24471,6 +24625,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 328.93 0)
 			(hide yes)
 			(show_name no)
@@ -25590,6 +25755,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 254 0)
 			(hide yes)
 			(show_name no)
@@ -27529,6 +27705,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 194.31 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "837bdfbc-3a2a-47fb-8351-338488f9fd7d")
 		)
@@ -28608,6 +28795,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 143.51 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 143.51 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -29737,6 +29935,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "dadafb35-eda3-4168-b899-336c8f65e2ce")
 		)
@@ -29818,6 +30027,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 143.51 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 143.51 105.41 0)
 			(hide yes)
 			(show_name no)
@@ -31179,6 +31399,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 92.71 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "c696a37d-a511-426f-8878-8309d8b7cbde")
 		)
@@ -31680,6 +31911,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 194.31 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "4073e6e9-069c-486f-a855-322663ed8d74")
 		)
@@ -31761,6 +32003,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 347.98 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 347.98 290.83 0)
 			(hide yes)
 			(show_name no)
@@ -31862,6 +32115,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 41.91 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "1656bfe0-f9ef-4ec6-9b4f-8601c7fecdb5")
 		)
@@ -31943,6 +32207,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 246.38 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 246.38 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -33892,6 +34167,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 143.51 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "30f733d0-e018-4966-90b1-c41087d7227b")
 		)
@@ -34215,6 +34501,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 41.91 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 41.91 328.93 0)
 			(hide yes)
 			(show_name no)
@@ -34904,6 +35201,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -36171,6 +36479,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 92.71 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "85e23a68-91d0-4093-9ea2-57b0e58858ae")
 		)
@@ -37428,6 +37747,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 92.71 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 92.71 105.41 0)
 			(hide yes)
 			(show_name no)
@@ -40721,6 +41051,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 194.31 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "3fbe9913-9c1a-4890-b7a8-22925d58705f")
 		)
@@ -41978,6 +42319,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "35293d26-b2a5-4a0f-b773-51750d1faa30")
 		)
@@ -43067,6 +43419,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 143.51 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "cdf5135c-7dee-4058-969e-d9b52a55713a")
 		)
@@ -43148,6 +43511,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 194.31 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 194.31 217.17 0)
 			(hide yes)
 			(show_name no)
@@ -43565,6 +43939,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 347.98 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 347.98 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -44318,6 +44703,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 41.91 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "d5c174b8-61ba-4472-93ed-37bc71feae72")
 		)
@@ -44483,6 +44879,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 92.71 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 92.71 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -44856,6 +45263,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 92.71 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "acf2dbb0-b815-48a1-a86b-8d8c2619e2fd")
 		)
@@ -44937,6 +45355,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 246.38 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 246.38 328.93 0)
 			(hide yes)
 			(show_name no)
@@ -45269,6 +45698,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 41.91 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 41.91 31.75 0)
 			(hide yes)
 			(show_name no)
@@ -46022,6 +46462,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 398.78 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "0c57490d-096e-4b98-8a51-36d233d5d6de")
 		)
@@ -46385,6 +46836,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 41.91 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "ca9220dc-e2a5-45fd-a25e-fecc23264802")
 		)
@@ -46476,6 +46938,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 41.91 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "bceeed92-fb67-4b81-b0c3-91992dd61a2f")
 		)
@@ -46557,6 +47030,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 41.91 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 41.91 105.41 0)
 			(hide yes)
 			(show_name no)
@@ -47216,6 +47700,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 41.91 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 41.91 254 0)
 			(hide yes)
 			(show_name no)
@@ -50311,6 +50806,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 41.91 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "75ed8189-320c-4af4-a255-e069db3958f3")
 		)
@@ -50476,6 +50982,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -50839,6 +51356,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 41.91 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 41.91 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -53524,6 +54052,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "76b47982-391f-45f7-a151-ad95310fdcd9")
 		)
@@ -53605,6 +54144,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -53938,6 +54488,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 194.31 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 194.31 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -54805,6 +55366,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 194.31 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "4df9d748-e0c2-47f1-8bb6-dacd262ff4a3")
 		)
@@ -54886,6 +55458,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 143.51 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 143.51 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -55333,6 +55916,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 347.98 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 347.98 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -57504,6 +58098,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 297.18 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "a25fba69-d8ba-4571-b5ff-b763fe1dff3b")
 		)
@@ -58489,6 +59094,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 143.51 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 143.51 254 0)
 			(hide yes)
 			(show_name no)
@@ -61362,6 +61978,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 347.98 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "9a5d31a8-b78d-4467-943a-b5393f6c6036")
 		)
@@ -61937,6 +62564,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 246.38 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "9f663cf8-1225-4dc3-b35f-ae4be4a09d73")
 		)
@@ -62018,6 +62656,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 347.98 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 347.98 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -62277,6 +62926,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 246.38 365.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 246.38 365.76 0)
 			(hide yes)
 			(show_name no)
@@ -63302,6 +63962,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 347.98 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 347.98 217.17 0)
 			(hide yes)
 			(show_name no)
@@ -64989,6 +65660,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 194.31 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "51cc0bf7-e6ea-47c1-8ee2-8a5eab96a0d5")
 		)
@@ -65920,6 +66602,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 143.51 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "162b4e5c-7236-4b9b-b47e-b8d290c07d4b")
 		)
@@ -66579,6 +67272,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 520.7 344.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "5eec88a2-2ef6-4369-8f48-243aad8cf546")
 		)
@@ -66660,6 +67364,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 194.31 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 194.31 254 0)
 			(hide yes)
 			(show_name no)
@@ -68925,6 +69640,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 92.71 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "c0ff57c0-8a87-42cd-9113-f6189315a79c")
 		)
@@ -71146,6 +71872,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 398.78 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "30525528-83c8-4edf-b6d2-9372ad80fa32")
 		)
@@ -72433,6 +73170,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 347.98 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "62419103-bb3b-4dd0-8dc3-bdb546dd48d7")
 		)
@@ -72755,6 +73503,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 246.38 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 246.38 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -78004,6 +78763,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 246.38 254 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "43feef85-2058-4a35-988f-737ab5a5c51c")
 		)
@@ -78609,6 +79379,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 347.98 328.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "6eda3b61-8cd2-4591-8af4-2958d0251861")
 		)
@@ -78690,6 +79471,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 461.01 344.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 461.01 344.17 0)
 			(hide yes)
 			(show_name no)
@@ -80259,6 +81051,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 194.31 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "0171d58d-ebdc-43ec-9a0b-300445786a44")
 		)
@@ -80854,6 +81657,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -83243,6 +84057,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 246.38 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "84f9c459-2526-4353-8eba-6fdb5da6de9b")
 		)
@@ -84678,6 +85503,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 297.18 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 297.18 180.34 0)
 			(hide yes)
 			(show_name no)
@@ -88011,6 +88847,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 246.38 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "2f595cb2-24e8-46a7-b0e9-65ad16a96f9d")
 		)
@@ -88092,6 +88939,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 92.71 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 92.71 31.75 0)
 			(hide yes)
 			(show_name no)
@@ -89043,6 +89901,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C266128"
+			(at 143.51 217.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "3"
 			(uuid "5c7c7914-2140-40e2-8330-4fc81deccb96")
 		)
@@ -89366,6 +90235,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 246.38 105.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 246.38 105.41 0)
 			(hide yes)
 			(show_name no)
@@ -92115,6 +92995,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 297.18 143.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 297.18 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -95042,6 +95933,17 @@
 			)
 		)
 		(property "Description" "25 mV/mT,±85-mT, 20-kHz, 3.3/5V, SOT-23"
+			(at 398.78 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C266128"
 			(at 398.78 31.75 0)
 			(hide yes)
 			(show_name no)

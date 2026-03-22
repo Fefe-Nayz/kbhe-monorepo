@@ -14000,7 +14000,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "SK-12D02"
+		(property "Value" "SK-12D02VG3"
 			(at 31.75 85.7249 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14046,6 +14046,17 @@
 		)
 		(property "LCSC Part" "C131374"
 			(at 24.13 83.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C131374"
+			(at 39.37 83.82 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14745,6 +14756,17 @@
 			)
 		)
 		(property "Description" "Very low capacitance ESD protection diode, 2 data-line, SOT-23-6"
+			(at 330.2 190.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C7519"
 			(at 330.2 190.5 0)
 			(hide yes)
 			(show_name no)
@@ -15759,6 +15781,17 @@
 				(justify left top)
 			)
 		)
+		(property "LCSC" "C1512049"
+			(at 353.06 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "738deab3-8de1-49e6-b7c0-9e55779e391e")
 		)
@@ -16112,7 +16145,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -20111,7 +20144,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -20481,6 +20514,17 @@
 			)
 		)
 		(property "Description" ""
+			(at 238.76 182.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C128396"
 			(at 238.76 182.88 0)
 			(hide yes)
 			(show_name no)
@@ -23159,6 +23203,17 @@
 				)
 			)
 		)
+		(property "LCSC" "C5270022"
+			(at 162.56 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "13"
 			(uuid "5c25444c-b1bb-44c3-8e1c-f5cba9ac5ba8")
 		)
@@ -23889,7 +23944,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -23966,7 +24021,7 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
@@ -25239,6 +25294,17 @@
 					(size 1.27 1.27)
 				)
 				(justify left top)
+			)
+		)
+		(property "LCSC" "C470754"
+			(at 275.59 111.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
 			)
 		)
 		(pin "D1"
