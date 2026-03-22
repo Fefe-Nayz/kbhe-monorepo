@@ -556,19 +556,19 @@
       },
       {
         "netclass": "USB_90Oms",
-        "pattern": "USB_PLUG_D+"
+        "pattern": "/MCU/USB_PLUG_D+"
       },
       {
         "netclass": "USB_90Oms",
-        "pattern": "USB_PLUG_D-"
+        "pattern": "/MCU/USB_PLUG_D-"
       },
       {
         "netclass": "USB_90Oms",
-        "pattern": "USB_D+"
+        "pattern": "/MCU/USB_D+"
       },
       {
         "netclass": "USB_90Oms",
-        "pattern": "USB_D-"
+        "pattern": "/MCU/USB_D-"
       }
     ]
   },
