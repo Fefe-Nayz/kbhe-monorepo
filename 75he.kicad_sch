@@ -18,6 +18,17 @@
 		)
 		(uuid "57d43c49-b4d1-4c11-a504-610a38b0d4d8")
 	)
+	(text "TODO:\n\nPeut etre ajouté une résistance de terminaison sur les mux selects"
+		(exclude_from_sim no)
+		(at 144.526 84.328 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "6a5dad49-21b4-4209-87f9-045be784880a")
+	)
 	(image
 		(at 147.955 165.1)
 		(uuid "0e55a01d-1d3d-43a3-9118-fdd3ab4d6f4f")
