@@ -12838,30 +12838,6 @@
 			)
 		)
 	)
-	(global_label "ENCODER_WAVE_2"
-		(shape input)
-		(at 204.47 142.24 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "3f459522-8be2-463d-9027-d6987ddcd2e3")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 224.1465 142.24 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
 	(global_label "SWCLK"
 		(shape input)
 		(at 204.47 121.92 0)
@@ -13003,30 +12979,6 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
-			)
-		)
-	)
-	(global_label "ENCODER_WAVE_1"
-		(shape input)
-		(at 204.47 139.7 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "8190d68a-c5ef-4e33-95b3-927005556639")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 224.1465 139.7 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
 			)
 		)
 	)
@@ -13222,6 +13174,30 @@
 			)
 		)
 	)
+	(global_label "ENCODER_WAVE_1"
+		(shape input)
+		(at 204.47 142.24 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "b6dc059c-5e0f-42ab-9cbf-d5c1834e3f46")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 224.1465 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "M4_OUT"
 		(shape input)
 		(at 204.47 96.52 0)
@@ -13267,6 +13243,30 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+	)
+	(global_label "ENCODER_WAVE_2"
+		(shape input)
+		(at 204.47 139.7 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "bd4a6cfe-b9aa-4cdf-b31d-6d94239bd8ff")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 224.1465 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 	)
