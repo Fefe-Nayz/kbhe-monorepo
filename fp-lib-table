@@ -13,4 +13,5 @@
 	(lib (name "KiCad") (type "KiCad") (uri "${KIPRJMOD}/Library/SN74LV4051APWR/KiCad.pretty") (options "") (descr ""))
 	(lib (name "SN74LV4051APWR") (type "KiCad") (uri "${KIPRJMOD}/Library/SN74LV4051APWR.pretty") (options "") (descr ""))
 	(lib (name "SOP65P640X120-16N") (type "KiCad") (uri "${KIPRJMOD}/Library/SN74LV4051APWR/KiCad/SOP65P640X120-16N.pretty") (options "") (descr ""))
+	(lib (name "SN74LV4051APWR") (type "KiCad") (uri "${KIPRJMOD}/Library/SN74LV4051APWR/SN74LV4051APWR.pretty") (options "") (descr ""))
 )
