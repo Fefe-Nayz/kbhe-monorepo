@@ -1178,6 +1178,432 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "SN74LV4051APWR:SN74LV4051APWR"
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "IC"
+				(at 24.13 7.62 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Value" "SN74LV4051APWR"
+				(at 24.13 5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+				(at 24.13 -94.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+				(at 24.13 -194.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Height" "1.2"
+				(at 24.13 -394.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Mouser Part Number" "595-SN74LV4051APWR"
+				(at 24.13 -494.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+				(at 24.13 -594.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Manufacturer_Name" "Texas Instruments"
+				(at 24.13 -694.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+				(at 24.13 -794.92 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(symbol "SN74LV4051APWR_1_1"
+				(rectangle
+					(start 5.08 2.54)
+					(end 22.86 -20.32)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin passive line
+					(at 0 0 0)
+					(length 5.08)
+					(name "Y4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -2.54 0)
+					(length 5.08)
+					(name "Y6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -5.08 0)
+					(length 5.08)
+					(name "COM"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -7.62 0)
+					(length 5.08)
+					(name "Y7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -10.16 0)
+					(length 5.08)
+					(name "Y5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -12.7 0)
+					(length 5.08)
+					(name "INH"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -15.24 0)
+					(length 5.08)
+					(name "GND_1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -17.78 0)
+					(length 5.08)
+					(name "GND_2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "8"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 -17.78 180)
+					(length 5.08)
+					(name "C"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "9"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 -15.24 180)
+					(length 5.08)
+					(name "B"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "10"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 -12.7 180)
+					(length 5.08)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "11"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 -10.16 180)
+					(length 5.08)
+					(name "Y3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "12"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 -7.62 180)
+					(length 5.08)
+					(name "Y0"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "13"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 -5.08 180)
+					(length 5.08)
+					(name "Y1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "14"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 -2.54 180)
+					(length 5.08)
+					(name "Y2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "15"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 27.94 0 180)
+					(length 5.08)
+					(name "VCC"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "16"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "power:+3.3VA"
 			(power global)
 			(pin_numbers
@@ -1464,7 +1890,7 @@
 		(uuid "1062f434-8e96-458c-999e-af8e860ecce7")
 	)
 	(junction
-		(at 27.94 52.07)
+		(at -44.45 41.91)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "1428b8ef-878c-48e3-9b6a-b64c74440223")
@@ -1524,6 +1950,12 @@
 		(uuid "3bb65749-804e-4a5c-a178-fdf5ccf4a877")
 	)
 	(junction
+		(at 33.02 43.18)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "3d86cffc-9624-4332-9447-968e7b23d9d8")
+	)
+	(junction
 		(at 196.85 156.21)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -1572,7 +2004,7 @@
 		(uuid "66761375-80b7-4de0-8232-6fe54033f469")
 	)
 	(junction
-		(at 29.21 60.96)
+		(at -43.18 50.8)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "67af4854-a32f-4fc6-b614-c52b9a501a7e")
@@ -1588,6 +2020,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "79f3601f-41da-44da-bfc5-1e99c7cb3361")
+	)
+	(junction
+		(at 195.58 93.98)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "9319fa65-fca1-43f3-a91e-267e45bf160e")
 	)
 	(junction
 		(at 29.21 217.17)
@@ -1620,6 +2058,18 @@
 		(uuid "a66637a4-9418-47fd-a8a4-d6d06be8553d")
 	)
 	(junction
+		(at 46.99 52.07)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "ab7f725b-ec2e-45bb-8d85-76a9d8c5f25a")
+	)
+	(junction
+		(at 193.04 146.05)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "b5aa1ff8-26f2-47ff-8419-fa57250272ee")
+	)
+	(junction
 		(at 29.21 111.76)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -1638,7 +2088,7 @@
 		(uuid "d40270a1-7d16-439a-a478-4b463252b4a9")
 	)
 	(junction
-		(at 24.13 60.96)
+		(at -48.26 50.8)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "d5dc647b-30ae-4e89-8b2c-1564b825c0c6")
@@ -1654,6 +2104,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "db48fa32-9f40-458f-9d71-8c9f8d19bd98")
+	)
+	(junction
+		(at 33.02 45.72)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "dbf752b2-8e5c-485e-84ad-ac075cc791bb")
 	)
 	(junction
 		(at 191.77 165.1)
@@ -1686,13 +2142,19 @@
 		(uuid "efcefaca-4c1f-42fe-bee7-874c034ae1d9")
 	)
 	(junction
+		(at 60.96 27.94)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "f0abaa6f-b39f-4c82-8fb2-7f778ed9f224")
+	)
+	(junction
 		(at 29.21 165.1)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "f4918098-4f46-41ef-be72-060d1b5b393c")
 	)
 	(junction
-		(at 29.21 59.69)
+		(at -43.18 49.53)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "fa9de585-ad38-4e6b-9ebb-51b5230e189a")
@@ -1763,7 +2225,7 @@
 	)
 	(wire
 		(pts
-			(xy 26.67 59.69) (xy 29.21 59.69)
+			(xy -45.72 49.53) (xy -43.18 49.53)
 		)
 		(stroke
 			(width 0)
@@ -1790,6 +2252,16 @@
 			(type default)
 		)
 		(uuid "144fa980-c908-427b-9151-bcc96bc80e9c")
+	)
+	(wire
+		(pts
+			(xy 60.96 27.94) (xy 74.93 27.94)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "14c4d18e-2b12-4014-aa34-71bffc2cde14")
 	)
 	(wire
 		(pts
@@ -1833,7 +2305,7 @@
 	)
 	(wire
 		(pts
-			(xy 29.21 41.91) (xy 24.13 41.91)
+			(xy -43.18 31.75) (xy -48.26 31.75)
 		)
 		(stroke
 			(width 0)
@@ -1863,7 +2335,7 @@
 	)
 	(wire
 		(pts
-			(xy 27.94 52.07) (xy 29.21 52.07)
+			(xy -44.45 41.91) (xy -43.18 41.91)
 		)
 		(stroke
 			(width 0)
@@ -1873,7 +2345,7 @@
 	)
 	(wire
 		(pts
-			(xy 24.13 41.91) (xy 24.13 60.96)
+			(xy -48.26 31.75) (xy -48.26 50.8)
 		)
 		(stroke
 			(width 0)
@@ -1900,6 +2372,16 @@
 			(type default)
 		)
 		(uuid "3550ef7e-d1cd-44fa-966e-568da8d4d2ef")
+	)
+	(wire
+		(pts
+			(xy 33.02 52.07) (xy 46.99 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "36c68019-735a-494e-8533-03971136082c")
 	)
 	(wire
 		(pts
@@ -1933,7 +2415,7 @@
 	)
 	(wire
 		(pts
-			(xy 29.21 60.96) (xy 29.21 62.23)
+			(xy -43.18 50.8) (xy -43.18 52.07)
 		)
 		(stroke
 			(width 0)
@@ -1973,7 +2455,7 @@
 	)
 	(wire
 		(pts
-			(xy 24.13 60.96) (xy 29.21 60.96)
+			(xy -48.26 50.8) (xy -43.18 50.8)
 		)
 		(stroke
 			(width 0)
@@ -2003,7 +2485,7 @@
 	)
 	(wire
 		(pts
-			(xy 196.85 93.98) (xy 191.77 93.98)
+			(xy 196.85 93.98) (xy 195.58 93.98)
 		)
 		(stroke
 			(width 0)
@@ -2053,7 +2535,7 @@
 	)
 	(wire
 		(pts
-			(xy 29.21 59.69) (xy 29.21 60.96)
+			(xy -43.18 49.53) (xy -43.18 50.8)
 		)
 		(stroke
 			(width 0)
@@ -2103,6 +2585,16 @@
 	)
 	(wire
 		(pts
+			(xy 33.02 45.72) (xy 33.02 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "75db269f-683c-47a7-9d95-af97bbb9be0b")
+	)
+	(wire
+		(pts
 			(xy 114.3 163.83) (xy 116.84 163.83)
 		)
 		(stroke
@@ -2130,6 +2622,16 @@
 			(type default)
 		)
 		(uuid "7ab6ed3c-0783-4824-831c-748c4b4d5e9f")
+	)
+	(wire
+		(pts
+			(xy 193.04 146.05) (xy 191.77 146.05)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7c15e261-4921-41f9-86a7-e948fd0aeb88")
 	)
 	(wire
 		(pts
@@ -2203,6 +2705,26 @@
 	)
 	(wire
 		(pts
+			(xy 74.93 52.07) (xy 46.99 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "95639a60-df06-41d6-a694-ea2f40bfd0fc")
+	)
+	(wire
+		(pts
+			(xy 33.02 43.18) (xy 33.02 45.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "963c4196-0260-4e7f-936d-82466e80373c")
+	)
+	(wire
+		(pts
 			(xy 195.58 52.07) (xy 196.85 52.07)
 		)
 		(stroke
@@ -2223,7 +2745,7 @@
 	)
 	(wire
 		(pts
-			(xy 196.85 146.05) (xy 191.77 146.05)
+			(xy 196.85 146.05) (xy 193.04 146.05)
 		)
 		(stroke
 			(width 0)
@@ -2263,7 +2785,7 @@
 	)
 	(wire
 		(pts
-			(xy 26.67 52.07) (xy 27.94 52.07)
+			(xy -45.72 41.91) (xy -44.45 41.91)
 		)
 		(stroke
 			(width 0)
@@ -2310,6 +2832,16 @@
 			(type default)
 		)
 		(uuid "bada459c-8023-4228-bb8d-fc46e8abb9c7")
+	)
+	(wire
+		(pts
+			(xy 74.93 35.56) (xy 74.93 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bbd4d7ab-21d6-4419-992f-c138d01cc1b8")
 	)
 	(wire
 		(pts
@@ -2433,6 +2965,16 @@
 	)
 	(wire
 		(pts
+			(xy 33.02 40.64) (xy 33.02 43.18)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d368b3cb-5038-403d-8c93-be9d1d997da6")
+	)
+	(wire
+		(pts
 			(xy 29.21 215.9) (xy 29.21 217.17)
 		)
 		(stroke
@@ -2543,6 +3085,16 @@
 	)
 	(wire
 		(pts
+			(xy 195.58 93.98) (xy 191.77 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fbf1f249-865e-4ca6-b5df-4697d59e73f4")
+	)
+	(wire
+		(pts
 			(xy 195.58 104.14) (xy 196.85 104.14)
 		)
 		(stroke
@@ -2564,6 +3116,30 @@
 		(uuid "05cd4026-a54a-49f8-b92d-96b3200c1b90")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 18.2421 133.35 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "M1_OUT"
+		(shape input)
+		(at 33.02 33.02 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "06b8a40f-2ad0-41b1-bf68-6f0023a9cdbf")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 22.7777 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -2719,6 +3295,30 @@
 			)
 		)
 	)
+	(global_label "K5_OUT"
+		(shape input)
+		(at 60.96 38.1 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "0caa91b3-a9ea-4719-91e7-b92f13f41865")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 71.0209 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "K41_OUT"
 		(shape input)
 		(at 157.48 41.91 0)
@@ -2863,6 +3463,30 @@
 			)
 		)
 	)
+	(global_label "K8_OUT"
+		(shape input)
+		(at 60.96 30.48 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "1a7db030-8728-4a82-8961-293a90c4f089")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 71.0209 30.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "K27_OUT"
 		(shape input)
 		(at 69.85 158.75 0)
@@ -2889,7 +3513,7 @@
 	)
 	(global_label "M_SEL_1"
 		(shape input)
-		(at 29.21 31.75 180)
+		(at -43.18 21.59 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -2899,7 +3523,7 @@
 		)
 		(uuid "21b2eb44-4e43-4714-8d03-55ca9d5a35d9")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 18.2421 31.75 0)
+			(at -54.1479 21.59 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -2924,6 +3548,54 @@
 		(uuid "21b832f1-34c7-4dee-8a1b-df95c461b140")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 81.1204 91.44 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "M_SEL_0"
+		(shape input)
+		(at 60.96 40.64 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "22e6cd97-8596-46c4-836d-512db6544e53")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 71.9279 40.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "M_SEL_2"
+		(shape input)
+		(at 60.96 45.72 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "244495df-fc60-4999-933b-83410f27d364")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 71.9279 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3273,7 +3945,7 @@
 	)
 	(global_label "K7_OUT"
 		(shape input)
-		(at 69.85 39.37 0)
+		(at -2.54 29.21 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -3283,7 +3955,7 @@
 		)
 		(uuid "37ec09a6-e1ab-4cdc-a0ce-80edbb96f3ea")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 79.9109 39.37 0)
+			(at 7.5209 29.21 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3417,7 +4089,7 @@
 	)
 	(global_label "K22_OUT"
 		(shape input)
-		(at 69.85 46.99 0)
+		(at -2.54 36.83 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -3427,7 +4099,7 @@
 		)
 		(uuid "428b5586-2c3a-420a-9750-fa8f5fc2af0b")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 81.1204 46.99 0)
+			(at 8.7304 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3511,6 +4183,30 @@
 			)
 		)
 	)
+	(global_label "K19_OUT"
+		(shape input)
+		(at 33.02 38.1 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "48857fc2-e5a2-47e1-a509-d0d809f89cf8")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 21.7496 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "K23_OUT"
 		(shape input)
 		(at 69.85 101.6 0)
@@ -3561,7 +4257,7 @@
 	)
 	(global_label "K5_OUT"
 		(shape input)
-		(at 69.85 44.45 0)
+		(at -2.54 34.29 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -3571,7 +4267,7 @@
 		)
 		(uuid "49c5a984-f6f0-4da1-b983-c56f687b8b38")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 79.9109 44.45 0)
+			(at 7.5209 34.29 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3620,6 +4316,30 @@
 		(uuid "4d02d27c-18f4-4503-8ffd-3693d0e52181")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 168.7504 158.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "K7_OUT"
+		(shape input)
+		(at 60.96 33.02 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "4e2a7ef0-7771-4ba7-8781-b55c5d8e8d76")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 71.0209 33.02 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3945,7 +4665,7 @@
 	)
 	(global_label "K6_OUT"
 		(shape input)
-		(at 69.85 36.83 0)
+		(at -2.54 26.67 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -3955,7 +4675,7 @@
 		)
 		(uuid "6b5a5b92-787e-4491-994e-d71cace60952")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 79.9109 36.83 0)
+			(at 7.5209 26.67 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4255,6 +4975,30 @@
 			)
 		)
 	)
+	(global_label "K6_OUT"
+		(shape input)
+		(at 60.96 35.56 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "8490fd16-e981-44ea-9cf0-3f2149681064")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 71.0209 35.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "K1_OUT"
 		(shape input)
 		(at 237.49 148.59 0)
@@ -4449,7 +5193,7 @@
 	)
 	(global_label "K20_OUT"
 		(shape input)
-		(at 69.85 54.61 0)
+		(at -2.54 44.45 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -4459,7 +5203,7 @@
 		)
 		(uuid "92619237-ad22-4c2f-8b2b-e5ec2f516d8a")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 81.1204 54.61 0)
+			(at 8.7304 44.45 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4468,6 +5212,30 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+			)
+		)
+	)
+	(global_label "K20_OUT"
+		(shape input)
+		(at 33.02 35.56 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "976907bb-8bfd-49c2-8148-7751bd620932")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 21.7496 35.56 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 			)
 		)
 	)
@@ -4497,7 +5265,7 @@
 	)
 	(global_label "M_SEL_0"
 		(shape input)
-		(at 29.21 29.21 180)
+		(at -43.18 19.05 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -4507,7 +5275,7 @@
 		)
 		(uuid "9c8c5daa-d4fa-48ba-8313-5bbb64cebd97")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 18.2421 29.21 0)
+			(at -54.1479 19.05 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4615,6 +5383,30 @@
 			)
 		)
 	)
+	(global_label "M_SEL_1"
+		(shape input)
+		(at 60.96 43.18 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "ab808d6a-28f5-4fed-9377-728a83fe3cd4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 71.9279 43.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "K81_OUT"
 		(shape input)
 		(at 157.48 91.44 0)
@@ -4665,7 +5457,7 @@
 	)
 	(global_label "M1_OUT"
 		(shape input)
-		(at 69.85 31.75 0)
+		(at -2.54 21.59 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -4675,7 +5467,7 @@
 		)
 		(uuid "b4bfd7d8-5850-4265-ae6e-183392f72bf2")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 80.0923 31.75 0)
+			(at 7.7023 21.59 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4756,6 +5548,30 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+			)
+		)
+	)
+	(global_label "K21_OUT"
+		(shape input)
+		(at 33.02 30.48 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "bfc20562-f52a-477f-a4e1-076fa2072b03")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 21.7496 30.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 			)
 		)
 	)
@@ -4929,7 +5745,7 @@
 	)
 	(global_label "M_SEL_2"
 		(shape input)
-		(at 29.21 36.83 180)
+		(at -43.18 26.67 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -4939,7 +5755,7 @@
 		)
 		(uuid "cedf0843-492c-4ccb-947e-328d68ec473c")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 18.2421 36.83 0)
+			(at -54.1479 26.67 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5073,7 +5889,7 @@
 	)
 	(global_label "K8_OUT"
 		(shape input)
-		(at 69.85 41.91 0)
+		(at -2.54 31.75 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5083,7 +5899,7 @@
 		)
 		(uuid "dfa4d257-3cc0-4dcd-9004-0d8bed1bf2da")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 79.9109 41.91 0)
+			(at 7.5209 31.75 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5217,7 +6033,7 @@
 	)
 	(global_label "K19_OUT"
 		(shape input)
-		(at 69.85 49.53 0)
+		(at -2.54 39.37 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5227,7 +6043,7 @@
 		)
 		(uuid "e8fb991d-8458-47e6-91fb-9f89d8739429")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 81.1204 49.53 0)
+			(at 8.7304 39.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5308,6 +6124,30 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+			)
+		)
+	)
+	(global_label "K22_OUT"
+		(shape input)
+		(at 33.02 27.94 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "eeb42240-4b5f-4e14-8ffc-2624979d41ab")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 21.7496 27.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 			)
 		)
 	)
@@ -5409,7 +6249,7 @@
 	)
 	(global_label "K21_OUT"
 		(shape input)
-		(at 69.85 52.07 0)
+		(at -2.54 41.91 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5419,7 +6259,7 @@
 		)
 		(uuid "f5e75e1b-2f4c-4180-826c-471f243e34eb")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 81.1204 52.07 0)
+			(at 8.7304 41.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5986,8 +6826,192 @@
 		)
 	)
 	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 238.76 22.86 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "14843723-125b-4114-92e3-35ce8c0449db")
+		(property "Reference" "M13"
+			(at 252.73 15.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 252.73 17.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 262.89 117.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 262.89 217.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 238.76 22.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 262.89 417.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 262.89 517.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 262.89 617.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 262.89 717.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 262.89 817.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "b0a1aaf0-36c7-4992-9e27-bb2ec5784ffe")
+		)
+		(pin "5"
+			(uuid "3c5f758f-97bd-4405-85c5-b478718c2d27")
+		)
+		(pin "10"
+			(uuid "09788123-676a-4cff-be2d-20089edd3af5")
+		)
+		(pin "8"
+			(uuid "a02b3877-c8a5-47ca-9fa4-76f6dd3629c6")
+		)
+		(pin "9"
+			(uuid "079f685f-96d9-4ddc-a054-555794c91501")
+		)
+		(pin "16"
+			(uuid "0c834f9f-139e-4db3-82bb-7a7fa377a102")
+		)
+		(pin "3"
+			(uuid "b1ff59bb-1c76-48f1-a9a3-e642887b943f")
+		)
+		(pin "15"
+			(uuid "1e05ce6f-795c-49c7-8728-5b98e9fd290a")
+		)
+		(pin "14"
+			(uuid "914e84b0-e2d1-416e-a27d-c8bf933f1164")
+		)
+		(pin "4"
+			(uuid "da80a1cb-6999-4c4b-b591-f72f08b85496")
+		)
+		(pin "11"
+			(uuid "0ed23e62-a70d-4825-857c-91296aeb24b7")
+		)
+		(pin "12"
+			(uuid "715de68e-a5bd-40e5-b7ac-d277ec1dfff4")
+		)
+		(pin "1"
+			(uuid "6ebdab19-7ed0-42d3-96ef-50b94fd3d5ab")
+		)
+		(pin "13"
+			(uuid "898dffaf-56c4-4748-a4d2-3abb22b19b42")
+		)
+		(pin "6"
+			(uuid "dd24193c-245d-4fc0-a515-f5e56fbadfe7")
+		)
+		(pin "2"
+			(uuid "7918120b-99c3-4ca0-9a3f-d0e03d45f8a0")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M13")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
-		(at 26.67 55.88 0)
+		(at -45.72 45.72 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -5998,7 +7022,7 @@
 		(fields_autoplaced yes)
 		(uuid "1cd44e04-a7ef-4f9d-8878-7caba2d24568")
 		(property "Reference" "C186"
-			(at 29.21 53.3399 0)
+			(at -43.18 43.1799 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6009,7 +7033,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 29.21 55.88 0)
+			(at -43.18 45.72 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6020,7 +7044,7 @@
 			)
 		)
 		(property "Footprint" "PCM_JLCPCB:C_0402"
-			(at 24.892 55.88 90)
+			(at -47.498 45.72 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6031,7 +7055,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6042,7 +7066,7 @@
 			)
 		)
 		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6053,7 +7077,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6064,7 +7088,7 @@
 			)
 		)
 		(property "Stock" "20208285"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6075,7 +7099,7 @@
 			)
 		)
 		(property "Price" "0.004USD"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6086,7 +7110,7 @@
 			)
 		)
 		(property "Process" "SMT"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6097,7 +7121,7 @@
 			)
 		)
 		(property "Minimum Qty" "20"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6108,7 +7132,7 @@
 			)
 		)
 		(property "Attrition Qty" "10"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6119,7 +7143,7 @@
 			)
 		)
 		(property "Class" "Basic Component"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6130,7 +7154,7 @@
 			)
 		)
 		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6141,7 +7165,7 @@
 			)
 		)
 		(property "Manufacturer" "Samsung Electro-Mechanics"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6152,7 +7176,7 @@
 			)
 		)
 		(property "Part" "CL05B104KO5NNNC"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6163,7 +7187,7 @@
 			)
 		)
 		(property "Voltage Rated" "16V"
-			(at 29.21 58.42 0)
+			(at -43.18 48.26 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6174,7 +7198,7 @@
 			)
 		)
 		(property "Tolerance" "±10%"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6185,7 +7209,7 @@
 			)
 		)
 		(property "Capacitance" "100nF"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6196,7 +7220,7 @@
 			)
 		)
 		(property "Temperature Coefficient" "X7R"
-			(at 26.67 55.88 0)
+			(at -45.72 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6539,7 +7563,7 @@
 	(symbol
 		(lib_name "SN74LV4051ADYYR_1")
 		(lib_id "SN74LV4051ADYYR:SN74LV4051ADYYR")
-		(at 29.21 29.21 0)
+		(at -43.18 19.05 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6550,7 +7574,7 @@
 		(fields_autoplaced yes)
 		(uuid "328fde8d-9032-4bdb-b94a-79c4151136e9")
 		(property "Reference" "M1"
-			(at 49.53 19.05 0)
+			(at -22.86 8.89 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6560,7 +7584,7 @@
 			)
 		)
 		(property "Value" "SN74LV4051ADYYR"
-			(at 49.53 21.59 0)
+			(at -22.86 11.43 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6570,7 +7594,7 @@
 			)
 		)
 		(property "Footprint" "SN74LV4051ADYYR:SOT-23-THIN16_DYY_TEX"
-			(at 29.21 29.21 0)
+			(at -43.18 19.05 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6582,7 +7606,7 @@
 			)
 		)
 		(property "Datasheet" "https://www.ti.com/lit/gpn/sn74lv4051a"
-			(at 29.21 29.21 0)
+			(at -43.18 19.05 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6594,7 +7618,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 29.21 29.21 0)
+			(at -43.18 19.05 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6605,7 +7629,7 @@
 			)
 		)
 		(property "LCSC" "C41558096"
-			(at 29.21 29.21 0)
+			(at -43.18 19.05 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6673,6 +7697,190 @@
 			(project "mux"
 				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "M1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 165.1 128.27 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "32fdec35-9e2c-4d17-a320-c3ef94ff0422")
+		(property "Reference" "M18"
+			(at 179.07 120.65 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 179.07 123.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 189.23 223.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 189.23 323.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 165.1 128.27 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 189.23 523.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 189.23 623.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 189.23 723.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 189.23 823.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 189.23 923.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "517bb465-5488-4ce4-9e2f-c50f362bd631")
+		)
+		(pin "5"
+			(uuid "494da23a-066b-4161-b4e2-6ad02c0a31bd")
+		)
+		(pin "10"
+			(uuid "e46d1d69-a087-4302-87b6-c5469dac3799")
+		)
+		(pin "8"
+			(uuid "79b0cbb5-d756-4ca0-ac61-c1dc3e42d719")
+		)
+		(pin "9"
+			(uuid "1607c904-f68a-4fd3-b748-b3b784add489")
+		)
+		(pin "16"
+			(uuid "bb80e043-0197-489d-8a2d-4cc264bedc9a")
+		)
+		(pin "3"
+			(uuid "d619f753-4c8a-4a35-beef-9344c4aa00f4")
+		)
+		(pin "15"
+			(uuid "b892f059-3202-4391-82c8-74d200418b14")
+		)
+		(pin "14"
+			(uuid "faf562c0-e71b-4e95-aea4-9df3d4c8ef3b")
+		)
+		(pin "4"
+			(uuid "005429a2-733b-4446-9054-0615d790e002")
+		)
+		(pin "11"
+			(uuid "e94ea481-5261-4112-a41e-97bae9a7fbd2")
+		)
+		(pin "12"
+			(uuid "6c8246e6-3735-4b1f-8624-930613ef7177")
+		)
+		(pin "1"
+			(uuid "ece997fc-f84e-4c5f-9107-f506a4f54ff8")
+		)
+		(pin "13"
+			(uuid "f31b8861-b8a2-43b1-8757-699ec2d1e667")
+		)
+		(pin "6"
+			(uuid "f3ef422e-2ae0-48d4-8f6b-d900ad8e554e")
+		)
+		(pin "2"
+			(uuid "36a2ca32-39d9-4b81-a936-cf4ceb679318")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M18")
 					(unit 1)
 				)
 			)
@@ -7146,6 +8354,242 @@
 		)
 	)
 	(symbol
+		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
+		(at 74.93 31.75 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "3e561d62-690b-43e5-aaa7-5c9507c070e9")
+		(property "Reference" "C284"
+			(at 77.47 29.2099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 77.47 31.75 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "PCM_JLCPCB:C_0402"
+			(at 73.152 31.75 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "16V 100nF X7R ±10% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C1525"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Stock" "20208285"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Price" "0.004USD"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Process" "SMT"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Minimum Qty" "20"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Attrition Qty" "10"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Class" "Basic Component"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Category" "Capacitors,Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Part" "CL05B104KO5NNNC"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Voltage Rated" "16V"
+			(at 77.47 34.29 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 0.8 0.8)
+				)
+				(justify left)
+			)
+		)
+		(property "Tolerance" "±10%"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Capacitance" "100nF"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Temperature Coefficient" "X7R"
+			(at 74.93 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "bd2e07f5-ba49-4de3-ad71-643bc801b972")
+		)
+		(pin "2"
+			(uuid "5eb45893-8d35-4c92-83cf-36813bfb9372")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "C284")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "SN74LV4051ADYYR:SN74LV4051ADYYR")
 		(at 29.21 133.35 0)
 		(unit 1)
@@ -7288,7 +8732,7 @@
 	)
 	(symbol
 		(lib_id "power:+3.3VA")
-		(at 27.94 52.07 0)
+		(at -44.45 41.91 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -7299,7 +8743,7 @@
 		(fields_autoplaced yes)
 		(uuid "4165f1a7-93b2-4453-8178-a3d751e3a5ed")
 		(property "Reference" "#PWR0206"
-			(at 27.94 55.88 0)
+			(at -44.45 45.72 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7310,7 +8754,7 @@
 			)
 		)
 		(property "Value" "+3.3VA"
-			(at 27.94 46.99 0)
+			(at -44.45 36.83 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -7320,7 +8764,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 27.94 52.07 0)
+			(at -44.45 41.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7331,7 +8775,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 27.94 52.07 0)
+			(at -44.45 41.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7342,7 +8786,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+3.3VA\""
-			(at 27.94 52.07 0)
+			(at -44.45 41.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7365,6 +8809,374 @@
 			(project "mux"
 				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "#PWR05")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 77.47 129.54 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "42229369-e9a3-48b3-bffd-5db62c83fc1d")
+		(property "Reference" "M17"
+			(at 91.44 121.92 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 91.44 124.46 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 101.6 224.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 101.6 324.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 77.47 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 101.6 524.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 101.6 624.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 101.6 724.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 101.6 824.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 101.6 924.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "a7372a60-bd76-401e-bde7-548b49193ea9")
+		)
+		(pin "5"
+			(uuid "dedf65aa-656d-4a36-ad6b-7d9719ac3c0d")
+		)
+		(pin "10"
+			(uuid "048d4698-f147-43e7-b5a2-77b13b8d0fbe")
+		)
+		(pin "8"
+			(uuid "a4eab925-44b6-4aba-8746-a0553e382247")
+		)
+		(pin "9"
+			(uuid "b3f1df46-1dc8-4a06-9419-c0ef5b4d6e5a")
+		)
+		(pin "16"
+			(uuid "d4c85595-1016-4b33-9e15-0f8e64a6a182")
+		)
+		(pin "3"
+			(uuid "d0ffdee4-d57e-4f22-a82b-45036adcbfd9")
+		)
+		(pin "15"
+			(uuid "963e9c75-5537-411a-af9e-4de2028aeb43")
+		)
+		(pin "14"
+			(uuid "24d2296a-b575-42a9-85f2-3fc1799cff6e")
+		)
+		(pin "4"
+			(uuid "0d3b6f5e-5c06-44b6-ad09-4c829d0b3cad")
+		)
+		(pin "11"
+			(uuid "aebaf7c8-1f21-4e73-8b6a-d6f02b11004c")
+		)
+		(pin "12"
+			(uuid "fe4720ab-a22f-4e1b-8953-1963fc43864b")
+		)
+		(pin "1"
+			(uuid "22511f55-3406-497f-b712-6d07df641f27")
+		)
+		(pin "13"
+			(uuid "d75fe481-e94c-4d40-96dd-8a1dddd33879")
+		)
+		(pin "6"
+			(uuid "33338c7f-7e74-43e7-ae98-c0db7abdb27b")
+		)
+		(pin "2"
+			(uuid "1e7c93c6-d7d2-464f-a9ed-06a52ad07b73")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M17")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 78.74 182.88 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "4259a8a1-4986-4f33-bb79-6a7134da25da")
+		(property "Reference" "M20"
+			(at 92.71 175.26 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 92.71 177.8 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 102.87 277.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 102.87 377.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 78.74 182.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 102.87 577.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 102.87 677.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 102.87 777.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 102.87 877.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 102.87 977.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "47c6a420-9cd5-403a-a1e3-23d876dde13d")
+		)
+		(pin "5"
+			(uuid "761dfe33-b762-48d3-8d51-6e17597cf4e9")
+		)
+		(pin "10"
+			(uuid "37a1aee0-c99e-44aa-952e-d9c3ddb2b293")
+		)
+		(pin "8"
+			(uuid "46e3f6bd-6503-42f6-bbac-7259f897744a")
+		)
+		(pin "9"
+			(uuid "daa326dc-2209-4a95-8931-a720df82e19a")
+		)
+		(pin "16"
+			(uuid "7a44b433-1d9b-4fee-b0c1-b4617ea3b51e")
+		)
+		(pin "3"
+			(uuid "234722a8-f533-4c22-9d60-59b413c378df")
+		)
+		(pin "15"
+			(uuid "e2d58a26-311b-4418-ab22-fe434e260ec5")
+		)
+		(pin "14"
+			(uuid "4826be61-ba26-413f-8ec5-1799a4d440bd")
+		)
+		(pin "4"
+			(uuid "6c37ad4d-981f-453d-be1d-1ee301e34a0b")
+		)
+		(pin "11"
+			(uuid "7218fdac-e99b-4ece-b358-019428e14d12")
+		)
+		(pin "12"
+			(uuid "57b26d1c-9256-4e57-9c7a-d6341f1db59b")
+		)
+		(pin "1"
+			(uuid "75eb63d6-87a3-40f9-90b7-e58b85420c76")
+		)
+		(pin "13"
+			(uuid "199957ad-9e91-4845-bee2-9bb0a495b08c")
+		)
+		(pin "6"
+			(uuid "c284988d-91e7-4197-a24e-16fa6a2b65a1")
+		)
+		(pin "2"
+			(uuid "6bea06d4-1fd8-4a0f-8940-6c93b6073e28")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M20")
 					(unit 1)
 				)
 			)
@@ -7754,6 +9566,190 @@
 		)
 	)
 	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 171.45 185.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "49f514d3-da72-4a35-b727-7ce1a8ae77b1")
+		(property "Reference" "M21"
+			(at 185.42 177.8 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 185.42 180.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 195.58 280.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 195.58 380.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 171.45 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 195.58 580.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 195.58 680.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 195.58 780.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 195.58 880.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 195.58 980.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "fea202d9-e1d7-4743-8776-a899c90ce314")
+		)
+		(pin "5"
+			(uuid "476a2f7a-5b0a-4650-ad01-9616bb5fa55e")
+		)
+		(pin "10"
+			(uuid "2b89e6d8-3b24-4cea-8977-5a70c7220263")
+		)
+		(pin "8"
+			(uuid "7da145af-103d-48f2-8162-77547f098a89")
+		)
+		(pin "9"
+			(uuid "ce8b7ea2-4735-4b91-b110-a3900493e71f")
+		)
+		(pin "16"
+			(uuid "ef149aa2-8949-41d7-b36b-3c2194c9fb0d")
+		)
+		(pin "3"
+			(uuid "f2ac5eeb-f70e-40cd-82cf-b0a8cfad1ecf")
+		)
+		(pin "15"
+			(uuid "4c29a31a-7f8d-418e-891a-cf1fd5e338ba")
+		)
+		(pin "14"
+			(uuid "71b74a88-6b1f-49b0-b8ae-ddb64416ff25")
+		)
+		(pin "4"
+			(uuid "d3cc8575-d70a-4b89-9a4e-9895bdf2d5ec")
+		)
+		(pin "11"
+			(uuid "9505e88f-43ea-45f6-8700-458372b905e6")
+		)
+		(pin "12"
+			(uuid "45ef7c3b-4ad0-489a-b438-321e2105048d")
+		)
+		(pin "1"
+			(uuid "690c4847-a58a-4fac-89f5-3695697df393")
+		)
+		(pin "13"
+			(uuid "d0599d43-bf66-4e1f-8c86-793c6ffa7fd1")
+		)
+		(pin "6"
+			(uuid "c56e9247-250d-4fd2-a713-32a9259f8c01")
+		)
+		(pin "2"
+			(uuid "cd792c69-e41c-4d91-b041-6d5de25b2479")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M21")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 191.77 60.96 0)
 		(unit 1)
@@ -7980,7 +9976,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 24.13 60.96 0)
+		(at -48.26 50.8 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -7991,7 +9987,7 @@
 		(fields_autoplaced yes)
 		(uuid "55a8cb79-7dcc-4c70-8150-151e9c6d28c5")
 		(property "Reference" "#PWR0209"
-			(at 24.13 67.31 0)
+			(at -48.26 57.15 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8002,7 +9998,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 24.13 66.04 0)
+			(at -48.26 55.88 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -8012,7 +10008,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 24.13 60.96 0)
+			(at -48.26 50.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8023,7 +10019,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 24.13 60.96 0)
+			(at -48.26 50.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8034,7 +10030,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 24.13 60.96 0)
+			(at -48.26 50.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8057,6 +10053,374 @@
 			(project "mux"
 				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "#PWR01")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 78.74 77.47 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "5684fdb5-0d74-44cc-9270-3b4c45506238")
+		(property "Reference" "M14"
+			(at 92.71 69.85 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 92.71 72.39 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 102.87 172.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 102.87 272.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 78.74 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 102.87 472.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 102.87 572.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 102.87 672.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 102.87 772.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 102.87 872.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "7c57c4cb-7d05-49cd-a649-37008970f7e9")
+		)
+		(pin "5"
+			(uuid "e46eece2-eed6-462c-ad60-ab74da149f54")
+		)
+		(pin "10"
+			(uuid "2154d2a1-1504-4892-9055-e2648b687479")
+		)
+		(pin "8"
+			(uuid "f9ce3e8a-b8de-448b-bcc7-a7df6adc896e")
+		)
+		(pin "9"
+			(uuid "6904a339-8eed-4888-ae9b-09766009b1eb")
+		)
+		(pin "16"
+			(uuid "ea8ef31c-03ed-4344-8073-3cf166efbf39")
+		)
+		(pin "3"
+			(uuid "7a83f2e0-d4c4-47dc-8ee9-ab7908ad956b")
+		)
+		(pin "15"
+			(uuid "e3d8266f-23a8-4e7f-8a11-943f6aed6e94")
+		)
+		(pin "14"
+			(uuid "c8d90389-7899-4343-a850-f28bc4abf1f6")
+		)
+		(pin "4"
+			(uuid "fbccae06-2129-40c7-b254-443ff0726dc7")
+		)
+		(pin "11"
+			(uuid "e898938c-9097-43fd-aa9a-1dec342b91cf")
+		)
+		(pin "12"
+			(uuid "60cec3df-5d91-4355-87ed-7a9fe90bc15a")
+		)
+		(pin "1"
+			(uuid "58a8ee9e-488d-4b4b-b6f4-ccf312ce7532")
+		)
+		(pin "13"
+			(uuid "189f8e86-d543-498e-86d1-3a5c5c80fe6e")
+		)
+		(pin "6"
+			(uuid "4b6d544f-f75f-451e-ba51-d398e16ef5c0")
+		)
+		(pin "2"
+			(uuid "3e095bb1-bfe6-4304-b9ec-ae3d58441bde")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M14")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 160.02 21.59 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "5c1b61c3-a934-4a05-97ef-cea367c64921")
+		(property "Reference" "M12"
+			(at 173.99 13.97 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 173.99 16.51 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 184.15 116.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 184.15 216.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 160.02 21.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 184.15 416.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 184.15 516.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 184.15 616.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 184.15 716.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 184.15 816.51 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "7d1cbfa0-be40-4641-b2d3-7f747875e521")
+		)
+		(pin "5"
+			(uuid "d1bf5039-1539-4849-a453-f1b50b3e5d7e")
+		)
+		(pin "10"
+			(uuid "a7385c58-bf02-4520-a107-cd90de6e460c")
+		)
+		(pin "8"
+			(uuid "511d34e0-2df0-4724-96c0-40031a08c19b")
+		)
+		(pin "9"
+			(uuid "4b2ba6c7-8245-4305-91cb-4f5fcd8f987a")
+		)
+		(pin "16"
+			(uuid "26ebdcf5-8af3-41f0-841a-493accfce19e")
+		)
+		(pin "3"
+			(uuid "0bac4312-c800-4426-a7e3-70fdc2474245")
+		)
+		(pin "15"
+			(uuid "25b6c848-4aea-4c21-9fba-442abb072856")
+		)
+		(pin "14"
+			(uuid "a943d6db-2d19-48c9-a433-9907d346e389")
+		)
+		(pin "4"
+			(uuid "ec3647e5-d9f2-48eb-8d5c-f9f56d6042d9")
+		)
+		(pin "11"
+			(uuid "9fa9f458-8455-4b61-9cf9-3609e50c8ed8")
+		)
+		(pin "12"
+			(uuid "ca72d348-ed16-438b-ad4a-75e74c16fe46")
+		)
+		(pin "1"
+			(uuid "56492645-ded8-4d79-a555-757f0fec7ccd")
+		)
+		(pin "13"
+			(uuid "44ef847b-b6a8-415d-940c-c2cf449280cb")
+		)
+		(pin "6"
+			(uuid "6aa66169-c807-43cb-8d3f-2fe31324915d")
+		)
+		(pin "2"
+			(uuid "02efb861-65cd-4ad1-9d1b-5166c0ab0a25")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M12")
 					(unit 1)
 				)
 			)
@@ -9390,6 +11754,84 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3VA")
+		(at 60.96 27.94 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "8ba5e617-8940-4c12-86ac-1ffa26125cec")
+		(property "Reference" "#PWR0503"
+			(at 60.96 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3VA"
+			(at 60.96 22.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 60.96 27.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 60.96 27.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3VA\""
+			(at 60.96 27.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "423373c4-527a-4243-a8e3-11e1956a0ddf")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "#PWR0503")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
 		(at 26.67 160.02 0)
 		(unit 1)
@@ -10368,6 +12810,268 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 46.99 52.07 0)
+		(mirror y)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "a85b2cab-96c3-4a96-a9a2-0582ccb53368")
+		(property "Reference" "#PWR0502"
+			(at 46.99 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 46.99 57.15 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 46.99 52.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 46.99 52.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 46.99 52.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "5eaca584-cf48-4ff9-81c2-d5e809ee9abb")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "#PWR0502")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 167.64 78.74 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a9bb0809-4541-41e3-b5f5-5a4a858603c2")
+		(property "Reference" "M15"
+			(at 181.61 71.12 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 181.61 73.66 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 191.77 173.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 191.77 273.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 167.64 78.74 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 191.77 473.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 191.77 573.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 191.77 673.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 191.77 773.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 191.77 873.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "4721a07e-38c6-4b66-a0e5-34421b354170")
+		)
+		(pin "5"
+			(uuid "dea7c307-55a7-49de-a5a1-75c667b57cee")
+		)
+		(pin "10"
+			(uuid "4a1b36df-0697-4848-9044-58d1d3ba89f7")
+		)
+		(pin "8"
+			(uuid "300f7edc-e507-48a5-aba4-602d66366450")
+		)
+		(pin "9"
+			(uuid "dd8f2efc-61d2-4d34-9f86-830aa36394a5")
+		)
+		(pin "16"
+			(uuid "aa4215d5-be30-4e09-bad1-7df4b6bc20dd")
+		)
+		(pin "3"
+			(uuid "67e478bd-715e-42b3-89ba-baa6308310eb")
+		)
+		(pin "15"
+			(uuid "f66e340c-922c-479d-9f2d-9bdc6d829780")
+		)
+		(pin "14"
+			(uuid "f505b13c-c3e9-454a-84a4-c2ff3fdf2047")
+		)
+		(pin "4"
+			(uuid "6fa76529-cc06-4fd1-9413-dc04146ac3e6")
+		)
+		(pin "11"
+			(uuid "e5016c6e-b8e5-42c8-a0e7-3163fd37e0ae")
+		)
+		(pin "12"
+			(uuid "eebd96b9-74fd-4fef-bba8-0101d342ae70")
+		)
+		(pin "1"
+			(uuid "86c1a6b9-421d-4fcc-968c-d71cdc7829f6")
+		)
+		(pin "13"
+			(uuid "ef50a2c7-7c89-4db2-9e5f-1a67d2da05ba")
+		)
+		(pin "6"
+			(uuid "0c993dd9-3835-442e-8896-163c0ca2e693")
+		)
+		(pin "2"
+			(uuid "c1a7eb4e-18aa-418d-bdc6-e65f6854bb17")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M15")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "PCM_JLCPCB-Capacitors:0402,100nF")
 		(at 26.67 212.09 0)
 		(unit 1)
@@ -10604,6 +13308,190 @@
 			(project "mux"
 				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "C4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 33.02 27.94 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "b2dfc126-c0da-4b48-ad4a-af6d54c69d35")
+		(property "Reference" "M1"
+			(at 46.99 20.32 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 46.99 22.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 57.15 122.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 57.15 222.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 33.02 27.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 57.15 422.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 57.15 522.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 57.15 622.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 57.15 722.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 57.15 822.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "4f8144c4-a1a3-4a77-a225-0e703eb29a06")
+		)
+		(pin "5"
+			(uuid "8b87110f-42a0-4180-a72c-4860aa4c1bf1")
+		)
+		(pin "10"
+			(uuid "30d114a4-2804-4fbd-a617-62a33cf43fc0")
+		)
+		(pin "8"
+			(uuid "42422a98-f0a5-46f7-b20f-1112e2cd5762")
+		)
+		(pin "9"
+			(uuid "e6cc8871-09a1-470d-bffd-90f77e84fc95")
+		)
+		(pin "16"
+			(uuid "527ca37c-1085-45b0-bb63-e7857d6b54b4")
+		)
+		(pin "3"
+			(uuid "79a0b7e6-1b07-4145-acdc-16c65a0d19d0")
+		)
+		(pin "15"
+			(uuid "72d4da5a-371c-4ffd-9f1b-cfff2bca4983")
+		)
+		(pin "14"
+			(uuid "187e3069-d5ce-4b33-999f-c529b5c8a012")
+		)
+		(pin "4"
+			(uuid "af541feb-2857-423c-8c3b-f927491f97ce")
+		)
+		(pin "11"
+			(uuid "cc629d7e-22f2-41d2-a806-6f11ad27879f")
+		)
+		(pin "12"
+			(uuid "f9ad3858-d097-43a5-a2de-05ac8c31d980")
+		)
+		(pin "1"
+			(uuid "26dce789-8fa3-4091-9533-e079c112a20e")
+		)
+		(pin "13"
+			(uuid "b8a3cc30-7b24-4249-85de-5512342d827a")
+		)
+		(pin "6"
+			(uuid "8bab0556-5576-4ca3-8b97-a20aae2dcdcc")
+		)
+		(pin "2"
+			(uuid "7425dd0e-ca41-4ba4-a93c-455075e89715")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M1")
 					(unit 1)
 				)
 			)
@@ -10930,6 +13818,190 @@
 			(project "mux"
 				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "#PWR011")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 248.92 80.01 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c34b9954-09b6-426b-bf2e-78816bb09288")
+		(property "Reference" "M16"
+			(at 262.89 72.39 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 262.89 74.93 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 273.05 174.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 273.05 274.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 248.92 80.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 273.05 474.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 273.05 574.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 273.05 674.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 273.05 774.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 273.05 874.93 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "f9eca80a-23a0-4c8c-a3d7-a5b9ea849aa6")
+		)
+		(pin "5"
+			(uuid "bd080bc9-6117-4027-a776-e0a558a5e2b9")
+		)
+		(pin "10"
+			(uuid "789a5b86-324a-44e8-a026-2eb124d2163e")
+		)
+		(pin "8"
+			(uuid "5249f377-703e-448c-83b6-c5af4a4b7b06")
+		)
+		(pin "9"
+			(uuid "cc1b699b-de50-4826-a8ff-1e21b2151652")
+		)
+		(pin "16"
+			(uuid "8b71b013-03ee-4cb9-b6e1-97df03e40bac")
+		)
+		(pin "3"
+			(uuid "35ae7b6b-2e60-43db-8663-72930e55da6b")
+		)
+		(pin "15"
+			(uuid "44809fe4-e01d-4a64-9a40-d0a4d0a244b7")
+		)
+		(pin "14"
+			(uuid "18b0162a-016a-430b-953b-de403ba70885")
+		)
+		(pin "4"
+			(uuid "6e132a1c-4ffa-41c7-967f-bd68c15aa2ee")
+		)
+		(pin "11"
+			(uuid "f07bd464-e6de-40ad-b5f2-6fb28e8022b6")
+		)
+		(pin "12"
+			(uuid "af70d40e-8a02-4acf-ac20-8093b96bfc78")
+		)
+		(pin "1"
+			(uuid "c4cc6ac8-5e22-498a-9885-abf37d124de1")
+		)
+		(pin "13"
+			(uuid "2bde7073-59f1-484d-a41f-14ffec60b578")
+		)
+		(pin "6"
+			(uuid "f7ccf2dd-47da-44b1-87c5-b7a44d0c3fdb")
+		)
+		(pin "2"
+			(uuid "688b76c3-3a58-458c-a535-dc7b425c3f8d")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M16")
 					(unit 1)
 				)
 			)
@@ -11266,6 +14338,190 @@
 			(project "mux"
 				(path "/80e9971c-7153-4562-b6d8-26758820b8b2"
 					(reference "#PWR06")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "SN74LV4051APWR:SN74LV4051APWR")
+		(at 252.73 130.81 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f2247f81-0c1a-479d-b641-14ad09e389c0")
+		(property "Reference" "M19"
+			(at 266.7 123.19 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SN74LV4051APWR"
+			(at 266.7 125.73 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(at 276.86 225.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/gpn/sn74lv4051a"
+			(at 276.86 325.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Description" "8-Channel Analog Multiplexer/Demultiplexer"
+			(at 252.73 130.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Height" "1.2"
+			(at 276.86 525.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Part Number" "595-SN74LV4051APWR"
+			(at 276.86 625.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/SN74LV4051APWR?qs=j%2FZo4ajzVJI89x2tgWsgsA%3D%3D"
+			(at 276.86 725.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Name" "Texas Instruments"
+			(at 276.86 825.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(property "Manufacturer_Part_Number" "SN74LV4051APWR"
+			(at 276.86 925.73 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "7"
+			(uuid "62f11394-c842-4bb5-ae54-3dc48e5281a4")
+		)
+		(pin "5"
+			(uuid "56dfd548-e85e-49d8-a544-5868b248499d")
+		)
+		(pin "10"
+			(uuid "bd751b37-88ee-49ae-b827-c82c94b0f866")
+		)
+		(pin "8"
+			(uuid "f31761ac-d39f-4740-b82a-87d20e51b812")
+		)
+		(pin "9"
+			(uuid "5e925a5e-addb-41cd-b617-39b41df976f7")
+		)
+		(pin "16"
+			(uuid "a3d314e1-6633-4ea3-bfc3-9a59e13db681")
+		)
+		(pin "3"
+			(uuid "09278a61-812e-4211-b7f9-a3c883c0f760")
+		)
+		(pin "15"
+			(uuid "8d5456dd-21df-4eef-b713-96797ce698c1")
+		)
+		(pin "14"
+			(uuid "2733a68d-0d38-4058-a72d-898c5cdc79e2")
+		)
+		(pin "4"
+			(uuid "daf5d7e4-f990-499b-8a1c-7631e025f474")
+		)
+		(pin "11"
+			(uuid "fc69fcd1-586e-4d1d-b488-8750842df513")
+		)
+		(pin "12"
+			(uuid "f819179e-a3d9-479c-8474-d522747d321a")
+		)
+		(pin "1"
+			(uuid "16f15cfe-5140-49a1-a4bb-ca35d68d6381")
+		)
+		(pin "13"
+			(uuid "1525cedf-259b-49f1-ad6d-550fbce90b5b")
+		)
+		(pin "6"
+			(uuid "54c006c7-1adc-4701-9444-52fb99bd491a")
+		)
+		(pin "2"
+			(uuid "49783ad1-0930-49c7-b2a5-9d783f14d038")
+		)
+		(instances
+			(project "75he"
+				(path "/0edb4e17-93a4-4f7b-ad91-3a5c72b69d23/6cd62204-e1e2-4b31-86d5-519042c12041"
+					(reference "M19")
 					(unit 1)
 				)
 			)
