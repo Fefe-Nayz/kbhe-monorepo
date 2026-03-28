@@ -182,6 +182,7 @@ class KBHEDevice:
     def __init__(self):
         self.device = None
         self.path = None
+        self._io_lock = threading.Lock()
     
     def connect(self):
         """Connect to the device."""
@@ -205,24 +206,39 @@ class KBHEDevice:
     
     def send_command(self, cmd_id, data=None, timeout_ms=100):
         """Send a command and wait for response."""
-        # Build packet
-        packet = [0] * (PACKET_SIZE + 1)
-        packet[0] = 0x00  # Report ID (required by hidapi on Windows)
-        packet[1] = cmd_id
-        
-        if data:
-            for i, byte in enumerate(data):
-                if i + 2 < len(packet):
-                    packet[i + 2] = byte
-        
-        # Send
-        self.device.write(packet)
-        
-        # Wait for response
-        time.sleep(timeout_ms / 1000.0)
-        response = self.device.read(PACKET_SIZE)
-        
-        return response
+        if self.device is None:
+            return None
+
+        with self._io_lock:
+            # Flush stale responses that could belong to previous requests.
+            for _ in range(8):
+                stale = self.device.read(PACKET_SIZE)
+                if not stale:
+                    break
+
+            # Build packet
+            packet = [0] * (PACKET_SIZE + 1)
+            packet[0] = 0x00  # Report ID (required by hidapi on Windows)
+            packet[1] = cmd_id
+
+            if data:
+                for i, byte in enumerate(data):
+                    if i + 2 < len(packet):
+                        packet[i + 2] = byte
+
+            # Send
+            self.device.write(packet)
+
+            # Read until timeout and keep the response matching this command.
+            deadline = time.time() + (timeout_ms / 1000.0)
+            while time.time() < deadline:
+                response = self.device.read(PACKET_SIZE)
+                if response and len(response) >= 2:
+                    if response[0] == int(cmd_id):
+                        return response
+                time.sleep(0.001)
+
+        return None
     
     def get_firmware_version(self):
         """Get firmware version."""
@@ -718,13 +734,16 @@ class KBHEDevice:
             states = list(resp[2:8])
             distances_norm = list(resp[8:14])  # Normalized 0-255
             # Extract distances in 0.01mm units (6 x uint16)
+            distances_01mm = []
             distances_mm = []
             for i in range(6):
                 val = resp[14 + i*2] | (resp[15 + i*2] << 8)
+                distances_01mm.append(val)
                 distances_mm.append(val / 100.0)  # Convert to mm float
             return {
                 'states': states, 
                 'distances': distances_norm,  # For progress bars
+                'distances_01mm': distances_01mm,  # Raw units for graphing
                 'distances_mm': distances_mm   # Actual mm values
             }
         return None
@@ -3385,11 +3404,10 @@ but NOT saved to flash until you click "Save to Flash".
                             if len(self.graph_data[i]) > max_points:
                                 self.graph_data[i] = self.graph_data[i][-max_points:]
                 elif dtype == 'distance':
-                    # Get distance in mm (as 0.01mm units)
+                    # Get distance in 0.01mm units directly from MCU
                     key_states = self.device.get_key_states()
-                    if key_states and 'distances_mm' in key_states:
-                        for i, dist_mm in enumerate(key_states['distances_mm']):
-                            val = int(dist_mm * 100)  # Convert mm to 0.01mm
+                    if key_states and 'distances_01mm' in key_states:
+                        for i, val in enumerate(key_states['distances_01mm']):
                             self.graph_data[i].append(val)
                             if len(self.graph_data[i]) > max_points:
                                 self.graph_data[i] = self.graph_data[i][-max_points:]

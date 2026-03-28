@@ -870,14 +870,8 @@ static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
       d = 1.0f;
     resp->distances_norm[i] = (uint8_t)(d * 255.0f);
 
-    // Raw distance in mm * 100 (0.01mm units)
-    // distances[i] is normalized 0-1, representing 0-4mm travel
-    float dist_mm = distances[i] * 4.0f;
-    if (dist_mm < 0.0f)
-      dist_mm = 0.0f;
-    if (dist_mm > 4.0f)
-      dist_mm = 4.0f;
-    resp->distances_mm[i] = (uint16_t)(dist_mm * 100.0f); // e.g., 1.25mm -> 125
+    // Raw distance in 0.01mm units from trigger state.
+    resp->distances_mm[i] = triggerGetDistance01mm(i);
   }
 }
 

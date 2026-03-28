@@ -161,6 +161,18 @@ int getKeyState(int keyIndex) {
   return states[keyIndex];
 }
 
+uint16_t triggerGetDistance01mm(int keyIndex) {
+  if (keyIndex < 0 || keyIndex >= 6)
+    return 0;
+
+  int32_t um = distances_um[keyIndex];
+  if (um < 0)
+    um = 0;
+
+  // Convert um to 0.01mm units (10um per step), rounded to nearest.
+  return (uint16_t)((um + 5) / 10);
+}
+
 static inline void updateKeyDataUm(int keyIndex, int32_t currentDistanceUm,
                                    int resetExtremums) {
   if (resetExtremums) {
