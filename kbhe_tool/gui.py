@@ -1,3 +1,6 @@
-from .ui import HAS_GUI, KBHEConfiguratorApp, LEDMatrixEditor
+from .qtgui import HAS_GUI, KBHEQtMainWindow, launch_gui
 
-__all__ = ["HAS_GUI", "KBHEConfiguratorApp", "LEDMatrixEditor"]
+KBHEConfiguratorApp = KBHEQtMainWindow
+LEDMatrixEditor = KBHEQtMainWindow
+
+__all__ = ["HAS_GUI", "KBHEConfiguratorApp", "LEDMatrixEditor", "launch_gui"]

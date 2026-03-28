@@ -4,7 +4,18 @@ import time
 
 import hid
 
-from .protocol import Command, PACKET_SIZE, PID, RAW_HID_INTERFACE, RAW_HID_USAGE_PAGE, Status, VID
+from .protocol import (
+    Command,
+    GAMEPAD_AXES,
+    GAMEPAD_BUTTONS,
+    GAMEPAD_DIRECTIONS,
+    PACKET_SIZE,
+    PID,
+    RAW_HID_INTERFACE,
+    RAW_HID_USAGE_PAGE,
+    Status,
+    VID,
+)
 
 
 def find_device_path(logger=print):
@@ -436,6 +447,12 @@ class KBHEDevice:
     
     def set_key_gamepad_map(self, key_index, axis, direction, button):
         """Set gamepad mapping for a key."""
+        if isinstance(axis, str):
+            axis = GAMEPAD_AXES.get(axis, 0)
+        if isinstance(direction, str):
+            direction = GAMEPAD_DIRECTIONS.get(direction, 0)
+        if isinstance(button, str):
+            button = GAMEPAD_BUTTONS.get(button, 0)
         data = [0, key_index, axis, direction, button]
         resp = self.send_command(Command.SET_KEY_GAMEPAD_MAP, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK

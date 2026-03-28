@@ -18,7 +18,18 @@ except ImportError:
     messagebox = None
 
 from ..firmware import perform_firmware_update, reconnect_device
-from ..protocol import HID_KEYCODES, HID_KEYCODE_NAMES, LEDEffect
+from ..protocol import (
+    GAMEPAD_AXES,
+    GAMEPAD_AXIS_NAMES,
+    GAMEPAD_BUTTONS,
+    GAMEPAD_BUTTON_NAMES,
+    GAMEPAD_DIRECTIONS,
+    GAMEPAD_DIRECTION_NAMES,
+    HID_KEYCODES,
+    HID_KEYCODE_NAMES,
+    LEDEffect,
+    LED_EFFECT_NAMES,
+)
 
 __all__ = [
     'HAS_GUI',
@@ -38,4 +49,11 @@ __all__ = [
     'HID_KEYCODES',
     'HID_KEYCODE_NAMES',
     'LEDEffect',
+    'LED_EFFECT_NAMES',
+    'GAMEPAD_AXES',
+    'GAMEPAD_AXIS_NAMES',
+    'GAMEPAD_DIRECTIONS',
+    'GAMEPAD_DIRECTION_NAMES',
+    'GAMEPAD_BUTTONS',
+    'GAMEPAD_BUTTON_NAMES',
 ]

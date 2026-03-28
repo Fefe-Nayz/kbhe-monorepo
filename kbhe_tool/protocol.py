@@ -83,9 +83,75 @@ class LEDEffect(IntEnum):
     NONE = 0
     RAINBOW = 1
     BREATHING = 2
-    COLOR_CYCLE = 3
-    WAVE = 4
-    REACTIVE = 5
+    STATIC_RAINBOW = 3
+    SOLID = 4
+    PLASMA = 5
+    FIRE = 6
+    OCEAN = 7
+    MATRIX = 8
+    SPARKLE = 9
+    BREATHING_RAINBOW = 10
+    SPIRAL = 11
+    COLOR_CYCLE = 12
+    REACTIVE = 13
+
+
+LED_EFFECT_NAMES = {
+    LEDEffect.NONE: "Static Pattern",
+    LEDEffect.RAINBOW: "Rainbow Wave",
+    LEDEffect.BREATHING: "Breathing",
+    LEDEffect.STATIC_RAINBOW: "Static Rainbow",
+    LEDEffect.SOLID: "Solid Color",
+    LEDEffect.PLASMA: "Plasma",
+    LEDEffect.FIRE: "Fire",
+    LEDEffect.OCEAN: "Ocean Waves",
+    LEDEffect.MATRIX: "Matrix Rain",
+    LEDEffect.SPARKLE: "Sparkle",
+    LEDEffect.BREATHING_RAINBOW: "Breathing Rainbow",
+    LEDEffect.SPIRAL: "Spiral",
+    LEDEffect.COLOR_CYCLE: "Color Cycle",
+    LEDEffect.REACTIVE: "Reactive",
+}
+
+
+GAMEPAD_AXES = {
+    "None": 0,
+    "Left Stick X": 1,
+    "Left Stick Y": 2,
+    "Right Stick X": 3,
+    "Right Stick Y": 4,
+    "Trigger L": 5,
+    "Trigger R": 6,
+}
+GAMEPAD_AXIS_NAMES = {value: key for key, value in GAMEPAD_AXES.items()}
+
+GAMEPAD_DIRECTIONS = {
+    "+": 0,
+    "-": 1,
+}
+GAMEPAD_DIRECTION_NAMES = {value: key for key, value in GAMEPAD_DIRECTIONS.items()}
+
+GAMEPAD_BUTTONS = {
+    "None": 0,
+    "A": 1,
+    "B": 2,
+    "X": 3,
+    "Y": 4,
+    "LB": 5,
+    "RB": 6,
+    "LT": 7,
+    "RT": 8,
+    "Select": 9,
+    "Start": 10,
+    "L3": 11,
+    "R3": 12,
+    "DPad Up": 13,
+    "DPad Down": 14,
+    "DPad Left": 15,
+    "DPad Right": 16,
+    "Home": 17,
+}
+GAMEPAD_BUTTON_NAMES = {value: key for key, value in GAMEPAD_BUTTONS.items()}
 
 
 HID_KEYCODES = {

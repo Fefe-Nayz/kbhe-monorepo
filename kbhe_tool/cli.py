@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from .firmware import perform_firmware_update, reconnect_device
-from .gui import HAS_GUI, LEDMatrixEditor
+from .gui import HAS_GUI, launch_gui
 
 
 def print_status(device):
@@ -44,10 +44,9 @@ def interactive_menu(device):
 
         if choice == '1':
             if HAS_GUI:
-                editor = LEDMatrixEditor(device)
-                editor.mainloop()
+                launch_gui(device)
             else:
-                print('❌ GUI not available (tkinter not installed)')
+                print('❌ GUI not available (PySide6 not installed)')
         elif choice == '2':
             print_status(device)
         elif choice == '3':
@@ -108,7 +107,7 @@ def interactive_menu(device):
 def parse_args():
     parser = argparse.ArgumentParser(description='KBHE Raw HID configuration tool')
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('--gui', action='store_true', help='Launch the Tk GUI')
+    group.add_argument('--gui', action='store_true', help='Launch the PySide6 configurator')
     group.add_argument('--flash', metavar='FIRMWARE_BIN', help='Flash a firmware .bin over HS HID updater')
     parser.add_argument('--fw-version', type=lambda value: int(value, 0), default=None)
     parser.add_argument('--timeout', type=float, default=5.0)
@@ -159,8 +158,7 @@ def main():
         print_status(device)
         if args.gui:
             if HAS_GUI:
-                editor = LEDMatrixEditor(device)
-                editor.mainloop()
+                launch_gui(device)
             else:
                 print('❌ GUI not available')
                 interactive_menu(device)

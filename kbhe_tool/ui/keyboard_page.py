@@ -1,335 +1,362 @@
 from .common import *
-from .scroll import ScrollableFrame
+from .widgets import create_card, create_page_frame, create_section_row, make_status_chip, set_status_style
 
 
 class KeyboardPageMixin:
     def create_key_settings_widgets(self, parent):
-        """Create Key Settings tab widgets."""
+        """Create the keyboard settings screen."""
 
-        # Info banner
-        ttk.Label(parent, text="⌨️ Configure per-key settings: actuation point, rapid trigger, SOCD, and keycodes",
-                  foreground="blue").pack(anchor=tk.W, pady=(0, 10))
+        _, body = create_page_frame(
+            parent,
+            "Keyboard",
+            "Per-key actuation, rapid trigger, SOCD pairing and HID keycodes. This screen follows the shared selected key from the app shell.",
+        )
 
-        # Key selector
-        selector_frame = ttk.Frame(parent)
-        selector_frame.pack(fill=tk.X, pady=5)
+        if not hasattr(self, "selected_key_var"):
+            self.selected_key_var = tk.IntVar(value=0)
 
-        ttk.Label(selector_frame, text="Select Key:", font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
+        self.key_focus_var = tk.StringVar(value="")
+        self.key_status_var = tk.StringVar(
+            value="Load the active key from the device, then apply live changes when you are ready."
+        )
 
-        self.selected_key_var = tk.IntVar(value=0)
-        for i in range(6):
-            rb = ttk.Radiobutton(
-                selector_frame, text=f"Key {i+1}",
-                variable=self.selected_key_var, value=i,
-                command=lambda idx=i: self.load_selected_key_settings(idx)
+        focus_card = create_card(
+            body,
+            "Active Key",
+            "The app shell owns selection. This page mirrors that state and updates the active key when you load from device.",
+        )
+        row = create_section_row(focus_card)
+        ttk.Label(row, text="Editing:", width=20).pack(side=tk.LEFT)
+        ttk.Label(row, textvariable=self.key_focus_var, style="SectionTitle.TLabel").pack(side=tk.LEFT)
+        self.key_status_label = make_status_chip(focus_card, self.key_status_var)
+
+        def add_slider_row(card, label, attr_name, value_attr_name, default, minimum, maximum, digits):
+            row = create_section_row(card)
+            ttk.Label(row, text=label, width=20).pack(side=tk.LEFT)
+
+            value_var = tk.DoubleVar(value=default)
+            setattr(self, attr_name, value_var)
+            label_var = tk.StringVar(value=f"{default:.{digits}f}mm")
+            setattr(self, value_attr_name, label_var)
+
+            slider = ttk.Scale(
+                row,
+                from_=minimum,
+                to=maximum,
+                variable=value_var,
+                orient=tk.HORIZONTAL,
+                length=250,
+                command=lambda value, target=label_var, precision=digits: target.set(
+                    f"{float(value):.{precision}f}mm"
+                ),
             )
-            rb.pack(side=tk.LEFT, padx=10)
+            slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+            ttk.Label(row, textvariable=label_var, width=8).pack(side=tk.LEFT)
+            return slider
 
-        scrollable = ScrollableFrame(parent)
-        scrollable.pack(fill=tk.BOTH, expand=True, pady=5)
-        scrollable_frame = scrollable.content
-
-        # === HID Keycode ===
-        keycode_frame = ttk.LabelFrame(scrollable_frame, text="🔤 HID Keycode", padding="10")
-        keycode_frame.pack(fill=tk.X, pady=5, padx=5)
-
-        keycode_inner = ttk.Frame(keycode_frame)
-        keycode_inner.pack(fill=tk.X, pady=5)
-
-        ttk.Label(keycode_inner, text="Keycode:", width=15).pack(side=tk.LEFT)
+        keycode_card = create_card(
+            body,
+            "HID Keycode",
+            "Choose the keyboard keycode this switch emits when keyboard output is enabled.",
+        )
+        keycode_row = create_section_row(keycode_card)
+        ttk.Label(keycode_row, text="Keycode:", width=20).pack(side=tk.LEFT)
         self.key_hid_keycode_var = tk.StringVar(value="Q")
         keycode_combo = ttk.Combobox(
-            keycode_inner, textvariable=self.key_hid_keycode_var,
-            values=list(HID_KEYCODES.keys()), width=15
+            keycode_row,
+            textvariable=self.key_hid_keycode_var,
+            values=list(HID_KEYCODES.keys()),
+            width=18,
+            state="readonly",
         )
         keycode_combo.pack(side=tk.LEFT, padx=5)
 
-        # === Fixed Actuation Settings (when Rapid Trigger disabled) ===
-        fixed_frame = ttk.LabelFrame(scrollable_frame, text="📍 Fixed Actuation (when Rapid Trigger disabled)", padding="10")
-        fixed_frame.pack(fill=tk.X, pady=5, padx=5)
-
-        # Actuation Point
-        actuation_row = ttk.Frame(fixed_frame)
-        actuation_row.pack(fill=tk.X, pady=3)
-
-        ttk.Label(actuation_row, text="Actuation Point:", width=20).pack(side=tk.LEFT)
-        self.key_actuation_var = tk.DoubleVar(value=2.0)
-        actuation_slider = ttk.Scale(
-            actuation_row, from_=0.1, to=4.0,
-            variable=self.key_actuation_var,
-            orient=tk.HORIZONTAL, length=200,
-            command=lambda v: self.key_actuation_label.config(text=f"{float(v):.1f}mm")
+        fixed_card = create_card(
+            body,
+            "Fixed Actuation",
+            "Used when rapid trigger is disabled. Release point remains independent so you can keep the key from chattering.",
         )
-        actuation_slider.pack(side=tk.LEFT, padx=5)
-        self.key_actuation_label = ttk.Label(actuation_row, text="2.0mm", width=8)
-        self.key_actuation_label.pack(side=tk.LEFT)
+        add_slider_row(fixed_card, "Actuation Point:", "key_actuation_var", "key_actuation_label_var", 2.0, 0.1, 4.0, 1)
+        add_slider_row(fixed_card, "Release Point:", "key_release_var", "key_release_label_var", 1.8, 0.1, 4.0, 1)
+        ttk.Label(
+            fixed_card,
+            text="Key activates at the actuation point and releases at the release point.",
+            style="SurfaceSubtle.TLabel",
+        ).pack(anchor=tk.W, pady=(6, 0))
 
-        # Release Point
-        release_row = ttk.Frame(fixed_frame)
-        release_row.pack(fill=tk.X, pady=3)
-
-        ttk.Label(release_row, text="Release Point:", width=20).pack(side=tk.LEFT)
-        self.key_release_var = tk.DoubleVar(value=1.8)
-        release_slider = ttk.Scale(
-            release_row, from_=0.1, to=4.0,
-            variable=self.key_release_var,
-            orient=tk.HORIZONTAL, length=200,
-            command=lambda v: self.key_release_label.config(text=f"{float(v):.1f}mm")
+        rapid_card = create_card(
+            body,
+            "Rapid Trigger",
+            "Enables rapid re-activation as the key moves back through a narrow sensitivity window.",
         )
-        release_slider.pack(side=tk.LEFT, padx=5)
-        self.key_release_label = ttk.Label(release_row, text="1.8mm", width=8)
-        self.key_release_label.pack(side=tk.LEFT)
-
-        ttk.Label(fixed_frame, text="💡 Key activates at Actuation Point, releases at Release Point", 
-                  foreground="gray", font=('Arial', 8)).pack(anchor=tk.W)
-
-        # === Rapid Trigger Settings ===
-        rapid_frame = ttk.LabelFrame(scrollable_frame, text="⚡ Rapid Trigger", padding="10")
-        rapid_frame.pack(fill=tk.X, pady=5, padx=5)
-
-        # Enable checkbox
         self.key_rapid_enabled_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            rapid_frame, text="Enable Rapid Trigger for this key",
+            rapid_card,
+            text="Enable rapid trigger for this key",
             variable=self.key_rapid_enabled_var,
-            command=self.on_rapid_trigger_toggle
+            command=self.on_rapid_trigger_toggle,
         ).pack(anchor=tk.W)
 
-        # Rapid trigger sub-frame (visible when enabled)
-        self.rapid_settings_frame = ttk.Frame(rapid_frame)
-        self.rapid_settings_frame.pack(fill=tk.X, pady=5)
+        self.rapid_settings_frame = ttk.Frame(rapid_card, style="Surface.TFrame")
+        self.rapid_settings_frame.pack(fill=tk.X, pady=(8, 2))
 
-        # Activation Distance
-        activation_row = ttk.Frame(self.rapid_settings_frame)
-        activation_row.pack(fill=tk.X, pady=3)
-
-        ttk.Label(activation_row, text="Activation Distance:", width=20).pack(side=tk.LEFT)
-        self.key_rapid_activation_var = tk.DoubleVar(value=0.5)
-        activation_slider = ttk.Scale(
-            activation_row, from_=0.1, to=2.0,
-            variable=self.key_rapid_activation_var,
-            orient=tk.HORIZONTAL, length=200,
-            command=lambda v: self.key_rapid_activation_label.config(text=f"{float(v):.2f}mm")
+        add_slider_row(
+            self.rapid_settings_frame,
+            "Activation Distance:",
+            "key_rapid_activation_var",
+            "key_rapid_activation_label_var",
+            0.5,
+            0.1,
+            2.0,
+            2,
         )
-        activation_slider.pack(side=tk.LEFT, padx=5)
-        self.key_rapid_activation_label = ttk.Label(activation_row, text="0.50mm", width=8)
-        self.key_rapid_activation_label.pack(side=tk.LEFT)
-
-        # Press Sensitivity
-        press_row = ttk.Frame(self.rapid_settings_frame)
-        press_row.pack(fill=tk.X, pady=3)
-
-        ttk.Label(press_row, text="Press Sensitivity:", width=20).pack(side=tk.LEFT)
-        self.key_rapid_press_var = tk.DoubleVar(value=0.3)
-        press_slider = ttk.Scale(
-            press_row, from_=0.1, to=1.0,
-            variable=self.key_rapid_press_var,
-            orient=tk.HORIZONTAL, length=200,
-            command=lambda v: self.key_rapid_press_label.config(text=f"{float(v):.2f}mm")
+        add_slider_row(
+            self.rapid_settings_frame,
+            "Press Sensitivity:",
+            "key_rapid_press_var",
+            "key_rapid_press_label_var",
+            0.3,
+            0.1,
+            1.0,
+            2,
         )
-        press_slider.pack(side=tk.LEFT, padx=5)
-        self.key_rapid_press_label = ttk.Label(press_row, text="0.30mm", width=8)
-        self.key_rapid_press_label.pack(side=tk.LEFT)
 
-        # Separate press/release sensitivity option
         self.key_separate_sensitivity_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            self.rapid_settings_frame, text="Use separate Press/Release sensitivity",
+            self.rapid_settings_frame,
+            text="Use separate press/release sensitivity",
             variable=self.key_separate_sensitivity_var,
-            command=self.on_separate_sensitivity_toggle
-        ).pack(anchor=tk.W, pady=3)
+            command=self.on_separate_sensitivity_toggle,
+        ).pack(anchor=tk.W, pady=(4, 0))
 
-        # Release Sensitivity (visible when separate sensitivity enabled)
-        self.release_sens_frame = ttk.Frame(self.rapid_settings_frame)
-
-        ttk.Label(self.release_sens_frame, text="Release Sensitivity:", width=20).pack(side=tk.LEFT)
-        self.key_rapid_release_var = tk.DoubleVar(value=0.3)
-        release_sens_slider = ttk.Scale(
-            self.release_sens_frame, from_=0.1, to=1.0,
-            variable=self.key_rapid_release_var,
-            orient=tk.HORIZONTAL, length=200,
-            command=lambda v: self.key_rapid_release_label.config(text=f"{float(v):.2f}mm")
+        self.release_sens_frame = ttk.Frame(self.rapid_settings_frame, style="Surface.TFrame")
+        add_slider_row(
+            self.release_sens_frame,
+            "Release Sensitivity:",
+            "key_rapid_release_var",
+            "key_rapid_release_label_var",
+            0.3,
+            0.1,
+            1.0,
+            2,
         )
-        release_sens_slider.pack(side=tk.LEFT, padx=5)
-        self.key_rapid_release_label = ttk.Label(self.release_sens_frame, text="0.30mm", width=8)
-        self.key_rapid_release_label.pack(side=tk.LEFT)
 
-        ttk.Label(rapid_frame, text="💡 Rapid trigger activates when key moves down by sensitivity amount after initial activation", 
-                  foreground="gray", font=('Arial', 8)).pack(anchor=tk.W)
+        ttk.Label(
+            rapid_card,
+            text="Rapid trigger fires when the key moves by the configured sensitivity after the initial actuation.",
+            style="SurfaceSubtle.TLabel",
+        ).pack(anchor=tk.W, pady=(6, 0))
 
-        # Initialize visibility
         self.on_rapid_trigger_toggle()
 
-        # === SOCD Settings ===
-        socd_frame = ttk.LabelFrame(scrollable_frame, text="🔀 SOCD (Simultaneous Opposing Cardinal Directions)", padding="10")
-        socd_frame.pack(fill=tk.X, pady=5, padx=5)
-
-        socd_row = ttk.Frame(socd_frame)
-        socd_row.pack(fill=tk.X, pady=5)
-
-        ttk.Label(socd_row, text="Paired Key:", width=15).pack(side=tk.LEFT)
-        self.key_socd_var = tk.StringVar(value="None")
-        socd_combo = ttk.Combobox(
-            socd_row, textvariable=self.key_socd_var,
-            values=["None", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5", "Key 6"],
-            width=10, state="readonly"
+        socd_card = create_card(
+            body,
+            "SOCD",
+            "Set a paired key for last-input priority behavior when opposing directions are pressed together.",
         )
-        socd_combo.pack(side=tk.LEFT, padx=5)
+        socd_row = create_section_row(socd_card)
+        ttk.Label(socd_row, text="Paired Key:", width=20).pack(side=tk.LEFT)
+        self.key_socd_var = tk.StringVar(value="None")
+        ttk.Combobox(
+            socd_row,
+            textvariable=self.key_socd_var,
+            values=["None", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5", "Key 6"],
+            width=12,
+            state="readonly",
+        ).pack(side=tk.LEFT, padx=5)
+        ttk.Label(
+            socd_card,
+            text="When both keys are pressed, the last input wins.",
+            style="SurfaceSubtle.TLabel",
+        ).pack(anchor=tk.W, pady=(6, 0))
 
-        ttk.Label(socd_frame, text="💡 When both keys pressed, last pressed wins (Last Input Priority)", 
-                  foreground="gray", font=('Arial', 8)).pack(anchor=tk.W)
-
-        # === Gamepad Options ===
-        gamepad_key_frame = ttk.LabelFrame(scrollable_frame, text="🎮 Per-Key Gamepad Options", padding="10")
-        gamepad_key_frame.pack(fill=tk.X, pady=5, padx=5)
-
+        gamepad_card = create_card(
+            body,
+            "Gamepad Output",
+            "Per-key behavior in gamepad mode stays consistent with the device firmware settings.",
+        )
         self.key_disable_kb_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            gamepad_key_frame, text="Disable keyboard output when this key is in gamepad mode",
-            variable=self.key_disable_kb_var
+            gamepad_card,
+            text="Disable keyboard output when this key is used in gamepad mode",
+            variable=self.key_disable_kb_var,
         ).pack(anchor=tk.W)
 
-        # === Action Buttons ===
-        button_frame = ttk.Frame(scrollable_frame)
-        button_frame.pack(fill=tk.X, pady=10, padx=5)
+        actions_card = create_card(body, "Actions", "Load the current device state, apply the active key, or copy it to all keys.")
+        button_row = create_section_row(actions_card)
+        ttk.Button(button_row, text="Load Settings", command=self.load_selected_key_settings, style="Ghost.TButton").pack(
+            side=tk.LEFT
+        )
+        ttk.Button(button_row, text="Apply Settings", command=self.apply_key_settings, style="Primary.TButton").pack(
+            side=tk.LEFT, padx=6
+        )
+        ttk.Button(button_row, text="Apply to All Keys", command=self.apply_to_all_keys, style="Ghost.TButton").pack(
+            side=tk.LEFT
+        )
 
-        ttk.Button(button_frame, text="📥 Load Settings", command=self.load_selected_key_settings).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="📤 Apply Settings", command=self.apply_key_settings).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="🔄 Apply to All Keys", command=self.apply_to_all_keys).pack(side=tk.LEFT, padx=5)
-
-        # Load initial
         self.load_selected_key_settings()
+
+    def _selected_key_index(self):
+        try:
+            if hasattr(self, "selected_key_var"):
+                return max(0, min(5, int(self.selected_key_var.get())))
+        except Exception:
+            pass
+        return 0
+
+    def _set_keyboard_status(self, message, level="default"):
+        if hasattr(self, "status_var"):
+            self.status_var.set(message)
+        if hasattr(self, "key_status_var"):
+            self.key_status_var.set(message)
+        if hasattr(self, "key_status_label"):
+            set_status_style(self.key_status_label, level)
+
+    def _sync_key_focus(self, key_idx):
+        key_idx = max(0, min(5, int(key_idx)))
+        if hasattr(self, "selected_key_var") and int(self.selected_key_var.get()) != key_idx:
+            self.selected_key_var.set(key_idx)
+        if hasattr(self, "key_focus_var"):
+            self.key_focus_var.set(f"Key {key_idx + 1}")
+        return key_idx
 
     def on_rapid_trigger_toggle(self):
         """Toggle rapid trigger settings visibility."""
-        if self.key_rapid_enabled_var.get():
-            self.rapid_settings_frame.pack(fill=tk.X, pady=5)
+        if getattr(self, "key_rapid_enabled_var", None) and self.key_rapid_enabled_var.get():
+            self.rapid_settings_frame.pack(fill=tk.X, pady=(8, 2))
         else:
             self.rapid_settings_frame.pack_forget()
 
     def on_separate_sensitivity_toggle(self):
         """Toggle separate release sensitivity visibility."""
-        if self.key_separate_sensitivity_var.get():
-            self.release_sens_frame.pack(fill=tk.X, pady=3)
+        if getattr(self, "key_separate_sensitivity_var", None) and self.key_separate_sensitivity_var.get():
+            self.release_sens_frame.pack(fill=tk.X, pady=(6, 0))
         else:
             self.release_sens_frame.pack_forget()
 
+    def _build_key_settings_payload(self):
+        keycode = HID_KEYCODES.get(self.key_hid_keycode_var.get(), 0x14)
+
+        socd_str = self.key_socd_var.get()
+        if socd_str == "None":
+            socd = 255
+        else:
+            try:
+                socd = int(socd_str.split()[-1]) - 1
+            except (ValueError, IndexError) as exc:
+                raise ValueError("Select a valid SOCD partner or None") from exc
+
+        return {
+            "hid_keycode": keycode,
+            "actuation_point_mm": self.key_actuation_var.get(),
+            "release_point_mm": self.key_release_var.get(),
+            "rapid_trigger_enabled": self.key_rapid_enabled_var.get(),
+            "rapid_trigger_activation": self.key_rapid_activation_var.get(),
+            "rapid_trigger_press": self.key_rapid_press_var.get(),
+            "rapid_trigger_release": (
+                self.key_rapid_release_var.get()
+                if self.key_separate_sensitivity_var.get()
+                else self.key_rapid_press_var.get()
+            ),
+            "socd_pair": socd,
+            "disable_kb_on_gamepad": self.key_disable_kb_var.get(),
+        }
+
     def load_selected_key_settings(self, key_idx=None):
         """Load settings for the selected key."""
+        if not self.device:
+            self._set_keyboard_status("Keyboard settings are unavailable because no device is connected.", "warn")
+            return
+
         if key_idx is None:
-            key_idx = self.selected_key_var.get()
+            key_idx = self._selected_key_index()
+        key_idx = self._sync_key_focus(key_idx)
+
         try:
             settings = self.device.get_key_settings(key_idx)
-            if settings:
-                # Find keycode name
-                keycode = settings.get('hid_keycode', 0x14)
-                keyname = HID_KEYCODE_NAMES.get(keycode, 'Q')
-                self.key_hid_keycode_var.set(keyname)
+            if not settings:
+                self._set_keyboard_status(f"No key settings were returned for Key {key_idx + 1}.", "warn")
+                return
 
-                # Fixed actuation settings
-                actuation_mm = settings.get('actuation_point_mm', 2.0)
-                release_mm = settings.get('release_point_mm', 1.8)
-                self.key_actuation_var.set(actuation_mm)
-                self.key_release_var.set(release_mm)
-                self.key_actuation_label.config(text=f"{actuation_mm:.1f}mm")
-                self.key_release_label.config(text=f"{release_mm:.1f}mm")
+            keycode = settings.get("hid_keycode", 0x14)
+            self.key_hid_keycode_var.set(HID_KEYCODE_NAMES.get(keycode, "Q"))
 
-                # Rapid trigger settings
-                rapid_enabled = settings.get('rapid_trigger_enabled', False)
-                self.key_rapid_enabled_var.set(rapid_enabled)
-                self.on_rapid_trigger_toggle()
+            actuation_mm = float(settings.get("actuation_point_mm", 2.0))
+            release_mm = float(settings.get("release_point_mm", 1.8))
+            self.key_actuation_var.set(actuation_mm)
+            self.key_release_var.set(release_mm)
+            self.key_actuation_label_var.set(f"{actuation_mm:.1f}mm")
+            self.key_release_label_var.set(f"{release_mm:.1f}mm")
 
-                rapid_activation = settings.get('rapid_trigger_activation', 0.5)
-                rapid_press = settings.get('rapid_trigger_press', 0.3)
-                rapid_release = settings.get('rapid_trigger_release', 0.3)
+            rapid_enabled = bool(settings.get("rapid_trigger_enabled", False))
+            self.key_rapid_enabled_var.set(rapid_enabled)
+            self.on_rapid_trigger_toggle()
 
-                self.key_rapid_activation_var.set(rapid_activation)
-                self.key_rapid_press_var.set(rapid_press)
-                self.key_rapid_release_var.set(rapid_release)
-                self.key_rapid_activation_label.config(text=f"{rapid_activation:.2f}mm")
-                self.key_rapid_press_label.config(text=f"{rapid_press:.2f}mm")
-                self.key_rapid_release_label.config(text=f"{rapid_release:.2f}mm")
+            rapid_activation = float(settings.get("rapid_trigger_activation", 0.5))
+            rapid_press = float(settings.get("rapid_trigger_press", 0.3))
+            rapid_release = float(settings.get("rapid_trigger_release", rapid_press))
+            self.key_rapid_activation_var.set(rapid_activation)
+            self.key_rapid_press_var.set(rapid_press)
+            self.key_rapid_release_var.set(rapid_release)
+            self.key_rapid_activation_label_var.set(f"{rapid_activation:.2f}mm")
+            self.key_rapid_press_label_var.set(f"{rapid_press:.2f}mm")
+            self.key_rapid_release_label_var.set(f"{rapid_release:.2f}mm")
 
-                # Separate sensitivity
-                separate = rapid_press != rapid_release
-                self.key_separate_sensitivity_var.set(separate)
-                self.on_separate_sensitivity_toggle()
+            separate = abs(rapid_press - rapid_release) > 0.0001
+            self.key_separate_sensitivity_var.set(separate)
+            self.on_separate_sensitivity_toggle()
 
-                # SOCD
-                socd = settings.get('socd_pair')
-                if socd is not None and socd < 6:
-                    self.key_socd_var.set(f"Key {socd + 1}")
-                else:
-                    self.key_socd_var.set("None")
+            socd = settings.get("socd_pair")
+            if socd is not None and socd != 255 and 0 <= int(socd) < 6:
+                self.key_socd_var.set(f"Key {int(socd) + 1}")
+            else:
+                self.key_socd_var.set("None")
 
-                # Disable KB on gamepad
-                self.key_disable_kb_var.set(settings.get('disable_kb_on_gamepad', False))
+            self.key_disable_kb_var.set(bool(settings.get("disable_kb_on_gamepad", False)))
 
-                self.status_var.set(f"📥 Loaded settings for Key {key_idx + 1}")
-        except Exception as e:
-            self.status_var.set(f"❌ Error loading key settings: {e}")
+            self._set_keyboard_status(f"Loaded settings for Key {key_idx + 1}.", "ok")
+        except Exception as exc:
+            self._set_keyboard_status(f"Error loading key settings: {exc}", "danger")
 
     def apply_key_settings(self):
         """Apply settings for the selected key."""
-        key_idx = self.selected_key_var.get()
+        if not self.device:
+            self._set_keyboard_status("Cannot apply keyboard settings because no device is connected.", "warn")
+            return
+
+        key_idx = self._selected_key_index()
         try:
-            keycode = HID_KEYCODES.get(self.key_hid_keycode_var.get(), 0x14)
-
-            # Get SOCD pair
-            socd_str = self.key_socd_var.get()
-            if socd_str == "None":
-                socd = 255  # No pair
-            else:
-                socd = int(socd_str.split()[1]) - 1
-
-            # Build settings dict
-            settings = {
-                'hid_keycode': keycode,
-                'actuation_point_mm': self.key_actuation_var.get(),
-                'release_point_mm': self.key_release_var.get(),
-                'rapid_trigger_enabled': self.key_rapid_enabled_var.get(),
-                'rapid_trigger_activation': self.key_rapid_activation_var.get(),
-                'rapid_trigger_press': self.key_rapid_press_var.get(),
-                'rapid_trigger_release': self.key_rapid_release_var.get() if self.key_separate_sensitivity_var.get() else self.key_rapid_press_var.get(),
-                'socd_pair': socd,
-                'disable_kb_on_gamepad': self.key_disable_kb_var.get()
-            }
-
+            settings = self._build_key_settings_payload()
             success = self.device.set_key_settings_extended(key_idx, settings)
-
             if success:
-                self.status_var.set(f"📤 Applied settings for Key {key_idx + 1} - LIVE (not saved)")
+                self._set_keyboard_status(f"Applied settings for Key {key_idx + 1} - live only, not saved.", "ok")
             else:
-                self.status_var.set(f"❌ Failed to apply key settings")
-        except Exception as e:
-            self.status_var.set(f"❌ Error applying key settings: {e}")
+                self._set_keyboard_status(f"Failed to apply settings for Key {key_idx + 1}.", "danger")
+        except Exception as exc:
+            self._set_keyboard_status(f"Error applying key settings: {exc}", "danger")
 
     def apply_to_all_keys(self):
         """Apply current settings to all keys."""
+        if not self.device:
+            self._set_keyboard_status("Cannot copy keyboard settings because no device is connected.", "warn")
+            return
+
         try:
+            settings = self._build_key_settings_payload()
+            failed_keys = []
+            self._set_keyboard_status("Applying the current key settings to all 6 keys...", "warn")
+            self.update_idletasks()
+
             for key_idx in range(6):
-                keycode = HID_KEYCODES.get(self.key_hid_keycode_var.get(), 0x14)
+                if not self.device.set_key_settings_extended(key_idx, settings):
+                    failed_keys.append(key_idx + 1)
 
-                socd_str = self.key_socd_var.get()
-                if socd_str == "None":
-                    socd = 255
-                else:
-                    socd = int(socd_str.split()[1]) - 1
-
-                settings = {
-                    'hid_keycode': keycode,
-                    'actuation_point_mm': self.key_actuation_var.get(),
-                    'release_point_mm': self.key_release_var.get(),
-                    'rapid_trigger_enabled': self.key_rapid_enabled_var.get(),
-                    'rapid_trigger_activation': self.key_rapid_activation_var.get(),
-                    'rapid_trigger_press': self.key_rapid_press_var.get(),
-                    'rapid_trigger_release': self.key_rapid_release_var.get() if self.key_separate_sensitivity_var.get() else self.key_rapid_press_var.get(),
-                    'socd_pair': socd,
-                    'disable_kb_on_gamepad': self.key_disable_kb_var.get()
-                }
-
-                self.device.set_key_settings_extended(key_idx, settings)
-
-            self.status_var.set(f"📤 Applied settings to all 6 keys - LIVE (not saved)")
-        except Exception as e:
-            self.status_var.set(f"❌ Error applying to all keys: {e}")
+            if failed_keys:
+                self._set_keyboard_status(
+                    f"Applied settings to most keys, but these failed: {', '.join(f'Key {key}' for key in failed_keys)}.",
+                    "danger",
+                )
+            else:
+                self._set_keyboard_status("Applied settings to all 6 keys - live only, not saved.", "ok")
+        except Exception as exc:
+            self._set_keyboard_status(f"Error applying settings to all keys: {exc}", "danger")

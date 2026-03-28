@@ -3,3 +3,4 @@ mx.scratch
 !.settings
 /libhmk-main
 /hmkconf-main
+**/__pycache__/

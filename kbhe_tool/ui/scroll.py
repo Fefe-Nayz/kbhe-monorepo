@@ -1,4 +1,5 @@
 from .common import tk, ttk
+from .theme import APP_COLORS
 
 
 class ScrollableFrame(ttk.Frame if ttk is not None else object):
@@ -8,9 +9,14 @@ class ScrollableFrame(ttk.Frame if ttk is not None else object):
         if ttk is None or tk is None:
             raise RuntimeError("tkinter is not available on this system")
         super().__init__(parent, **kwargs)
-        self.canvas = tk.Canvas(self, highlightthickness=0)
+        self.canvas = tk.Canvas(
+            self,
+            highlightthickness=0,
+            borderwidth=0,
+            background=APP_COLORS["surface"],
+        )
         self.scrollbar = ttk.Scrollbar(self, orient='vertical', command=self.canvas.yview)
-        self.content = ttk.Frame(self.canvas)
+        self.content = ttk.Frame(self.canvas, style="Surface.TFrame")
         self.window_id = self.canvas.create_window((0, 0), window=self.content, anchor='nw')
 
         self.canvas.configure(yscrollcommand=self.scrollbar.set)

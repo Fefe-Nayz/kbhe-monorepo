@@ -2,236 +2,389 @@ from .common import *
 
 
 class DevicePageMixin:
+    def _set_device_status(self, message):
+        if hasattr(self, "status_var"):
+            self.status_var.set(message)
+
+    @staticmethod
+    def _clamp_channel(value):
+        try:
+            return max(0, min(255, int(value)))
+        except (TypeError, ValueError):
+            return 0
+
+    def _serialize_pixels(self):
+        payload = []
+        for index in range(64):
+            if index < len(getattr(self, "pixels", [])):
+                pixel = self.pixels[index]
+            else:
+                pixel = (0, 0, 0)
+            channels = list(pixel[:3]) + [0, 0, 0]
+            payload.extend(self._clamp_channel(channel) for channel in channels[:3])
+        return payload[:192]
+
+    def _load_pixel_blob(self, blob):
+        if len(blob) < 192:
+            return False
+
+        for index in range(64):
+            base = index * 3
+            self.pixels[index] = [blob[base], blob[base + 1], blob[base + 2]]
+        return True
+
     def create_settings_widgets(self, parent):
         """Create Settings tab widgets."""
+        info_frame = ttk.LabelFrame(parent, text="Device Information", padding=10, style="Card.TLabelframe")
+        info_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(
+            info_frame,
+            text="Use this page to inspect the current firmware, toggle HID interfaces, and save or reset persistent settings.",
+            style="SurfaceSubtle.TLabel",
+            wraplength=980,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(0, 8))
 
-        # Device Info
-        info_frame = ttk.LabelFrame(parent, text="📱 Device Information", padding="10")
-        info_frame.pack(fill=tk.X, pady=5)
-
-        self.firmware_label = ttk.Label(info_frame, text="Firmware Version: Loading...", font=('Arial', 10))
+        self.firmware_label = ttk.Label(info_frame, text="Firmware Version: Loading...", font=("Segoe UI Semibold", 10, "bold"))
         self.firmware_label.pack(anchor=tk.W)
 
-        # Refresh firmware version
-        version = self.device.get_firmware_version()
+        try:
+            version = self.device.get_firmware_version()
+        except Exception as exc:
+            version = None
+            self._set_device_status(f"⚠️ Failed to read firmware version: {exc}")
         self.firmware_label.config(text=f"Firmware Version: {version if version else 'Unknown'}")
 
-        # HID Interfaces
-        interfaces_frame = ttk.LabelFrame(parent, text="🔌 HID Interfaces (LIVE changes)", padding="10")
-        interfaces_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(interfaces_frame, text="⚠️ Changes take effect immediately but are NOT saved until you click 'Save to Flash'",
-                  foreground="orange").pack(anchor=tk.W, pady=(0, 10))
+        interfaces_frame = ttk.LabelFrame(parent, text="HID Interfaces", padding=10, style="Card.TLabelframe")
+        interfaces_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(
+            interfaces_frame,
+            text="Keyboard, gamepad, and NKRO toggles are saved immediately in firmware. LED enable stays live-only until you save.",
+            style="SurfaceSubtle.TLabel",
+            wraplength=980,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(0, 8))
 
         self.keyboard_enabled_var = tk.BooleanVar(value=False)
-        kb_check = ttk.Checkbutton(
-            interfaces_frame, text="⌨️ Keyboard HID (sends keypresses)",
+        ttk.Checkbutton(
+            interfaces_frame,
+            text="⌨️ Keyboard HID (sends keypresses)",
             variable=self.keyboard_enabled_var,
-            command=self.on_keyboard_enabled_change
-        )
-        kb_check.pack(anchor=tk.W, pady=2)
+            command=self.on_keyboard_enabled_change,
+        ).pack(anchor=tk.W, pady=2)
 
         self.gamepad_enabled_var = tk.BooleanVar(value=True)
-        gp_check = ttk.Checkbutton(
-            interfaces_frame, text="🎮 Gamepad HID (analog axes)",
+        ttk.Checkbutton(
+            interfaces_frame,
+            text="🎮 Gamepad HID (analog axes)",
             variable=self.gamepad_enabled_var,
-            command=self.on_gamepad_enabled_change
-        )
-        gp_check.pack(anchor=tk.W, pady=2)
+            command=self.on_gamepad_enabled_change,
+        ).pack(anchor=tk.W, pady=2)
 
         self.led_enabled_var = tk.BooleanVar(value=True)
-        led_check = ttk.Checkbutton(
-            interfaces_frame, text="💡 LED Matrix (WS2812)",
+        ttk.Checkbutton(
+            interfaces_frame,
+            text="💡 LED Matrix (WS2812)",
             variable=self.led_enabled_var,
-            command=self.on_led_enabled_change
-        )
-        led_check.pack(anchor=tk.W, pady=2)
+            command=self.on_led_enabled_change,
+        ).pack(anchor=tk.W, pady=2)
 
-        # NKRO Mode
-        ttk.Separator(interfaces_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
-        ttk.Label(interfaces_frame, text="Keyboard Mode:", font=('Arial', 9, 'bold')).pack(anchor=tk.W)
+        ttk.Separator(interfaces_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=8)
+        ttk.Label(interfaces_frame, text="Keyboard mode", style="SurfaceSubtle.TLabel").pack(anchor=tk.W, pady=(0, 2))
 
         self.nkro_enabled_var = tk.BooleanVar(value=False)
-        nkro_check = ttk.Checkbutton(
-            interfaces_frame, text="🔠 NKRO Mode (N-Key Rollover instead of 6KRO)",
+        ttk.Checkbutton(
+            interfaces_frame,
+            text="🔠 NKRO mode (N-Key Rollover instead of 6KRO)",
             variable=self.nkro_enabled_var,
-            command=self.on_nkro_enabled_change
-        )
-        nkro_check.pack(anchor=tk.W, pady=2)
-        ttk.Label(interfaces_frame, text="    Uses independent HID interface for unlimited simultaneous keys",
-                  foreground="gray").pack(anchor=tk.W)
+            command=self.on_nkro_enabled_change,
+        ).pack(anchor=tk.W, pady=2)
+        ttk.Label(
+            interfaces_frame,
+            text="Uses an independent HID interface for unlimited simultaneous keys.",
+            style="SurfaceSubtle.TLabel",
+            wraplength=980,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(0, 0))
 
-        # Save section
-        save_frame = ttk.LabelFrame(parent, text="💾 Save Settings to Flash", padding="10")
-        save_frame.pack(fill=tk.X, pady=5)
+        save_frame = ttk.LabelFrame(parent, text="Save Settings", padding=10, style="Card.TLabelframe")
+        save_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(
+            save_frame,
+            text="Saving writes the current LED matrix contents, brightness, and LED enable state into flash memory. Keyboard, gamepad, and NKRO toggles already persist when changed.",
+            style="SurfaceSubtle.TLabel",
+            wraplength=980,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(0, 8))
 
-        ttk.Label(save_frame, text="Click to save ALL settings (LED pattern, brightness, enabled states)\nto flash memory. Settings will persist after power cycle.",
-                  justify=tk.LEFT).pack(anchor=tk.W, pady=5)
+        ttk.Button(
+            save_frame,
+            text="💾 Save All Settings to Flash",
+            command=self.save_to_device,
+            style="Primary.TButton",
+        ).pack(fill=tk.X)
 
-        ttk.Button(save_frame, text="💾 SAVE ALL SETTINGS TO FLASH", 
-                   command=self.save_to_device).pack(fill=tk.X, pady=5)
+        reset_frame = ttk.LabelFrame(parent, text="Factory Reset", padding=10, style="Card.TLabelframe")
+        reset_frame.pack(fill=tk.X)
+        ttk.Label(
+            reset_frame,
+            text="Resetting clears LED patterns and returns interface options to their defaults.",
+            style="SurfaceSubtle.TLabel",
+            wraplength=980,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(0, 8))
 
-        # Factory Reset
-        reset_frame = ttk.LabelFrame(parent, text="🔧 Factory Reset", padding="10")
-        reset_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(reset_frame, text="Reset all settings to factory defaults.\nThis will clear LED patterns and reset all options.",
-                  foreground="red").pack(anchor=tk.W, pady=5)
-
-        ttk.Button(reset_frame, text="⚠️ Factory Reset", command=self.factory_reset).pack(anchor=tk.W)
+        ttk.Button(reset_frame, text="⚠️ Factory Reset", command=self.factory_reset, style="Ghost.TButton").pack(anchor=tk.W)
 
     def load_from_device(self):
         """Load current state from device."""
+        errors = []
+
         try:
             version = self.device.get_firmware_version()
-            if hasattr(self, 'firmware_label'):
+            if hasattr(self, "firmware_label"):
                 self.firmware_label.config(text=f"Firmware Version: {version if version else 'Unknown'}")
+        except Exception as exc:
+            errors.append(f"firmware version: {exc}")
 
-            # Load brightness
+        try:
             brightness = self.device.led_get_brightness()
             if brightness is not None:
                 self.brightness_var.set(brightness)
                 self.brightness_label.config(text=str(brightness))
+        except Exception as exc:
+            errors.append(f"brightness: {exc}")
 
-            # Load enabled states
+        try:
             led_enabled = self.device.led_get_enabled()
             if led_enabled is not None:
                 self.led_enabled_var.set(led_enabled)
+        except Exception as exc:
+            errors.append(f"LED enabled: {exc}")
 
+        try:
             options = self.device.get_options()
             if options:
-                self.keyboard_enabled_var.set(options['keyboard_enabled'])
-                self.gamepad_enabled_var.set(options['gamepad_enabled'])
+                keyboard_enabled = options.get("keyboard_enabled")
+                gamepad_enabled = options.get("gamepad_enabled")
+                if keyboard_enabled is not None:
+                    self.keyboard_enabled_var.set(keyboard_enabled)
+                if gamepad_enabled is not None:
+                    self.gamepad_enabled_var.set(gamepad_enabled)
+        except Exception as exc:
+            errors.append(f"options: {exc}")
 
-            # Load NKRO state
-            nkro_enabled = self.device.get_nkro_enabled()
-            if nkro_enabled is not None and hasattr(self, 'nkro_enabled_var'):
-                self.nkro_enabled_var.set(nkro_enabled)
+        if hasattr(self, "nkro_enabled_var"):
+            try:
+                nkro_enabled = self.device.get_nkro_enabled()
+                if nkro_enabled is not None:
+                    self.nkro_enabled_var.set(nkro_enabled)
+            except Exception as exc:
+                errors.append(f"NKRO: {exc}")
 
-            # Load pixel data
+        try:
             pixel_data = self.device.led_download_all()
             if pixel_data:
-                for i in range(64):
-                    self.pixels[i] = [pixel_data[i*3], pixel_data[i*3+1], pixel_data[i*3+2]]
-                self.update_led_display()
+                if len(pixel_data) >= 192:
+                    self._load_pixel_blob(pixel_data[:192])
+                    self.update_led_display()
+                else:
+                    errors.append(f"pixels: expected 192 bytes, got {len(pixel_data)}")
+        except Exception as exc:
+            errors.append(f"pixels: {exc}")
 
-            self.status_var.set("🔄 Loaded current state from device")
-        except Exception as e:
-            self.status_var.set(f"❌ Error loading: {e}")
+        if errors:
+            self._set_device_status("⚠️ Loaded with warnings: " + "; ".join(errors))
+        else:
+            self._set_device_status("🔄 Loaded current state from device")
 
     def save_to_device(self):
         """Save current state to device flash."""
         try:
-            # Upload pixel data first
-            pixel_data = []
-            for pixel in self.pixels:
-                pixel_data.extend(pixel)
+            pixel_data = self._serialize_pixels()
+        except Exception as exc:
+            self._set_device_status(f"❌ Failed to prepare LED data: {exc}")
+            messagebox.showerror("Error", f"Failed to prepare LED data:\n{exc}")
+            return
 
-            self.status_var.set("💾 Uploading LED data...")
+        try:
+            self._set_device_status("💾 Uploading LED data...")
             self.update_idletasks()
 
-            if self.device.led_upload_all(pixel_data):
-                self.status_var.set("💾 Saving to flash...")
-                self.update_idletasks()
-
-                if self.device.save_settings():
-                    self.status_var.set("✅ All settings saved to flash!")
-                    self.refresh_from_device()
-                    messagebox.showinfo("Success", "Settings saved to device flash!\n\nYour LED pattern and settings will persist after power cycle.")
-                else:
-                    self.status_var.set("❌ Failed to save to flash")
-                    messagebox.showerror("Error", "Failed to save settings to flash")
-            else:
-                self.status_var.set("❌ Failed to upload LED data")
+            if not self.device.led_upload_all(pixel_data):
+                self._set_device_status("❌ Failed to upload LED data")
                 messagebox.showerror("Error", "Failed to upload LED data to device")
-        except Exception as e:
-            self.status_var.set(f"❌ Error saving: {e}")
-            messagebox.showerror("Error", f"Error saving to device: {e}")
+                return
+
+            self._set_device_status("💾 Saving to flash...")
+            self.update_idletasks()
+
+            if not self.device.save_settings():
+                self._set_device_status("❌ Failed to save to flash")
+                messagebox.showerror("Error", "Failed to save settings to flash")
+                return
+        except Exception as exc:
+            self._set_device_status(f"❌ Error saving: {exc}")
+            messagebox.showerror("Error", f"Error saving to device: {exc}")
+            return
+
+        self._set_device_status("✅ All settings saved to flash!")
+        try:
+            self.refresh_from_device()
+        except Exception as exc:
+            self._set_device_status(f"✅ Saved to flash, but refresh failed: {exc}")
+        messagebox.showinfo(
+            "Success",
+            "Settings saved to device flash!\n\nYour LED pattern and settings will persist after power cycle.",
+        )
 
     def export_to_file(self):
         """Export LED pattern to file."""
         filename = filedialog.asksaveasfilename(
             defaultextension=".led",
-            filetypes=[("LED Pattern", "*.led"), ("All Files", "*.*")]
+            filetypes=[("LED Pattern", "*.led"), ("All Files", "*.*")],
+            title="Export LED Pattern",
         )
-        if filename:
-            try:
-                with open(filename, 'wb') as f:
-                    f.write(bytes([self.brightness_var.get()]))
-                    for pixel in self.pixels:
-                        f.write(bytes(pixel))
-                self.status_var.set(f"📁 Exported to {filename}")
-            except Exception as e:
-                self.status_var.set(f"❌ Export error: {e}")
+        if not filename:
+            return
+
+        try:
+            brightness = self._clamp_channel(self.brightness_var.get())
+            payload = bytes([brightness]) + bytes(self._serialize_pixels())
+            pathlib.Path(filename).write_bytes(payload)
+        except Exception as exc:
+            self._set_device_status(f"❌ Export error: {exc}")
+            messagebox.showerror("Export error", f"Failed to export LED pattern:\n{exc}")
+            return
+
+        self._set_device_status(f"📁 Exported to {filename}")
 
     def import_from_file(self):
         """Import LED pattern from file."""
         filename = filedialog.askopenfilename(
-            filetypes=[("LED Pattern", "*.led"), ("All Files", "*.*")]
+            title="Import LED Pattern",
+            filetypes=[("LED Pattern", "*.led"), ("All Files", "*.*")],
         )
-        if filename:
-            try:
-                with open(filename, 'rb') as f:
-                    data = f.read()
+        if not filename:
+            return
 
-                if len(data) >= 193:
-                    brightness = data[0]
-                    self.brightness_var.set(brightness)
-                    self.brightness_label.config(text=str(brightness))
-                    self.device.led_set_brightness(brightness)
+        try:
+            data = pathlib.Path(filename).read_bytes()
+        except Exception as exc:
+            self._set_device_status(f"❌ Import error: {exc}")
+            messagebox.showerror("Import error", f"Failed to read LED pattern:\n{exc}")
+            return
 
-                    for i in range(64):
-                        self.pixels[i] = [data[1 + i*3], data[1 + i*3 + 1], data[1 + i*3 + 2]]
+        if len(data) < 193:
+            self._set_device_status("❌ Invalid file format")
+            messagebox.showerror("Import error", "Invalid LED pattern file.\nExpected 193 bytes.")
+            return
 
-                    self.update_led_display()
+        try:
+            brightness = data[0]
+            self.brightness_var.set(brightness)
+            self.brightness_label.config(text=str(brightness))
+            self.device.led_set_brightness(brightness)
 
-                    # Upload to device
-                    pixel_data = list(data[1:193])
-                    self.device.led_upload_all(pixel_data)
+            self._load_pixel_blob(data[1:193])
+            self.update_led_display()
 
-                    self.status_var.set(f"📂 Imported from {filename} - LIVE (not saved)")
-                else:
-                    self.status_var.set("❌ Invalid file format")
-            except Exception as e:
-                self.status_var.set(f"❌ Import error: {e}")
+            pixel_data = list(data[1:193])
+            if not self.device.led_upload_all(pixel_data):
+                raise RuntimeError("device rejected the LED payload")
+        except Exception as exc:
+            self._set_device_status(f"❌ Import error: {exc}")
+            messagebox.showerror("Import error", f"Failed to import LED pattern:\n{exc}")
+            return
+
+        self._set_device_status(f"📂 Imported from {filename} - LIVE (not saved)")
 
     def on_led_enabled_change(self):
         """Handle LED enabled checkbox change."""
         enabled = self.led_enabled_var.get()
-        self.device.led_set_enabled(enabled)
-        self.status_var.set(f"💡 LED {'enabled' if enabled else 'disabled'} - LIVE (not saved)")
+        try:
+            if not self.device.led_set_enabled(enabled):
+                raise RuntimeError("device rejected the LED interface change")
+        except Exception as exc:
+            self.led_enabled_var.set(not enabled)
+            self._set_device_status(f"❌ Failed to update LED interface: {exc}")
+            return
+
+        self._set_device_status(f"💡 LED {'enabled' if enabled else 'disabled'} - live only until Save to Flash")
 
     def on_keyboard_enabled_change(self):
         """Handle keyboard enabled checkbox change."""
         enabled = self.keyboard_enabled_var.get()
-        self.device.set_keyboard_enabled(enabled)
-        self.status_var.set(f"⌨️ Keyboard {'enabled' if enabled else 'disabled'} - LIVE (not saved)")
+        try:
+            if not self.device.set_keyboard_enabled(enabled):
+                raise RuntimeError("device rejected the keyboard HID change")
+        except Exception as exc:
+            self.keyboard_enabled_var.set(not enabled)
+            self._set_device_status(f"❌ Failed to update keyboard HID: {exc}")
+            return
+
+        self._set_device_status(f"⌨️ Keyboard {'enabled' if enabled else 'disabled'} - saved immediately")
 
     def on_gamepad_enabled_change(self):
         """Handle gamepad enabled checkbox change."""
         enabled = self.gamepad_enabled_var.get()
-        self.device.set_gamepad_enabled(enabled)
-        self.status_var.set(f"🎮 Gamepad {'enabled' if enabled else 'disabled'} - LIVE (not saved)")
+        try:
+            if not self.device.set_gamepad_enabled(enabled):
+                raise RuntimeError("device rejected the gamepad HID change")
+        except Exception as exc:
+            self.gamepad_enabled_var.set(not enabled)
+            self._set_device_status(f"❌ Failed to update gamepad HID: {exc}")
+            return
+
+        self._set_device_status(f"🎮 Gamepad {'enabled' if enabled else 'disabled'} - saved immediately")
 
     def on_nkro_enabled_change(self):
         """Handle NKRO mode checkbox change."""
         enabled = self.nkro_enabled_var.get()
-        self.device.set_nkro_enabled(enabled)
-        self.status_var.set(f"🔠 NKRO {'enabled' if enabled else 'disabled'} - LIVE (not saved)")
+        try:
+            if not self.device.set_nkro_enabled(enabled):
+                raise RuntimeError("device rejected the NKRO change")
+        except Exception as exc:
+            self.nkro_enabled_var.set(not enabled)
+            self._set_device_status(f"❌ Failed to update NKRO mode: {exc}")
+            return
+
+        self._set_device_status(
+            f"🔠 NKRO {'enabled' if enabled else 'disabled'} - saved immediately (USB re-enumeration may be required)"
+        )
 
     def factory_reset(self):
         """Reset to factory defaults."""
-        if messagebox.askyesno("Factory Reset", 
-                "Are you sure you want to reset ALL settings to factory defaults?\n\n"
-                "This will:\n"
-                "- Clear all LED patterns\n"
-                "- Reset brightness to default\n"
-                "- Reset all interface settings\n\n"
-                "This cannot be undone!"):
-            if self.device.factory_reset():
-                self.status_var.set("🔧 Factory reset complete!")
-                messagebox.showinfo("Success", "Factory reset complete!\n\nReloading settings...")
-                self.load_from_device()
-            else:
-                self.status_var.set("❌ Factory reset failed")
+        if not messagebox.askyesno(
+            "Factory Reset",
+            "Are you sure you want to reset ALL settings to factory defaults?\n\n"
+            "This will:\n"
+            "- Clear all LED patterns\n"
+            "- Reset brightness to default\n"
+            "- Reset all interface settings\n\n"
+            "This cannot be undone!",
+        ):
+            return
+
+        try:
+            if not self.device.factory_reset():
+                self._set_device_status("❌ Factory reset failed")
                 messagebox.showerror("Error", "Factory reset failed")
+                return
+        except Exception as exc:
+            self._set_device_status(f"❌ Factory reset failed: {exc}")
+            messagebox.showerror("Error", f"Factory reset failed:\n{exc}")
+            return
+
+        self._set_device_status("🔧 Factory reset complete. Reloading device state...")
+        try:
+            if hasattr(self, "refresh_from_device"):
+                self.refresh_from_device()
+            else:
+                self.load_from_device()
+        except Exception as exc:
+            self._set_device_status(f"🔧 Factory reset complete, but reload failed: {exc}")
+            messagebox.showwarning("Factory reset", f"Factory reset completed, but reload failed:\n{exc}")
+            return
+
+        messagebox.showinfo("Success", "Factory reset complete!\n\nReloading settings...")

@@ -1,493 +1,620 @@
-from .common import *
+from __future__ import annotations
+
+import time
+from typing import Any, Optional
+
+from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QRadioButton,
+    QScrollArea,
+    QSpinBox,
+    QProgressBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 
-class DebugPageMixin:
-    def create_debug_widgets(self, parent):
-        """Create Debug/Sensors tab widgets."""
+def _clamp(value: int, low: int, high: int) -> int:
+    return max(low, min(high, value))
 
-        # ADC Live Values
-        adc_frame = ttk.LabelFrame(parent, text="📊 ADC Sensor Values (Live)", padding="10")
-        adc_frame.pack(fill=tk.X, pady=5)
 
-        # Refresh rate control
-        rate_frame = ttk.Frame(adc_frame)
-        rate_frame.pack(fill=tk.X)
+class DebugPage(QWidget):
+    statusChanged = Signal(str)
 
-        self.live_update_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
-            rate_frame, text="Enable Live Updates",
-            variable=self.live_update_var,
-            command=self.toggle_live_update
-        ).pack(side=tk.LEFT)
+    def __init__(self, device: Any | None = None, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.device = device
+        self._page_active = False
+        self._last_sensor_error: Optional[str] = None
+        self._gui_tick_started = time.monotonic()
+        self._gui_tick_count = 0
+        self._diag_group: QButtonGroup | None = None
 
-        ttk.Label(rate_frame, text="  Refresh (ms):").pack(side=tk.LEFT)
-        self.refresh_rate_var = tk.IntVar(value=50)
-        refresh_spin = ttk.Spinbox(rate_frame, from_=20, to=500, width=5, 
-                                   textvariable=self.refresh_rate_var)
-        refresh_spin.pack(side=tk.LEFT, padx=5)
+        self.setObjectName("DebugPage")
+        self._build_ui()
+        self._apply_style()
+        self._sync_enabled_state()
+        self._init_timer()
+        self.reload()
 
-        # LUT Parameters info
-        ttk.Label(adc_frame, text="LUT: ADC 2100-2672 → Distance 0-4mm | ADC typical range: 2000-2700",
-                  font=('Consolas', 8), foreground='gray').pack(anchor=tk.W, pady=(5,0))
+    def create_debug_widgets(self, parent: QWidget | None = None):
+        del parent
+        return self
 
-        # Create ADC value displays
-        adc_values_frame = ttk.Frame(adc_frame)
-        adc_values_frame.pack(fill=tk.X, pady=10)
+    def set_device(self, device: Any | None):
+        self.device = device
+        self._sync_enabled_state()
+        self.reload()
 
+    def reload(self):
+        self.load_filter_settings()
+        self.refresh_config_display()
+        self._refresh_live_state()
+
+    def on_page_activated(self):
+        self._page_active = True
+        self.reload()
+        if self.live_update_check.isChecked() and self.device is not None:
+            self.sensor_timer.start(self.refresh_rate_spin.value())
+            self._poll_sensor_once()
+        self._refresh_live_state()
+
+    def on_page_deactivated(self):
+        self._page_active = False
+        self.sensor_timer.stop()
+        self._refresh_live_state()
+
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        root.addWidget(scroll)
+
+        content = QWidget()
+        scroll.setWidget(content)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        header = self._card("Diagnostics", "Live sensor monitoring, filter tuning, and diagnostic controls.")
+        hl = header.layout()
+        self.connection_label = QLabel("No device connected")
+        self.status_label = QLabel("Ready.")
+        self.live_state_label = QLabel("Live polling is disabled.")
+        self.connection_label.setProperty("muted", True)
+        self.live_state_label.setProperty("muted", True)
+        for label in (self.connection_label, self.status_label, self.live_state_label):
+            label.setWordWrap(True)
+            hl.addWidget(label)
+        actions = QHBoxLayout()
+        self.reload_button = QPushButton("Reload")
+        self.reload_button.clicked.connect(self.reload)
+        self.refresh_config_button = QPushButton("Refresh Config")
+        self.refresh_config_button.clicked.connect(self.refresh_config_display)
+        actions.addWidget(self.reload_button)
+        actions.addWidget(self.refresh_config_button)
+        actions.addStretch(1)
+        hl.addLayout(actions)
+        layout.addWidget(header)
+
+        monitor = self._card("Live Sensor Monitor", "The timer starts only when the page is active.")
+        ml = monitor.layout()
+        top = QHBoxLayout()
+        self.live_update_check = QCheckBox("Enable live updates")
+        self.live_update_check.toggled.connect(self.toggle_live_update)
+        self.refresh_rate_spin = QSpinBox()
+        self.refresh_rate_spin.setRange(50, 1000)
+        self.refresh_rate_spin.setValue(100)
+        self.refresh_rate_spin.valueChanged.connect(self._on_refresh_rate_changed)
+        top.addWidget(self.live_update_check)
+        top.addWidget(QLabel("Refresh interval (ms):"))
+        top.addWidget(self.refresh_rate_spin)
+        top.addStretch(1)
+        ml.addLayout(top)
+
+        metrics = QHBoxLayout()
+        self.hid_rate_value = self._metric_card("HID Poll Rate")
+        self.gui_rate_value = self._metric_card("GUI Update Rate")
+        metrics.addWidget(self.hid_rate_value["frame"])
+        metrics.addWidget(self.gui_rate_value["frame"])
+        ml.addLayout(metrics)
+        self.hid_rate_value["value"].setText("-- Hz")
+        self.gui_rate_value["value"].setText("-- Hz")
+
+        self.monitor_state_label = QLabel("Stopped.")
+        self.monitor_state_label.setProperty("muted", True)
+        ml.addWidget(self.monitor_state_label)
+        layout.addWidget(monitor)
+
+        adc = self._card("ADC Sensor Values", "Raw ADC values and the derived distance estimates.")
+        al = adc.layout()
+        note = QLabel("LUT: ADC 2100-2672 -> Distance 0-4 mm | Typical raw range: 2000-2700")
+        note.setProperty("muted", True)
+        note.setWordWrap(True)
+        al.addWidget(note)
+        adc_grid = QGridLayout()
+        adc_grid.addWidget(QLabel("Key"), 0, 0)
+        adc_grid.addWidget(QLabel("ADC"), 0, 1)
+        adc_grid.addWidget(QLabel("Value"), 0, 2)
+        adc_grid.addWidget(QLabel("Distance"), 0, 3)
         self.adc_labels = []
         self.adc_bars = []
         self.distance_labels = []
-
-        # Header row
-        header_frame = ttk.Frame(adc_values_frame)
-        header_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(header_frame, text="Key", width=6, font=('Consolas', 9, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(header_frame, text="ADC Bar (2000-2700)", width=30, font=('Consolas', 9, 'bold')).pack(side=tk.LEFT, padx=5)
-        ttk.Label(header_frame, text="ADC", width=6, font=('Consolas', 9, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(header_frame, text="Distance", width=10, font=('Consolas', 9, 'bold')).pack(side=tk.LEFT)
-
         for i in range(6):
-            row_frame = ttk.Frame(adc_values_frame)
-            row_frame.pack(fill=tk.X, pady=2)
-
-            ttk.Label(row_frame, text=f"Key {i+1}:", width=6, font=('Consolas', 9)).pack(side=tk.LEFT)
-
-            # Progress bar for visual - optimized range 2000-2700
-            bar = ttk.Progressbar(row_frame, length=250, maximum=700, mode='determinate')
-            bar.pack(side=tk.LEFT, padx=5)
+            row = i + 1
+            adc_grid.addWidget(QLabel(f"Key {i + 1}"), row, 0)
+            bar = QProgressBar()
+            bar.setRange(0, 700)
+            bar.setTextVisible(False)
             self.adc_bars.append(bar)
+            adc_grid.addWidget(bar, row, 1)
+            value = QLabel("----")
+            self.adc_labels.append(value)
+            adc_grid.addWidget(value, row, 2)
+            dist = QLabel("-.-- mm")
+            self.distance_labels.append(dist)
+            adc_grid.addWidget(dist, row, 3)
+        al.addLayout(adc_grid)
+        layout.addWidget(adc)
 
-            # Numeric ADC value
-            label = ttk.Label(row_frame, text="----", width=6, font=('Consolas', 10))
-            label.pack(side=tk.LEFT)
-            self.adc_labels.append(label)
-
-            # Distance value (calculated from LUT)
-            dist_label = ttk.Label(row_frame, text="-.--mm", width=10, font=('Consolas', 10))
-            dist_label.pack(side=tk.LEFT)
-            self.distance_labels.append(dist_label)
-
-        # Key States
-        key_frame = ttk.LabelFrame(parent, text="🔘 Key States", padding="10")
-        key_frame.pack(fill=tk.X, pady=5)
-
-        key_states_frame = ttk.Frame(key_frame)
-        key_states_frame.pack(fill=tk.X)
-
+        key = self._card("Key States", "Normalized key travel and key press state.")
+        kl = key.layout()
+        key_grid = QGridLayout()
         self.key_state_labels = []
-        self.key_distance_bars = []  # Mini bars for key distances
+        self.key_distance_bars = []
         for i in range(6):
-            frame = ttk.Frame(key_states_frame)
-            frame.pack(side=tk.LEFT, padx=10, expand=True)
+            box = self._subcard()
+            box_l = QVBoxLayout(box)
+            box_l.setContentsMargins(10, 10, 10, 10)
+            box_l.setSpacing(4)
+            title = QLabel(f"Key {i + 1}")
+            title.setStyleSheet("font-weight: 600;")
+            state = QLabel("⬜ OFF")
+            state.setProperty("muted", True)
+            bar = QProgressBar()
+            bar.setRange(0, 255)
+            bar.setTextVisible(False)
+            box_l.addWidget(title)
+            box_l.addWidget(state)
+            box_l.addWidget(bar)
+            key_grid.addWidget(box, i // 3, i % 3)
+            self.key_state_labels.append(state)
+            self.key_distance_bars.append(bar)
+        kl.addLayout(key_grid)
+        layout.addWidget(key)
 
-            ttk.Label(frame, text=f"Key {i+1}", font=('Arial', 9)).pack()
-            state_label = ttk.Label(frame, text="⬜", font=('Arial', 20))
-            state_label.pack()
-            self.key_state_labels.append(state_label)
+        lock = self._card("Lock Indicators", "Caps, Num, and Scroll lock state plus quick test buttons.")
+        ll = lock.layout()
+        lock_grid = QGridLayout()
+        self.caps_lock_indicator = self._chip("Caps Lock")
+        self.num_lock_indicator = self._chip("Num Lock")
+        self.scroll_lock_indicator = self._chip("Scroll Lock")
+        self.pe0_led_indicator = self._chip("PE0 LED")
+        lock_grid.addWidget(self.caps_lock_indicator["frame"], 0, 0)
+        lock_grid.addWidget(self.num_lock_indicator["frame"], 0, 1)
+        lock_grid.addWidget(self.scroll_lock_indicator["frame"], 1, 0)
+        lock_grid.addWidget(self.pe0_led_indicator["frame"], 1, 1)
+        ll.addLayout(lock_grid)
+        buttons = QHBoxLayout()
+        for text, code in [("Toggle Caps Lock", 0x39), ("Toggle Num Lock", 0x53), ("Toggle Scroll Lock", 0x47)]:
+            btn = QPushButton(text)
+            btn.clicked.connect(lambda _checked=False, k=code: self.send_keypress(k))
+            buttons.addWidget(btn)
+        buttons.addStretch(1)
+        ll.addLayout(buttons)
+        layout.addWidget(lock)
 
-            # Mini distance bar (0-255 normalized)
-            dist_bar = ttk.Progressbar(frame, length=50, maximum=255, mode='determinate')
-            dist_bar.pack(pady=2)
-            self.key_distance_bars.append(dist_bar)
+        config = self._card("Current Configuration", "Firmware, HID options, LED state, and live-not-saved reminders.")
+        cl = config.layout()
+        self.config_text = QPlainTextEdit()
+        self.config_text.setReadOnly(True)
+        self.config_text.setMinimumHeight(180)
+        cl.addWidget(self.config_text)
+        layout.addWidget(config)
 
-        # Timing/Performance info
-        timing_frame = ttk.LabelFrame(parent, text="⏱️ Performance", padding="10")
-        timing_frame.pack(fill=tk.X, pady=5)
+        filter_box = self._card("ADC EMA Filter Settings", "Tune the filter, then apply live to the device.")
+        fl = filter_box.layout()
+        self.filter_enabled_check = QCheckBox("Enable ADC EMA Filter")
+        self.filter_enabled_check.toggled.connect(self.on_filter_enabled_change)
+        fl.addWidget(self.filter_enabled_check)
+        self.filter_noise_band_spin = self._spin(1, 100, 30)
+        self.filter_alpha_min_spin = self._spin(2, 128, 32)
+        self.filter_alpha_max_spin = self._spin(1, 32, 4)
+        form = QGridLayout()
+        for row, (label, spin, hint) in enumerate([
+            ("Noise Band (ADC counts)", self.filter_noise_band_spin, "(default: 30)"),
+            ("Alpha Min (1/N, slow)", self.filter_alpha_min_spin, "(default: 32 -> 1/32)"),
+            ("Alpha Max (1/N, fast)", self.filter_alpha_max_spin, "(default: 4 -> 1/4)"),
+        ]):
+            form.addWidget(QLabel(label), row, 0)
+            form.addWidget(spin, row, 1)
+            hint_label = QLabel(hint)
+            hint_label.setProperty("muted", True)
+            form.addWidget(hint_label, row, 2)
+        fl.addLayout(form)
+        filter_actions = QHBoxLayout()
+        self.apply_filter_button = QPushButton("Apply Filter")
+        self.apply_filter_button.clicked.connect(self.apply_filter_settings)
+        self.reload_filter_button = QPushButton("Reload From Device")
+        self.reload_filter_button.clicked.connect(self.load_filter_settings)
+        self.reset_filter_button = QPushButton("Reset Defaults")
+        self.reset_filter_button.clicked.connect(self.reset_filter_defaults)
+        for btn in (self.apply_filter_button, self.reload_filter_button, self.reset_filter_button):
+            filter_actions.addWidget(btn)
+        filter_actions.addStretch(1)
+        fl.addLayout(filter_actions)
+        layout.addWidget(filter_box)
 
-        timing_info_frame = ttk.Frame(timing_frame)
-        timing_info_frame.pack(fill=tk.X)
+        diag = self._card("LED Diagnostic Mode", "Use these modes to isolate DMA, CPU, and pin-coupling behavior.")
+        dl = diag.layout()
+        self._diag_group = QButtonGroup(self)
+        grid = QGridLayout()
+        for idx, (mode, title, detail) in enumerate([
+            (0, "Normal operation", "Standard keyboard and LED behavior."),
+            (1, "DMA stress", "Send LED data without CPU computation."),
+            (2, "CPU stress", "Compute effects without LED updates."),
+            (3, "DMA + CPU", "Compute and send data with the LED pin disabled."),
+        ]):
+            box = self._subcard()
+            box_l = QVBoxLayout(box)
+            box_l.setContentsMargins(10, 10, 10, 10)
+            box_l.setSpacing(4)
+            radio = QRadioButton(title)
+            radio.toggled.connect(lambda checked, m=mode: checked and self.on_diagnostic_mode_change(m))
+            self._diag_group.addButton(radio, mode)
+            detail_label = QLabel(detail)
+            detail_label.setProperty("muted", True)
+            detail_label.setWordWrap(True)
+            box_l.addWidget(radio)
+            box_l.addWidget(detail_label)
+            grid.addWidget(box, idx // 2, idx % 2)
+        dl.addLayout(grid)
+        layout.addWidget(diag)
+        layout.addStretch(1)
 
-        ttk.Label(timing_info_frame, text="HID Poll Rate:", width=15).pack(side=tk.LEFT)
-        self.hid_rate_label = ttk.Label(timing_info_frame, text="-- Hz", font=('Consolas', 10))
-        self.hid_rate_label.pack(side=tk.LEFT, padx=10)
+    def _apply_style(self):
+        self.setStyleSheet(
+            """
+            QWidget#DebugPage { background: #f4f7fb; }
+            QFrame[card="true"] { background: white; border: 1px solid #d8e0ea; border-radius: 16px; }
+            QFrame[subcard="true"] { background: #fbfcfe; border: 1px solid #e3e9f2; border-radius: 12px; }
+            QLabel[muted="true"] { color: #667085; }
+            QProgressBar { border: 1px solid #cfd7e2; border-radius: 6px; background: #eef2f7; height: 10px; }
+            QProgressBar::chunk { border-radius: 6px; background: #2563eb; }
+            QPlainTextEdit { background: #0f172a; color: #e5eefb; border: 1px solid #d8e0ea; border-radius: 12px; font-family: Consolas, monospace; font-size: 10pt; }
+            QPushButton { padding: 6px 12px; }
+            """
+        )
 
-        ttk.Label(timing_info_frame, text="GUI Update Rate:", width=15).pack(side=tk.LEFT)
-        self.gui_rate_label = ttk.Label(timing_info_frame, text="-- Hz", font=('Consolas', 10))
-        self.gui_rate_label.pack(side=tk.LEFT, padx=10)
+    def _card(self, title: str, subtitle: str | None = None) -> QFrame:
+        card = QFrame()
+        card.setProperty("card", True)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-size: 15px; font-weight: 700; color: #101828;")
+        layout.addWidget(title_label)
+        if subtitle:
+            sub = QLabel(subtitle)
+            sub.setProperty("muted", True)
+            sub.setWordWrap(True)
+            layout.addWidget(sub)
+        return card
 
-        # Timing tracking
-        self.last_update_time = time.time()
-        self.update_count = 0
+    def _subcard(self) -> QFrame:
+        card = QFrame()
+        card.setProperty("subcard", True)
+        return card
 
-        # Lock Indicators Status
-        lock_frame = ttk.LabelFrame(parent, text="🔒 Lock Indicators", padding="10")
-        lock_frame.pack(fill=tk.X, pady=5)
+    def _metric_card(self, title: str):
+        frame = self._subcard()
+        frame.setMinimumWidth(220)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(12, 10, 12, 10)
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-weight: 600; color: #344054;")
+        value_label = QLabel("--")
+        value_label.setStyleSheet("font-size: 18px; font-weight: 700; color: #101828;")
+        layout.addWidget(title_label)
+        layout.addWidget(value_label)
+        return {"frame": frame, "value": value_label}
 
-        lock_status_frame = ttk.Frame(lock_frame)
-        lock_status_frame.pack(fill=tk.X)
+    def _chip(self, title: str):
+        frame = self._subcard()
+        layout = QHBoxLayout(frame)
+        layout.setContentsMargins(10, 10, 10, 10)
+        label = QLabel(title)
+        value = QLabel("⬜ OFF")
+        value.setProperty("muted", True)
+        layout.addWidget(label)
+        layout.addStretch(1)
+        layout.addWidget(value)
+        return {"frame": frame, "value": value}
 
-        # Caps Lock indicator
-        caps_frame = ttk.Frame(lock_status_frame)
-        caps_frame.pack(side=tk.LEFT, padx=20)
-        ttk.Label(caps_frame, text="Caps Lock", font=('Arial', 10)).pack()
-        self.caps_lock_indicator = ttk.Label(caps_frame, text="⬜ OFF", font=('Arial', 14))
-        self.caps_lock_indicator.pack()
+    def _spin(self, minimum: int, maximum: int, value: int) -> QSpinBox:
+        spin = QSpinBox()
+        spin.setRange(minimum, maximum)
+        spin.setValue(value)
+        spin.setFixedWidth(90)
+        return spin
 
-        # Num Lock indicator
-        num_frame = ttk.Frame(lock_status_frame)
-        num_frame.pack(side=tk.LEFT, padx=20)
-        ttk.Label(num_frame, text="Num Lock", font=('Arial', 10)).pack()
-        self.num_lock_indicator = ttk.Label(num_frame, text="⬜ OFF", font=('Arial', 14))
-        self.num_lock_indicator.pack()
+    def _set_status(self, message: str, kind: str = "info"):
+        colors = {"info": "#175cd3", "ok": "#067647", "warn": "#b54708", "error": "#b42318"}
+        self.status_label.setText(message)
+        self.status_label.setStyleSheet(f"color: {colors.get(kind, '#175cd3')}; font-weight: 600;")
+        self.statusChanged.emit(message)
 
-        # Scroll Lock indicator
-        scroll_frame = ttk.Frame(lock_status_frame)
-        scroll_frame.pack(side=tk.LEFT, padx=20)
-        ttk.Label(scroll_frame, text="Scroll Lock", font=('Arial', 10)).pack()
-        self.scroll_lock_indicator = ttk.Label(scroll_frame, text="⬜ OFF", font=('Arial', 14))
-        self.scroll_lock_indicator.pack()
-
-        # PE0 LED Status
-        pe0_frame = ttk.Frame(lock_status_frame)
-        pe0_frame.pack(side=tk.LEFT, padx=20)
-        ttk.Label(pe0_frame, text="PE0 LED", font=('Arial', 10)).pack()
-        self.pe0_led_indicator = ttk.Label(pe0_frame, text="⬜ OFF", font=('Arial', 14))
-        self.pe0_led_indicator.pack()
-
-        # Manual lock toggle buttons (for testing)
-        lock_buttons_frame = ttk.Frame(lock_frame)
-        lock_buttons_frame.pack(fill=tk.X, pady=5)
-        ttk.Button(lock_buttons_frame, text="Toggle Caps Lock", 
-                   command=lambda: self.send_keypress(0x39)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(lock_buttons_frame, text="Toggle Num Lock", 
-                   command=lambda: self.send_keypress(0x53)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(lock_buttons_frame, text="Toggle Scroll Lock", 
-                   command=lambda: self.send_keypress(0x47)).pack(side=tk.LEFT, padx=5)
-
-        # Current Configuration Summary
-        config_frame = ttk.LabelFrame(parent, text="📋 Current Configuration", padding="10")
-        config_frame.pack(fill=tk.X, pady=5)
-
-        self.config_text = tk.Text(config_frame, height=10, width=80, font=('Consolas', 9))
-        self.config_text.pack(fill=tk.X)
-
-        ttk.Button(config_frame, text="🔄 Refresh Configuration", command=self.refresh_config_display).pack(pady=5)
-
-        # ADC EMA Filter Settings
-        filter_frame = ttk.LabelFrame(parent, text="🎚️ ADC EMA Filter Settings", padding="10")
-        filter_frame.pack(fill=tk.X, pady=5)
-
-        # Filter enable checkbox
-        self.filter_enabled_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            filter_frame, text="Enable ADC EMA Filter",
-            variable=self.filter_enabled_var,
-            command=self.on_filter_enabled_change
-        ).pack(anchor=tk.W)
-
-        ttk.Label(filter_frame, text="(Disabling filter shows raw ADC values, may be noisy)", 
-                  foreground="gray").pack(anchor=tk.W, pady=(0, 10))
-
-        # Filter parameters
-        params_frame = ttk.Frame(filter_frame)
-        params_frame.pack(fill=tk.X)
-
-        # Noise Band
-        nb_frame = ttk.Frame(params_frame)
-        nb_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(nb_frame, text="Noise Band (ADC counts):", width=25).pack(side=tk.LEFT)
-        self.filter_noise_band_var = tk.IntVar(value=30)
-        ttk.Spinbox(nb_frame, from_=1, to=100, width=8, 
-                    textvariable=self.filter_noise_band_var).pack(side=tk.LEFT, padx=5)
-        ttk.Label(nb_frame, text="(default: 30)", foreground="gray").pack(side=tk.LEFT)
-
-        # Alpha Min Denominator
-        amin_frame = ttk.Frame(params_frame)
-        amin_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(amin_frame, text="Alpha Min (1/N, slow):", width=25).pack(side=tk.LEFT)
-        self.filter_alpha_min_var = tk.IntVar(value=32)
-        ttk.Spinbox(amin_frame, from_=2, to=128, width=8, 
-                    textvariable=self.filter_alpha_min_var).pack(side=tk.LEFT, padx=5)
-        ttk.Label(amin_frame, text="(default: 32 → 1/32 = strong smoothing)", foreground="gray").pack(side=tk.LEFT)
-
-        # Alpha Max Denominator
-        amax_frame = ttk.Frame(params_frame)
-        amax_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(amax_frame, text="Alpha Max (1/N, fast):", width=25).pack(side=tk.LEFT)
-        self.filter_alpha_max_var = tk.IntVar(value=4)
-        ttk.Spinbox(amax_frame, from_=1, to=32, width=8, 
-                    textvariable=self.filter_alpha_max_var).pack(side=tk.LEFT, padx=5)
-        ttk.Label(amax_frame, text="(default: 4 → 1/4 = fast response)", foreground="gray").pack(side=tk.LEFT)
-
-        # Apply button
-        btn_frame = ttk.Frame(filter_frame)
-        btn_frame.pack(fill=tk.X, pady=10)
-        ttk.Button(btn_frame, text="📤 Apply Filter Settings", 
-                   command=self.apply_filter_settings).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="📥 Reload From Device", 
-                   command=self.load_filter_settings).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="🔄 Reset to Defaults", 
-                   command=self.reset_filter_defaults).pack(side=tk.LEFT, padx=5)
-
-        # Load initial filter settings
-        self.load_filter_settings()
-
-        # LED Diagnostic Mode (for troubleshooting ADC noise)
-        diag_frame = ttk.LabelFrame(parent, text="🔬 LED Diagnostic Mode (ADC Noise Testing)", padding="10")
-        diag_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(diag_frame, text="Use this to diagnose if ADC noise is caused by LED DMA activity or CPU computation:",
-                  foreground="gray").pack(anchor=tk.W)
-
-        self.diagnostic_mode_var = tk.IntVar(value=0)
-
-        ttk.Radiobutton(diag_frame, text="Normal Operation", 
-                       variable=self.diagnostic_mode_var, value=0,
-                       command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
-
-        ttk.Radiobutton(diag_frame, text="Mode 1: DMA Stress (sends LED data, no CPU computation)", 
-                       variable=self.diagnostic_mode_var, value=1,
-                       command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
-        ttk.Label(diag_frame, text="    → If noise appears: DMA/electrical interference is the cause",
-                  foreground="blue", font=('Arial', 9)).pack(anchor=tk.W)
-
-        ttk.Radiobutton(diag_frame, text="Mode 2: CPU Stress (computes effects, no LED updates)", 
-                       variable=self.diagnostic_mode_var, value=2,
-                       command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
-        ttk.Label(diag_frame, text="    → If noise appears: CPU load/interrupt latency is the cause",
-                  foreground="blue", font=('Arial', 9)).pack(anchor=tk.W)
-
-        ttk.Radiobutton(diag_frame, text="Mode 3: DMA + CPU (computes & sends data, LED pin disabled)", 
-                       variable=self.diagnostic_mode_var, value=3,
-                       command=self.on_diagnostic_mode_change).pack(anchor=tk.W)
-        ttk.Label(diag_frame, text="    → If noise disappears: PWM pin switching is causing interference",
-                  foreground="blue", font=('Arial', 9)).pack(anchor=tk.W)
-
-        ttk.Label(diag_frame, text="\n💡 Tips: Also try moving LED cables away from sensor wires to test electrical coupling",
-                  foreground="gray").pack(anchor=tk.W)
-
-        # Initial config display
-        self.refresh_config_display()
-
-    def toggle_live_update(self):
-        """Toggle live sensor updates using background thread."""
-        if self.live_update_var.get():
-            if self.active_tab == "Debug / Sensors":
-                self._start_sensor_updates()
-            else:
-                self.status_var.set("Live sensor updates armed. Open the Debug / Sensors tab to start polling.")
+    def _refresh_connection_state(self):
+        if self.device is None:
+            self.connection_label.setText("No device connected")
+            self.connection_label.setStyleSheet("color: #b42318; font-weight: 600;")
         else:
-            self._stop_sensor_updates()
+            self.connection_label.setText("Device connected")
+            self.connection_label.setStyleSheet("color: #067647; font-weight: 600;")
 
-    def _sensor_reader_thread(self):
-        """Background thread that reads sensor data."""
-        while self.sensor_thread_running:
-            try:
-                adc_values = self.device.get_adc_values()
-                key_states = self.device.get_key_states()
-                lock_states = self.device.get_lock_states()
-                self.sensor_queue.put({'adc': adc_values, 'keys': key_states, 'locks': lock_states})
-            except Exception as e:
-                self.sensor_queue.put({'error': str(e)})
+    def _sync_enabled_state(self):
+        has_device = self.device is not None
+        for widget in [
+            self.live_update_check,
+            self.refresh_rate_spin,
+            self.reload_button,
+            self.refresh_config_button,
+            self.filter_enabled_check,
+            self.filter_noise_band_spin,
+            self.filter_alpha_min_spin,
+            self.filter_alpha_max_spin,
+            self.apply_filter_button,
+            self.reload_filter_button,
+            self.reset_filter_button,
+            self.config_text,
+        ]:
+            widget.setEnabled(has_device)
+        if self._diag_group is not None:
+            for btn in self._diag_group.buttons():
+                btn.setEnabled(has_device)
+        self._refresh_connection_state()
 
-            # Sleep based on refresh rate (convert ms to seconds)
-            try:
-                refresh_ms = self.refresh_rate_var.get()
-            except Exception:
-                refresh_ms = 50
-            time.sleep(refresh_ms / 1000.0)
+    def _refresh_live_state(self):
+        if self.live_update_check.isChecked() and self._page_active and self.device is not None:
+            self.live_state_label.setText(f"Live polling is running every {self.refresh_rate_spin.value()} ms.")
+            self.monitor_state_label.setText("Running.")
+        elif self.live_update_check.isChecked():
+            self.live_state_label.setText("Live polling is armed and will start when this page becomes active.")
+            self.monitor_state_label.setText("Armed.")
+        else:
+            self.live_state_label.setText("Live polling is disabled.")
+            self.monitor_state_label.setText("Stopped.")
 
-    def _process_sensor_queue(self):
-        """Process sensor data from queue and update GUI."""
-        if not self.live_sensor_update:
-            return
+    def _init_timer(self):
+        self.sensor_timer = QTimer(self)
+        self.sensor_timer.timeout.connect(self._poll_sensor_once)
 
+    def _on_refresh_rate_changed(self, _value: int):
+        if self._page_active and self.live_update_check.isChecked() and self.device is not None:
+            self.sensor_timer.start(self.refresh_rate_spin.value())
+            self._poll_sensor_once()
+        self._refresh_live_state()
+
+    def toggle_live_update(self, _checked: bool):
+        if self.live_update_check.isChecked() and self._page_active and self.device is not None:
+            self.sensor_timer.start(self.refresh_rate_spin.value())
+            self._poll_sensor_once()
+        else:
+            self.sensor_timer.stop()
+        self._refresh_live_state()
+
+    def _device_call(self, name: str, default: Any = None, *args, **kwargs):
+        if self.device is None:
+            return default
+        method = getattr(self.device, name, None)
+        if method is None:
+            return default
         try:
-            # Process all queued data (get latest)
-            data = None
-            while not self.sensor_queue.empty():
-                data = self.sensor_queue.get_nowait()
+            return method(*args, **kwargs)
+        except Exception as exc:
+            self._set_status(f"{name} failed: {exc}", "error")
+            return default
 
-            if data:
-                if 'error' in data:
-                    self.status_var.set(f"Sensor error: {data['error']}")
-                else:
-                    self._update_sensor_display(data.get('adc'), data.get('keys'))
-                    self._update_lock_display(data.get('locks'))
-
-        except queue.Empty:
-            pass
-        except Exception as e:
-            self.status_var.set(f"GUI update error: {e}")
-
-        # Schedule next GUI update (faster than sensor read for responsiveness)
-        self.sensor_update_job = self.after(16, self._process_sensor_queue)  # ~60 FPS GUI
-
-    def _update_sensor_display(self, adc_data, key_states):
-        """Update GUI with sensor data (called from main thread)."""
-        if adc_data:
-            # adc_data is now a dict with 'adc', 'scan_time_us', 'scan_rate_hz'
-            adc_values = adc_data.get('adc', [])
-            for i, val in enumerate(adc_values):
-                # Progress bar range is 2000-2700, so subtract 2000 for bar value
-                bar_val = max(0, min(700, val - 2000))
-                self.adc_bars[i]['value'] = bar_val
-                self.adc_labels[i].config(text=f"{val:4d}")
-
-            # Update MCU timing display
-            scan_rate = adc_data.get('scan_rate_hz', 0)
-            scan_time = adc_data.get('scan_time_us', 0)
-            self.hid_rate_label.config(text=f"{scan_rate} Hz ({scan_time}µs)")
-
-        if key_states:
-            for i, state in enumerate(key_states['states']):
-                self.key_state_labels[i].config(
-                    text="🟢" if state else "⬜",
-                    foreground="green" if state else "gray"
-                )
-            # Update distance bars from normalized distances
-            if 'distances' in key_states:
-                for i, dist in enumerate(key_states['distances']):
-                    self.key_distance_bars[i]['value'] = dist
-
-            # Update distance in mm from MCU (actual LUT values)
-            if 'distances_mm' in key_states:
-                for i, dist_mm in enumerate(key_states['distances_mm']):
-                    self.distance_labels[i].config(text=f"{dist_mm:.2f}mm")
-
-        # Update GUI timing stats
-        self.update_count += 1
-        now = time.time()
-        elapsed = now - self.last_update_time
-        if elapsed >= 1.0:
-            gui_rate = self.update_count / elapsed
-            self.gui_rate_label.config(text=f"{gui_rate:.1f} Hz")
-            self.update_count = 0
-            self.last_update_time = now
-
-    def _update_lock_display(self, lock_states):
-        """Update lock indicator display (called from main thread)."""
-        if not lock_states:
+    def _poll_sensor_once(self):
+        if self.device is None:
+            self._set_status("Connect a device to read diagnostics.", "warn")
+            return
+        try:
+            adc_data = self.device.get_adc_values() or {}
+            key_states = self.device.get_key_states() or {}
+            lock_states = self.device.get_lock_states() or {}
+        except Exception as exc:
+            error = f"Sensor monitor error: {exc}"
+            if error != self._last_sensor_error:
+                self._last_sensor_error = error
+                self._set_status(error, "error")
             return
 
-        caps = lock_states.get('caps_lock', False)
-        num = lock_states.get('num_lock', False)
-        scroll = lock_states.get('scroll_lock', False)
+        self._last_sensor_error = None
+        self._update_adc_display(adc_data)
+        self._update_key_display(key_states)
+        self._update_lock_display(lock_states)
+        self._update_gui_rate()
 
-        # Update Caps Lock indicator
-        self.caps_lock_indicator.config(
-            text="🟢 ON" if caps else "⬜ OFF",
-            foreground="green" if caps else "gray"
-        )
+    def _update_adc_display(self, adc_data: dict):
+        adc_values = list(adc_data.get("adc") or [])
+        for i in range(6):
+            value = adc_values[i] if i < len(adc_values) else None
+            if value is None:
+                self.adc_bars[i].setValue(0)
+                self.adc_labels[i].setText("----")
+            else:
+                self.adc_bars[i].setValue(_clamp(int(value) - 2000, 0, 700))
+                self.adc_labels[i].setText(f"{int(value):4d}")
+        scan_rate = adc_data.get("scan_rate_hz")
+        scan_time = adc_data.get("scan_time_us")
+        if scan_rate is not None and scan_time is not None:
+            self.hid_rate_value["value"].setText(f"{scan_rate} Hz / {scan_time} us")
+        elif scan_rate is not None:
+            self.hid_rate_value["value"].setText(f"{scan_rate} Hz")
 
-        # Update Num Lock indicator
-        self.num_lock_indicator.config(
-            text="🟢 ON" if num else "⬜ OFF",
-            foreground="green" if num else "gray"
-        )
+    def _update_key_display(self, key_states: dict):
+        states = list(key_states.get("states") or [])
+        distances = list(key_states.get("distances") or [])
+        distances_mm = list(key_states.get("distances_mm") or [])
+        for i in range(6):
+            active = bool(states[i]) if i < len(states) else False
+            self.key_state_labels[i].setText("🟢 ON" if active else "⬜ OFF")
+            self.key_state_labels[i].setStyleSheet("color: #067647; font-weight: 600;" if active else "color: #667085;")
+            self.key_distance_bars[i].setValue(int(distances[i]) if i < len(distances) else 0)
+            self.distance_labels[i].setText(f"{distances_mm[i]:.2f} mm" if i < len(distances_mm) else "-.-- mm")
 
-        # Update Scroll Lock indicator
-        self.scroll_lock_indicator.config(
-            text="🟢 ON" if scroll else "⬜ OFF",
-            foreground="green" if scroll else "gray"
-        )
-
-        # Update PE0 LED status based on firmware behavior
-        # Both ON = solid, Caps only = fast blink, Num only = slow blink, Both OFF = off
+    def _update_lock_display(self, lock_states: dict):
+        caps = bool(lock_states.get("caps_lock", False))
+        num = bool(lock_states.get("num_lock", False))
+        scroll = bool(lock_states.get("scroll_lock", False))
+        self._set_chip(self.caps_lock_indicator, caps)
+        self._set_chip(self.num_lock_indicator, num)
+        self._set_chip(self.scroll_lock_indicator, scroll)
         if caps and num:
-            pe0_text = "🟢 SOLID"
-            pe0_color = "green"
+            self._set_chip(self.pe0_led_indicator, True, "🟢 SOLID", "#067647")
         elif caps and not num:
-            pe0_text = "🟡 FAST BLINK"
-            pe0_color = "orange"
+            self._set_chip(self.pe0_led_indicator, True, "🟡 FAST BLINK", "#b54708")
         elif num and not caps:
-            pe0_text = "🟡 SLOW BLINK"
-            pe0_color = "orange"
+            self._set_chip(self.pe0_led_indicator, True, "🟡 SLOW BLINK", "#b54708")
         else:
-            pe0_text = "⬜ OFF"
-            pe0_color = "gray"
+            self._set_chip(self.pe0_led_indicator, False)
 
-        self.pe0_led_indicator.config(text=pe0_text, foreground=pe0_color)
+    def _set_chip(self, chip: dict, enabled: bool, text: str | None = None, color: str | None = None):
+        chip["value"].setText(text if text is not None else ("🟢 ON" if enabled else "⬜ OFF"))
+        chip["value"].setStyleSheet(f"color: {color or ('#067647' if enabled else '#667085')}; font-weight: 600;")
 
-    def send_keypress(self, keycode):
-        """Send a single key press and release via the keyboard interface."""
-        # This is just for testing - toggle locks via actual key press
-        # For now, show a message that user needs to press physical key
-        self.status_var.set(f"Press physical key with HID code 0x{keycode:02X} to toggle")
+    def _update_gui_rate(self):
+        self._gui_tick_count += 1
+        elapsed = time.monotonic() - self._gui_tick_started
+        if elapsed >= 1.0:
+            self.gui_rate_value["value"].setText(f"{self._gui_tick_count / elapsed:.1f} Hz")
+            self._gui_tick_count = 0
+            self._gui_tick_started = time.monotonic()
+
+    def send_keypress(self, keycode: int):
+        if self.device is None:
+            self._set_status("Connect a device before sending a keypress.", "warn")
+            return
+        self._set_status(f"Press the physical key with HID code 0x{keycode:02X} to toggle the lock state.", "info")
 
     def load_filter_settings(self):
-        """Load filter settings from device."""
-        try:
-            enabled = self.device.get_filter_enabled()
-            if enabled is not None:
-                self.filter_enabled_var.set(enabled)
+        if self.device is None:
+            self._set_status("Connect a device to load filter settings.", "warn")
+            return
+        enabled = self._device_call("get_filter_enabled", None)
+        params = self._device_call("get_filter_params", {}) or {}
+        if enabled is not None:
+            self.filter_enabled_check.setChecked(bool(enabled))
+        if "noise_band" in params:
+            self.filter_noise_band_spin.setValue(int(params["noise_band"]))
+        if "alpha_min_denom" in params:
+            self.filter_alpha_min_spin.setValue(int(params["alpha_min_denom"]))
+        if "alpha_max_denom" in params:
+            self.filter_alpha_max_spin.setValue(int(params["alpha_max_denom"]))
+        self._set_status("Filter settings loaded.", "ok")
 
-            params = self.device.get_filter_params()
-            if params:
-                self.filter_noise_band_var.set(params['noise_band'])
-                self.filter_alpha_min_var.set(params['alpha_min_denom'])
-                self.filter_alpha_max_var.set(params['alpha_max_denom'])
-
-            self.status_var.set("📥 Filter settings loaded from device")
-        except Exception as e:
-            self.status_var.set(f"❌ Error loading filter settings: {e}")
-
-    def on_filter_enabled_change(self):
-        """Handle filter enable/disable toggle."""
-        enabled = self.filter_enabled_var.get()
-        if self.device.set_filter_enabled(enabled):
-            self.status_var.set(f"🎚️ Filter {'enabled' if enabled else 'disabled'} - LIVE")
+    def on_filter_enabled_change(self, enabled: bool):
+        if self.device is None:
+            self._set_status("Connect a device before changing the filter.", "warn")
+            return
+        if self._device_call("set_filter_enabled", False, bool(enabled)):
+            self._set_status(f"Filter {'enabled' if enabled else 'disabled'} live.", "ok")
         else:
-            self.status_var.set("❌ Failed to update filter state")
+            self._set_status("Failed to update filter state.", "error")
 
     def apply_filter_settings(self):
-        """Apply filter parameters to device."""
-        noise_band = self.filter_noise_band_var.get()
-        alpha_min = self.filter_alpha_min_var.get()
-        alpha_max = self.filter_alpha_max_var.get()
-
-        if self.device.set_filter_params(noise_band, alpha_min, alpha_max):
-            self.status_var.set(f"📤 Filter params applied: band={noise_band}, αmin=1/{alpha_min}, αmax=1/{alpha_max}")
+        if self.device is None:
+            self._set_status("Connect a device before applying filter settings.", "warn")
+            return
+        noise_band = _clamp(self.filter_noise_band_spin.value(), 1, 100)
+        alpha_min = _clamp(self.filter_alpha_min_spin.value(), 2, 128)
+        alpha_max = _clamp(self.filter_alpha_max_spin.value(), 1, 32)
+        self.filter_noise_band_spin.setValue(noise_band)
+        self.filter_alpha_min_spin.setValue(alpha_min)
+        self.filter_alpha_max_spin.setValue(alpha_max)
+        if self._device_call("set_filter_params", False, noise_band, alpha_min, alpha_max):
+            self._set_status(f"Filter params applied: band={noise_band}, alpha_min=1/{alpha_min}, alpha_max=1/{alpha_max}", "ok")
         else:
-            self.status_var.set("❌ Failed to apply filter parameters")
+            self._set_status("Error applying filter parameters.", "error")
 
     def reset_filter_defaults(self):
-        """Reset filter to default values."""
-        self.filter_enabled_var.set(True)
-        self.filter_noise_band_var.set(30)
-        self.filter_alpha_min_var.set(32)
-        self.filter_alpha_max_var.set(4)
-
-        # Apply defaults to device
-        self.device.set_filter_enabled(True)
-        self.device.set_filter_params(30, 32, 4)
-        self.status_var.set("🔄 Filter reset to defaults")
-
-    def on_diagnostic_mode_change(self):
-        """Handle diagnostic mode change."""
-        mode = self.diagnostic_mode_var.get()
-        mode_names = {0: "Normal", 1: "DMA Stress", 2: "CPU Stress", 3: "DMA + CPU"}
-        if self.device.set_led_diagnostic(mode):
-            self.status_var.set(f"🔬 Diagnostic mode: {mode_names.get(mode, 'Unknown')}")
+        self.filter_enabled_check.setChecked(True)
+        self.filter_noise_band_spin.setValue(30)
+        self.filter_alpha_min_spin.setValue(32)
+        self.filter_alpha_max_spin.setValue(4)
+        if self.device is None:
+            self._set_status("Connect a device before resetting filter defaults.", "warn")
+            return
+        enabled_ok = self._device_call("set_filter_enabled", False, True)
+        params_ok = self._device_call("set_filter_params", False, 30, 32, 4)
+        if enabled_ok and params_ok:
+            self._set_status("Filter reset to defaults.", "ok")
         else:
-            self.status_var.set("❌ Failed to set diagnostic mode")
+            self._set_status("Filter defaults were sent, but the device reported a failure.", "warn")
+
+    def on_diagnostic_mode_change(self, mode: int | None = None):
+        if self.device is None:
+            self._set_status("Connect a device before changing diagnostic mode.", "warn")
+            return
+        if mode is None and self._diag_group is not None:
+            mode = self._diag_group.checkedId()
+        if mode is None or mode < 0:
+            return
+        names = {0: "Normal", 1: "DMA Stress", 2: "CPU Stress", 3: "DMA + CPU"}
+        if self._device_call("set_led_diagnostic", False, mode):
+            self._set_status(f"Diagnostic mode: {names.get(mode, 'Unknown')}", "ok")
+        else:
+            self._set_status("Failed to set diagnostic mode.", "error")
 
     def refresh_config_display(self):
-        """Refresh the configuration display."""
-        self.config_text.delete(1.0, tk.END)
+        if self.device is None:
+            self.config_text.setPlainText("No device connected.\n\nConnect a device to inspect firmware and live options.")
+            self._set_status("Connect a device to refresh configuration.", "warn")
+            return
+        version = self._device_call("get_firmware_version", "Unknown")
+        options = self._device_call("get_options", {}) or {}
+        led_enabled = self._device_call("led_get_enabled", None)
+        brightness = self._device_call("led_get_brightness", None)
+        filter_enabled = self._device_call("get_filter_enabled", None)
+        filter_params = self._device_call("get_filter_params", {}) or {}
+        lines = [
+            "KBHE Configuration",
+            "",
+            f"Firmware Version: {version if version else 'Unknown'}",
+            "",
+            "HID Interfaces:",
+            f"  - Keyboard: {'Enabled' if options.get('keyboard_enabled') else 'Disabled'}",
+            f"  - Gamepad:  {'Enabled' if options.get('gamepad_enabled') else 'Disabled'}",
+            f"  - Raw HID:  {'Enabled' if options.get('raw_hid_echo', True) else 'Disabled'}",
+            "",
+            "LED Matrix:",
+            f"  - Enabled:    {'Yes' if led_enabled else 'No'}",
+            f"  - Brightness: {brightness if brightness is not None else 'Unknown'}",
+            "",
+            "ADC Filter:",
+            f"  - Enabled:    {'Yes' if filter_enabled else 'No'}",
+            f"  - Noise Band: {filter_params.get('noise_band', 'Unknown')}",
+            f"  - Alpha Min:  {filter_params.get('alpha_min_denom', 'Unknown')}",
+            f"  - Alpha Max:  {filter_params.get('alpha_max_denom', 'Unknown')}",
+            "",
+            "Note: Live changes are applied immediately but are not saved to flash until you explicitly save them.",
+        ]
+        self.config_text.setPlainText("\n".join(lines))
+        self._set_status("Configuration refreshed.", "ok")
 
-        try:
-            version = self.device.get_firmware_version()
-            options = self.device.get_options()
-            brightness = self.device.led_get_brightness()
-            led_enabled = self.device.led_get_enabled()
 
-            config_str = f"""=== KBHE Configuration ===
-
-Firmware Version: {version if version else 'Unknown'}
-
-HID Interfaces:
-  - Keyboard: {'Enabled' if options and options['keyboard_enabled'] else 'Disabled'}
-  - Gamepad:  {'Enabled' if options and options['gamepad_enabled'] else 'Disabled'}
-  - Raw HID:  Always Enabled
-
-LED Matrix:
-  - Enabled:    {'Yes' if led_enabled else 'No'}
-  - Brightness: {brightness if brightness is not None else 'Unknown'}
-
-Note: Changes to toggles are sent immediately to the device
-but NOT saved to flash until you click "Save to Flash".
-"""
-            self.config_text.insert(tk.END, config_str)
-        except Exception as e:
-            self.config_text.insert(tk.END, f"Error reading config: {e}")
+DebugPageMixin = DebugPage

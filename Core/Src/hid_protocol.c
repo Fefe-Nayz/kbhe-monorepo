@@ -74,12 +74,10 @@ static void cmd_set_options(const uint8_t *in, uint8_t *out) {
   const hid_packet_options_t *req = (const hid_packet_options_t *)in;
   hid_packet_options_t *resp = (hid_packet_options_t *)out;
 
-  settings_options_t opts;
+  settings_options_t opts = settings_get_options();
   opts.keyboard_enabled = req->keyboard_enabled ? 1 : 0;
   opts.gamepad_enabled = req->gamepad_enabled ? 1 : 0;
   opts.raw_hid_echo = req->raw_hid_echo ? 1 : 0;
-  opts.led_enabled = settings_is_led_enabled() ? 1 : 0; // Preserve LED state
-  opts.reserved = 0;
 
   bool success = settings_set_options(opts);
 
@@ -192,7 +190,13 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  settings_key_t key;
+  const settings_key_t *current_key = settings_get_key(req->key_index);
+  if (current_key == NULL) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  settings_key_t key = *current_key;
   key.hid_keycode = req->hid_keycode;
   key.actuation_point_mm = req->actuation_point_mm;
   key.release_point_mm = req->release_point_mm;
@@ -248,7 +252,13 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
 
   bool success = true;
   for (int i = 0; i < 6; i++) {
-    settings_key_t key;
+    const settings_key_t *current_key = settings_get_key(i);
+    if (current_key == NULL) {
+      success = false;
+      continue;
+    }
+
+    settings_key_t key = *current_key;
     key.hid_keycode = req->keys[i].hid_keycode;
     key.actuation_point_mm = req->keys[i].actuation_point_mm;
     key.release_point_mm = req->keys[i].release_point_mm;
