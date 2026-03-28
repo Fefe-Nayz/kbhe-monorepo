@@ -89,6 +89,15 @@ static void clear_interrupt_state(void) {
   }
 }
 
+static void restore_core_state_for_application(void) {
+  /* Match the architectural reset state before entering Reset_Handler. */
+  __set_CONTROL(0u);
+  __set_BASEPRI(0u);
+  __enable_irq();
+  __DSB();
+  __ISB();
+}
+
 static void jump_to_application(bool runtime_cleanup) {
   const uint32_t *app_vector = (const uint32_t *)UPDATER_APP_BASE;
   uint32_t app_stack = app_vector[0];
@@ -116,6 +125,7 @@ static void jump_to_application(bool runtime_cleanup) {
   SCB->VTOR = UPDATER_APP_BASE;
   __set_MSP(app_stack);
   __set_PSP(app_stack);
+  restore_core_state_for_application();
   __DSB();
   __ISB();
 

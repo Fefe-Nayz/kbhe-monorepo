@@ -43,6 +43,10 @@ FLASH_WRITE_ALIGN = 4
 DATA_CHUNK_SIZE = 56
 
 
+def default_logger(message):
+    print(message)
+
+
 def build_updater_packet(command, sequence, offset=0, payload=b""):
     if len(payload) > DATA_CHUNK_SIZE:
         raise ValueError("payload too large")
@@ -171,12 +175,12 @@ class HidDevice:
         return self.read_packet(timeout_s)
 
 
-def request_updater_from_app(timeout_s):
+def request_updater_from_app(timeout_s, logger=default_logger):
     path = find_app_path()
     if path is None:
         return False
 
-    print("Requesting updater mode from application...")
+    logger("Requesting updater mode from application...")
     device = HidDevice(path)
     try:
         packet = bytearray(PACKET_SIZE)
@@ -190,24 +194,24 @@ def request_updater_from_app(timeout_s):
     return True
 
 
-def ensure_updater_mode(timeout_s):
+def ensure_updater_mode(timeout_s, logger=default_logger):
     updater_path = find_updater_path()
     if updater_path is not None:
         return updater_path
 
-    if request_updater_from_app(timeout_s):
+    if request_updater_from_app(timeout_s, logger=logger):
         return wait_for_path(find_updater_path, timeout_s, "updater")
 
     raise RuntimeError("neither the updater PID nor the application Raw HID interface was found")
 
 
-def transact_with_retry(device, packet, timeout_s, retries):
+def transact_with_retry(device, packet, timeout_s, retries, logger=default_logger):
     last_response = None
     for attempt in range(1, retries + 1):
         last_response = device.transact(packet, timeout_s)
         if last_response is not None:
             return parse_updater_response(last_response)
-        print(f"Retry {attempt}/{retries} after timeout...")
+        logger(f"Retry {attempt}/{retries} after timeout...")
     raise RuntimeError("device did not respond after retries")
 
 
@@ -227,7 +231,7 @@ def parse_hello_payload(payload):
     return struct.unpack("<HHIIIHH", payload[:20])
 
 
-def flash_firmware(firmware_path, firmware_version, timeout_s, retries):
+def flash_firmware(firmware_path, firmware_version, timeout_s, retries, logger=default_logger):
     firmware = pathlib.Path(firmware_path).read_bytes()
     if not firmware:
         raise RuntimeError("firmware file is empty")
@@ -235,15 +239,20 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries):
     padded = firmware + (b"\xFF" * (align_up(len(firmware), FLASH_WRITE_ALIGN) - len(firmware)))
     image_crc32 = zlib.crc32(firmware) & 0xFFFFFFFF
 
-    updater_path = ensure_updater_mode(timeout_s)
-    print(f"Connected to updater: {updater_path}")
+    updater_path = ensure_updater_mode(timeout_s, logger=logger)
+    logger(f"Connected to updater: {updater_path}")
 
     device = HidDevice(updater_path)
     try:
         sequence = 1
+        last_logged_percent = -1
 
         hello = transact_with_retry(
-            device, build_updater_packet(UPDATER_CMD_HELLO, sequence), timeout_s, retries
+            device,
+            build_updater_packet(UPDATER_CMD_HELLO, sequence),
+            timeout_s,
+            retries,
+            logger=logger,
         )
         require_ok(hello, UPDATER_CMD_HELLO)
         (
@@ -269,7 +278,7 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries):
                 f"firmware is too large ({len(firmware)} bytes), updater max is {app_max_size} bytes"
             )
 
-        print(
+        logger(
             f"Updater ready: app_base=0x{app_base:08X}, max_size={app_max_size}, installed={format_fw_version(installed_fw_version) if installed_fw_version else 'unknown'}"
         )
 
@@ -280,6 +289,7 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries):
             build_updater_packet(UPDATER_CMD_BEGIN, sequence, 0, begin_payload),
             timeout_s,
             retries,
+            logger=logger,
         )
         require_ok(begin, UPDATER_CMD_BEGIN)
 
@@ -293,6 +303,7 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries):
                 build_updater_packet(UPDATER_CMD_DATA, sequence, offset, chunk),
                 timeout_s,
                 retries,
+                logger=logger,
             )
             require_ok(response, UPDATER_CMD_DATA)
 
@@ -305,19 +316,36 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries):
             offset = next_offset
             progress = min(offset, len(firmware))
             percent = (progress * 100) // len(firmware)
-            print(f"\rFlashing: {progress}/{len(firmware)} bytes ({percent}%)", end="", flush=True)
+            if logger is default_logger:
+                print(
+                    f"\rFlashing: {progress}/{len(firmware)} bytes ({percent}%)",
+                    end="",
+                    flush=True,
+                )
+            elif progress == len(firmware) or (percent % 5 == 0 and percent != last_logged_percent):
+                logger(f"Flashing: {progress}/{len(firmware)} bytes ({percent}%)")
+                last_logged_percent = percent
 
-        print()
+        if logger is default_logger:
+            print()
 
         sequence = (sequence + 1) & 0xFF
         finish = transact_with_retry(
-            device, build_updater_packet(UPDATER_CMD_FINISH, sequence), timeout_s, retries
+            device,
+            build_updater_packet(UPDATER_CMD_FINISH, sequence),
+            timeout_s,
+            retries,
+            logger=logger,
         )
         require_ok(finish, UPDATER_CMD_FINISH)
 
         sequence = (sequence + 1) & 0xFF
         boot = transact_with_retry(
-            device, build_updater_packet(UPDATER_CMD_BOOT, sequence), timeout_s, retries
+            device,
+            build_updater_packet(UPDATER_CMD_BOOT, sequence),
+            timeout_s,
+            retries,
+            logger=logger,
         )
         require_ok(boot, UPDATER_CMD_BOOT)
     except Exception:
@@ -330,8 +358,8 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries):
     finally:
         device.close()
 
-    wait_for_path(find_app_path, timeout_s, "application")
-    print("Update complete, application is back online.")
+    wait_for_path(find_app_path, max(timeout_s, 10.0), "application")
+    logger("Update complete, application is back online.")
 
 
 def parse_args():
@@ -365,7 +393,7 @@ def main():
     print(
         f"Flashing {args.firmware} with firmware version {format_fw_version(firmware_version)} (0x{firmware_version:04X})"
     )
-    flash_firmware(args.firmware, firmware_version, args.timeout, args.retries)
+    flash_firmware(args.firmware, firmware_version, args.timeout, args.retries, logger=default_logger)
 
 
 if __name__ == "__main__":
