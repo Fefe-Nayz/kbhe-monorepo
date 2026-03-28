@@ -190,11 +190,19 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
  */
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                                 uint16_t len) {
-  (void)instance;
   (void)report;
   (void)len;
 
-  // Rapport envoyé avec succès
-  // Peut être utilisé pour déclencher l'envoi du prochain rapport
-  report_pending = false;
+  switch (instance) {
+  case HID_ITF_KEYBOARD:
+    report_pending = false;
+    break;
+
+  case HID_ITF_RAW_HID:
+    raw_hid_on_report_complete();
+    break;
+
+  default:
+    break;
+  }
 }

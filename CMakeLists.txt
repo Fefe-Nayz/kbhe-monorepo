@@ -20,6 +20,7 @@ endif()
 
 # Set the project name
 set(CMAKE_PROJECT_NAME kbhe)
+set(KBHE_BOOTLOADER_TARGET kbhe_bootloader)
 
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -36,6 +37,8 @@ add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
+
+set(STM32_SYSTEM_SRC ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/system_stm32f7xx.c)
 
 #--------------------------------------------------------------------+
 # TinyUSB Configuration
@@ -63,6 +66,35 @@ set(TINYUSB_INC
     ${TINYUSB_DIR}/src/common
 )
 
+function(kbhe_configure_binary_target target linker_script vect_tab_offset)
+    target_compile_definitions(${target} PRIVATE
+        HSE_VALUE=16000000U
+        USER_VECT_TAB_ADDRESS
+        VECT_TAB_OFFSET=${vect_tab_offset}
+    )
+
+    target_link_options(${target} PRIVATE
+        "-T${linker_script}"
+        "-Wl,-Map=$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.map"
+    )
+
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_OBJCOPY} -Obinary
+                $<TARGET_FILE:${target}>
+                $<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.bin
+        COMMAND ${CMAKE_OBJCOPY} -Oihex
+                $<TARGET_FILE:${target}>
+                $<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.hex
+        COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${target}>
+        VERBATIM
+    )
+
+    set_target_properties(${target} PROPERTIES
+        ADDITIONAL_CLEAN_FILES
+        "$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.bin;$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.hex;$<TARGET_FILE_DIR:${target}>/$<TARGET_FILE_BASE_NAME:${target}>.map"
+    )
+endfunction()
+
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
@@ -70,6 +102,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    ${STM32_SYSTEM_SRC}
     # TinyUSB sources
     ${TINYUSB_SRC}
     # USB application sources
@@ -86,6 +119,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/flash_storage.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/settings.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid_protocol.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_shared.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_app.c
     # LED Matrix (WS2812)
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/led_matrix.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Src/ws2812.c
@@ -104,12 +139,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Inc
 )
 
-# Add project symbols (macros)
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    # HSE value for USB HS PHY PLL configuration
-    HSE_VALUE=16000000U
-)
-
 # Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
@@ -118,4 +147,46 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+)
+
+kbhe_configure_binary_target(
+    ${CMAKE_PROJECT_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/STM32F723XX_FLASH.ld
+    0x00010000U
+)
+
+add_executable(${KBHE_BOOTLOADER_TARGET})
+
+target_sources(${KBHE_BOOTLOADER_TARGET} PRIVATE
+    ${STM32_SYSTEM_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/startup_stm32f723xx.s
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/sysmem.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/syscalls.c
+    ${TINYUSB_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_shared.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/bootloader_usb.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/updater_bootloader.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/usb_descriptors.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/stm32f7xx_it.c
+)
+
+target_include_directories(${KBHE_BOOTLOADER_TARGET} BEFORE PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Inc
+)
+
+target_include_directories(${KBHE_BOOTLOADER_TARGET} PRIVATE
+    ${TINYUSB_INC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
+)
+
+target_link_libraries(${KBHE_BOOTLOADER_TARGET}
+    stm32cubemx
+    STM32_Drivers
+)
+
+kbhe_configure_binary_target(
+    ${KBHE_BOOTLOADER_TARGET}
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/STM32F723XX_BOOTLOADER.ld
+    0x00000000U
 )

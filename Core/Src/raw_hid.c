@@ -2,6 +2,7 @@
 #include "raw_hid.h"
 #include "hid_protocol.h"
 #include "tusb.h"
+#include "updater_app.h"
 #include "usb_descriptors.h"
 #include <stdint.h>
 #include <string.h>
@@ -68,6 +69,11 @@ bool raw_hid_send(const uint8_t *data, uint16_t len) {
   // Use instance 1 (Raw HID) with report_id = 0 (no report ID in generic
   // descriptor)
   return tud_hid_n_report(RAW_HID_INSTANCE, 0, tx_buffer, len);
+}
+
+void raw_hid_on_report_complete(void) {
+  tx_state = false;
+  updater_app_notify_response_sent();
 }
 
 // À appeler dans la boucle principale pour traiter les paquets reçus

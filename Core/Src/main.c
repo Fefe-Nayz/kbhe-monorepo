@@ -28,7 +28,9 @@
 #include "stm32f7xx_hal_adc.h"
 #include "trigger.h"
 #include "tusb.h"
+#include "updater_app.h"
 #include "usb_gamepad.h"
+#include "usb_descriptors.h"
 #include "usb_hid.h"
 #include "usb_hid_nkro.h"
 #include "ws2812.h" // Include WS2812 header
@@ -425,7 +427,7 @@ int main(void) {
   // Initialisation TinyUSB - RHPORT 1 = USB HS avec PHY intégré
   const tusb_rhport_init_t rhport_init = {.role = TUSB_ROLE_DEVICE,
                                           .speed = TUSB_SPEED_HIGH};
-  tusb_init(1, &rhport_init);
+  tusb_init(USB_RHPORT_HS, &rhport_init);
 
   raw_hid_init();
 
@@ -451,6 +453,7 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
   while (1) {
     tud_task(); // TinyUSB device task
+    updater_app_task();
 
     // If a full ADC scan is complete, process keys and restart
     if (adc_scan_complete) {

@@ -30,6 +30,9 @@ bool raw_hid_send(const uint8_t *data, uint16_t len);
 // Callback interne pour TinyUSB (à appeler dans tud_hid_set_report_cb)
 void raw_hid_on_receive(const uint8_t *data, uint16_t len);
 
+// Callback interne pour TinyUSB (à appeler dans tud_hid_report_complete_cb)
+void raw_hid_on_report_complete(void);
+
 #ifdef __cplusplus
 }
 #endif

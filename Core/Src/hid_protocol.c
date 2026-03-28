@@ -8,6 +8,7 @@
 #include "led_matrix.h"
 #include "main.h"
 #include "settings.h"
+#include "updater_app.h"
 #include "trigger.h"
 #include <string.h>
 
@@ -33,6 +34,25 @@ static void cmd_factory_reset(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_FACTORY_RESET;
   resp->status_or_len = settings_reset() ? HID_RESP_OK : HID_RESP_ERROR;
+}
+
+static void cmd_reboot(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
+  resp->command_id = CMD_REBOOT;
+  resp->status_or_len = updater_app_schedule_action(UPDATER_APP_ACTION_REBOOT)
+                            ? HID_RESP_OK
+                            : HID_RESP_ERROR;
+}
+
+static void cmd_enter_bootloader(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
+  resp->command_id = CMD_ENTER_BOOTLOADER;
+  resp->status_or_len =
+      updater_app_schedule_action(UPDATER_APP_ACTION_ENTER_UPDATER)
+          ? HID_RESP_OK
+          : HID_RESP_ERROR;
 }
 
 //--------------------------------------------------------------------+
@@ -931,6 +951,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
   // System commands
   case CMD_GET_FIRMWARE_VERSION:
     cmd_get_firmware_version(in_packet, out_packet);
+    break;
+
+  case CMD_REBOOT:
+    cmd_reboot(in_packet, out_packet);
+    break;
+
+  case CMD_ENTER_BOOTLOADER:
+    cmd_enter_bootloader(in_packet, out_packet);
     break;
 
   case CMD_FACTORY_RESET:

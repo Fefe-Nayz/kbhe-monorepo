@@ -7,6 +7,7 @@
 #define USB_DESCRIPTORS_H_
 
 #include <stdint.h>
+#include "updater_shared.h"
 
 //--------------------------------------------------------------------+
 // USB Device Descriptor
@@ -14,8 +15,10 @@
 
 // VID/PID - Utiliser des valeurs de test
 // IMPORTANT: Pour un produit commercial, obtenir un VID/PID officiel!
-#define USB_VID 0x9172 // VID d'exemple
-#define USB_PID 0x0002 // PID arbitraire pour test
+#define USB_VID KBHE_USB_VID
+#define USB_PID KBHE_APP_USB_PID
+
+#define USB_RHPORT_HS 1u
 
 // USB Version - USB 2.0 pour High Speed
 #define USB_BCD 0x0200
