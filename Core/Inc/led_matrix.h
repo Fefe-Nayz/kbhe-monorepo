@@ -47,6 +47,7 @@ typedef enum {
   LED_EFFECT_COLOR_CYCLE = 12,       // Solid color cycle
   LED_EFFECT_REACTIVE = 13,          // React to key presses
   LED_EFFECT_THIRD_PARTY = 14,       // External/third-party live control
+  LED_EFFECT_DISTANCE_SENSOR = 15,   // Per-key color from sensor distance
   LED_EFFECT_MAX
 } led_effect_mode_t;
 

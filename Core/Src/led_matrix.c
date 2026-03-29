@@ -5,6 +5,7 @@
 
 #include "led_matrix.h"
 #include "main.h"
+#include "trigger.h"
 #include "ws2812.h"
 #include <string.h>
 
@@ -56,6 +57,10 @@ static uint8_t key_wave_radius[6] = {0, 0, 0, 0, 0, 0};
 // Prototype mapping: 6 keys -> 6 LEDs.
 // Adjust this table if physical key/LED wiring differs.
 static const uint8_t key_led_index[6] = {0, 1, 2, 3, 4, 5};
+
+// Trigger travel normalization range used by triggerGetDistance01mm():
+// 4.00 mm => 400 units (0.01 mm).
+#define KEY_TRAVEL_MAX_01MM 400u
 
 //--------------------------------------------------------------------+
 // Private Functions
@@ -685,6 +690,37 @@ static void effect_color_cycle(void) {
 }
 
 /**
+ * @brief Sensor distance effect - each key LED color follows its travel distance
+ *
+ * Mapping used (for the 6-key prototype):
+ * - released (0.00 mm): cool blue/cyan
+ * - pressed  (4.00 mm): warm red
+ */
+static void effect_distance_sensor(void) {
+  led_matrix_clear();
+
+  for (uint8_t key = 0; key < 6; key++) {
+    uint16_t distance_01mm = triggerGetDistance01mm(key);
+    if (distance_01mm > KEY_TRAVEL_MAX_01MM) {
+      distance_01mm = KEY_TRAVEL_MAX_01MM;
+    }
+
+    uint8_t level = (uint8_t)((distance_01mm * 255u) / KEY_TRAVEL_MAX_01MM);
+
+    // Hue ramps from cyan/blue to red as distance increases.
+    uint8_t hue = (uint8_t)(170u - ((uint16_t)170u * level) / 255u);
+    // Also increase brightness with travel for better readability.
+    uint8_t value = (uint8_t)(32u + ((uint16_t)223u * level) / 255u);
+
+    uint8_t r, g, b;
+    led_matrix_hsv_to_rgb(hue, 255, value, &r, &g, &b);
+
+    uint8_t led_idx = key_led_index[key];
+    led_matrix_set_pixel_idx(led_idx, r, g, b);
+  }
+}
+
+/**
  * @brief Reactive effect - lights up on key presses
  */
 static void effect_reactive(void) {
@@ -890,6 +926,9 @@ void led_matrix_effect_tick(uint32_t tick) {
     break;
   case LED_EFFECT_REACTIVE:
     effect_reactive();
+    break;
+  case LED_EFFECT_DISTANCE_SENSOR:
+    effect_distance_sensor();
     break;
   default:
     break;

@@ -95,6 +95,7 @@ class LEDEffect(IntEnum):
     COLOR_CYCLE = 12
     REACTIVE = 13
     THIRD_PARTY = 14
+    DISTANCE_SENSOR = 15
 
     # Backward-compatible alias for older code paths.
     NONE = MATRIX
@@ -116,6 +117,7 @@ LED_EFFECT_NAMES = {
     LEDEffect.COLOR_CYCLE: "Color Cycle",
     LEDEffect.REACTIVE: "Reactive",
     LEDEffect.THIRD_PARTY: "Third-Party Live",
+    LEDEffect.DISTANCE_SENSOR: "Sensor Distance",
 }
 
 

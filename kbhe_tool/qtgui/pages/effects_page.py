@@ -54,6 +54,7 @@ EFFECT_GROUPS = [
         "Reactive",
         [
             (13, "Reactive (Key Press)"),
+            (15, "Sensor Distance"),
         ],
     ),
 ]
@@ -74,6 +75,7 @@ EFFECT_METADATA: dict[int, tuple[str, str]] = {
     12: ("Color Cycle", "Continuous cycling through the selected effect color palette."),
     13: ("Reactive (Key Press)", "Responds to key presses using the selected effect color."),
     14: ("Third-Party Live", "Matrix is read-only in this app; live frame is displayed from device state."),
+    15: ("Sensor Distance", "Each key LED color changes live according to its sensor travel distance."),
 }
 
 _QUICK_COLORS = [

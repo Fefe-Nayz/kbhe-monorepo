@@ -32,6 +32,7 @@ class EffectsPageMixin:
             "Reactive",
             [
                 (13, "Reactive (Key Press)"),
+                (15, "Sensor Distance"),
             ],
         ),
     ]
@@ -52,6 +53,7 @@ class EffectsPageMixin:
         12: ("Color Cycle", "Continuous cycling through the selected effect color palette."),
         13: ("Reactive (Key Press)", "Responds to key presses using the selected effect color."),
         14: ("Third-Party Live", "Matrix is read-only in this app; live frame is displayed from device state."),
+        15: ("Sensor Distance", "Each key LED color changes live according to its sensor travel distance."),
     }
 
     def _set_effect_status(self, message):
