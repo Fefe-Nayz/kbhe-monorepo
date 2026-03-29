@@ -83,7 +83,6 @@ export function AppSidebar() {
         </SidebarGroup>
 
 
-
         <SidebarGroup>
           <SidebarGroupLabel>Application</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -132,6 +131,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
       </SidebarContent>
       
     
