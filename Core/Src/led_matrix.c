@@ -50,7 +50,12 @@ static bool effect_render_context = false;
 static uint8_t diagnostic_mode = 0;
 
 // Reactive effect state
-static uint8_t key_brightness[6] = {0, 0, 0, 0, 0, 0};
+static uint8_t key_wave_energy[6] = {0, 0, 0, 0, 0, 0};
+static uint8_t key_wave_radius[6] = {0, 0, 0, 0, 0, 0};
+
+// Prototype mapping: 6 keys -> 6 LEDs.
+// Adjust this table if physical key/LED wiring differs.
+static const uint8_t key_led_index[6] = {0, 1, 2, 3, 4, 5};
 
 //--------------------------------------------------------------------+
 // Private Functions
@@ -70,6 +75,10 @@ static inline uint8_t xy_to_index(uint8_t x, uint8_t y) {
  */
 static inline uint8_t apply_brightness(uint8_t color, uint8_t brightness) {
   return (uint8_t)((uint16_t)color * brightness / 255);
+}
+
+static inline uint8_t abs_u8_diff(uint8_t a, uint8_t b) {
+  return (a > b) ? (a - b) : (b - a);
 }
 
 /**
@@ -451,7 +460,8 @@ void led_matrix_key_event(uint8_t key_index, bool pressed) {
   if (key_index >= 6)
     return;
   if (pressed) {
-    key_brightness[key_index] = 255;
+    key_wave_energy[key_index] = 255;
+    key_wave_radius[key_index] = 0;
   }
 }
 
@@ -680,31 +690,71 @@ static void effect_color_cycle(void) {
 static void effect_reactive(void) {
   led_matrix_clear();
 
-  // Each key maps to a column or area of the matrix
-  // Keys 0-5 map to columns (with 2 pixels per key)
+  // Render an expanding wave around each key's mapped LED.
+  // For this prototype we only drive the 6 physical LEDs.
+  for (uint8_t led_slot = 0; led_slot < 6; led_slot++) {
+    uint8_t led_idx = key_led_index[led_slot];
+    uint16_t intensity = 0;
+
+    for (uint8_t key = 0; key < 6; key++) {
+      uint8_t energy = key_wave_energy[key];
+      if (energy == 0) {
+        continue;
+      }
+
+      uint8_t origin_led = key_led_index[key];
+      uint8_t distance = abs_u8_diff(led_idx, origin_led);
+
+      // Core falloff keeps the pressed key bright while neighbors get weaker.
+      uint16_t core =
+          (energy > (uint16_t)(distance * 56u))
+              ? (energy - (uint16_t)(distance * 56u))
+              : 0u;
+
+      // Ring component creates the outward moving wave front.
+      int16_t ring_delta =
+          (int16_t)key_wave_radius[key] - (int16_t)(distance * 64u);
+      if (ring_delta < 0) {
+        ring_delta = -ring_delta;
+      }
+
+      uint16_t ring = 0u;
+      if (ring_delta < 64) {
+        ring = ((uint16_t)(64 - ring_delta) * energy) / 64u;
+      }
+
+      uint16_t contribution = (core > ring) ? core : ring;
+      if (contribution > intensity) {
+        intensity = contribution;
+      }
+    }
+
+    uint8_t r = (uint8_t)((uint16_t)effect_color_r * intensity / 255u);
+    uint8_t g = (uint8_t)((uint16_t)effect_color_g * intensity / 255u);
+    uint8_t b = (uint8_t)((uint16_t)effect_color_b * intensity / 255u);
+    led_matrix_set_pixel_idx(led_idx, r, g, b);
+  }
+
+  // Advance and decay all active key waves.
   for (uint8_t key = 0; key < 6; key++) {
-    if (key_brightness[key] > 0) {
-      uint8_t col = key;
-      uint8_t brightness = key_brightness[key];
+    if (key_wave_energy[key] == 0) {
+      continue;
+    }
 
-      uint8_t r = (uint8_t)((uint16_t)effect_color_r * brightness / 255);
-      uint8_t g = (uint8_t)((uint16_t)effect_color_g * brightness / 255);
-      uint8_t b = (uint8_t)((uint16_t)effect_color_b * brightness / 255);
+    if (key_wave_energy[key] > 14) {
+      key_wave_energy[key] -= 14;
+    } else {
+      key_wave_energy[key] = 0;
+    }
 
-      // Light up the column for this key
-      for (uint8_t y = 0; y < LED_MATRIX_HEIGHT; y++) {
-        led_matrix_set_pixel(col, y, r, g, b);
-        if (col + 1 < LED_MATRIX_WIDTH) {
-          led_matrix_set_pixel(col + 1, y, r, g, b);
-        }
-      }
+    if (key_wave_radius[key] < (255 - 28)) {
+      key_wave_radius[key] += 28;
+    } else {
+      key_wave_radius[key] = 255;
+    }
 
-      // Fade out
-      if (key_brightness[key] > 8) {
-        key_brightness[key] -= 8;
-      } else {
-        key_brightness[key] = 0;
-      }
+    if (key_wave_energy[key] == 0) {
+      key_wave_radius[key] = 0;
     }
   }
 }
