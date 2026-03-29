@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCharts import QChart, QChartView, QLineSeries, QScatterSeries, QValueAxis
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -23,6 +24,18 @@ from ..widgets import (
     make_primary_button,
     make_secondary_button,
 )
+
+
+# (name, p1x, p1y, p2x, p2y)
+_CURVE_PRESETS: list[tuple[str, int, int, int, int]] = [
+    ("Linear",           85,  85, 170, 170),
+    ("S-Curve",          50,  85, 170, 205),
+    ("Aggressive",       20, 100, 100, 255),
+    ("Slow Start",      100,  20, 200, 200),
+    ("Fast Start",       20, 200, 100, 255),
+    ("Ease In",         150,  60, 210, 210),
+    ("Ease Out",         50,  50, 110, 200),
+]
 
 
 def _clamp(value: int, low: int, high: int) -> int:
@@ -207,12 +220,68 @@ class CalibrationPage(QWidget):
         chart_host_layout.addWidget(self.curve_chart_view)
         curve_body.addWidget(chart_host, 2)
 
-        # Control spinboxes
+        # Live position scatter series (a single dot on the curve)
+        self.position_series = QScatterSeries()
+        self.position_series.setMarkerSize(14)
+        self.position_series.setMarkerShape(QScatterSeries.MarkerShape.MarkerShapeCircle)
+        self.position_series.setColor(QColor(c["warning"]))
+        self.position_series.setBorderColor(QColor(c["warning"]))
+        self.curve_chart.addSeries(self.position_series)
+        self.position_series.attachAxis(self.curve_axis_x)
+        self.position_series.attachAxis(self.curve_axis_y)
+        self.position_series.setVisible(False)
+
+        self.position_timer = QTimer(self)
+        self.position_timer.timeout.connect(self._update_position_dot)
+
+        # Control spinboxes + preset
         controls = QWidget()
-        ctrl_layout = QGridLayout(controls)
+        ctrl_layout = QVBoxLayout(controls)
         ctrl_layout.setContentsMargins(0, 0, 0, 0)
-        ctrl_layout.setHorizontalSpacing(10)
-        ctrl_layout.setVerticalSpacing(10)
+        ctrl_layout.setSpacing(10)
+
+        # Preset row
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(8)
+        preset_lbl = QLabel("Preset")
+        preset_lbl.setObjectName("Muted")
+        preset_row.addWidget(preset_lbl)
+        self.preset_combo = QComboBox()
+        self.preset_combo.addItem("Custom", None)
+        for name, p1x, p1y, p2x, p2y in _CURVE_PRESETS:
+            self.preset_combo.addItem(name, (p1x, p1y, p2x, p2y))
+        self.preset_combo.currentIndexChanged.connect(self._on_preset_selected)
+        preset_row.addWidget(self.preset_combo, 1)
+        ctrl_layout.addLayout(preset_row)
+
+        # Live position row
+        live_row = QHBoxLayout()
+        live_row.setSpacing(8)
+
+        self.track_position_check = QCheckBox("Track live position")
+        self.track_position_check.toggled.connect(self._on_track_position_toggled)
+        live_row.addWidget(self.track_position_check)
+
+        live_rate_lbl = QLabel("Rate (ms)")
+        live_rate_lbl.setObjectName("Muted")
+        live_row.addWidget(live_rate_lbl)
+
+        self.position_rate_spin = QSpinBox()
+        self.position_rate_spin.setRange(16, 1000)
+        self.position_rate_spin.setValue(100)
+        self.position_rate_spin.setSingleStep(5)
+        self.position_rate_spin.valueChanged.connect(self._on_position_rate_changed)
+        live_row.addWidget(self.position_rate_spin)
+
+        live_row.addStretch(1)
+        ctrl_layout.addLayout(live_row)
+
+        # Spinboxes grid
+        spin_grid_widget = QWidget()
+        spin_grid = QGridLayout(spin_grid_widget)
+        spin_grid.setContentsMargins(0, 0, 0, 0)
+        spin_grid.setHorizontalSpacing(10)
+        spin_grid.setVerticalSpacing(10)
 
         self.p1x_spin = QSpinBox()
         self.p1y_spin = QSpinBox()
@@ -220,7 +289,7 @@ class CalibrationPage(QWidget):
         self.p2y_spin = QSpinBox()
         for spin in (self.p1x_spin, self.p1y_spin, self.p2x_spin, self.p2y_spin):
             spin.setRange(0, 255)
-            spin.valueChanged.connect(self._update_curve_preview)
+            spin.valueChanged.connect(self._on_spin_changed)
 
         for row, (name, spin) in enumerate([
             ("P1 X", self.p1x_spin),
@@ -230,15 +299,16 @@ class CalibrationPage(QWidget):
         ]):
             lbl = QLabel(name)
             lbl.setObjectName("Muted")
-            ctrl_layout.addWidget(lbl, row, 0)
-            ctrl_layout.addWidget(spin, row, 1)
+            spin_grid.addWidget(lbl, row, 0)
+            spin_grid.addWidget(spin, row, 1)
 
         tip = QLabel("Tip: keep X coords ordered left-to-right for predictable curves.")
         tip.setObjectName("Muted")
         tip.setWordWrap(True)
-        ctrl_layout.addWidget(tip, 4, 0, 1, 2)
+        spin_grid.addWidget(tip, 4, 0, 1, 2)
+        ctrl_layout.addWidget(spin_grid_widget)
 
-        ctrl_layout.setRowStretch(5, 1)
+        ctrl_layout.addStretch(1)
         curve_body.addWidget(controls, 1)
 
         # Curve actions
@@ -288,6 +358,78 @@ class CalibrationPage(QWidget):
         y = mt**3 * p0[1] + 3 * mt**2 * t * p1[1] + 3 * mt * t**2 * p2[1] + t**3 * p3[1]
         return x, y
 
+    def _on_spin_changed(self) -> None:
+        """Called when any spinbox changes; marks preset as Custom and redraws."""
+        self._update_curve_preview()
+        # If the current values don't match any preset, switch to Custom
+        vals = (
+            self.p1x_spin.value(), self.p1y_spin.value(),
+            self.p2x_spin.value(), self.p2y_spin.value(),
+        )
+        for i, (_, p1x, p1y, p2x, p2y) in enumerate(_CURVE_PRESETS):
+            if vals == (p1x, p1y, p2x, p2y):
+                self.preset_combo.blockSignals(True)
+                self.preset_combo.setCurrentIndex(i + 1)  # +1 because index 0 is "Custom"
+                self.preset_combo.blockSignals(False)
+                return
+        self.preset_combo.blockSignals(True)
+        self.preset_combo.setCurrentIndex(0)  # Custom
+        self.preset_combo.blockSignals(False)
+
+    def _on_preset_selected(self, index: int) -> None:
+        data = self.preset_combo.itemData(index)
+        if data is None:
+            return
+        p1x, p1y, p2x, p2y = data
+        for spin, val in zip(
+            (self.p1x_spin, self.p1y_spin, self.p2x_spin, self.p2y_spin),
+            (p1x, p1y, p2x, p2y),
+        ):
+            spin.blockSignals(True)
+            spin.setValue(val)
+            spin.blockSignals(False)
+        self._update_curve_preview()
+
+    def _on_track_position_toggled(self, checked: bool) -> None:
+        self.position_series.setVisible(checked)
+        if checked:
+            self.position_timer.start(self.position_rate_spin.value())
+            self._update_position_dot()
+        else:
+            self.position_timer.stop()
+            self.position_series.clear()
+
+    def _on_position_rate_changed(self, value: int) -> None:
+        if self.position_timer.isActive():
+            self.position_timer.setInterval(value)
+
+    def _update_position_dot(self) -> None:
+        try:
+            key_states = self.device.get_key_states()
+            distances = (key_states.get("distances") or [0] * 6) if key_states else [0] * 6
+            travel = float(distances[self._current_key]) if self._current_key < len(distances) else 0.0
+        except Exception:
+            return
+
+        p0 = (0, 0)
+        p1 = (self.p1x_spin.value(), self.p1y_spin.value())
+        p2 = (self.p2x_spin.value(), self.p2y_spin.value())
+        p3 = (255, 255)
+
+        # Binary-search for the t that gives x ≈ travel
+        lo, hi = 0.0, 1.0
+        for _ in range(20):
+            mid = (lo + hi) / 2.0
+            bx, _ = self._bezier_point(mid, p0, p1, p2, p3)
+            if bx < travel:
+                lo = mid
+            else:
+                hi = mid
+        _, by = self._bezier_point((lo + hi) / 2.0, p0, p1, p2, p3)
+
+        self.position_series.clear()
+        self.position_series.append(travel, by)
+
     def _update_curve_preview(self) -> None:
         self.curve_series.clear()
         p0 = (0, 0)
@@ -301,6 +443,9 @@ class CalibrationPage(QWidget):
     def apply_theme(self) -> None:
         c = current_colors()
         self.curve_series.setPen(QPen(QColor(c["accent"]), 2))
+        if hasattr(self, "position_series"):
+            self.position_series.setColor(QColor(c["warning"]))
+            self.position_series.setBorderColor(QColor(c["warning"]))
         text_brush = QBrush(QColor(c["text_muted"]))
         grid_pen = QPen(QColor(c["border"]), 1)
         line_pen = QPen(QColor(c["border"]), 1)
@@ -391,12 +536,21 @@ class CalibrationPage(QWidget):
 
         self._loading = True
         self.curve_enabled_check.setChecked(bool(curve.get("curve_enabled", False)))
-        self.p1x_spin.setValue(int(curve.get("p1_x", 85)))
-        self.p1y_spin.setValue(int(curve.get("p1_y", 85)))
-        self.p2x_spin.setValue(int(curve.get("p2_x", 170)))
-        self.p2y_spin.setValue(int(curve.get("p2_y", 170)))
+        for spin, val in zip(
+            (self.p1x_spin, self.p1y_spin, self.p2x_spin, self.p2y_spin),
+            (
+                int(curve.get("p1_x", 85)),
+                int(curve.get("p1_y", 85)),
+                int(curve.get("p2_x", 170)),
+                int(curve.get("p2_y", 170)),
+            ),
+        ):
+            spin.blockSignals(True)
+            spin.setValue(val)
+            spin.blockSignals(False)
         self._loading = False
         self._update_curve_preview()
+        self._on_spin_changed()  # sync preset combo
         self._update_status(f"Loaded curve for Key {self._current_key + 1}.", "success")
 
     def apply_analog_curve(self) -> None:
@@ -432,6 +586,8 @@ class CalibrationPage(QWidget):
 
     def on_page_activated(self) -> None:
         self.reload()
+        if self.track_position_check.isChecked():
+            self.position_timer.start(self.position_rate_spin.value())
 
     def on_page_deactivated(self) -> None:
-        pass
+        self.position_timer.stop()

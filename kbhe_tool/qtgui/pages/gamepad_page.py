@@ -211,6 +211,7 @@ class GamepadPage(QWidget):
         actions.addStretch(1)
         card.body_layout.addLayout(actions)
 
+        card.body_layout.addStretch(1)
         return card
 
     def _build_preview_card(self) -> SectionCard:
@@ -242,6 +243,7 @@ class GamepadPage(QWidget):
         bar_grid.setHorizontalSpacing(8)
         bar_grid.setVerticalSpacing(6)
         self.key_distance_bars: list[QFrame] = []
+        self.key_distance_bar_hosts: list[QFrame] = []
         self.key_distance_labels: list[QLabel] = []
         c = current_colors()
         for i in range(6):
@@ -267,6 +269,7 @@ class GamepadPage(QWidget):
             bar_grid.addWidget(bar_host, i, 1)
             bar_grid.addWidget(val_lbl, i, 2)
             self.key_distance_bars.append(fill)
+            self.key_distance_bar_hosts.append(bar_host)
             self.key_distance_labels.append(val_lbl)
 
         card.body_layout.addLayout(bar_grid)
@@ -285,6 +288,8 @@ class GamepadPage(QWidget):
         self.mapping_table.verticalHeader().setVisible(False)
         self.mapping_table.horizontalHeader().setStretchLastSection(True)
         self.mapping_table.setAlternatingRowColors(False)
+        self.mapping_table.setMinimumHeight(300)
+        self.mapping_table.verticalHeader().setDefaultSectionSize(44)
 
         for row in range(6):
             self.mapping_table.setItem(row, 0, QTableWidgetItem(f"Key {row + 1}"))
@@ -499,6 +504,12 @@ class GamepadPage(QWidget):
             x = (float(distances[1]) - float(distances[0])) / 255.0
             y = (float(distances[3]) - float(distances[2])) / 255.0
         self.preview_widget.set_state(x, y, self.square_check.isChecked(), self.deadzone_slider.value())
+
+    def apply_theme(self) -> None:
+        c = current_colors()
+        for bar_host, fill in zip(self.key_distance_bar_hosts, self.key_distance_bars):
+            bar_host.setStyleSheet(f"background: {c['surface_alt']}; border-radius: 6px;")
+            fill.setStyleSheet(f"background: {c['accent']}; border-radius: 6px;")
 
     # ------------------------------------------------------------------
     # Page lifecycle

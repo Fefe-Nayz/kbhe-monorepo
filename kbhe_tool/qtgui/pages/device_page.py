@@ -372,7 +372,8 @@ class DevicePage(QWidget):
     # ------------------------------------------------------------------
 
     def on_led_enabled_change(self, state: int) -> None:
-        enabled = state == Qt.Checked
+        _ = state
+        enabled = self.led_enabled.isChecked()
         try:
             ok = self.device.led_set_enabled(enabled)
         except Exception as exc:
@@ -390,7 +391,8 @@ class DevicePage(QWidget):
         )
 
     def on_keyboard_enabled_change(self, state: int) -> None:
-        enabled = state == Qt.Checked
+        _ = state
+        enabled = self.keyboard_enabled.isChecked()
         try:
             ok = self.device.set_keyboard_enabled(enabled)
         except Exception as exc:
@@ -406,7 +408,8 @@ class DevicePage(QWidget):
         )
 
     def on_gamepad_enabled_change(self, state: int) -> None:
-        enabled = state == Qt.Checked
+        _ = state
+        enabled = self.gamepad_enabled.isChecked()
         try:
             ok = self.device.set_gamepad_enabled(enabled)
         except Exception as exc:
@@ -422,7 +425,8 @@ class DevicePage(QWidget):
         )
 
     def on_nkro_enabled_change(self, state: int) -> None:
-        enabled = state == Qt.Checked
+        _ = state
+        enabled = self.nkro_enabled.isChecked()
         try:
             ok = self.device.set_nkro_enabled(enabled)
         except Exception as exc:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QColorDialog,
     QFrame,
     QGridLayout,
@@ -177,6 +178,8 @@ class EffectsPage(QWidget):
         scroll.setWidget(scroll_content)
 
         self.effect_mode_buttons: dict[int, QRadioButton] = {}
+        self._mode_group = QButtonGroup(self)
+        self._mode_group.setExclusive(True)
         for group_name, modes in EFFECT_GROUPS:
             sub = SubCard()
             grp_lbl = QLabel(group_name)
@@ -189,6 +192,7 @@ class EffectsPage(QWidget):
                 )
                 sub.layout.addWidget(btn)
                 self.effect_mode_buttons[value] = btn
+                self._mode_group.addButton(btn)
             scroll_layout.addWidget(sub)
 
         scroll_layout.addStretch(1)
@@ -266,7 +270,7 @@ class EffectsPage(QWidget):
             swatch.setText(label)
             swatch.setToolTip(hex_color)
             swatch.setCursor(Qt.PointingHandCursor)
-            swatch.setFixedHeight(34)
+            swatch.setFixedSize(76, 34)
             light_text = hex_color in ("#ffffff", "#ffd60a", "#64d2ff")
             swatch.setStyleSheet(
                 f"QToolButton {{"

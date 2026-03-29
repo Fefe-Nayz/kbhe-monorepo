@@ -124,13 +124,13 @@ class KBHEDevice:
     def set_keyboard_enabled(self, enabled):
         """Set keyboard enabled state."""
         data = [0, 1 if enabled else 0]  # 0 = placeholder for status byte
-        resp = self.send_command(Command.SET_KEYBOARD_ENABLED, data)
+        resp = self.send_command(Command.SET_KEYBOARD_ENABLED, data, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def set_gamepad_enabled(self, enabled):
         """Set gamepad enabled state."""
         data = [0, 1 if enabled else 0]  # 0 = placeholder for status byte
-        resp = self.send_command(Command.SET_GAMEPAD_ENABLED, data)
+        resp = self.send_command(Command.SET_GAMEPAD_ENABLED, data, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def get_nkro_enabled(self):
@@ -143,7 +143,7 @@ class KBHEDevice:
     def set_nkro_enabled(self, enabled):
         """Set NKRO mode enabled state."""
         data = [0, 1 if enabled else 0]  # 0 = placeholder for status byte
-        resp = self.send_command(Command.SET_NKRO_ENABLED, data)
+        resp = self.send_command(Command.SET_NKRO_ENABLED, data, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def save_settings(self):

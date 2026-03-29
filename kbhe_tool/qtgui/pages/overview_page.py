@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -11,7 +12,7 @@ from PySide6.QtWidgets import (
 from ..widgets import (
     PageScaffold,
     SectionCard,
-    SubCard,
+    StatusChip,
     make_secondary_button,
 )
 
@@ -28,6 +29,10 @@ class OverviewPage(QWidget):
             self.session.selectedKeyChanged.connect(self.on_selected_key_changed)
         except Exception:
             pass
+        try:
+            self.session.snapshotChanged.connect(self.reload)
+        except Exception:
+            pass
         self.reload()
 
     # ------------------------------------------------------------------
@@ -41,20 +46,20 @@ class OverviewPage(QWidget):
 
         scaffold = PageScaffold(
             "Overview",
-            "Verify device state, understand what persists automatically, "
-            "then jump directly into keys, calibration, lighting, or firmware maintenance.",
+            "Current device status at a glance. Jump into any configuration screen from here.",
         )
         root.addWidget(scaffold, 1)
 
-        # ── Status tiles ──────────────────────────────────────────────
+        # ── Status tiles (2×2) ────────────────────────────────────────
         tiles_grid = QGridLayout()
         tiles_grid.setHorizontalSpacing(14)
         tiles_grid.setVerticalSpacing(14)
 
-        self.connection_tile = self._make_tile("Connection")
-        self.firmware_tile = self._make_tile("Firmware")
-        self.interfaces_tile = self._make_tile("Interfaces")
-        self.lighting_tile = self._make_tile("Lighting")
+        self.connection_tile = self._make_tile("Connection", "●")
+        self.firmware_tile = self._make_tile("Firmware", "⬡")
+        self.interfaces_tile = self._make_tile("Interfaces", "⌨")
+        self.lighting_tile = self._make_tile("Lighting", "◈")
+
         tiles_grid.addWidget(self.connection_tile["frame"], 0, 0)
         tiles_grid.addWidget(self.firmware_tile["frame"], 0, 1)
         tiles_grid.addWidget(self.interfaces_tile["frame"], 1, 0)
@@ -79,24 +84,38 @@ class OverviewPage(QWidget):
 
         scaffold.add_stretch()
 
-    def _make_tile(self, title: str) -> dict:
-        sub = SubCard()
+    def _make_tile(self, title: str, icon: str = "") -> dict:
+        """A prominent status tile styled like a SectionCard."""
+        frame = QFrame()
+        frame.setObjectName("SectionCard")
 
-        lbl = QLabel(title)
-        lbl.setObjectName("Muted")
-        sub.layout.addWidget(lbl)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(8)
 
-        value = QLabel("--")
+        # Header: label + status chip
+        header = QHBoxLayout()
+        header.setSpacing(8)
+        lbl = QLabel(f"{icon}  {title.upper()}" if icon else title.upper())
+        lbl.setObjectName("SidebarGroupLabel")
+        header.addWidget(lbl, 1)
+        chip = StatusChip("—", "neutral")
+        header.addWidget(chip)
+        layout.addLayout(header)
+
+        # Large value
+        value = QLabel("—")
         value.setObjectName("CardTitle")
-        value.setStyleSheet("font-size: 14pt; font-weight: 700;")
-        sub.layout.addWidget(value)
+        value.setStyleSheet("font-size: 17pt; font-weight: 700; margin-top: 2px;")
+        layout.addWidget(value)
 
+        # Detail line
         detail = QLabel("")
         detail.setObjectName("Muted")
         detail.setWordWrap(True)
-        sub.layout.addWidget(detail)
+        layout.addWidget(detail)
 
-        return {"frame": sub, "value": value, "detail": detail}
+        return {"frame": frame, "value": value, "detail": detail, "chip": chip}
 
     def _build_actions_card(self) -> SectionCard:
         card = SectionCard(
@@ -135,7 +154,7 @@ class OverviewPage(QWidget):
 
         self.focus_key_value = QLabel("Key 1")
         self.focus_key_value.setObjectName("CardTitle")
-        self.focus_key_value.setStyleSheet("font-size: 20pt; font-weight: 700;")
+        self.focus_key_value.setStyleSheet("font-size: 28pt; font-weight: 700; padding: 8px 0;")
         card.body_layout.addWidget(self.focus_key_value)
 
         hint = QLabel(
@@ -144,6 +163,8 @@ class OverviewPage(QWidget):
         hint.setObjectName("Muted")
         hint.setWordWrap(True)
         card.body_layout.addWidget(hint)
+
+        card.body_layout.addSpacing(4)
 
         for title, page_id in [
             ("Open Keyboard Tuning", "keyboard"),
@@ -154,6 +175,7 @@ class OverviewPage(QWidget):
                 make_secondary_button(title, lambda _=False, pid=page_id: self._open_page(pid))
             )
 
+        card.body_layout.addStretch(1)
         return card
 
     def _build_persistence_card(self) -> SectionCard:
@@ -167,6 +189,7 @@ class OverviewPage(QWidget):
             lbl.setObjectName("Muted")
             lbl.setWordWrap(True)
             card.body_layout.addWidget(lbl)
+        card.body_layout.addStretch(1)
         return card
 
     def _build_workflow_card(self) -> SectionCard:
@@ -181,6 +204,7 @@ class OverviewPage(QWidget):
             lbl.setObjectName("Muted")
             lbl.setWordWrap(True)
             card.body_layout.addWidget(lbl)
+        card.body_layout.addStretch(1)
         return card
 
     # ------------------------------------------------------------------
@@ -191,15 +215,16 @@ class OverviewPage(QWidget):
         if self.controller is not None and hasattr(self.controller, "show_page"):
             self.controller.show_page(page_id)
 
-    def _set_tile(self, tile: dict, value: str, detail: str) -> None:
+    def _set_tile(self, tile: dict, value: str, detail: str, level: str = "neutral") -> None:
         tile["value"].setText(value)
         tile["detail"].setText(detail)
+        tile["chip"].set_text_and_level(value, level)
 
     # ------------------------------------------------------------------
     # Data
     # ------------------------------------------------------------------
 
-    def reload(self) -> None:
+    def reload(self, *_args) -> None:
         snapshot = self.session.snapshot or {}
         options = snapshot.get("options") or {}
         connected = bool(getattr(self.session, "connected", True))
@@ -212,21 +237,25 @@ class OverviewPage(QWidget):
             self.connection_tile,
             "Connected" if connected else "Disconnected",
             "Raw HID session is active." if connected else "Reconnect the keyboard before editing settings.",
+            "ok" if connected else "bad",
         )
         self._set_tile(
             self.firmware_tile,
             str(firmware),
             "Application firmware reported by the device.",
+            "info" if firmware != "Unknown" else "neutral",
         )
         self._set_tile(
             self.interfaces_tile,
             f"KBD {'On' if options.get('keyboard_enabled') else 'Off'}  •  PAD {'On' if options.get('gamepad_enabled') else 'Off'}",
             f"NKRO {'On' if nkro_enabled else 'Off'}",
+            "ok" if options.get("keyboard_enabled") else "neutral",
         )
         self._set_tile(
             self.lighting_tile,
             f"LED {'On' if led_enabled else 'Off'}",
             f"Brightness {brightness if brightness is not None else '--'}",
+            "ok" if led_enabled else "neutral",
         )
 
     # ------------------------------------------------------------------
@@ -237,6 +266,10 @@ class OverviewPage(QWidget):
         self.focus_key_value.setText(f"Key {int(key_index) + 1}")
 
     def on_page_activated(self) -> None:
+        try:
+            self.session.refresh_snapshot()
+        except Exception:
+            pass
         self.reload()
 
     def on_page_deactivated(self) -> None:

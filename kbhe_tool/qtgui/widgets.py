@@ -185,7 +185,7 @@ class FormRow(QWidget):
 # ---------------------------------------------------------------------------
 
 class StatusChip(QLabel):
-    """Small pill-shaped coloured status label for use inside cards."""
+    """Small pill-shaped coloured status label — drawn with QPainter for reliable rounding."""
 
     _STYLES = {
         "neutral": ("background:#f1f5f9;color:#475569;",  "background:#252d3d;color:#8b9ab3;"),
@@ -195,12 +195,31 @@ class StatusChip(QLabel):
         "info":    ("background:#eff6ff;color:#1d4ed8;",  "background:#162035;color:#60a5fa;"),
     }
 
+    @staticmethod
+    def _parse_pair(style_str: str) -> tuple[str, str]:
+        """Extract (background_hex, color_hex) from 'background:X;color:Y;' string."""
+        bg, fg = "#f1f5f9", "#475569"
+        for part in style_str.rstrip(";").split(";"):
+            k, _, v = part.strip().partition(":")
+            k = k.strip(); v = v.strip()
+            if k == "background":
+                bg = v
+            elif k == "color":
+                fg = v
+        return bg, fg
+
     def __init__(self, text: str = "", level: str = "neutral", parent=None):
         super().__init__(text, parent)
         self._level = level
-        self._base_style = (
-            "border-radius:999px; padding:4px 10px; font-size:9pt; font-weight:600;"
-        )
+        try:
+            from PySide6.QtGui import QColor as _QC
+            self._bg_color = _QC("#f1f5f9")
+            self._text_color = _QC("#475569")
+        except Exception:
+            self._bg_color = None
+            self._text_color = None
+        # Ensure adequate padding via stylesheet (no background — we paint it)
+        self.setStyleSheet("padding: 4px 10px; font-size: 9pt; font-weight: 600; background: transparent;")
         self._apply()
 
     def set_level(self, level: str) -> None:
@@ -213,7 +232,6 @@ class StatusChip(QLabel):
 
     def changeEvent(self, event) -> None:  # type: ignore[override]
         super().changeEvent(event)
-        # Re-apply colors whenever the global stylesheet changes (theme switch)
         try:
             from PySide6.QtCore import QEvent
             if event.type() == QEvent.Type.StyleChange:
@@ -222,9 +240,41 @@ class StatusChip(QLabel):
             pass
 
     def _apply(self) -> None:
+        try:
+            from PySide6.QtGui import QColor as _QC
+        except ImportError:
+            return
         pair = self._STYLES.get(self._level, self._STYLES["neutral"])
         is_dark = _current_theme_name() == "dark"
-        self.setStyleSheet(self._base_style + pair[1 if is_dark else 0])
+        bg_hex, fg_hex = self._parse_pair(pair[1 if is_dark else 0])
+        new_bg = _QC(bg_hex)
+        new_fg = _QC(fg_hex)
+        if new_bg == self._bg_color and new_fg == self._text_color:
+            return
+        self._bg_color = new_bg
+        self._text_color = new_fg
+        self.update()
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        if self._bg_color is None:
+            super().paintEvent(event)
+            return
+        try:
+            from PySide6.QtGui import QPainter, QPainterPath, QBrush
+            from PySide6.QtCore import QRectF
+        except ImportError:
+            super().paintEvent(event)
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        radius = rect.height() / 2.0
+        path = QPainterPath()
+        path.addRoundedRect(rect, radius, radius)
+        painter.fillPath(path, QBrush(self._bg_color))
+        painter.setPen(self._text_color)
+        painter.setFont(self.font())
+        painter.drawText(self.rect(), Qt.AlignCenter, self.text())
 
 
 # ---------------------------------------------------------------------------

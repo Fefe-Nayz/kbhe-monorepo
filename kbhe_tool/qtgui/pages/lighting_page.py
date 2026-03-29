@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pathlib
 
-from PySide6.QtCore import QSignalBlocker, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import QSignalBlocker, QSize, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QColorDialog,
     QFileDialog,
@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
-    QPushButton,
+    QSizePolicy,
     QSlider,
     QToolButton,
     QVBoxLayout,
@@ -27,6 +27,97 @@ from ..widgets import (
     make_primary_button,
     make_secondary_button,
 )
+
+
+class MatrixCanvas(QWidget):
+    """An 8×8 LED matrix drawn entirely with QPainter — no child widgets needed."""
+
+    cellClicked = Signal(int)  # emits LED index 0-63
+
+    def __init__(self, n: int, gap: int, parent=None):
+        super().__init__(parent)
+        self._n = n
+        self._gap = gap
+        self._pixels: list[list[int]] = [[0, 0, 0]] * (n * n)
+        self._hovered = -1
+        sp = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
+        self.setMouseTracking(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return width
+
+    def sizeHint(self) -> QSize:
+        return QSize(300, 300)
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(120, 120)
+
+    def set_pixels(self, pixels: list) -> None:
+        self._pixels = [list(p[:3]) for p in pixels[: self._n * self._n]]
+        self.update()
+
+    def _cell_size(self) -> int:
+        return max(4, (self.width() - (self._n - 1) * self._gap) // self._n)
+
+    def _cell_at(self, x: int, y: int) -> int:
+        cs = self._cell_size()
+        if cs <= 0:
+            return -1
+        step = cs + self._gap
+        col = x // step
+        row = y // step
+        if col < 0 or col >= self._n or row < 0 or row >= self._n:
+            return -1
+        if (x - col * step) >= cs or (y - row * step) >= cs:
+            return -1  # click landed in a gap
+        return row * self._n + col
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        cs = self._cell_size()
+        step = cs + self._gap
+        radius = max(3.0, cs * 0.27)
+        for i, rgb in enumerate(self._pixels):
+            row, col = divmod(i, self._n)
+            x = col * step
+            y = row * step
+            if i == self._hovered:
+                pw = 2.0
+                border = QColor(100, 160, 255, 200)
+            else:
+                pw = 1.0
+                border = QColor(0, 0, 0, 30)
+            painter.setPen(QPen(border, pw))
+            painter.setBrush(QBrush(QColor(rgb[0], rgb[1], rgb[2])))
+            painter.drawRoundedRect(
+                x + pw / 2, y + pw / 2, cs - pw, cs - pw, radius, radius
+            )
+
+    def mouseMoveEvent(self, event) -> None:
+        old = self._hovered
+        p = event.pos()
+        self._hovered = self._cell_at(p.x(), p.y())
+        if old != self._hovered:
+            self.update()
+
+    def leaveEvent(self, event) -> None:
+        self._hovered = -1
+        self.update()
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            p = event.pos()
+            idx = self._cell_at(p.x(), p.y())
+            if idx >= 0:
+                self.cellClicked.emit(idx)
+
 
 QUICK_COLORS = [
     ("#ff3b30", "Red"),
@@ -137,31 +228,10 @@ class LightingPage(QWidget):
             "Click a cell to paint it with the selected color.",
         )
 
-        _cell, _gap, _n = 30, 4, 8
-        _grid_px = _n * _cell + (_n - 1) * _gap  # 268 px
+        self.matrix_canvas = MatrixCanvas(8, 4)
+        self.matrix_canvas.cellClicked.connect(self.on_led_click)
 
-        grid_host = QWidget()
-        grid_host.setFixedSize(_grid_px, _grid_px)
-        self.matrix_grid = QGridLayout(grid_host)
-        self.matrix_grid.setContentsMargins(0, 0, 0, 0)
-        self.matrix_grid.setHorizontalSpacing(_gap)
-        self.matrix_grid.setVerticalSpacing(_gap)
-
-        self.matrix_buttons: list[list[QPushButton]] = []
-        for y in range(8):
-            row_btns = []
-            for x in range(8):
-                index = y * 8 + x
-                btn = QPushButton()
-                btn.setObjectName("MatrixButton")
-                btn.setCursor(Qt.PointingHandCursor)
-                btn.setToolTip(f"LED {index + 1}")
-                btn.clicked.connect(lambda _=False, i=index: self.on_led_click(i))
-                self.matrix_grid.addWidget(btn, y, x)
-                row_btns.append(btn)
-            self.matrix_buttons.append(row_btns)
-
-        card.body_layout.addWidget(grid_host)
+        card.body_layout.addWidget(self.matrix_canvas)
         card.body_layout.addStretch(1)
         return card
 
@@ -207,7 +277,7 @@ class LightingPage(QWidget):
             swatch.setText(label)
             swatch.setToolTip(hex_color)
             swatch.setCursor(Qt.PointingHandCursor)
-            swatch.setFixedHeight(34)
+            swatch.setFixedSize(76, 34)
             light_text = hex_color in ("#ffffff", "#ffd60a", "#64d2ff")
             swatch.setStyleSheet(
                 f"QToolButton {{"
@@ -299,20 +369,7 @@ class LightingPage(QWidget):
                 pass
 
     def _refresh_matrix(self) -> None:
-        for index, pixel in enumerate(self.pixels[:64]):
-            y, x = divmod(index, 8)
-            bg = _rgb_to_hex(pixel)
-            self.matrix_buttons[y][x].setStyleSheet(
-                f"QPushButton#MatrixButton {{"
-                f"  background: {bg};"
-                f"  border-radius: 8px;"
-                f"  border: 1px solid rgba(0,0,0,0.12);"
-                f"  min-width: 30px; min-height: 30px;"
-                f"  max-width: 30px; max-height: 30px;"
-                f"  padding: 0px;"
-                f"}}"
-                f"QPushButton#MatrixButton:hover {{ border-color: palette(highlight); }}"
-            )
+        self.matrix_canvas.set_pixels(self.pixels)
 
     def _set_current_color(self, rgb: list[int]) -> None:
         self.current_color = [_clamp(ch) for ch in rgb[:3]]

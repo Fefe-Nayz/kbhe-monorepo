@@ -27,6 +27,7 @@ from .pages import (
     KeyboardPage,
     LightingPage,
     OverviewPage,
+    TravelPage,
 )
 from .session import AppSession
 from .theme import apply_app_style, current_theme_mode
@@ -43,6 +44,7 @@ _NAV: list[tuple[str, str, str | None]] = [
     ("overview",     "Overview",         "Workspace"),
     ("keyboard",     "Keyboard",         "Configure"),
     ("calibration",  "Calibration",      None),
+    ("travel",       "Travel",           None),
     ("gamepad",      "Gamepad",          None),
     ("lighting",     "Lighting",         "Lighting"),
     ("effects",      "Effects",          None),
@@ -233,6 +235,7 @@ class KBHEQtMainWindow(QMainWindow):
             "overview":    OverviewPage(s, controller=self),
             "keyboard":    KeyboardPage(s),
             "calibration": CalibrationPage(s),
+            "travel":      TravelPage(s),
             "gamepad":     GamepadPage(s),
             "lighting":    LightingPage(d, controller=self),
             "effects":     EffectsPage(d, controller=self),
@@ -283,6 +286,7 @@ class KBHEQtMainWindow(QMainWindow):
         "overview":    "Overview",
         "keyboard":    "Keyboard",
         "calibration": "Calibration",
+        "travel":      "Travel",
         "gamepad":     "Gamepad",
         "lighting":    "Lighting",
         "effects":     "Effects",
