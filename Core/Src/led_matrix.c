@@ -16,11 +16,11 @@
 // WS2812 handle - made globally accessible for DMA callbacks
 ws2812_handleTypeDef led_ws2812_handle;
 
-// Current pixel data (scaled by brightness)
-static uint8_t pixels[LED_MATRIX_DATA_SIZE];
+// Static matrix pattern (user/software editable, persisted in settings)
+static uint8_t pixels_static[LED_MATRIX_DATA_SIZE];
 
-// Original pixel data (full brightness)
-static uint8_t pixels_original[LED_MATRIX_DATA_SIZE];
+// Runtime frame currently displayed on LEDs (effects/third-party/live state)
+static uint8_t pixels_runtime[LED_MATRIX_DATA_SIZE];
 
 // Current brightness
 static uint8_t current_brightness = LED_BRIGHTNESS_DEFAULT;
@@ -30,6 +30,27 @@ static bool display_enabled = true;
 
 // Initialized flag
 static bool initialized = false;
+
+// Effect state variables
+static led_effect_mode_t current_effect = LED_EFFECT_NONE;
+static uint8_t effect_color_r = 255;
+static uint8_t effect_color_g = 0;
+static uint8_t effect_color_b = 0;
+static uint8_t effect_speed = 50;
+static uint8_t fps_limit = 60; // Default 60 FPS
+static uint32_t last_effect_tick = 0;
+static uint32_t last_render_tick = 0; // Separate tick for FPS limiting
+static uint16_t effect_offset = 0;
+
+// Effect renderer context flag: when true, pixel writes target runtime frame only.
+static bool effect_render_context = false;
+
+// Diagnostic mode: 0=normal, 1=DMA stress (no CPU computation), 2=CPU stress
+// (compute but no DMA)
+static uint8_t diagnostic_mode = 0;
+
+// Reactive effect state
+static uint8_t key_brightness[6] = {0, 0, 0, 0, 0, 0};
 
 //--------------------------------------------------------------------+
 // Private Functions
@@ -52,6 +73,16 @@ static inline uint8_t apply_brightness(uint8_t color, uint8_t brightness) {
 }
 
 /**
+ * @brief Push one runtime pixel to WS2812 buffer
+ */
+static inline void push_runtime_pixel_to_ws2812(uint8_t index) {
+  uint8_t r = apply_brightness(pixels_runtime[index * 3 + 0], current_brightness);
+  uint8_t g = apply_brightness(pixels_runtime[index * 3 + 1], current_brightness);
+  uint8_t b = apply_brightness(pixels_runtime[index * 3 + 2], current_brightness);
+  setLedValues(&led_ws2812_handle, index, r, g, b);
+}
+
+/**
  * @brief Update ws2812 driver with current pixel data
  */
 static void update_ws2812(void) {
@@ -60,15 +91,14 @@ static void update_ws2812(void) {
 
   // Apply brightness and copy to WS2812 buffer
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t r =
-        apply_brightness(pixels_original[i * 3 + 0], current_brightness);
-    uint8_t g =
-        apply_brightness(pixels_original[i * 3 + 1], current_brightness);
-    uint8_t b =
-        apply_brightness(pixels_original[i * 3 + 2], current_brightness);
+    push_runtime_pixel_to_ws2812(i);
+  }
+}
 
-    // WS2812 expects GRB order
-    setLedValues(&led_ws2812_handle, i, r, g, b);
+static void sync_runtime_from_static(void) {
+  memcpy(pixels_runtime, pixels_static, LED_MATRIX_DATA_SIZE);
+  if (initialized && display_enabled) {
+    update_ws2812();
   }
 }
 
@@ -86,8 +116,8 @@ bool led_matrix_init(void *htim, uint32_t channel) {
   }
 
   // Clear pixels
-  memset(pixels, 0, sizeof(pixels));
-  memset(pixels_original, 0, sizeof(pixels_original));
+  memset(pixels_static, 0, sizeof(pixels_static));
+  memset(pixels_runtime, 0, sizeof(pixels_runtime));
 
   // Reset brightness
   current_brightness = LED_BRIGHTNESS_DEFAULT;
@@ -116,41 +146,87 @@ void led_matrix_get_pixel(uint8_t x, uint8_t y, uint8_t *r, uint8_t *g,
 
   uint8_t idx = xy_to_index(x, y);
   if (r)
-    *r = pixels_original[idx * 3 + 0];
+    *r = pixels_static[idx * 3 + 0];
   if (g)
-    *g = pixels_original[idx * 3 + 1];
+    *g = pixels_static[idx * 3 + 1];
   if (b)
-    *b = pixels_original[idx * 3 + 2];
+    *b = pixels_static[idx * 3 + 2];
 }
 
 void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
   if (index >= LED_MATRIX_NUM_LEDS)
     return;
 
-  // Store original colors
-  pixels_original[index * 3 + 0] = r;
-  pixels_original[index * 3 + 1] = g;
-  pixels_original[index * 3 + 2] = b;
-
-  // Store brightness-adjusted colors
-  pixels[index * 3 + 0] = apply_brightness(r, current_brightness);
-  pixels[index * 3 + 1] = apply_brightness(g, current_brightness);
-  pixels[index * 3 + 2] = apply_brightness(b, current_brightness);
-
-  // Update WS2812 buffer
-  if (initialized && display_enabled) {
-    setLedValues(&led_ws2812_handle, index, pixels[index * 3 + 0],
-                 pixels[index * 3 + 1], pixels[index * 3 + 2]);
+  if (effect_render_context) {
+    pixels_runtime[index * 3 + 0] = r;
+    pixels_runtime[index * 3 + 1] = g;
+    pixels_runtime[index * 3 + 2] = b;
+    if (initialized && display_enabled) {
+      push_runtime_pixel_to_ws2812(index);
+    }
+    return;
   }
+
+  if (current_effect == LED_EFFECT_STATIC_MATRIX) {
+    // Editable matrix mode: update both saved pattern and displayed frame.
+    pixels_static[index * 3 + 0] = r;
+    pixels_static[index * 3 + 1] = g;
+    pixels_static[index * 3 + 2] = b;
+    pixels_runtime[index * 3 + 0] = r;
+    pixels_runtime[index * 3 + 1] = g;
+    pixels_runtime[index * 3 + 2] = b;
+    if (initialized && display_enabled) {
+      push_runtime_pixel_to_ws2812(index);
+    }
+    return;
+  }
+
+  if (current_effect == LED_EFFECT_THIRD_PARTY) {
+    // Third-party live mode: keep runtime editable externally, do not alter
+    // persisted matrix pattern.
+    pixels_runtime[index * 3 + 0] = r;
+    pixels_runtime[index * 3 + 1] = g;
+    pixels_runtime[index * 3 + 2] = b;
+    if (initialized && display_enabled) {
+      push_runtime_pixel_to_ws2812(index);
+    }
+    return;
+  }
+
+  // Animated effects: keep saved matrix pattern current, runtime is driven by
+  // effect renderer and must not be overwritten here.
+  pixels_static[index * 3 + 0] = r;
+  pixels_static[index * 3 + 1] = g;
+  pixels_static[index * 3 + 2] = b;
 }
 
 void led_matrix_clear(void) {
-  memset(pixels, 0, sizeof(pixels));
-  memset(pixels_original, 0, sizeof(pixels_original));
-
-  if (initialized) {
-    zeroLedValues(&led_ws2812_handle);
+  if (effect_render_context) {
+    memset(pixels_runtime, 0, sizeof(pixels_runtime));
+    if (initialized && display_enabled) {
+      zeroLedValues(&led_ws2812_handle);
+    }
+    return;
   }
+
+  if (current_effect == LED_EFFECT_STATIC_MATRIX) {
+    memset(pixels_static, 0, sizeof(pixels_static));
+    memset(pixels_runtime, 0, sizeof(pixels_runtime));
+    if (initialized && display_enabled) {
+      zeroLedValues(&led_ws2812_handle);
+    }
+    return;
+  }
+
+  if (current_effect == LED_EFFECT_THIRD_PARTY) {
+    memset(pixels_runtime, 0, sizeof(pixels_runtime));
+    if (initialized && display_enabled) {
+      zeroLedValues(&led_ws2812_handle);
+    }
+    return;
+  }
+
+  memset(pixels_static, 0, sizeof(pixels_static));
 }
 
 void led_matrix_fill(uint8_t r, uint8_t g, uint8_t b) {
@@ -186,23 +262,23 @@ bool led_matrix_is_enabled(void) { return display_enabled; }
 
 void led_matrix_update(void) { update_ws2812(); }
 
-const uint8_t *led_matrix_get_raw_data(void) { return pixels_original; }
+const uint8_t *led_matrix_get_raw_data(void) { return pixels_runtime; }
 
 void led_matrix_set_raw_data(const uint8_t *data) {
   if (data == NULL)
     return;
 
-  memcpy(pixels_original, data, LED_MATRIX_DATA_SIZE);
+  memcpy(pixels_static, data, LED_MATRIX_DATA_SIZE);
 
-  // Re-apply brightness
-  if (initialized) {
-    update_ws2812();
+  // Only drive runtime directly when matrix mode is active.
+  if (current_effect == LED_EFFECT_STATIC_MATRIX) {
+    sync_runtime_from_static();
   }
 }
 
 led_matrix_data_t led_matrix_get_data(void) {
   led_matrix_data_t data;
-  memcpy(data.pixels, pixels_original, LED_MATRIX_DATA_SIZE);
+  memcpy(data.pixels, pixels_static, LED_MATRIX_DATA_SIZE);
   data.brightness = current_brightness;
   data.enabled = display_enabled ? 1 : 0;
   data.reserved[0] = 0;
@@ -214,9 +290,13 @@ void led_matrix_load_data(const led_matrix_data_t *data) {
   if (data == NULL)
     return;
 
-  memcpy(pixels_original, data->pixels, LED_MATRIX_DATA_SIZE);
+  memcpy(pixels_static, data->pixels, LED_MATRIX_DATA_SIZE);
   current_brightness = data->brightness;
   display_enabled = data->enabled ? true : false;
+
+  if (current_effect == LED_EFFECT_STATIC_MATRIX) {
+    memcpy(pixels_runtime, pixels_static, LED_MATRIX_DATA_SIZE);
+  }
 
   if (initialized) {
     if (display_enabled) {
@@ -292,27 +372,15 @@ void led_matrix_test_rainbow(uint8_t offset) {
 // LED Effect Implementation
 //--------------------------------------------------------------------+
 
-// Effect state variables
-static led_effect_mode_t current_effect = LED_EFFECT_NONE;
-static uint8_t effect_color_r = 255;
-static uint8_t effect_color_g = 0;
-static uint8_t effect_color_b = 0;
-static uint8_t effect_speed = 50;
-static uint8_t fps_limit = 60; // Default 60 FPS
-static uint32_t last_effect_tick = 0;
-static uint32_t last_render_tick = 0; // Separate tick for FPS limiting
-static uint16_t effect_offset = 0;
-
-// Diagnostic mode: 0=normal, 1=DMA stress (no CPU computation), 2=CPU stress
-// (compute but no DMA)
-static uint8_t diagnostic_mode = 0;
-
-// Reactive effect state
-static uint8_t key_brightness[6] = {0, 0, 0, 0, 0, 0};
-
 void led_matrix_set_effect(led_effect_mode_t mode) {
+  led_effect_mode_t previous_effect = current_effect;
   current_effect = mode;
   effect_offset = 0;
+
+  // Restoring matrix mode must restore the exact saved pattern.
+  if (mode == LED_EFFECT_STATIC_MATRIX && previous_effect != LED_EFFECT_STATIC_MATRIX) {
+    sync_runtime_from_static();
+  }
 }
 
 led_effect_mode_t led_matrix_get_effect(void) { return current_effect; }
@@ -696,9 +764,9 @@ void led_matrix_effect_tick(uint32_t tick) {
         led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
         // Store in local pixels array but DON'T send to WS2812
         uint8_t idx = y * LED_MATRIX_WIDTH + x;
-        pixels_original[idx * 3 + 0] = r;
-        pixels_original[idx * 3 + 1] = g;
-        pixels_original[idx * 3 + 2] = b;
+        pixels_runtime[idx * 3 + 0] = r;
+        pixels_runtime[idx * 3 + 1] = g;
+        pixels_runtime[idx * 3 + 2] = b;
       }
     }
     // Explicitly clear dirty flag to prevent DMA
@@ -725,12 +793,14 @@ void led_matrix_effect_tick(uint32_t tick) {
     return;
   }
 
-  // Normal mode: skip if no effect selected
-  if (current_effect == LED_EFFECT_NONE) {
+  // Matrix static mode and third-party mode do not run internal animations.
+  if (current_effect == LED_EFFECT_STATIC_MATRIX ||
+      current_effect == LED_EFFECT_THIRD_PARTY) {
     return;
   }
 
   // Now render the effect using current effect_offset
+  effect_render_context = true;
   switch (current_effect) {
   case LED_EFFECT_RAINBOW:
     effect_rainbow();
@@ -774,4 +844,5 @@ void led_matrix_effect_tick(uint32_t tick) {
   default:
     break;
   }
+  effect_render_context = false;
 }

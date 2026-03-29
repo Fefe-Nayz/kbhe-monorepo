@@ -27,10 +27,11 @@ from ..widgets import (
 
 EFFECT_GROUPS = [
     (
-        "Static / Utility",
+        "Software Control",
         [
-            (0, "None (Static Pattern)"),
+            (0, "Matrix (Software)"),
             (4, "Solid Color"),
+            (14, "Third-Party Live"),
         ],
     ),
     (
@@ -58,7 +59,7 @@ EFFECT_GROUPS = [
 ]
 
 EFFECT_METADATA: dict[int, tuple[str, str]] = {
-    0: ("None (Static Pattern)", "No animation; the matrix keeps the current static pattern."),
+    0: ("Matrix (Software)", "No animation; uses the editable matrix pattern from the Lighting tab."),
     1: ("Rainbow Wave", "Animated rainbow sweep across the matrix."),
     2: ("Breathing", "Smooth in/out pulsing with the selected color."),
     3: ("Static Rainbow", "Rainbow colors stay visible without motion."),
@@ -72,6 +73,7 @@ EFFECT_METADATA: dict[int, tuple[str, str]] = {
     11: ("Spiral", "Spinning spiral motion pattern."),
     12: ("Color Cycle", "Continuous cycling through the selected effect color palette."),
     13: ("Reactive (Key Press)", "Responds to key presses using the selected effect color."),
+    14: ("Third-Party Live", "Matrix is read-only in this app; live frame is displayed from device state."),
 }
 
 _QUICK_COLORS = [

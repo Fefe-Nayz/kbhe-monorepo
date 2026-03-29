@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
-    QCheckBox,
     QHBoxLayout,
     QLabel,
-    QSpinBox,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -200,9 +198,12 @@ class TravelPage(QWidget):
         self.session = session
         self.device = session.device
         self._page_active = False
-        self._poll_timer = QTimer(self)
-        self._poll_timer.timeout.connect(self._poll)
+        try:
+            self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
+        except Exception:
+            pass
         self._build_ui()
+        self._update_live_info(self.session.live_enabled, self.session.live_interval_ms)
         self._load_all_thresholds()
 
     # ------------------------------------------------------------------
@@ -226,19 +227,12 @@ class TravelPage(QWidget):
         ctrl_row = QHBoxLayout()
         ctrl_row.setSpacing(14)
 
-        self.live_check = QCheckBox("Live preview")
-        self.live_check.toggled.connect(self._on_live_toggled)
-        ctrl_row.addWidget(self.live_check)
-
-        interval_lbl = QLabel("Interval (ms):")
+        interval_lbl = QLabel("Global live")
         interval_lbl.setObjectName("Muted")
         ctrl_row.addWidget(interval_lbl)
 
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(16, 500)
-        self.interval_spin.setValue(33)
-        self.interval_spin.valueChanged.connect(self._on_interval_changed)
-        ctrl_row.addWidget(self.interval_spin)
+        self.live_info = StatusChip("OFF", "neutral")
+        ctrl_row.addWidget(self.live_info)
 
         ctrl_row.addStretch(1)
         ctrl_row.addWidget(make_secondary_button("Reload Thresholds", self._load_all_thresholds))
@@ -309,7 +303,6 @@ class TravelPage(QWidget):
             data = self.device.get_key_states()
         except Exception as exc:
             self._set_status(f"Poll error: {exc}", "bad")
-            self._poll_timer.stop()
             return
         if not data:
             return
@@ -324,19 +317,22 @@ class TravelPage(QWidget):
         self.status_chip.set_text_and_level(msg, level)
 
     # ------------------------------------------------------------------
-    # Live toggle
+    # Global live settings
     # ------------------------------------------------------------------
 
-    def _on_live_toggled(self, checked: bool) -> None:
-        if checked and self._page_active:
-            self._poll_timer.start(self.interval_spin.value())
-            self._poll()
+    def _update_live_info(self, enabled: bool, interval_ms: int) -> None:
+        if enabled:
+            self.live_info.set_text_and_level(f"ON @ {int(interval_ms)} ms", "info")
         else:
-            self._poll_timer.stop()
+            self.live_info.set_text_and_level("OFF", "neutral")
 
-    def _on_interval_changed(self, value: int) -> None:
-        if self._poll_timer.isActive():
-            self._poll_timer.setInterval(value)
+    def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
+        self._update_live_info(enabled, interval_ms)
+
+    def on_live_tick(self) -> None:
+        if not self._page_active or not self.session.live_enabled:
+            return
+        self._poll()
 
     # ------------------------------------------------------------------
     # Page lifecycle
@@ -348,9 +344,8 @@ class TravelPage(QWidget):
     def on_page_activated(self) -> None:
         self._page_active = True
         self._load_all_thresholds()
-        if self.live_check.isChecked():
-            self._poll_timer.start(self.interval_spin.value())
+        if self.session.live_enabled:
+            self._poll()
 
     def on_page_deactivated(self) -> None:
         self._page_active = False
-        self._poll_timer.stop()

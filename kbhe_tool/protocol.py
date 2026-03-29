@@ -80,7 +80,7 @@ class Command(IntEnum):
 
 
 class LEDEffect(IntEnum):
-    NONE = 0
+    MATRIX = 0
     RAINBOW = 1
     BREATHING = 2
     STATIC_RAINBOW = 3
@@ -88,16 +88,20 @@ class LEDEffect(IntEnum):
     PLASMA = 5
     FIRE = 6
     OCEAN = 7
-    MATRIX = 8
+    MATRIX_RAIN = 8
     SPARKLE = 9
     BREATHING_RAINBOW = 10
     SPIRAL = 11
     COLOR_CYCLE = 12
     REACTIVE = 13
+    THIRD_PARTY = 14
+
+    # Backward-compatible alias for older code paths.
+    NONE = MATRIX
 
 
 LED_EFFECT_NAMES = {
-    LEDEffect.NONE: "Static Pattern",
+    LEDEffect.MATRIX: "Matrix (Software)",
     LEDEffect.RAINBOW: "Rainbow Wave",
     LEDEffect.BREATHING: "Breathing",
     LEDEffect.STATIC_RAINBOW: "Static Rainbow",
@@ -105,12 +109,13 @@ LED_EFFECT_NAMES = {
     LEDEffect.PLASMA: "Plasma",
     LEDEffect.FIRE: "Fire",
     LEDEffect.OCEAN: "Ocean Waves",
-    LEDEffect.MATRIX: "Matrix Rain",
+    LEDEffect.MATRIX_RAIN: "Matrix Rain",
     LEDEffect.SPARKLE: "Sparkle",
     LEDEffect.BREATHING_RAINBOW: "Breathing Rainbow",
     LEDEffect.SPIRAL: "Spiral",
     LEDEffect.COLOR_CYCLE: "Color Cycle",
     LEDEffect.REACTIVE: "Reactive",
+    LEDEffect.THIRD_PARTY: "Third-Party Live",
 }
 
 

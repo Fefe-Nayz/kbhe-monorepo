@@ -629,7 +629,7 @@ static void cmd_get_led_row(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  const uint8_t *pixels = settings_get_led_pixels();
+  const uint8_t *pixels = led_matrix_get_raw_data();
   uint16_t offset = req->row * LED_MATRIX_WIDTH * 3; // Row offset in bytes
 
   resp->status = HID_RESP_OK;

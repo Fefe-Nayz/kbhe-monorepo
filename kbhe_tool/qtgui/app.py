@@ -12,11 +12,13 @@ from .common import (
     QPushButton,
     QStackedWidget,
     QStatusBar,
+    QTimer,
     QVBoxLayout,
     QWidget,
     Qt,
 )
 from .pages import (
+    AppSettingsPage,
     CalibrationPage,
     DebugPage,
     DevicePage,
@@ -42,6 +44,7 @@ from .widgets import KeySelector, StatusPill, make_primary_button, make_secondar
 
 _NAV: list[tuple[str, str, str | None]] = [
     ("overview",     "Overview",         "Workspace"),
+    ("settings",     "App Settings",     None),
     ("keyboard",     "Keyboard",         "Configure"),
     ("calibration",  "Calibration",      None),
     ("travel",       "Travel",           None),
@@ -66,6 +69,9 @@ class KBHEQtMainWindow(QMainWindow):
         self.theme_mode = current_theme_mode()
         self.nav_buttons: dict[str, QPushButton] = {}
         self.pages: dict[str, QWidget] = {}
+        self._theme_btns: dict[str, QPushButton] = {}
+        self.live_timer = QTimer(self)
+        self.live_timer.timeout.connect(self._on_live_tick)
 
         self.setWindowTitle("KBHE Configurator")
         self.resize(1440, 900)
@@ -73,6 +79,7 @@ class KBHEQtMainWindow(QMainWindow):
 
         self._build_ui()
         self._connect_signals()
+        self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         self.session.refresh_snapshot()
         self.show_page("overview")
 
@@ -172,23 +179,6 @@ class KBHEQtMainWindow(QMainWindow):
         footer_layout.setContentsMargins(12, 10, 12, 10)
         footer_layout.setSpacing(6)
 
-        theme_lbl = QLabel("THEME")
-        theme_lbl.setObjectName("SidebarGroupLabel")
-        footer_layout.addWidget(theme_lbl)
-
-        self._theme_btns: dict[str, QPushButton] = {}
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(4)
-        btn_row.setContentsMargins(0, 0, 0, 0)
-        for label, mode in [("Auto", "system"), ("Light", "light"), ("Dark", "dark")]:
-            btn = QPushButton(label)
-            btn.setObjectName("ThemeToggleBtn")
-            btn.setProperty("active", "true" if mode == self.theme_mode else "false")
-            btn.clicked.connect(lambda _c=False, m=mode: self._set_theme(m))
-            btn_row.addWidget(btn)
-            self._theme_btns[mode] = btn
-        footer_layout.addLayout(btn_row)
-
         reload_btn = make_secondary_button("Reload All", self._refresh_all)
         footer_layout.addWidget(reload_btn)
 
@@ -233,6 +223,7 @@ class KBHEQtMainWindow(QMainWindow):
         d = s.device
         return {
             "overview":    OverviewPage(s, controller=self),
+            "settings":    AppSettingsPage(s, controller=self),
             "keyboard":    KeyboardPage(s),
             "calibration": CalibrationPage(s),
             "travel":      TravelPage(s),
@@ -253,6 +244,7 @@ class KBHEQtMainWindow(QMainWindow):
         self.session.statusChanged.connect(self._on_status_changed)
         self.session.snapshotChanged.connect(self._on_snapshot_changed)
         self.session.connectionChanged.connect(self._on_connection_changed)
+        self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
 
     def _on_status_changed(self, message: str, level: str) -> None:
         self.status_pill.setText(message)
@@ -278,12 +270,31 @@ class KBHEQtMainWindow(QMainWindow):
         self.connection_dot.style().unpolish(self.connection_dot)
         self.connection_dot.style().polish(self.connection_dot)
 
+    def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
+        if enabled:
+            self.live_timer.start(max(20, int(interval_ms)))
+        else:
+            self.live_timer.stop()
+
+    def _on_live_tick(self) -> None:
+        self.session.refresh_snapshot()
+        if not self.session.connected:
+            return
+        if self.active_page_id and self.active_page_id in self.pages:
+            page = self.pages[self.active_page_id]
+            if hasattr(page, "on_live_tick"):
+                try:
+                    page.on_live_tick()
+                except Exception:
+                    pass
+
     # ------------------------------------------------------------------
     # Navigation
     # ------------------------------------------------------------------
 
     _PAGE_TITLES: dict[str, str] = {
         "overview":    "Overview",
+        "settings":    "App Settings",
         "keyboard":    "Keyboard",
         "calibration": "Calibration",
         "travel":      "Travel",
@@ -386,6 +397,7 @@ class KBHEQtMainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:
+        self.live_timer.stop()
         if self.active_page_id and self.active_page_id in self.pages:
             page = self.pages[self.active_page_id]
             if hasattr(page, "on_page_deactivated"):

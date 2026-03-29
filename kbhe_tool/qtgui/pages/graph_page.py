@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
-from PySide6.QtCore import QPointF, QTimer, Qt
+from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -44,10 +44,13 @@ class GraphPage(QWidget):
         self.session = session
         self.device = session.device
         self._page_active = False
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self._update_graph)
+        try:
+            self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
+        except Exception:
+            pass
         self.graph_data = {i: [] for i in range(6)}
         self._build_ui()
+        self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         self.apply_theme()
 
     # ------------------------------------------------------------------
@@ -94,9 +97,15 @@ class GraphPage(QWidget):
     def _build_controls_card(self) -> SectionCard:
         card = SectionCard("Capture Controls")
 
-        self.live_check = QCheckBox("Enable live graph")
-        self.live_check.toggled.connect(self._sync_timer)
-        card.body_layout.addWidget(self.live_check)
+        live_row = QHBoxLayout()
+        live_row.setSpacing(8)
+        live_lbl = QLabel("Global live")
+        live_lbl.setObjectName("Muted")
+        live_row.addWidget(live_lbl)
+        self.live_info = StatusChip("OFF", "neutral")
+        live_row.addWidget(self.live_info)
+        live_row.addStretch(1)
+        card.body_layout.addLayout(live_row)
 
         dtype_row = QHBoxLayout()
         dtype_lbl = QLabel("Data type")
@@ -119,17 +128,6 @@ class GraphPage(QWidget):
         self.points_spin.valueChanged.connect(self._trim_buffers)
         points_row.addWidget(self.points_spin)
         card.body_layout.addLayout(points_row)
-
-        interval_row = QHBoxLayout()
-        int_lbl = QLabel("Update (ms)")
-        int_lbl.setObjectName("Muted")
-        interval_row.addWidget(int_lbl)
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(10, 500)
-        self.interval_spin.setValue(60)
-        self.interval_spin.valueChanged.connect(self._sync_timer)
-        interval_row.addWidget(self.interval_spin)
-        card.body_layout.addLayout(interval_row)
 
         y_row = QHBoxLayout()
         ymin_lbl = QLabel("Y min")
@@ -266,12 +264,11 @@ class GraphPage(QWidget):
         self.axis_x.setRange(0, max(1, max_len - 1))
         self.axis_y.setRange(ymin, ymax)
 
-    def _sync_timer(self) -> None:
-        if self.live_check.isChecked() and self._page_active:
-            self.timer.start(int(self.interval_spin.value()))
-            self._update_graph()
+    def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
+        if enabled:
+            self.live_info.set_text_and_level(f"ON @ {int(interval_ms)} ms", "info")
         else:
-            self.timer.stop()
+            self.live_info.set_text_and_level("OFF", "neutral")
 
     def _trim_buffers(self) -> None:
         limit = int(self.points_spin.value())
@@ -305,7 +302,6 @@ class GraphPage(QWidget):
             samples = self._collect_samples()
         except Exception as exc:
             self._update_status(f"Graph update failed: {exc}", "error")
-            self.timer.stop()
             return
         limit = int(self.points_spin.value())
         for i in range(6):
@@ -313,6 +309,11 @@ class GraphPage(QWidget):
             self.graph_data[i].append(value)
             self.graph_data[i] = self.graph_data[i][-limit:]
         self._refresh_chart()
+
+    def on_live_tick(self) -> None:
+        if not self._page_active or not self.session.live_enabled:
+            return
+        self._update_graph()
 
     def _refresh_chart(self) -> None:
         max_len = 1
@@ -388,8 +389,8 @@ class GraphPage(QWidget):
 
     def on_page_activated(self) -> None:
         self._page_active = True
-        self._sync_timer()
+        if self.session.live_enabled:
+            self._update_graph()
 
     def on_page_deactivated(self) -> None:
         self._page_active = False
-        self.timer.stop()

@@ -40,6 +40,7 @@ class MatrixCanvas(QWidget):
         self._gap = gap
         self._pixels: list[list[int]] = [[0, 0, 0]] * (n * n)
         self._hovered = -1
+        self._read_only = False
         sp = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         sp.setHeightForWidth(True)
         self.setSizePolicy(sp)
@@ -60,6 +61,17 @@ class MatrixCanvas(QWidget):
 
     def set_pixels(self, pixels: list) -> None:
         self._pixels = [list(p[:3]) for p in pixels[: self._n * self._n]]
+        self.update()
+
+    def set_read_only(self, read_only: bool) -> None:
+        self._read_only = bool(read_only)
+        self.setCursor(
+            Qt.CursorShape.ArrowCursor
+            if self._read_only
+            else Qt.CursorShape.PointingHandCursor
+        )
+        if self._read_only:
+            self._hovered = -1
         self.update()
 
     def _cell_size(self) -> int:
@@ -101,6 +113,11 @@ class MatrixCanvas(QWidget):
             )
 
     def mouseMoveEvent(self, event) -> None:
+        if self._read_only:
+            if self._hovered != -1:
+                self._hovered = -1
+                self.update()
+            return
         old = self._hovered
         p = event.pos()
         self._hovered = self._cell_at(p.x(), p.y())
@@ -112,6 +129,8 @@ class MatrixCanvas(QWidget):
         self.update()
 
     def mousePressEvent(self, event) -> None:
+        if self._read_only:
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             p = event.pos()
             idx = self._cell_at(p.x(), p.y())
@@ -134,6 +153,9 @@ QUICK_COLORS = [
     ("#5e5ce6", "Indigo"),
 ]
 
+LED_EFFECT_MATRIX_SOFTWARE = 0
+LED_EFFECT_THIRD_PARTY = 14
+
 
 def _clamp(value: int) -> int:
     return max(0, min(255, int(value)))
@@ -150,6 +172,11 @@ class LightingPage(QWidget):
         self.device = device
         self.controller = controller
         self._loading = False
+        self._page_active = False
+        self._current_effect_mode = LED_EFFECT_MATRIX_SOFTWARE
+        self._matrix_editable = True
+        self._last_live_sync_error = None
+        self._matrix_edit_widgets: list[QWidget] = []
         self._build_state()
         self._build_ui()
         self.reload()
@@ -228,6 +255,9 @@ class LightingPage(QWidget):
             "Click a cell to paint it with the selected color.",
         )
 
+        self.matrix_mode_chip = StatusChip("Matrix mode (editable)", "ok")
+        card.add_header_widget(self.matrix_mode_chip)
+
         self.matrix_canvas = MatrixCanvas(8, 4)
         self.matrix_canvas.cellClicked.connect(self.on_led_click)
 
@@ -261,9 +291,9 @@ class LightingPage(QWidget):
         self.color_label.setObjectName("Muted")
         card.body_layout.addWidget(self.color_label)
 
-        card.body_layout.addWidget(
-            make_secondary_button("Choose Color…", self.pick_color)
-        )
+        self.choose_color_btn = make_secondary_button("Choose Color…", self.pick_color)
+        card.body_layout.addWidget(self.choose_color_btn)
+        self._register_matrix_edit_widget(self.choose_color_btn)
 
         # Quick-color swatches
         swatch_host = QWidget()
@@ -290,6 +320,7 @@ class LightingPage(QWidget):
                 f"QToolButton:hover {{ border-color: palette(highlight); }}"
             )
             swatch.clicked.connect(lambda _=False, h=hex_color: self.set_color_hex(h))
+            self._register_matrix_edit_widget(swatch)
             swatch_grid.addWidget(swatch, i // 4, i % 4)
 
         card.body_layout.addWidget(swatch_host)
@@ -318,10 +349,19 @@ class LightingPage(QWidget):
             "Live Actions",
             "These actions update the keyboard immediately.",
         )
-        card.body_layout.addWidget(make_primary_button("Fill with Current Color", self.fill_color))
-        card.body_layout.addWidget(make_danger_button("Clear Matrix", self.clear_all))
-        card.body_layout.addWidget(make_secondary_button("Run Rainbow Test", self.rainbow_test))
-        card.body_layout.addWidget(make_secondary_button("Reload from Device", self.reload))
+        self.fill_btn = make_primary_button("Fill with Current Color", self.fill_color)
+        self.clear_btn = make_danger_button("Clear Matrix", self.clear_all)
+        self.rainbow_btn = make_secondary_button("Run Rainbow Test", self.rainbow_test)
+        self.reload_btn = make_secondary_button("Reload from Device", self.reload)
+
+        card.body_layout.addWidget(self.fill_btn)
+        card.body_layout.addWidget(self.clear_btn)
+        card.body_layout.addWidget(self.rainbow_btn)
+        card.body_layout.addWidget(self.reload_btn)
+
+        self._register_matrix_edit_widget(self.fill_btn)
+        self._register_matrix_edit_widget(self.clear_btn)
+        self._register_matrix_edit_widget(self.rainbow_btn)
         return card
 
     def _build_persistence_card(self) -> SectionCard:
@@ -329,20 +369,82 @@ class LightingPage(QWidget):
             "Persistence",
             "Save to flash when you want the current live state to survive power cycles.",
         )
-        card.body_layout.addWidget(make_primary_button("Save to Flash", self.save_to_flash))
+        self.save_to_flash_btn = make_primary_button("Save to Flash", self.save_to_flash)
+        card.body_layout.addWidget(self.save_to_flash_btn)
+        self._register_matrix_edit_widget(self.save_to_flash_btn)
 
         file_row = QHBoxLayout()
         file_row.setSpacing(8)
-        file_row.addWidget(make_secondary_button("Export", self.export_to_file))
-        file_row.addWidget(make_secondary_button("Import", self.import_from_file))
+        self.export_btn = make_secondary_button("Export", self.export_to_file)
+        self.import_btn = make_secondary_button("Import", self.import_from_file)
+        file_row.addWidget(self.export_btn)
+        file_row.addWidget(self.import_btn)
         file_row.addStretch(1)
         card.body_layout.addLayout(file_row)
+
+        self._register_matrix_edit_widget(self.import_btn)
 
         return card
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _register_matrix_edit_widget(self, widget: QWidget) -> None:
+        self._matrix_edit_widgets.append(widget)
+
+    @staticmethod
+    def _is_matrix_edit_mode(effect_mode: int | None) -> bool:
+        return int(effect_mode) == LED_EFFECT_MATRIX_SOFTWARE if effect_mode is not None else False
+
+    def _set_matrix_editable(self, editable: bool, effect_mode: int | None = None) -> None:
+        self._matrix_editable = bool(editable)
+        self.matrix_canvas.set_read_only(not self._matrix_editable)
+        for widget in self._matrix_edit_widgets:
+            widget.setEnabled(self._matrix_editable)
+
+        mode = int(effect_mode) if effect_mode is not None else self._current_effect_mode
+        if self._matrix_editable:
+            self.matrix_mode_chip.set_text_and_level("Matrix mode (editable)", "ok")
+        elif mode == LED_EFFECT_THIRD_PARTY:
+            self.matrix_mode_chip.set_text_and_level("Third-party mode (read-only live)", "info")
+        else:
+            self.matrix_mode_chip.set_text_and_level("Effect mode (read-only live)", "info")
+
+    def _sync_effect_mode_from_device(self) -> int | None:
+        try:
+            mode = self.device.get_led_effect()
+        except Exception as exc:
+            message = f"Failed to read effect mode: {exc}"
+            if message != self._last_live_sync_error:
+                self._last_live_sync_error = message
+                self._update_status(message, "warning")
+            return None
+
+        if mode is None:
+            return None
+
+        self._current_effect_mode = int(mode)
+        self._set_matrix_editable(
+            self._is_matrix_edit_mode(self._current_effect_mode),
+            self._current_effect_mode,
+        )
+        return self._current_effect_mode
+
+    def _deny_edit_if_read_only(self) -> bool:
+        if self._matrix_editable:
+            return False
+        if self._current_effect_mode == LED_EFFECT_THIRD_PARTY:
+            self._update_status(
+                "Matrix editing is disabled in Third-party mode. Showing live LED state only.",
+                "warning",
+            )
+        else:
+            self._update_status(
+                "Matrix editing is disabled while an effect is active. Switch to Matrix mode to edit.",
+                "warning",
+            )
+        return True
 
     def _update_status(self, message: str, kind: str = "info") -> None:
         level_map = {"success": "ok", "warning": "warn", "error": "bad", "info": "info"}
@@ -368,6 +470,11 @@ class LightingPage(QWidget):
             except Exception:
                 pass
 
+    def _global_live_enabled(self) -> bool:
+        if self.controller is None or not hasattr(self.controller, "session"):
+            return False
+        return bool(getattr(self.controller.session, "live_enabled", False))
+
     def _refresh_matrix(self) -> None:
         self.matrix_canvas.set_pixels(self.pixels)
 
@@ -381,11 +488,36 @@ class LightingPage(QWidget):
         r, g, b = self.current_color
         self.color_label.setText(f"RGB({r}, {g}, {b})")
 
+    def _refresh_live_effect_frame(self) -> None:
+        try:
+            effect_mode = self._sync_effect_mode_from_device()
+            if effect_mode is None or self._is_matrix_edit_mode(effect_mode):
+                self._last_live_sync_error = None
+                return
+
+            pixels = self.device.led_download_all()
+            if not pixels or len(pixels) < 192:
+                return
+
+            for i in range(64):
+                base = i * 3
+                self.pixels[i] = [pixels[base], pixels[base + 1], pixels[base + 2]]
+            self._sync_shared()
+            self._refresh_matrix()
+            self._last_live_sync_error = None
+        except Exception as exc:
+            message = str(exc)
+            if message != self._last_live_sync_error:
+                self._last_live_sync_error = message
+                self._update_status(f"Live LED sync failed: {exc}", "warning")
+
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
 
     def on_led_click(self, index: int) -> None:
+        if self._deny_edit_if_read_only():
+            return
         if index < 0 or index >= len(self.pixels):
             return
         rgb = self.current_color[:3]
@@ -425,6 +557,8 @@ class LightingPage(QWidget):
         self._update_status(f"Brightness set to {brightness} live.", "success")
 
     def pick_color(self) -> None:
+        if self._deny_edit_if_read_only():
+            return
         color = QColorDialog.getColor(QColor(*self.current_color[:3]), self, "Choose LED Color")
         if not color.isValid():
             return
@@ -434,6 +568,8 @@ class LightingPage(QWidget):
         )
 
     def set_color_hex(self, hex_color: str) -> None:
+        if self._deny_edit_if_read_only():
+            return
         qcolor = QColor(hex_color)
         if not qcolor.isValid():
             self._update_status(f"Invalid color value: {hex_color}", "error")
@@ -442,6 +578,8 @@ class LightingPage(QWidget):
         self._update_status(f"Paint color set to {hex_color.upper()}.", "success")
 
     def clear_all(self) -> None:
+        if self._deny_edit_if_read_only():
+            return
         previous = [p[:] for p in self.pixels]
         for i in range(64):
             self.pixels[i] = [0, 0, 0]
@@ -462,6 +600,8 @@ class LightingPage(QWidget):
         self._update_status("Matrix cleared live.", "success")
 
     def fill_color(self) -> None:
+        if self._deny_edit_if_read_only():
+            return
         rgb = self.current_color[:3]
         previous = [p[:] for p in self.pixels]
         for i in range(64):
@@ -485,6 +625,8 @@ class LightingPage(QWidget):
         )
 
     def rainbow_test(self) -> None:
+        if self._deny_edit_if_read_only():
+            return
         try:
             ok = self.device.led_test_rainbow()
         except Exception as exc:
@@ -501,6 +643,17 @@ class LightingPage(QWidget):
 
     def reload(self) -> None:
         errors = []
+        try:
+            effect_mode = self.device.get_led_effect()
+            if effect_mode is not None:
+                self._current_effect_mode = int(effect_mode)
+                self._set_matrix_editable(
+                    self._is_matrix_edit_mode(self._current_effect_mode),
+                    self._current_effect_mode,
+                )
+        except Exception as exc:
+            errors.append(f"effect mode: {exc}")
+
         try:
             brightness = self.device.led_get_brightness()
             if brightness is not None:
@@ -532,10 +685,15 @@ class LightingPage(QWidget):
         else:
             self._update_status("Lighting state loaded from device.", "success")
 
+        # When an effect is active, update the matrix from the current live LED frame.
+        self._refresh_live_effect_frame()
+
     load_from_device = reload
     refresh_from_device = reload
 
     def save_to_flash(self) -> None:
+        if self._deny_edit_if_read_only():
+            return
         pixel_data = []
         for pixel in self.pixels[:64]:
             pixel_data.extend(int(ch) for ch in pixel[:3])
@@ -577,6 +735,8 @@ class LightingPage(QWidget):
         self._update_status(f"Exported lighting pattern to {filename}.", "success")
 
     def import_from_file(self) -> None:
+        if self._deny_edit_if_read_only():
+            return
         filename, _ = QFileDialog.getOpenFileName(
             self,
             "Import LED Pattern",
@@ -624,10 +784,16 @@ class LightingPage(QWidget):
     # ------------------------------------------------------------------
 
     def on_page_activated(self) -> None:
+        self._page_active = True
         self.reload()
 
+    def on_live_tick(self) -> None:
+        if not self._page_active or not self._global_live_enabled():
+            return
+        self._refresh_live_effect_frame()
+
     def on_page_deactivated(self) -> None:
-        pass
+        self._page_active = False
 
     def _serialize_pixels(self) -> list[int]:
         payload = []

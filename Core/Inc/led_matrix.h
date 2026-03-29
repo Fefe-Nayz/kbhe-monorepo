@@ -32,7 +32,7 @@ extern "C" {
 // LED Effect Modes
 //--------------------------------------------------------------------+
 typedef enum {
-  LED_EFFECT_NONE = 0,               // Static pattern (user-defined)
+  LED_EFFECT_NONE = 0,               // Matrix (software static pattern)
   LED_EFFECT_RAINBOW = 1,            // Rainbow wave (diagonal)
   LED_EFFECT_BREATHING = 2,          // Breathing (fade in/out)
   LED_EFFECT_STATIC_RAINBOW = 3,     // Static rainbow pattern
@@ -46,8 +46,11 @@ typedef enum {
   LED_EFFECT_SPIRAL = 11,            // Spiral
   LED_EFFECT_COLOR_CYCLE = 12,       // Solid color cycle
   LED_EFFECT_REACTIVE = 13,          // React to key presses
+  LED_EFFECT_THIRD_PARTY = 14,       // External/third-party live control
   LED_EFFECT_MAX
 } led_effect_mode_t;
+
+#define LED_EFFECT_STATIC_MATRIX LED_EFFECT_NONE
 
 //--------------------------------------------------------------------+
 // LED Matrix Data Structure (for storage)

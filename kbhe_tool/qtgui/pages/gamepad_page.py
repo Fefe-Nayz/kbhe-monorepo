@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Qt, QRectF
+from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -110,9 +110,12 @@ class GamepadPage(QWidget):
         self._current_key = int(getattr(session, "selected_key", 0))
         self._page_active = False
         self._loading = False
-        self.preview_timer = QTimer(self)
-        self.preview_timer.timeout.connect(self._poll_preview)
+        try:
+            self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
+        except Exception:
+            pass
         self._build_ui()
+        self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         try:
             self.session.selectedKeyChanged.connect(self.on_selected_key_changed)
         except Exception:
@@ -222,18 +225,12 @@ class GamepadPage(QWidget):
 
         preview_header = QHBoxLayout()
         preview_header.setSpacing(8)
-        self.preview_toggle = QCheckBox("Enable live preview")
-        self.preview_toggle.toggled.connect(self._sync_preview_timer)
-        preview_header.addWidget(self.preview_toggle)
+        live_lbl = QLabel("Global live")
+        live_lbl.setObjectName("Muted")
+        preview_header.addWidget(live_lbl)
+        self.preview_live_info = StatusChip("OFF", "neutral")
+        preview_header.addWidget(self.preview_live_info)
         preview_header.addStretch(1)
-        interval_lbl = QLabel("Interval (ms)")
-        interval_lbl.setObjectName("Muted")
-        preview_header.addWidget(interval_lbl)
-        self.preview_interval_spin = QSpinBox()
-        self.preview_interval_spin.setRange(20, 500)
-        self.preview_interval_spin.setValue(75)
-        self.preview_interval_spin.valueChanged.connect(self._sync_preview_timer)
-        preview_header.addWidget(self.preview_interval_spin)
         card.body_layout.addLayout(preview_header)
 
         self.preview_widget = StickPreview()
@@ -473,12 +470,11 @@ class GamepadPage(QWidget):
         else:
             self._update_status("All per-key mappings applied.", "success")
 
-    def _sync_preview_timer(self) -> None:
-        if self.preview_toggle.isChecked() and self._page_active:
-            self.preview_timer.start(int(self.preview_interval_spin.value()))
-            self._poll_preview()
+    def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
+        if enabled:
+            self.preview_live_info.set_text_and_level(f"ON @ {int(interval_ms)} ms", "info")
         else:
-            self.preview_timer.stop()
+            self.preview_live_info.set_text_and_level("OFF", "neutral")
 
     def _set_preview_bar(self, index: int, normalized_value: int) -> None:
         fill = self.key_distance_bars[index]
@@ -492,7 +488,6 @@ class GamepadPage(QWidget):
             key_states = self.device.get_key_states() or {}
         except Exception as exc:
             self._update_status(f"Preview error: {exc}", "warning")
-            self.preview_timer.stop()
             return
 
         distances = list(key_states.get("distances") or [0] * 6)
@@ -504,6 +499,11 @@ class GamepadPage(QWidget):
             x = (float(distances[1]) - float(distances[0])) / 255.0
             y = (float(distances[3]) - float(distances[2])) / 255.0
         self.preview_widget.set_state(x, y, self.square_check.isChecked(), self.deadzone_slider.value())
+
+    def on_live_tick(self) -> None:
+        if not self._page_active or not self.session.live_enabled:
+            return
+        self._poll_preview()
 
     def apply_theme(self) -> None:
         c = current_colors()
@@ -522,8 +522,8 @@ class GamepadPage(QWidget):
     def on_page_activated(self) -> None:
         self._page_active = True
         self.reload()
-        self._sync_preview_timer()
+        if self.session.live_enabled:
+            self._poll_preview()
 
     def on_page_deactivated(self) -> None:
         self._page_active = False
-        self.preview_timer.stop()

@@ -5,10 +5,11 @@ from .theme import APP_COLORS
 class EffectsPageMixin:
     EFFECT_MODE_GROUPS = [
         (
-            "Static / Utility",
+            "Software Control",
             [
-                (0, "None (Static Pattern)"),
+                (0, "Matrix (Software)"),
                 (4, "Solid Color"),
+                (14, "Third-Party Live"),
             ],
         ),
         (
@@ -36,7 +37,7 @@ class EffectsPageMixin:
     ]
 
     EFFECT_MODE_METADATA = {
-        0: ("None (Static Pattern)", "No animation; the matrix keeps the current static pattern."),
+        0: ("Matrix (Software)", "No animation; uses the editable matrix pattern from the Lighting tab."),
         1: ("Rainbow Wave", "Animated rainbow sweep across the matrix."),
         2: ("Breathing", "Smooth in/out pulsing with the selected color."),
         3: ("Static Rainbow", "Rainbow colors stay visible without motion."),
@@ -50,6 +51,7 @@ class EffectsPageMixin:
         11: ("Spiral", "Spinning spiral motion pattern."),
         12: ("Color Cycle", "Continuous cycling through the selected effect color palette."),
         13: ("Reactive (Key Press)", "Responds to key presses using the selected effect color."),
+        14: ("Third-Party Live", "Matrix is read-only in this app; live frame is displayed from device state."),
     }
 
     def _set_effect_status(self, message):

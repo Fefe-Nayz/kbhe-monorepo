@@ -19,7 +19,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from kbhe_tool.firmware import perform_firmware_update, reconnect_device
+from kbhe_tool.firmware import (
+    format_firmware_version,
+    perform_firmware_update,
+    reconnect_device,
+    resolve_firmware_version,
+)
 from ..widgets import (
     PageScaffold,
     SectionCard,
@@ -154,7 +159,7 @@ class FirmwarePage(QWidget):
     def _build_options_card(self) -> SectionCard:
         card = SectionCard(
             "Flash Options",
-            "Leave firmware version blank to auto-read from Core/Src/settings.c.",
+            "Leave firmware version blank to auto-detect directly from the selected .bin image.",
         )
 
         form_row = QHBoxLayout()
@@ -166,6 +171,7 @@ class FirmwarePage(QWidget):
 
         self.firmware_version_edit = QLineEdit()
         self.firmware_version_edit.setPlaceholderText("Auto-detect")
+        self.firmware_version_edit.textChanged.connect(self._update_selection_summary)
         form_row.addWidget(self.firmware_version_edit, 1)
 
         timeout_lbl = QLabel("Timeout (s):")
@@ -268,9 +274,31 @@ class FirmwarePage(QWidget):
             self.selection_details.setText(str(path))
             return
 
+        version_note = ""
+        manual_text = self.firmware_version_edit.text().strip()
+        if manual_text:
+            try:
+                manual_version = int(manual_text, 0)
+                version_note = (
+                    f"\nFirmware version: {format_firmware_version(manual_version)} "
+                    f"(0x{manual_version:04X}) · source manual override"
+                )
+            except ValueError:
+                version_note = "\nFirmware version: invalid manual value"
+        else:
+            try:
+                auto_version, source = resolve_firmware_version(path)
+                version_note = (
+                    f"\nFirmware version: {format_firmware_version(auto_version)} "
+                    f"(0x{auto_version:04X}) · source {source}"
+                )
+            except Exception as exc:
+                version_note = f"\nFirmware version: auto-detect failed ({exc})"
+
         self.selection_summary.setText(f"{path.name} ready to flash")
         self.selection_details.setText(
             f"{path} · {_format_bytes(stat.st_size)} · modified {_format_timestamp(stat.st_mtime)}"
+            f"{version_note}"
         )
 
     def _set_busy(self, busy: bool) -> None:
@@ -380,20 +408,35 @@ class FirmwarePage(QWidget):
 
         version_text = self.firmware_version_edit.text().strip()
         try:
-            firmware_version = int(version_text, 0) if version_text else None
             timeout_s = float(self.timeout_spin.value())
             retries = int(self.retries_spin.value())
         except ValueError as exc:
             QMessageBox.warning(self, "Invalid firmware options", str(exc))
             return
 
-        label = version_text if version_text else "auto-detect from Core/Src/settings.c"
+        try:
+            if version_text:
+                firmware_version = int(version_text, 0)
+                version_source = "manual override"
+            else:
+                firmware_version, version_source = resolve_firmware_version(firmware_path)
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                "Version auto-detect failed",
+                f"Could not determine firmware version for the selected image:\n{exc}",
+            )
+            self._update_status(f"Firmware version auto-detect failed: {exc}", "error")
+            return
+
+        label = f"{format_firmware_version(firmware_version)} (0x{firmware_version:04X})"
         confirm = QMessageBox.question(
             self,
             "Confirm firmware flash",
             f"Flash the selected firmware image?\n\n"
             f"File: {firmware_path}\n"
             f"Version: {label}\n"
+            f"Version source: {version_source}\n"
             f"Timeout: {timeout_s:.1f}s\n"
             f"Retries: {retries}\n\n"
             "Only the application slot will be updated.",
@@ -404,7 +447,7 @@ class FirmwarePage(QWidget):
         self._set_busy(True)
         self._append_log("-" * 72)
         self._append_log(f"Starting flash for {firmware_path}")
-        self._append_log(f"Version: {label}")
+        self._append_log(f"Version: {label} ({version_source})")
         self._append_log(f"Timeout: {timeout_s:.1f}s | Retries: {retries}")
         self._update_status("Flashing firmware...", "warning")
 

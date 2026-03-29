@@ -1,3 +1,4 @@
+from .app_settings_page import AppSettingsPage
 from .calibration_page import CalibrationPage
 from .debug_page import DebugPage
 from .device_page import DevicePage
@@ -12,6 +13,7 @@ from .travel_page import TravelPage
 from .workspace_page import WorkspacePage
 
 __all__ = [
+    "AppSettingsPage",
     "CalibrationPage",
     "DebugPage",
     "DevicePage",

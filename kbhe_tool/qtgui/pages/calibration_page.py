@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QScatterSeries, QValueAxis
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
@@ -49,8 +49,13 @@ class CalibrationPage(QWidget):
         self.device = session.device
         self._current_key = int(getattr(session, "selected_key", 0))
         self._loading = False
+        try:
+            self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
+        except Exception:
+            pass
         self._build_ui()
         self.apply_theme()
+        self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         try:
             self.session.selectedKeyChanged.connect(self.on_selected_key_changed)
         except Exception:
@@ -231,9 +236,6 @@ class CalibrationPage(QWidget):
         self.position_series.attachAxis(self.curve_axis_y)
         self.position_series.setVisible(False)
 
-        self.position_timer = QTimer(self)
-        self.position_timer.timeout.connect(self._update_position_dot)
-
         # Control spinboxes + preset
         controls = QWidget()
         ctrl_layout = QVBoxLayout(controls)
@@ -258,20 +260,12 @@ class CalibrationPage(QWidget):
         live_row = QHBoxLayout()
         live_row.setSpacing(8)
 
-        self.track_position_check = QCheckBox("Track live position")
-        self.track_position_check.toggled.connect(self._on_track_position_toggled)
-        live_row.addWidget(self.track_position_check)
-
-        live_rate_lbl = QLabel("Rate (ms)")
+        live_rate_lbl = QLabel("Global live")
         live_rate_lbl.setObjectName("Muted")
         live_row.addWidget(live_rate_lbl)
 
-        self.position_rate_spin = QSpinBox()
-        self.position_rate_spin.setRange(16, 1000)
-        self.position_rate_spin.setValue(100)
-        self.position_rate_spin.setSingleStep(5)
-        self.position_rate_spin.valueChanged.connect(self._on_position_rate_changed)
-        live_row.addWidget(self.position_rate_spin)
+        self.position_rate_label = StatusChip("OFF", "neutral")
+        live_row.addWidget(self.position_rate_label)
 
         live_row.addStretch(1)
         ctrl_layout.addLayout(live_row)
@@ -390,18 +384,15 @@ class CalibrationPage(QWidget):
             spin.blockSignals(False)
         self._update_curve_preview()
 
-    def _on_track_position_toggled(self, checked: bool) -> None:
-        self.position_series.setVisible(checked)
-        if checked:
-            self.position_timer.start(self.position_rate_spin.value())
+    def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
+        if enabled:
+            self.position_rate_label.set_text_and_level(f"ON @ {int(interval_ms)} ms", "info")
+            self.position_series.setVisible(True)
             self._update_position_dot()
         else:
-            self.position_timer.stop()
+            self.position_rate_label.set_text_and_level("OFF", "neutral")
+            self.position_series.setVisible(False)
             self.position_series.clear()
-
-    def _on_position_rate_changed(self, value: int) -> None:
-        if self.position_timer.isActive():
-            self.position_timer.setInterval(value)
 
     def _update_position_dot(self) -> None:
         try:
@@ -429,6 +420,11 @@ class CalibrationPage(QWidget):
 
         self.position_series.clear()
         self.position_series.append(travel, by)
+
+    def on_live_tick(self) -> None:
+        if not self.session.live_enabled:
+            return
+        self._update_position_dot()
 
     def _update_curve_preview(self) -> None:
         self.curve_series.clear()
@@ -586,8 +582,8 @@ class CalibrationPage(QWidget):
 
     def on_page_activated(self) -> None:
         self.reload()
-        if self.track_position_check.isChecked():
-            self.position_timer.start(self.position_rate_spin.value())
+        if self.session.live_enabled:
+            self._update_position_dot()
 
     def on_page_deactivated(self) -> None:
-        self.position_timer.stop()
+        pass

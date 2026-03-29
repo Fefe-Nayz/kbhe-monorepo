@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 
-from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -46,9 +45,12 @@ class DebugPage(QWidget):
         self._last_error = None
         self._tick_started = time.monotonic()
         self._tick_count = 0
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self._poll_sensor_once)
+        try:
+            self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
+        except Exception:
+            pass
         self._build_ui()
+        self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         self.reload()
 
     # ------------------------------------------------------------------
@@ -103,18 +105,12 @@ class DebugPage(QWidget):
 
         controls = QHBoxLayout()
         controls.setSpacing(8)
-        self.live_toggle = QCheckBox("Enable live polling")
-        self.live_toggle.toggled.connect(self._sync_timer)
-        controls.addWidget(self.live_toggle)
+        live_lbl = QLabel("Global live")
+        live_lbl.setObjectName("Muted")
+        controls.addWidget(live_lbl)
+        self.live_info = StatusChip("OFF", "neutral")
+        controls.addWidget(self.live_info)
         controls.addStretch(1)
-        interval_lbl = QLabel("Interval (ms)")
-        interval_lbl.setObjectName("Muted")
-        controls.addWidget(interval_lbl)
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(20, 500)
-        self.interval_spin.setValue(50)
-        self.interval_spin.valueChanged.connect(self._sync_timer)
-        controls.addWidget(self.interval_spin)
         card.body_layout.addLayout(controls)
 
         rate_row = QHBoxLayout()
@@ -293,12 +289,11 @@ class DebugPage(QWidget):
         except Exception:
             pass
 
-    def _sync_timer(self) -> None:
-        if self.live_toggle.isChecked() and self._page_active:
-            self.timer.start(int(self.interval_spin.value()))
-            self._poll_sensor_once()
+    def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
+        if enabled:
+            self.live_info.set_text_and_level(f"ON @ {int(interval_ms)} ms", "info")
         else:
-            self.timer.stop()
+            self.live_info.set_text_and_level("OFF", "neutral")
 
     # ------------------------------------------------------------------
     # Live polling
@@ -366,6 +361,11 @@ class DebugPage(QWidget):
             self.gui_rate_chip.setText(f"{self._tick_count / elapsed:.1f} Hz")
             self._tick_started = time.monotonic()
             self._tick_count = 0
+
+    def on_live_tick(self) -> None:
+        if not self._page_active or not self.session.live_enabled:
+            return
+        self._poll_sensor_once()
 
     # ------------------------------------------------------------------
     # Data loading / actions
@@ -480,8 +480,8 @@ class DebugPage(QWidget):
 
     def on_page_activated(self) -> None:
         self._page_active = True
-        self._sync_timer()
+        if self.session.live_enabled:
+            self._poll_sensor_once()
 
     def on_page_deactivated(self) -> None:
         self._page_active = False
-        self.timer.stop()
