@@ -332,6 +332,8 @@ class KBHEQtMainWindow(QMainWindow):
 
     def _refresh_active(self) -> None:
         self.session.refresh_snapshot()
+        if not self.session.connected:
+            return
         if self.active_page_id and self.active_page_id in self.pages:
             page = self.pages[self.active_page_id]
             if hasattr(page, "reload"):
@@ -340,6 +342,8 @@ class KBHEQtMainWindow(QMainWindow):
 
     def _refresh_all(self) -> None:
         self.session.refresh_snapshot()
+        if not self.session.connected:
+            return
         for page in self.pages.values():
             try:
                 if hasattr(page, "reload"):

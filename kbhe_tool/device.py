@@ -45,6 +45,9 @@ class KBHEDevice:
     
     def connect(self, logger=print):
         """Connect to the device."""
+        # Ensure stale handles from a previous unplug are fully released first.
+        self.disconnect()
+
         self.path = find_device_path(logger=logger)
         if self.path is None:
             raise Exception("Device not found")
@@ -57,11 +60,19 @@ class KBHEDevice:
         self.device.set_nonblocking(1)
         
         return True
+
+    def reconnect(self, logger=None):
+        """Reconnect to the device using a fresh HID handle."""
+        self.disconnect()
+        return self.connect(logger=logger)
     
     def disconnect(self):
         """Disconnect from the device."""
         if self.device:
-            self.device.close()
+            try:
+                self.device.close()
+            except Exception:
+                pass
             self.device = None
     
     def send_command(self, cmd_id, data=None, timeout_ms=100):
