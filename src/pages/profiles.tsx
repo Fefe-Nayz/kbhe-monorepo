@@ -12,7 +12,7 @@ export default function Profiles() {
   const selectedProfile = useProfileStore(state => state.selectedProfile)
   const selectProfile = useProfileStore(state => state.selectProfile)
 
-  {/*Refresh the page to get all the keyboard configuration that where saved*/}
+  {/*Refresh the page to get all the keyboard configuration that where saved*/ }
   useEffect(() => {
     refresh()
   }, [])
@@ -25,30 +25,30 @@ export default function Profiles() {
 
       <div style={{ padding: 20 }}>
 
-      <h2>Keyboard Profile Test</h2>
+        <h2>Keyboard Profile Test</h2>
 
-      {/* INPUT */}
-      <div>
-        <label>Profile name :</label>
-        <input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="gaming / work / fps"
-        />
+        {/* INPUT */}
+        <div>
+          <label>Profile name :</label>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="gaming / work / fps"
+          />
 
-        <button onClick={() => save(name)}>
-          Save profile
-        </button>
+          <button onClick={() => save(name)}>
+            Save profile
+          </button>
 
-        <button onClick={refresh}>
-          Refresh
-        </button>
+          <button onClick={refresh}>
+            Refresh
+          </button>
+        </div>
       </div>
-    </div>
 
 
 
-     <hr />
+      <hr />
 
 
       {/* PROFILE LIST */}
@@ -62,40 +62,41 @@ export default function Profiles() {
 
       {profiles.map(profile => (
 
-  <div
-    key={profile.name}
-    style={{
-      border: selectedProfile?.name === profile.name
-        ? "2px solid green"
-        : "1px solid gray",
-      padding: 10,
-      marginBottom: 10
-    }}
-  >
+        <div
+          key={profile.name}
+          style={{
+            border: selectedProfile?.name === profile.name
+              ? "2px solid green"
+              : "1px solid gray",
+            padding: 10,
+            marginBottom: 10
+          }}
+        >
 
-    <strong>{profile.name}</strong>
+          <strong>{profile.name}</strong>
 
-    {selectedProfile?.name === profile.name && (
-      <span style={{ marginLeft: 10 }}>✓ Selected</span>
-    )}
+          {selectedProfile?.name === profile.name && (
+            <span style={{ marginLeft: 10 }}>✓ Selected</span>
+          )}
 
-    <div style={{ marginTop: 5 }}>
+          <div style={{ marginTop: 5 }}>
 
-      <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => selectProfile(profile.name)}>
-        Select
-      </button>
+            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => selectProfile(profile.name)}>
+              Select
+            </button>
 
-      <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" onClick={() => remove(profile.name)}>
-        Delete
-      </button>
+            <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" onClick={() => remove(profile.name)}>
+              Delete
+            </button>
+
+          </div>
+
+        </div>
+
+
+      ))}
 
     </div>
 
-  </div>
-  
-
-))}
-
-    </div> 
-
-  )}
+  )
+}

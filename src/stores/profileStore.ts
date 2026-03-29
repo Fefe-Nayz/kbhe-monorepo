@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { useKeyboardStore ,type KeyboardState } from "./keyboard-store"
+import { defaultLayout } from "@/constants/defaultLayout"
 
 const STORAGE_PREFIX = "keyboard-profile:"
 
@@ -100,14 +101,18 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
   save: (name) => {
 
-    const state = useKeyboardStore.getState()
+    let state = useKeyboardStore.getState()
 
-    localStorage.setItem(
-      STORAGE_PREFIX + name,
-      JSON.stringify(state)
-    )
+    // When a new profile is created, initialize it with the default layout
+    if (!get().profiles.find(p => p.name === name)) {
+      state = { ...state, layout: defaultLayout }
+    }
 
+    localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(state))
     get().refresh()
+
+    //When saving a new profile, automatically select it
+    get().selectProfile(name)
   },
 
   remove: (name) => {

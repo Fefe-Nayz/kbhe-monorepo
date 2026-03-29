@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { defaultLayout, type KeyboardLayout } from '@/constants/defaultLayout'
 
+//import { useProfileStore } from './profileStore'
+
 export type KeyMode = 'single' | 'multi'
 export type displayedInfo = "regular" | "actuationMode" | "analogValues"
 export type labelItems = string
@@ -22,6 +24,7 @@ export interface KeyboardState {
   displayedInfo: displayedInfo
   selectedKeys: string[]
   layout: KeyboardLayout
+  saveEnabled: boolean
 
   setMode: (mode: KeyMode) => void
   setDisplayedInfo: (displayedInfo: displayedInfo) => void
@@ -30,6 +33,7 @@ export interface KeyboardState {
   updateKeyConfig: (keyIds: string[], update: string) => void
   updateLayout: (layout: KeyboardLayout) => void
   resetLayout: () => void
+  setSaveEnabled: (enabled: boolean) => void 
 }
 
 export const useKeyboardStore = create<KeyboardState>()(
@@ -40,6 +44,9 @@ export const useKeyboardStore = create<KeyboardState>()(
       displayedInfo: "regular",
       selectedKeys: [],
       layout: defaultLayout,
+      saveEnabled: false, // we don't save by default
+
+      setSaveEnabled: (enabled) => set({ saveEnabled: enabled }),
 
       setMode: (mode) => set({ mode }),
 
@@ -68,7 +75,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
       clearSelection: () => set({ selectedKeys: [] }),
 
-      updateKeyConfig: (keyIds, update) => {
+      updateKeyConfig: (keyIds: string[], update: Partial<KeyConfig>) => {
 
         const { layout } = get()
 
@@ -76,7 +83,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           keys: layout.keys.map(row =>
             row.map(key =>
               keyIds.includes(key.id)
-                ? { ...key, value: update }
+                ? { ...key, ...update }
                 : key
             )
           )
@@ -87,10 +94,12 @@ export const useKeyboardStore = create<KeyboardState>()(
 
       updateLayout: (layout) => set({ layout }),
 
-      resetLayout: () => set({
-        layout: defaultLayout,
-        selectedKeys: []
-      })
+      resetLayout: (save = true) => {
+        const { setSaveEnabled } = get()
+        if (!save) setSaveEnabled(false)
+        set({ layout: defaultLayout, selectedKeys: [] })
+        if (!save) setSaveEnabled(true)
+      }
 
     }),
     {
@@ -105,3 +114,4 @@ export const useKeyboardStore = create<KeyboardState>()(
     }
   )
 )
+
