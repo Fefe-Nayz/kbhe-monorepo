@@ -98,6 +98,9 @@ typedef enum {
   CMD_GET_ADC_VALUES = 0xE0,
   CMD_GET_KEY_STATES = 0xE1,
   CMD_GET_LOCK_STATES = 0xE2, // Get Caps/Num/Scroll lock states
+  CMD_ADC_CAPTURE_START = 0xE3,
+  CMD_ADC_CAPTURE_STATUS = 0xE4,
+  CMD_ADC_CAPTURE_READ = 0xE5,
 
   // Echo command for testing (0xFE)
   CMD_ECHO = 0xFE,
@@ -253,6 +256,59 @@ typedef struct __attribute__((packed)) {
   uint16_t distances_mm[6];  // Distance in 0.01mm units (e.g., 125 = 1.25mm)
   uint8_t reserved[38];
 } hid_resp_key_states_t;
+
+/**
+ * @brief ADC capture start request packet
+ */
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t key_index;
+  uint8_t reserved0;
+  uint32_t duration_ms;
+  uint8_t reserved[56];
+} hid_req_adc_capture_start_t;
+
+/**
+ * @brief ADC capture status response packet
+ */
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t active;
+  uint8_t key_index;
+  uint32_t duration_ms;
+  uint32_t sample_count;
+  uint32_t overflow_count;
+  uint8_t reserved[48];
+} hid_resp_adc_capture_status_t;
+
+/**
+ * @brief ADC capture read request packet
+ */
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint32_t start_index;
+  uint8_t max_samples;
+  uint8_t reserved[57];
+} hid_req_adc_capture_read_t;
+
+/**
+ * @brief ADC capture read response packet
+ */
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t active;
+  uint8_t key_index;
+  uint32_t total_samples;
+  uint32_t start_index;
+  uint8_t sample_count;
+  uint16_t raw_samples[12];
+  uint16_t filtered_samples[12];
+  uint8_t reserved[3];
+} hid_resp_adc_capture_read_t;
 
 /**
  * @brief LED single pixel packet

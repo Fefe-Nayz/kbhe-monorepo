@@ -4,6 +4,7 @@
  */
 
 #include "hid_protocol.h"
+#include "adc_capture.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "main.h"
@@ -923,6 +924,76 @@ static void cmd_get_lock_states(const uint8_t *in, uint8_t *out) {
   resp->payload[0] = lock_state;
 }
 
+static void cmd_adc_capture_start(const uint8_t *in, uint8_t *out) {
+  const hid_req_adc_capture_start_t *req =
+      (const hid_req_adc_capture_start_t *)in;
+  hid_resp_adc_capture_status_t *resp = (hid_resp_adc_capture_status_t *)out;
+
+  resp->command_id = CMD_ADC_CAPTURE_START;
+
+  if (req->key_index >= 6 || req->duration_ms == 0) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    resp->active = 0;
+    resp->key_index = req->key_index;
+    resp->duration_ms = 0;
+    resp->sample_count = 0;
+    resp->overflow_count = 0;
+    return;
+  }
+
+  bool ok = adc_capture_start(req->key_index, req->duration_ms);
+  resp->status = ok ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->active = adc_capture_is_active() ? 1 : 0;
+  resp->key_index = adc_capture_key_index();
+  resp->duration_ms = adc_capture_duration_ms();
+  resp->sample_count = adc_capture_sample_count();
+  resp->overflow_count = adc_capture_overflow_count();
+}
+
+static void cmd_adc_capture_status(const uint8_t *in, uint8_t *out) {
+  (void)in;
+  hid_resp_adc_capture_status_t *resp = (hid_resp_adc_capture_status_t *)out;
+
+  resp->command_id = CMD_ADC_CAPTURE_STATUS;
+  resp->status = HID_RESP_OK;
+  resp->active = adc_capture_is_active() ? 1 : 0;
+  resp->key_index = adc_capture_key_index();
+  resp->duration_ms = adc_capture_duration_ms();
+  resp->sample_count = adc_capture_sample_count();
+  resp->overflow_count = adc_capture_overflow_count();
+}
+
+static void cmd_adc_capture_read(const uint8_t *in, uint8_t *out) {
+  const hid_req_adc_capture_read_t *req = (const hid_req_adc_capture_read_t *)in;
+  hid_resp_adc_capture_read_t *resp = (hid_resp_adc_capture_read_t *)out;
+
+  uint16_t raw_samples[ADC_CAPTURE_MAX_READ_SAMPLES] = {0};
+  uint16_t filtered_samples[ADC_CAPTURE_MAX_READ_SAMPLES] = {0};
+  uint32_t total_samples = 0;
+
+  uint8_t max_samples = req->max_samples;
+  if (max_samples == 0 || max_samples > ADC_CAPTURE_MAX_READ_SAMPLES) {
+    max_samples = ADC_CAPTURE_MAX_READ_SAMPLES;
+  }
+
+  uint8_t count =
+      adc_capture_read_chunk(req->start_index, max_samples, raw_samples,
+                             filtered_samples, &total_samples);
+
+  resp->command_id = CMD_ADC_CAPTURE_READ;
+  resp->status = HID_RESP_OK;
+  resp->active = adc_capture_is_active() ? 1 : 0;
+  resp->key_index = adc_capture_key_index();
+  resp->total_samples = total_samples;
+  resp->start_index = req->start_index;
+  resp->sample_count = count;
+
+  for (uint8_t i = 0; i < count; i++) {
+    resp->raw_samples[i] = raw_samples[i];
+    resp->filtered_samples[i] = filtered_samples[i];
+  }
+}
+
 static void cmd_echo(const uint8_t *in, uint8_t *out) {
   // Simply copy input to output with OK status
   memcpy(out, in, HID_PROTOCOL_PACKET_SIZE);
@@ -1180,6 +1251,18 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_GET_LOCK_STATES:
     cmd_get_lock_states(in_packet, out_packet);
+    break;
+
+  case CMD_ADC_CAPTURE_START:
+    cmd_adc_capture_start(in_packet, out_packet);
+    break;
+
+  case CMD_ADC_CAPTURE_STATUS:
+    cmd_adc_capture_status(in_packet, out_packet);
+    break;
+
+  case CMD_ADC_CAPTURE_READ:
+    cmd_adc_capture_read(in_packet, out_packet);
     break;
 
   // Echo for testing

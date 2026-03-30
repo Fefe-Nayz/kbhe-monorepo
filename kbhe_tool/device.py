@@ -625,6 +625,92 @@ class KBHEDevice:
             }
         return None
 
+    def adc_capture_start(self, key_index, duration_ms):
+        """Start ADC capture in MCU RAM for one key and a fixed duration."""
+        duration_ms = max(1, int(duration_ms))
+        data = [
+            0,
+            int(key_index) & 0xFF,
+            0,
+            duration_ms & 0xFF,
+            (duration_ms >> 8) & 0xFF,
+            (duration_ms >> 16) & 0xFF,
+            (duration_ms >> 24) & 0xFF,
+        ]
+        resp = self.send_command(Command.ADC_CAPTURE_START, data)
+        if resp and len(resp) >= 16 and resp[1] == Status.OK:
+            return {
+                'active': bool(resp[2]),
+                'key_index': resp[3],
+                'duration_ms': resp[4] | (resp[5] << 8) | (resp[6] << 16) | (resp[7] << 24),
+                'sample_count': resp[8] | (resp[9] << 8) | (resp[10] << 16) | (resp[11] << 24),
+                'overflow_count': resp[12] | (resp[13] << 8) | (resp[14] << 16) | (resp[15] << 24),
+            }
+        return None
+
+    def adc_capture_status(self):
+        """Get current ADC capture status from MCU RAM."""
+        resp = self.send_command(Command.ADC_CAPTURE_STATUS)
+        if resp and len(resp) >= 16 and resp[1] == Status.OK:
+            return {
+                'active': bool(resp[2]),
+                'key_index': resp[3],
+                'duration_ms': resp[4] | (resp[5] << 8) | (resp[6] << 16) | (resp[7] << 24),
+                'sample_count': resp[8] | (resp[9] << 8) | (resp[10] << 16) | (resp[11] << 24),
+                'overflow_count': resp[12] | (resp[13] << 8) | (resp[14] << 16) | (resp[15] << 24),
+            }
+        return None
+
+    def adc_capture_read(self, start_index, max_samples=12):
+        """Read a chunk of captured ADC samples from MCU RAM."""
+        if max_samples < 1:
+            max_samples = 1
+        if max_samples > 12:
+            max_samples = 12
+
+        start_index = int(start_index)
+        data = [
+            0,
+            start_index & 0xFF,
+            (start_index >> 8) & 0xFF,
+            (start_index >> 16) & 0xFF,
+            (start_index >> 24) & 0xFF,
+            int(max_samples) & 0xFF,
+        ]
+
+        resp = self.send_command(Command.ADC_CAPTURE_READ, data)
+        if not resp or len(resp) < 13 or resp[1] != Status.OK:
+            return None
+
+        total_samples = resp[4] | (resp[5] << 8) | (resp[6] << 16) | (resp[7] << 24)
+        returned_start = resp[8] | (resp[9] << 8) | (resp[10] << 16) | (resp[11] << 24)
+        count = resp[12]
+
+        raw_samples = []
+        filtered_samples = []
+
+        raw_base = 13
+        filtered_base = raw_base + 24
+        count = min(count, 12)
+
+        for i in range(count):
+            raw_idx = raw_base + i * 2
+            filtered_idx = filtered_base + i * 2
+            raw_val = resp[raw_idx] | (resp[raw_idx + 1] << 8)
+            filtered_val = resp[filtered_idx] | (resp[filtered_idx + 1] << 8)
+            raw_samples.append(raw_val)
+            filtered_samples.append(filtered_val)
+
+        return {
+            'active': bool(resp[2]),
+            'key_index': resp[3],
+            'total_samples': total_samples,
+            'start_index': returned_start,
+            'sample_count': count,
+            'raw_samples': raw_samples,
+            'filtered_samples': filtered_samples,
+        }
+
     def get_lock_states(self):
         """Get keyboard lock states (Caps, Num, Scroll)."""
         resp = self.send_command(Command.GET_LOCK_STATES)

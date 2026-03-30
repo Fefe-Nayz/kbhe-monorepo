@@ -75,6 +75,9 @@ class Command(IntEnum):
     GET_ADC_VALUES = 0xE0
     GET_KEY_STATES = 0xE1
     GET_LOCK_STATES = 0xE2
+    ADC_CAPTURE_START = 0xE3
+    ADC_CAPTURE_STATUS = 0xE4
+    ADC_CAPTURE_READ = 0xE5
 
     ECHO = 0xFE
 
