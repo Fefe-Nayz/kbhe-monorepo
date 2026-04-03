@@ -2,6 +2,7 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Routes, Route } from "react-router-dom"
 import { useProfileStore } from "./stores/profileStore"
+import { useKeyboardStore } from "./stores/keyboard-store"
 
 import { useEffect } from "react"
 
@@ -16,11 +17,29 @@ import Profiles from "./pages/profiles"
 
 import Nav from "./components/Nav"
 
+
 export default function App() {
 
   useEffect(() => {
-    useProfileStore.getState().init()
-  }, [])
+  const profileStore = useProfileStore.getState()
+
+  // initialize the profile store (load profiles from localStorage)
+  profileStore.init()
+
+  // Subscribe to keyboard store changes and update the selected profile in real-time
+
+  const unsubscribe = useKeyboardStore.subscribe((keyboardState, previousKeyboardState) => {
+    if (keyboardState.saveEnabled && profileStore.selectedProfile && keyboardState !== previousKeyboardState) {
+      profileStore.updateSelectedProfile(keyboardState)
+    }
+  })
+
+
+  return () => unsubscribe() // cleanup si App se démonte
+}, [])
+
+  // TODO: Use the subscribe method to save the layout in localStorage whenever it changes
+
 
   return (
 
