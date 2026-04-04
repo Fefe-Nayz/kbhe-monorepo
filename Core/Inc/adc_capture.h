@@ -15,8 +15,7 @@ void adc_capture_init(void);
 bool adc_capture_start(uint8_t key_index, uint32_t duration_ms);
 void adc_capture_cancel(void);
 
-void adc_capture_process_scan(const uint32_t *adc_raw_values,
-                              const uint16_t *adc_filtered_values,
+void adc_capture_process_scan(const uint16_t *adc_filtered_values,
                               uint8_t key_count, uint32_t now_ms);
 
 bool adc_capture_is_active(void);

@@ -1,17 +1,10 @@
-/*
- * Nombre de points dans la LUT
- */
-int LUT_SIZE = 572;
 
-/*
- * Valeur de tension de départ pour la LUT
- */
-int LUT_BASE_VOLTAGE = 2100;
+#include "analog/lut.h"
 
 /*
  * LUT contenant les distances en µm correspondant à des tensions entre LUT_BASE_VOLTAGE et LUT_BASE_VOLTAGE + LUT_SIZE - 1
  */
-int LUT[572] = {
+static int16_t LUT[LUT_SIZE] = {
   -920, -790, -700,  -630, -570, -520, -470, -420, -370, -330, -290,
   -250, -210, -170, -140, -100,  -70, -30, 0,   30,  70,  100,
   130,  160,  190,  220,  250,  280,  310,  340,  370,  400,   430,
@@ -69,7 +62,7 @@ int LUT[572] = {
 /**
  * Convertit la tension (pts ADC) en distance (µm) en utilisant la LUT
  */
-int getDistanceUmFromVoltage(int voltage) {
+int16_t getDistanceFromVoltage(uint16_t voltage) {
   int i = voltage - LUT_BASE_VOLTAGE;
 
   if (i <= 0) {
@@ -87,5 +80,5 @@ int getDistanceUmFromVoltage(int voltage) {
  * Compatibilité à retirer plus tard
  */
 float getValueFromLUT(int voltage) {
-  return (float) getDistanceUmFromVoltage(voltage) / 1000.0f;
+  return (float) getDistanceFromVoltage(voltage) / 1000.0f;
 }

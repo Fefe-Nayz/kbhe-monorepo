@@ -1,4 +1,5 @@
 #include "adc_capture.h"
+#include "analog/analog.h"
 
 #include <string.h>
 
@@ -37,10 +38,9 @@ bool adc_capture_start(uint8_t key_index, uint32_t duration_ms) {
 
 void adc_capture_cancel(void) { g_capture.active = 0u; }
 
-void adc_capture_process_scan(const uint32_t *adc_raw_values,
-                              const uint16_t *adc_filtered_values,
+void adc_capture_process_scan(const uint16_t *adc_filtered_values,
                               uint8_t key_count, uint32_t now_ms) {
-  if (!g_capture.active || adc_raw_values == NULL || adc_filtered_values == NULL) {
+  if (!g_capture.active || adc_filtered_values == NULL) {
     return;
   }
 
@@ -55,7 +55,7 @@ void adc_capture_process_scan(const uint32_t *adc_raw_values,
 
   if (g_capture.sample_count < ADC_CAPTURE_MAX_SAMPLES) {
     uint32_t sample_index = g_capture.sample_count;
-    g_raw_samples[sample_index] = (uint16_t)adc_raw_values[g_capture.key_index];
+    g_raw_samples[sample_index] = analog_read_raw_value(g_capture.key_index);
     g_filtered_samples[sample_index] = adc_filtered_values[g_capture.key_index];
     g_capture.sample_count++;
   } else {

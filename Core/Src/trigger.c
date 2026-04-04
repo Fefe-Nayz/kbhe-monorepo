@@ -1,6 +1,6 @@
 #include "trigger.h"
 #include "led_matrix.h"
-#include "lut.c"
+#include "analog/lut.h"
 #include "offset.c"
 #include "settings.h"
 #include "usb_gamepad.h"

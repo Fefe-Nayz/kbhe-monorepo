@@ -5,6 +5,7 @@
 
 #include "hid_protocol.h"
 #include "adc_capture.h"
+#include "analog/analog.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "main.h"
@@ -16,7 +17,6 @@
 //--------------------------------------------------------------------+
 // External declarations for debug data
 //--------------------------------------------------------------------+
-extern uint16_t adc_values[]; // From main.c
 extern float distances[];     // From trigger.c
 extern int states[];          // From trigger.c
 
@@ -386,12 +386,13 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
   if (key_index == 0xFF) {
     // Auto-calibrate all keys
     for (int i = 0; i < 6; i++) {
-      settings_set_key_calibration(i, (int16_t)adc_values[i]);
+      settings_set_key_calibration(i, (int16_t)analog_read_raw_value(i));
     }
     resp->status = HID_RESP_OK;
   } else if (key_index < 6) {
     // Auto-calibrate single key
-    settings_set_key_calibration(key_index, (int16_t)adc_values[key_index]);
+    settings_set_key_calibration(key_index,
+                                 (int16_t)analog_read_raw_value(key_index));
     resp->status = HID_RESP_OK;
   } else {
     resp->status = HID_RESP_INVALID_PARAM;
@@ -871,7 +872,7 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   resp->status = HID_RESP_OK;
 
   for (int i = 0; i < 6; i++) {
-    resp->adc_values[i] = adc_values[i];
+    resp->adc_values[i] = analog_read_raw_value(i);
   }
 
   // Include timing information from main loop
@@ -1014,6 +1015,7 @@ static void cmd_unknown(const uint8_t *in, uint8_t *out) {
 void hid_protocol_init(void) {
   // Initialize settings module
   settings_init();
+  adc_capture_init();
 }
 
 bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {

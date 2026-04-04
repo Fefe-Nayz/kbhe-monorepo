@@ -113,6 +113,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/raw_hid.c
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_capture.c
     # Key trigger logic
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/trigger.c
     # Settings and flash storage
@@ -121,6 +122,9 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid_protocol.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_shared.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_app.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/analog.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/lut.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/multiplexer.c
     # LED Matrix (WS2812)
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/led_matrix.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Src/ws2812.c

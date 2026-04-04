@@ -21,6 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "analog/multiplexer.h"
+#include "analog/lut.h"
+#include "analog/analog.h"
+
+#include "adc_capture.h"
 #include "adc_ema.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
@@ -34,6 +39,7 @@
 #include "usb_hid.h"
 #include "usb_hid_nkro.h"
 #include "ws2812.h" // Include WS2812 header
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/cdefs.h>
@@ -66,10 +72,10 @@ DMA_HandleTypeDef hdma_tim3_ch2;
 PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
 /* USER CODE BEGIN PV */
-/**
- * ADC DMA NUMBER OF CONVERSIONS COMPLETED
- */
-uint32_t num_conv = 0;
+// /**
+//  * ADC DMA NUMBER OF CONVERSIONS COMPLETED
+//  */
+// uint32_t num_conv = 0;
 
 /**
  * LED DMA BUFFER
@@ -90,35 +96,34 @@ static uint8_t filter_noise_band = ADC_EMA_NOISE_BAND_DEFAULT;
 static uint8_t filter_alpha_min_denom = ADC_EMA_ALPHA_MIN_DENOM_DEFAULT;
 static uint8_t filter_alpha_max_denom = ADC_EMA_ALPHA_MAX_DENOM_DEFAULT;
 
-/**
- * MUX CONFIGURATION
- */
-/**
- * NUMBER OF CHANNELS PER MUX AND NUMBER OF MULTIPLEXERS
- */
-#define NUM_MUX_CHANNELS 13
-#define NUM_MUX 8
+// /**
+//  * MUX CONFIGURATION
+//  */
+// /**
+//  * NUMBER OF CHANNELS PER MUX AND NUMBER OF MULTIPLEXERS
+//  */
+// #define NUM_MUX_CHANNELS 13
+// #define NUM_MUX 8
 
-/**
- * CURRENT MUX CHANNEL
- */
-uint16_t mux_channel = 0;
+// /**
+//  * CURRENT MUX CHANNEL
+//  */
+// uint16_t mux_channel = 0;
 
 /**
  * ADC DMA BUFFER
  */
 // Déclarer un buffer de 128 valeurs de type uint16_t (2 octets chacune) soit
 // 256 octets
-#define ADC_BUFFER_LENGTH 128
-uint16_t adc_buffer[ADC_BUFFER_LENGTH]
-    __attribute__((aligned(ADC_BUFFER_LENGTH * 2)));
+// #define ADC_BUFFER_LENGTH 128
+// uint16_t adc_buffer[ADC_BUFFER_LENGTH]
+//     __attribute__((aligned(ADC_BUFFER_LENGTH * 2)));
 
-/**
- * ADC VALUES FOR ALL MUX CHANNELS
- * Format: [MUX0_CH0, MUX0_CH1, ..., MUX0_CH5, MUX1_CH0, ..., MUX1_CH5]
- */
+// /**
+//  * ADC VALUES FOR ALL MUX CHANNELS
+//  * Format: [MUX0_CH0, MUX0_CH1, ..., MUX0_CH5, MUX1_CH0, ..., MUX1_CH5]
+//  */
 uint16_t adc_values[NUM_MUX * NUM_MUX_CHANNELS];
-uint32_t adc_values_raw[NUM_MUX * NUM_MUX_CHANNELS];
 
 /**
  * EMA state per logical channel (mux input i, mux_channel).
@@ -137,40 +142,9 @@ uint16_t adc_samples[NUM_MUX * SAMPLE_COUNT];
 /**
  * Timings measurement variables
  */
-// Temps de scan total (conversions ADC seulement)
-uint32_t adc_total_scan_us = 0;
-uint32_t adc_total_scan_start_cycles = 0;
-uint32_t adc_total_scan_end_cycles = 0;
 // Temps entre deux scans complets (incluant loop principale)
 uint32_t adc_full_cycle_us = 0;
 uint32_t adc_full_cycle_start_cycles = 0;
-// Temps de conversion ADC
-uint32_t adc_callback_us = 0;
-uint32_t adc_callback_start_cycles = 0;
-uint32_t adc_callback_end_cycles = 0;
-// Temps de commutation GPIO
-uint32_t gpio_switching_us = 0;
-
-/**
- * Liste des valeurs pour la touche 1
- */
-uint16_t key_2_values_raw = 0;
-uint16_t key_2_values_filtered = 0;
-// uint16_t key_1_values_index = 0;
-// uint16_t key_1_values[512];
-// uint16_t key_1_values_filtered[512];
-// uint32_t key_2_values_index = 0;
-// uint16_t key_2_values[512];
-// uint32_t key_5_values_index = 0;
-// uint16_t key_5_values[512];
-// uint16_t key_gnd_values_index = 0;
-// uint16_t key_gnd_values[512];
-// uint16_t key_high_values_index = 0;
-// uint16_t key_high_values[512];
-/**
- * Flag to indicate a full scan is complete and main loop can process
- */
-static volatile uint8_t adc_scan_complete = 0;
 
 //--------------------------------------------------------------------+
 // Filter Management Functions
@@ -259,13 +233,13 @@ void tusb_time_delay_ms_api(uint32_t ms) { HAL_Delay(ms); }
 #define KBHE_ALWAYS_INLINE static inline
 #endif
 
-KBHE_ALWAYS_INLINE void GPIO_WriteMasked_BSRR(GPIO_TypeDef *port,
-                                              uint16_t pins_mask,
-                                              uint16_t pins_set) {
-  const uint32_t set = (uint32_t)(pins_set & pins_mask);
-  const uint32_t reset = (uint32_t)((pins_mask & (uint16_t)~pins_set) << 16);
-  port->BSRR = set | reset;
-}
+// KBHE_ALWAYS_INLINE void GPIO_WriteMasked_BSRR(GPIO_TypeDef *port,
+//                                               uint16_t pins_mask,
+//                                               uint16_t pins_set) {
+//   const uint32_t set = (uint32_t)(pins_set & pins_mask);
+//   const uint32_t reset = (uint32_t)((pins_mask & (uint16_t)~pins_set) << 16);
+//   port->BSRR = set | reset;
+// }
 
 static void DWT_CycleCounter_Init(void) {
   /* Active le compteur de cycles (Cortex-M7) */
@@ -289,54 +263,54 @@ static void TIM4_StartOneShot_TRGO(void) {
   TIM4->CR1 |= TIM_CR1_CEN;
 }
 
-/**
- * Selects the current channel on the multiplexer.
- */
-static void MUX_SelectChannel(uint8_t channel) {
-  // uint32_t start_cycles = DWT->CYCCNT;
-  /* M0..M3 = bus d'adresse (0..15). On utilise ici 0..NUM_MUX_CHANNELS-1. */
-  if (channel >= (uint8_t)NUM_MUX_CHANNELS) {
-    channel = 0U;
-  }
+// /**
+//  * Selects the current channel on the multiplexer.
+//  */
+// static void MUX_SelectChannel(uint8_t channel) {
+//   // uint32_t start_cycles = DWT->CYCCNT;
+//   /* M0..M3 = bus d'adresse (0..15). On utilise ici 0..NUM_MUX_CHANNELS-1. */
+//   if (channel >= (uint8_t)NUM_MUX_CHANNELS) {
+//     channel = 0U;
+//   }
 
-  /* Chemin critique: évite HAL_GPIO_WritePin (très coûteux) */
-  if (M0_GPIO_Port == M1_GPIO_Port) {
-    uint16_t pins_set = 0U;
-    if ((channel & 0x01U) != 0U) {
-      pins_set |= M0_Pin;
-    }
-    if ((channel & 0x02U) != 0U) {
-      pins_set |= M1_Pin;
-    }
-    GPIO_WriteMasked_BSRR(M0_GPIO_Port, (uint16_t)(M0_Pin | M1_Pin), pins_set);
-  } else {
-    GPIO_WriteMasked_BSRR(M0_GPIO_Port, M0_Pin,
-                          ((channel & 0x01U) != 0U) ? M0_Pin : 0U);
-    GPIO_WriteMasked_BSRR(M1_GPIO_Port, M1_Pin,
-                          ((channel & 0x02U) != 0U) ? M1_Pin : 0U);
-  }
+//   /* Chemin critique: évite HAL_GPIO_WritePin (très coûteux) */
+//   if (M0_GPIO_Port == M1_GPIO_Port) {
+//     uint16_t pins_set = 0U;
+//     if ((channel & 0x01U) != 0U) {
+//       pins_set |= M0_Pin;
+//     }
+//     if ((channel & 0x02U) != 0U) {
+//       pins_set |= M1_Pin;
+//     }
+//     GPIO_WriteMasked_BSRR(M0_GPIO_Port, (uint16_t)(M0_Pin | M1_Pin), pins_set);
+//   } else {
+//     GPIO_WriteMasked_BSRR(M0_GPIO_Port, M0_Pin,
+//                           ((channel & 0x01U) != 0U) ? M0_Pin : 0U);
+//     GPIO_WriteMasked_BSRR(M1_GPIO_Port, M1_Pin,
+//                           ((channel & 0x02U) != 0U) ? M1_Pin : 0U);
+//   }
 
-  if (M2_GPIO_Port == M3_GPIO_Port) {
-    uint16_t pins_set = 0U;
-    if ((channel & 0x04U) != 0U) {
-      pins_set |= M2_Pin;
-    }
-    if ((channel & 0x08U) != 0U) {
-      pins_set |= M3_Pin;
-    }
-    GPIO_WriteMasked_BSRR(M2_GPIO_Port, (uint16_t)(M2_Pin | M3_Pin), pins_set);
-  } else {
-    GPIO_WriteMasked_BSRR(M2_GPIO_Port, M2_Pin,
-                          ((channel & 0x04U) != 0U) ? M2_Pin : 0U);
-    GPIO_WriteMasked_BSRR(M3_GPIO_Port, M3_Pin,
-                          ((channel & 0x08U) != 0U) ? M3_Pin : 0U);
-  }
+//   if (M2_GPIO_Port == M3_GPIO_Port) {
+//     uint16_t pins_set = 0U;
+//     if ((channel & 0x04U) != 0U) {
+//       pins_set |= M2_Pin;
+//     }
+//     if ((channel & 0x08U) != 0U) {
+//       pins_set |= M3_Pin;
+//     }
+//     GPIO_WriteMasked_BSRR(M2_GPIO_Port, (uint16_t)(M2_Pin | M3_Pin), pins_set);
+//   } else {
+//     GPIO_WriteMasked_BSRR(M2_GPIO_Port, M2_Pin,
+//                           ((channel & 0x04U) != 0U) ? M2_Pin : 0U);
+//     GPIO_WriteMasked_BSRR(M3_GPIO_Port, M3_Pin,
+//                           ((channel & 0x08U) != 0U) ? M3_Pin : 0U);
+//   }
 
-  mux_channel = channel;
+//   mux_channel = channel;
 
-  // uint32_t end_cycles = DWT->CYCCNT;
-  // gpio_switching_us = cycles_to_us(end_cycles - start_cycles);
-}
+//   // uint32_t end_cycles = DWT->CYCCNT;
+//   // gpio_switching_us = cycles_to_us(end_cycles - start_cycles);
+// }
 
 //============================================================================+
 // WS2812 LED DMA CALLBACKS
@@ -376,6 +350,15 @@ int main(void) {
     adc_values[i] = 0;
   }
 
+  // Initialize analog module
+  AnalogConfig_t analog_config = {
+    .hadc = &hadc1
+  };
+  
+  analog_init(&analog_config);
+
+  uint16_t *adc_buffer = analog_get_adc_buffer_ptr();
+
   // Initialize EMA state for each logical ADC channel using runtime parameters
   reinit_ema_filters();
   /* USER CODE END 1 */
@@ -387,9 +370,6 @@ int main(void) {
 
   /* Enable I-Cache---------------------------------------------------------*/
   SCB_EnableICache();
-
-  /* Enable D-Cache---------------------------------------------------------*/
-  SCB_EnableDCache();
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -416,6 +396,8 @@ int main(void) {
   MX_TIM4_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  multiplexer_init();
+
   // Affectation du buffer DMA non-cacheable au handle WS2812
   led_ws2812_handle.dma_buffer = ws2812_dma_buffer;
 
@@ -438,9 +420,8 @@ int main(void) {
 
   DWT_CycleCounter_Init();
 
-  MUX_SelectChannel(0);
+  multiplexer_select_mux_channel(0U);
 
-  adc_total_scan_start_cycles = DWT->CYCCNT;
   adc_full_cycle_start_cycles = DWT->CYCCNT;
   if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) != HAL_OK) {
     Error_Handler();
@@ -453,27 +434,30 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
   while (1) {
     tud_task(); // TinyUSB device task
+    raw_hid_task();
     updater_app_task();
 
     // If a full ADC scan is complete, process keys and restart
-    if (adc_scan_complete) {
-      adc_scan_complete = 0;
-
+    if (analog_is_scan_complete()) {
       // Measure time since last scan start (full cycle time)
       uint32_t now = DWT->CYCCNT;
       adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
       adc_full_cycle_start_cycles = now;
 
       // Filtrer les entrées
-      for (int key = 0; key < NUM_MUX * NUM_MUX_CHANNELS; key++) {
+      for (int key = 0; key < NUM_KEYS; key++) {
+        uint16_t raw_value = analog_read_raw_value(key);
+
         // Apply EMA filtering if enabled
         if (filter_enabled) {
           adc_values[key] =
-              adc_ema_update(&adc_ema_states[key], adc_values_raw[key]);
+              adc_ema_update(&adc_ema_states[key], raw_value);
         } else {
-          adc_values[key] = adc_values_raw[key];
+          adc_values[key] = raw_value;
         }
       }
+
+      adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
 
       // Process all 6 keys with trigger logic
       for (int key = 0; key < 6; key++) {
@@ -484,11 +468,9 @@ int main(void) {
       usb_hid_nkro_task();
       usb_gamepad_task();
 
-      MUX_SelectChannel(0);
+      analog_set_scan_complete(false);
       TIM4_StartOneShot_TRGO();
     } else {
-      raw_hid_task();
-
       // Update LED effects (uses HAL_GetTick for timing)
       led_matrix_effect_tick(HAL_GetTick());
 
@@ -885,55 +867,55 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-  /**
-   * When an ADC burst is complete, store the values and switch to the next MUX
-   * channel
-   */
-  if (hadc->Instance == ADC1) {
-    adc_callback_start_cycles = DWT->CYCCNT;
+// void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+//   /**
+//    * When an ADC burst is complete, store the values and switch to the next MUX
+//    * channel
+//    */
+//   if (hadc->Instance == ADC1) {
+//     adc_callback_start_cycles = DWT->CYCCNT;
 
-    // Increment number of conversions completed
-    num_conv++;
+//     // Increment number of conversions completed
+//     num_conv++;
 
-    // Store ADC values for all MUX
-    for (uint8_t i = 0; i < NUM_MUX; i++) {
-      /**
-       * MUX0_CH0, MUX0_CH1, ..., MUX0_CH13, MUX1_CH0, ..., MUX7_CH13
-       */
-      uint16_t new_adc_value = adc_buffer[i];
+//     // Store ADC values for all MUX
+//     for (uint8_t i = 0; i < NUM_MUX; i++) {
+//       /**
+//        * MUX0_CH0, MUX0_CH1, ..., MUX0_CH13, MUX1_CH0, ..., MUX7_CH13
+//        */
+//       uint16_t new_adc_value = adc_buffer[i];
 
-      uint16_t logical_index = (uint16_t)(mux_channel + (i * NUM_MUX_CHANNELS));
+//       uint16_t logical_index = (uint16_t)(mux_channel + (i * NUM_MUX_CHANNELS));
 
-      // Store raw value
-      adc_values_raw[logical_index] = new_adc_value;
-    }
+//       // Store raw value
+//       adc_values_raw[logical_index] = new_adc_value;
+//     }
 
-    // Increment MUX channel
-    mux_channel++;
+//     // Increment MUX channel
+//     mux_channel++;
 
-    // If all channels have been read, reset to channel 0
-    if (mux_channel >= NUM_MUX_CHANNELS) {
-      mux_channel = 0U;
+//     // If all channels have been read, reset to channel 0
+//     if (mux_channel >= NUM_MUX_CHANNELS) {
+//       mux_channel = 0U;
 
-      // Signal that a full scan is complete - let main loop restart
-      adc_scan_complete = 1;
-      return; // Don't restart timer here, let main loop do it
-    }
+//       // Signal that a full scan is complete - let main loop restart
+//       adc_scan_complete = 1;
+//       return; // Don't restart timer here, let main loop do it
+//     }
 
-    // Select next MUX channel
-    MUX_SelectChannel(mux_channel);
+//     // Select next MUX channel
+//     MUX_SelectChannel(mux_channel);
 
-    // Start 0.5us timer to wait for MUX settling time then trigger ADC
-    // Only restart immediately - the main loop will have time between full
-    // scans because the DMA priority is lower than USB
-    TIM4_StartOneShot_TRGO();
+//     // Start 0.5us timer to wait for MUX settling time then trigger ADC
+//     // Only restart immediately - the main loop will have time between full
+//     // scans because the DMA priority is lower than USB
+//     TIM4_StartOneShot_TRGO();
 
-    adc_callback_end_cycles = DWT->CYCCNT;
-    adc_callback_us =
-        cycles_to_us(adc_callback_end_cycles - adc_callback_start_cycles);
-  }
-}
+//     adc_callback_end_cycles = DWT->CYCCNT;
+//     adc_callback_us =
+//         cycles_to_us(adc_callback_end_cycles - adc_callback_start_cycles);
+//   }
+// }
 
 /* USER CODE END 4 */
 
@@ -949,7 +931,7 @@ void MPU_Config(void) {
    */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
   MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-  MPU_InitStruct.BaseAddress = (uint32_t)&adc_buffer;
+  MPU_InitStruct.BaseAddress = (uint32_t)(uintptr_t)analog_get_adc_buffer_ptr();
   MPU_InitStruct.Size = MPU_REGION_SIZE_256B;
   MPU_InitStruct.SubRegionDisable = 0x00;
   MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
