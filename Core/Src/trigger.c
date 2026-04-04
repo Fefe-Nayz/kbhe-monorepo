@@ -1,12 +1,13 @@
 #include "trigger.h"
 #include "led_matrix.h"
 #include "analog/lut.h"
-#include "offset.c"
+#include "analog/calibration.h"
 #include "settings.h"
 #include "usb_gamepad.h"
 #include "usb_hid.h"
 #include "usb_hid_nkro.h"
 #include <stdint.h>
+#include "board_config.h"
 
 /**
  * DISABLE KEYBOARD TYPING (compile-time default, overridden by settings)
@@ -139,7 +140,7 @@ static int getSOCDPairedKey(int keyIndex) {
 }
 
 void triggerInit() {
-  offsetInit();
+  calibration_init();
   usb_gamepad_init();
 
   // Apply compile-time flags
@@ -336,7 +337,7 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   const int lastState = states[keyIndex];
   const int32_t lastDistanceUm = distances_um[keyIndex];
 
-  const int correctedCurrentVoltage = getCorrectedValue(keyIndex, currentVoltage);
+  const int correctedCurrentVoltage = calibration_get_calibrated_value(keyIndex, currentVoltage);
   const float currentDistanceMm = getValueFromLUT(correctedCurrentVoltage);
   const int32_t currentDistanceUm = (int32_t)(currentDistanceMm * 1000.0f);
 

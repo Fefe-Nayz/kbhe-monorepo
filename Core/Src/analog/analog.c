@@ -67,6 +67,22 @@ uint16_t analog_read_raw_value(uint8_t key) {
 }
 
 /*
+ * Read the filtered value for a key
+ */
+uint16_t analog_read_filtered_value(uint8_t key) {
+    // Check if key is within valid range (0 to NUM_KEYS - 1)
+    if (key >= NUM_KEYS) {
+        return 0;
+    }
+
+    // Get the physical key index from the logical key
+    uint8_t physical_key_index = logical_key_index_to_physical_index[key];
+
+    // Return the filtered value for the corresponding physical key index
+    return filtered_values[physical_key_index];
+}
+
+/*
  * ADC conversion complete callback
  * This function is called when the ADC conversion is completed
  */

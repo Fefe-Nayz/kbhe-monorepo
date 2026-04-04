@@ -12,6 +12,7 @@
 #include "settings.h"
 #include "updater_app.h"
 #include "trigger.h"
+#include "analog/calibration.h"
 #include <string.h>
 
 //--------------------------------------------------------------------+
@@ -19,6 +20,14 @@
 //--------------------------------------------------------------------+
 extern float distances[];     // From trigger.c
 extern int states[];          // From trigger.c
+
+static inline bool is_valid_adc_calibration_value(int16_t value) {
+  return value >= 0 && value <= 4095;
+}
+
+static inline void refresh_runtime_calibration(void) {
+  calibration_load_settings();
+}
 
 //--------------------------------------------------------------------+
 // Internal Functions - System Commands
@@ -33,8 +42,17 @@ static void cmd_get_firmware_version(const uint8_t *in, uint8_t *out) {
 
 static void cmd_factory_reset(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
+
   resp->command_id = CMD_FACTORY_RESET;
-  resp->status_or_len = settings_reset() ? HID_RESP_OK : HID_RESP_ERROR;
+
+  bool success = settings_reset();
+  if (success) {
+    // Keep trigger-side offsets in sync with settings defaults after reset.
+    refresh_runtime_calibration();
+  }
+
+  resp->status_or_len = success ? HID_RESP_OK : HID_RESP_ERROR;
 }
 
 static void cmd_reboot(const uint8_t *in, uint8_t *out) {
@@ -332,11 +350,9 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
 // Internal Functions - Calibration Commands
 //--------------------------------------------------------------------+
 
-// External declaration for offset recalculation
-extern void offsetRecalculate(void);
-
 static void cmd_get_calibration(const uint8_t *in, uint8_t *out) {
   hid_packet_calibration_t *resp = (hid_packet_calibration_t *)out;
+  (void)in;
 
   resp->command_id = CMD_GET_CALIBRATION;
   resp->status = HID_RESP_OK;
@@ -360,11 +376,23 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
     cal.key_zero_values[i] = req->key_zero_values[i];
   }
 
+  if (!is_valid_adc_calibration_value(cal.lut_zero_value)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  for (int i = 0; i < 6; i++) {
+    if (!is_valid_adc_calibration_value(cal.key_zero_values[i])) {
+      resp->status = HID_RESP_INVALID_PARAM;
+      return;
+    }
+  }
+
   bool success = settings_set_calibration(&cal);
 
   // Recalculate offsets with new calibration
   if (success) {
-    offsetRecalculate();
+    refresh_runtime_calibration();
   }
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
@@ -383,24 +411,31 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
 
   uint8_t key_index = req->key_index;
 
+  bool success = true;
+
   if (key_index == 0xFF) {
     // Auto-calibrate all keys
     for (int i = 0; i < 6; i++) {
-      settings_set_key_calibration(i, (int16_t)analog_read_raw_value(i));
+      if (!settings_set_key_calibration(i, (int16_t)analog_read_raw_value(i))) {
+        success = false;
+      }
     }
-    resp->status = HID_RESP_OK;
   } else if (key_index < 6) {
     // Auto-calibrate single key
-    settings_set_key_calibration(key_index,
-                                 (int16_t)analog_read_raw_value(key_index));
-    resp->status = HID_RESP_OK;
+    success = settings_set_key_calibration(
+        key_index, (int16_t)analog_read_raw_value(key_index));
   } else {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
 
+  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  if (!success) {
+    return;
+  }
+
   // Recalculate offsets
-  offsetRecalculate();
+  refresh_runtime_calibration();
 
   // Return updated calibration
   const settings_calibration_t *cal = settings_get_calibration();
