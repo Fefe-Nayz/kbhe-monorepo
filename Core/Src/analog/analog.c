@@ -31,7 +31,7 @@ static bool is_scan_complete = false;
 //     16, 5
 // };
 
-static const uint8_t logical_key_index_to_physical_index[NUM_KEYS] = {
+static const uint8_t LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[NUM_KEYS] = {
     0, 8, 16, 24, 32, 40
 };
 
@@ -60,7 +60,7 @@ uint16_t analog_read_raw_value(uint8_t key) {
     }
 
     // Get the physical key index from the logical key
-    uint8_t physical_key_index = logical_key_index_to_physical_index[key];
+    uint8_t physical_key_index = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[key];
 
     // Return the raw value for the corresponding physical key index
     return raw_values[physical_key_index];
@@ -76,7 +76,7 @@ uint16_t analog_read_filtered_value(uint8_t key) {
     }
 
     // Get the physical key index from the logical key
-    uint8_t physical_key_index = logical_key_index_to_physical_index[key];
+    uint8_t physical_key_index = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[key];
 
     // Return the filtered value for the corresponding physical key index
     return filtered_values[physical_key_index];

@@ -4,7 +4,7 @@
 /*
  * LUT contenant les distances en µm correspondant à des tensions entre LUT_BASE_VOLTAGE et LUT_BASE_VOLTAGE + LUT_SIZE - 1
  */
-static int16_t LUT[LUT_SIZE] = {
+static const int16_t LUT[LUT_SIZE] = {
   -920, -790, -700,  -630, -570, -520, -470, -420, -370, -330, -290,
   -250, -210, -170, -140, -100,  -70, -30, 0,   30,  70,  100,
   130,  160,  190,  220,  250,  280,  310,  340,  370,  400,   430,
