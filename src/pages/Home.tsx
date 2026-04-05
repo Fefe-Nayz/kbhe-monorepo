@@ -1,19 +1,18 @@
 import BaseKeyboard from "@/components/baseKeyboard"
 import KeyMapper from "@/components/keyMapper"
-import { useKeyboardStore } from "@/stores/keyboard-store"
-import { useEffect } from "react"
+
 
 export default function Home() {
+  //use keboard store with the state been saved in local storage been enabled
 
-  const setSaveEnabled = useKeyboardStore(state => state.setSaveEnabled)
 
-  useEffect(() => {
+  /*useEffect(() => {
     setSaveEnabled(true)
 
     return () => {
       setSaveEnabled(false)
     }
-  }, [setSaveEnabled])
+  }, [])*/
 
   return (
     <div className="bg-green-700 justify-center items-center p-4 h-[88vh]">

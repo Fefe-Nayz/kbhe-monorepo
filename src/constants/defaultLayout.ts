@@ -1,6 +1,8 @@
+import type { ReactNode } from "react"
+
 export type KeyMode = 'single' | 'multi';
 export type displayedInfo = "regular" | "actuationMode" | "analogValues"
-export type labelItems = React.ReactNode;
+export type labelItems = ReactNode;
 
 export interface KeyConfig {
   id: string;

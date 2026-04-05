@@ -21,23 +21,22 @@ import Nav from "./components/Nav"
 export default function App() {
 
   useEffect(() => {
-  const profileStore = useProfileStore.getState()
-
   // initialize the profile store (load profiles from localStorage)
-  profileStore.init()
+  useProfileStore.getState().init()
 
   // Subscribe to keyboard store changes and update the selected profile in real-time
-
   const unsubscribe = useKeyboardStore.subscribe((keyboardState, previousKeyboardState) => {
-    if (keyboardState.saveEnabled && profileStore.selectedProfile && keyboardState !== previousKeyboardState) {
-      profileStore.updateSelectedProfile(keyboardState)
-    }
+    if (!keyboardState.saveEnabled) return
+    if (keyboardState === previousKeyboardState) return
+
+    const selected = useProfileStore.getState().selectedProfile
+    if (!selected) return
+
+    useProfileStore.getState().updateSelectedProfile(keyboardState)
   })
 
-
-  return () => unsubscribe() // cleanup si App se démonte
+  return () => unsubscribe() // cleanup when component unmounts
 }, [])
-
   // TODO: Use the subscribe method to save the layout in localStorage whenever it changes
 
 

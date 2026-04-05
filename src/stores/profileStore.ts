@@ -108,7 +108,12 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       state = { ...state, layout: defaultLayout }
     }
 
-    localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(state))
+    const dataToSave = {
+      layout: state.layout,
+      mode: state.mode,
+      displayedInfo: state.displayedInfo,
+    }
+    localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(dataToSave))
     get().refresh()
 
     //When saving a new profile, automatically select it
@@ -155,7 +160,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   set({ selectedProfile: profile })
 
   // apply to keyboard store
-  useKeyboardStore.setState(profile.data, true)
+  useKeyboardStore.setState({layout: profile.data.layout,})
 
   localStorage.setItem(ACTIVE_PROFILE, name)
 },
