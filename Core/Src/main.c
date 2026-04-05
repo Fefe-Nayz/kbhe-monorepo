@@ -24,6 +24,7 @@
 #include "analog/multiplexer.h"
 #include "analog/lut.h"
 #include "analog/analog.h"
+#include "analog/filter.h"
 
 #include "adc_capture.h"
 #include "adc_ema.h"
@@ -185,6 +186,13 @@ void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
 
   // Reinitialize filters with new parameters
   reinit_ema_filters();
+}
+
+uint16_t get_filtered_adc_value(uint8_t key) {
+  if (key >= NUM_KEYS) {
+    return 0u;
+  }
+  return adc_values[key];
 }
 
 /* USER CODE END PV */
@@ -447,11 +455,12 @@ int main(void) {
       // Filtrer les entrées
       for (int key = 0; key < NUM_KEYS; key++) {
         uint16_t raw_value = analog_read_raw_value(key);
+        uint16_t previous_filtered_value = adc_values[key];
 
         // Apply EMA filtering if enabled
         if (filter_enabled) {
-          adc_values[key] =
-              adc_ema_update(&adc_ema_states[key], raw_value);
+          // adc_values[key] = adc_ema_update(&adc_ema_states[key], raw_value);
+          adc_values[key] = filter_compute_next_filtered_value(raw_value, previous_filtered_value);
         } else {
           adc_values[key] = raw_value;
         }

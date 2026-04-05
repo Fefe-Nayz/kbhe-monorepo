@@ -274,6 +274,7 @@ class GraphPage(QWidget):
         dl = dtype.layout()
         self.graph_dtype_combo = QComboBox()
         self.graph_dtype_combo.addItem("ADC Raw (2000-2700)", "adc")
+        self.graph_dtype_combo.addItem("ADC Filtered (2000-2700)", "adc_filtered")
         self.graph_dtype_combo.addItem("Distance (0-4mm)", "distance")
         self.graph_dtype_combo.addItem("Normalized (0-100%)", "normalized")
         self.graph_dtype_combo.currentIndexChanged.connect(self.on_graph_dtype_change)
@@ -444,10 +445,13 @@ class GraphPage(QWidget):
 
     def _set_dtype_defaults(self, clear: bool = True):
         dtype = self.data_type()
-        if dtype == "adc":
+        if dtype in ("adc", "adc_filtered"):
             self.graph_ymin_spin.setValue(2000)
             self.graph_ymax_spin.setValue(2700)
-            self.dtype_hint_label.setText("ADC values are plotted in raw counts with the 2000-2700 window.")
+            if dtype == "adc_filtered":
+                self.dtype_hint_label.setText("ADC values are plotted in filtered counts with the 2000-2700 window.")
+            else:
+                self.dtype_hint_label.setText("ADC values are plotted in raw counts with the 2000-2700 window.")
         elif dtype == "distance":
             self.graph_ymin_spin.setValue(0)
             self.graph_ymax_spin.setValue(400)
@@ -489,9 +493,11 @@ class GraphPage(QWidget):
     def _collect_samples(self, dtype: str):
         if self.device is None:
             return []
-        if dtype == "adc":
+        if dtype in ("adc", "adc_filtered"):
             data = self.device.get_adc_values() or {}
-            return _sample_list(data.get("adc") or [])
+            if dtype == "adc_filtered":
+                return _sample_list(data.get("adc_filtered") or data.get("adc") or [])
+            return _sample_list(data.get("adc_raw") or data.get("adc") or [])
         key_states = self.device.get_key_states() or {}
         if dtype == "distance":
             return _sample_list(key_states.get("distances_01mm") or [])
@@ -527,7 +533,12 @@ class GraphPage(QWidget):
 
     def draw_graph_stats(self):
         dtype = self.data_type()
-        suffix = {"adc": "", "distance": " 0.01mm", "normalized": "%"}[dtype]
+        suffix = {
+            "adc": "",
+            "adc_filtered": "",
+            "distance": " 0.01mm",
+            "normalized": "%",
+        }[dtype]
         for i, lbl in enumerate(self.graph_stats_labels):
             data = self.graph_data[i]
             if data and self.graph_channel_checks[i].isChecked():
@@ -587,6 +598,8 @@ class GraphPage(QWidget):
         dtype = self.data_type()
         if dtype == "adc":
             self.dtype_hint_label.setText("ADC values are plotted in raw counts with the 2000-2700 window.")
+        elif dtype == "adc_filtered":
+            self.dtype_hint_label.setText("ADC values are plotted in filtered counts with the 2000-2700 window.")
         elif dtype == "distance":
             self.dtype_hint_label.setText("Distance uses the 0.01 mm values returned by the firmware.")
         else:

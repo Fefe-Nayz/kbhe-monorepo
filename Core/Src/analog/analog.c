@@ -9,6 +9,8 @@ static uint16_t adc_buffer[ADC_BUFFER_LENGTH] __attribute__((aligned(ADC_BUFFER_
 
 static uint16_t raw_values[NUM_ANALOG_INPUTS];
 
+static uint16_t filtered_values[NUM_KEYS];
+
 static uint8_t current_mux_channel = 0;
 
 static bool is_scan_complete = false;
@@ -17,7 +19,7 @@ static bool is_scan_complete = false;
  * Mapping from logical key index (0-81) to physical key index (0-87)
  * For example logical key index 0 corresponds to physical key index 43
  */
-// static const uint8_t logical_key_index_to_physical_index[NUM_KEYS] = {
+// static const uint8_t LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[NUM_KEYS] = {
 //     43, 10, 21, 32, 33, 0, 11, 22,
 //     34, 1, 12, 23, 35, 24, 66, 88,
 //     77, 55, 56, 78, 67, 45, 57, 79,
@@ -48,6 +50,11 @@ void analog_init(AnalogConfig_t* config) {
     for (uint8_t i = 0; i < NUM_ANALOG_INPUTS; i++) {
         raw_values[i] = 0;
     }
+
+    // Initialize filtered values to 0
+    for (uint8_t i = 0; i < NUM_KEYS; i++) {
+        filtered_values[i] = 0;
+    }
 }
 
 /*
@@ -75,11 +82,8 @@ uint16_t analog_read_filtered_value(uint8_t key) {
         return 0;
     }
 
-    // Get the physical key index from the logical key
-    uint8_t physical_key_index = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[key];
-
-    // Return the filtered value for the corresponding physical key index
-    return filtered_values[physical_key_index];
+    // Return the filtered value
+    return filtered_values[key];
 }
 
 /*

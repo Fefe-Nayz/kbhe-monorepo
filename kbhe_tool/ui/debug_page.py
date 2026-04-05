@@ -450,15 +450,23 @@ class DebugPage(QWidget):
         self._update_gui_rate()
 
     def _update_adc_display(self, adc_data: dict):
-        adc_values = list(adc_data.get("adc") or [])
+        adc_raw = list(adc_data.get("adc_raw") or adc_data.get("adc") or [])
+        adc_filtered = list(adc_data.get("adc_filtered") or adc_raw)
         for i in range(6):
-            value = adc_values[i] if i < len(adc_values) else None
-            if value is None:
+            raw_value = adc_raw[i] if i < len(adc_raw) else None
+            filtered_value = adc_filtered[i] if i < len(adc_filtered) else None
+            if raw_value is None:
                 self.adc_bars[i].setValue(0)
                 self.adc_labels[i].setText("----")
             else:
-                self.adc_bars[i].setValue(_clamp(int(value) - 2000, 0, 700))
-                self.adc_labels[i].setText(f"{int(value):4d}")
+                bar_value = int(filtered_value if filtered_value is not None else raw_value)
+                self.adc_bars[i].setValue(_clamp(bar_value - 2000, 0, 700))
+                if filtered_value is None:
+                    self.adc_labels[i].setText(f"R:{int(raw_value):4d}")
+                else:
+                    self.adc_labels[i].setText(
+                        f"R:{int(raw_value):4d} F:{int(filtered_value):4d}"
+                    )
         scan_rate = adc_data.get("scan_rate_hz")
         scan_time = adc_data.get("scan_time_us")
         if scan_rate is not None and scan_time is not None:

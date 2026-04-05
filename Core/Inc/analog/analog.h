@@ -19,4 +19,6 @@ void analog_set_scan_complete(bool complete);
 
 uint16_t analog_read_raw_value(uint8_t key);
 
+uint16_t analog_read_filtered_value(uint8_t key);
+
 uint16_t* analog_get_adc_buffer_ptr(void);

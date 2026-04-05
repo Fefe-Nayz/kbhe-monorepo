@@ -313,12 +313,23 @@ class DebugPage(QWidget):
 
         self._last_error = None
 
-        adc_values = list(adc_data.get("adc") or [])
+        adc_raw = list(adc_data.get("adc_raw") or adc_data.get("adc") or [])
+        adc_filtered = list(adc_data.get("adc_filtered") or adc_raw)
         distances_mm = list(key_states.get("distances_mm") or [])
         for i, (bar, value_label, distance_label) in enumerate(self.adc_rows):
-            value = int(adc_values[i]) if i < len(adc_values) else 0
-            bar.setValue(_clamp(value - 2000, 0, 700))
-            value_label.setText(f"{value:4d}" if value else "----")
+            raw_value = int(adc_raw[i]) if i < len(adc_raw) else None
+            filtered_value = int(adc_filtered[i]) if i < len(adc_filtered) else None
+
+            if raw_value is None:
+                bar.setValue(0)
+                value_label.setText("----")
+            else:
+                shown = filtered_value if filtered_value is not None else raw_value
+                bar.setValue(_clamp(shown - 2000, 0, 700))
+                if filtered_value is None:
+                    value_label.setText(f"R:{raw_value:4d}")
+                else:
+                    value_label.setText(f"R:{raw_value:4d} F:{filtered_value:4d}")
             distance_label.setText(
                 f"{distances_mm[i]:.2f} mm" if i < len(distances_mm) else "-.-- mm"
             )

@@ -239,10 +239,11 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint16_t adc_values[6]; // Raw ADC values (12-bit)
+  uint16_t adc_raw[6];      // Raw ADC values (12-bit)
+  uint16_t adc_filtered[6]; // Filtered ADC values
   uint16_t scan_time_us;  // Main loop scan time in microseconds
   uint16_t scan_rate_hz;  // Calculated scan rate in Hz
-  uint8_t reserved[46];
+  uint8_t reserved[34];
 } hid_resp_adc_values_t;
 
 /**

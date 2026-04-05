@@ -89,6 +89,7 @@ void get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
                        uint8_t *alpha_max_denom);
 void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
                        uint8_t alpha_max_denom);
+uint16_t get_filtered_adc_value(uint8_t key);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

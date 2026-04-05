@@ -587,20 +587,69 @@ class KBHEDevice:
     # --- Debug Commands ---
     
     def get_adc_values(self):
-        """Get ADC values for all keys (debug) with timing info."""
+        """Get ADC values for all keys (debug) with timing info.
+
+        Supports both payload formats:
+        - New: raw[6] + filtered[6] + timing
+        - Legacy: adc[6] + timing
+        """
         resp = self.send_command(Command.GET_ADC_VALUES)
         if resp and len(resp) >= 18 and resp[1] == Status.OK:
-            values = []
+            # Legacy format candidate: adc (bytes 2..13), timing (14..17)
+            legacy_values = []
             for i in range(6):
-                val = resp[2 + i*2] | (resp[3 + i*2] << 8)
-                values.append(val)
-            # Extract timing info (after 6 x uint16 ADC values = 14 bytes)
-            scan_time_us = resp[14] | (resp[15] << 8)
-            scan_rate_hz = resp[16] | (resp[17] << 8)
+                legacy_values.append(resp[2 + i * 2] | (resp[3 + i * 2] << 8))
+
+            legacy_scan_time_us = resp[14] | (resp[15] << 8)
+            legacy_scan_rate_hz = resp[16] | (resp[17] << 8)
+
+            # New format candidate: raw (2..13), filtered (14..25), timing (26..29)
+            if len(resp) >= 30:
+                raw_values = []
+                filtered_values = []
+
+                for i in range(6):
+                    raw_idx = 2 + i * 2
+                    filt_idx = 14 + i * 2
+                    raw_values.append(resp[raw_idx] | (resp[raw_idx + 1] << 8))
+                    filtered_values.append(resp[filt_idx] | (resp[filt_idx + 1] << 8))
+
+                scan_time_us = resp[26] | (resp[27] << 8)
+                scan_rate_hz = resp[28] | (resp[29] << 8)
+
+                # If timing fields are zero here but valid in legacy position,
+                # we are most likely talking to legacy firmware.
+                if (
+                    scan_time_us == 0
+                    and scan_rate_hz == 0
+                    and (legacy_scan_time_us != 0 or legacy_scan_rate_hz != 0)
+                ):
+                    return {
+                        'adc': legacy_values,
+                        'adc_raw': legacy_values,
+                        'adc_filtered': legacy_values,
+                        'scan_time_us': legacy_scan_time_us,
+                        'scan_rate_hz': legacy_scan_rate_hz,
+                        'adc_payload_format': 'legacy'
+                    }
+
+                return {
+                    # Keep legacy key for existing UI code paths.
+                    'adc': raw_values,
+                    'adc_raw': raw_values,
+                    'adc_filtered': filtered_values,
+                    'scan_time_us': scan_time_us,
+                    'scan_rate_hz': scan_rate_hz,
+                    'adc_payload_format': 'extended'
+                }
+
             return {
-                'adc': values,
-                'scan_time_us': scan_time_us,
-                'scan_rate_hz': scan_rate_hz
+                'adc': legacy_values,
+                'adc_raw': legacy_values,
+                'adc_filtered': legacy_values,
+                'scan_time_us': legacy_scan_time_us,
+                'scan_rate_hz': legacy_scan_rate_hz,
+                'adc_payload_format': 'legacy'
             }
         return None
     

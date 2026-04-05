@@ -23,7 +23,15 @@ def print_status(device):
 
     adc = device.get_adc_values()
     if adc:
-        print(f"ADC Values: {adc}")
+        raw = adc.get('adc_raw', adc.get('adc', []))
+        filtered = adc.get('adc_filtered', raw)
+        payload_format = adc.get('adc_payload_format')
+        print(f"ADC Raw:        {raw}")
+        print(f"ADC Filtered:   {filtered}")
+        if payload_format:
+            print(f"ADC Payload:    {payload_format}")
+        print(f"Scan Time (us): {adc.get('scan_time_us', 'N/A')}")
+        print(f"Scan Rate (Hz): {adc.get('scan_rate_hz', 'N/A')}")
 
 def interactive_menu(device):
     while True:

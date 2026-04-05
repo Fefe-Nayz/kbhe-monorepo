@@ -35,6 +35,7 @@ def _clamp(value: int, low: int, high: int) -> int:
 class GraphPage(QWidget):
     DATA_TYPES = [
         ("adc", "ADC Raw"),
+        ("adc_filtered", "ADC Filtered"),
         ("distance", "Distance (0.01 mm)"),
         ("normalized", "Normalized (%)"),
     ]
@@ -243,7 +244,7 @@ class GraphPage(QWidget):
 
     def _set_default_y_range(self) -> None:
         dtype = self.dtype_combo.currentData()
-        if dtype == "adc":
+        if dtype in ("adc", "adc_filtered"):
             self.ymin_spin.setValue(2000)
             self.ymax_spin.setValue(2700)
         elif dtype == "distance":
@@ -282,9 +283,13 @@ class GraphPage(QWidget):
 
     def _collect_samples(self) -> list[int]:
         dtype = self.dtype_combo.currentData()
-        if dtype == "adc":
+        if dtype in ("adc", "adc_filtered"):
             payload = self.device.get_adc_values() or {}
-            return [int(v) for v in list(payload.get("adc") or [])[:6]]
+            if dtype == "adc_filtered":
+                values = payload.get("adc_filtered") or payload.get("adc") or []
+            else:
+                values = payload.get("adc_raw") or payload.get("adc") or []
+            return [int(v) for v in list(values)[:6]]
         key_states = self.device.get_key_states() or {}
         if dtype == "distance":
             return [int(v) for v in list(key_states.get("distances_01mm") or [])[:6]]

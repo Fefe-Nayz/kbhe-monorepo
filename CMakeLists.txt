@@ -113,6 +113,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/raw_hid.c
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/filter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_capture.c
     # Key trigger logic
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/trigger.c
@@ -152,6 +153,13 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+)
+
+# Keep build compatibility with current filter module symbol name.
+set_source_files_properties(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/filter.c
+    PROPERTIES
+    COMPILE_DEFINITIONS "compute_next_filtered_value=filter_compute_next_filtered_value"
 )
 
 kbhe_configure_binary_target(
