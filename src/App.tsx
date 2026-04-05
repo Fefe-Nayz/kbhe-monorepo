@@ -46,8 +46,6 @@ export default function App() {
 
   return () => unsubscribe() // cleanup when component unmounts
 }, [])
-  // TODO: Use the subscribe method to save the layout in localStorage whenever it changes
-
 
 if (!ready) {
   return null
