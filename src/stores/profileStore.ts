@@ -35,7 +35,6 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   getNumberOfProfiles: () => get().profiles.length,
 
   init: () => {
-
   const key = STORAGE_PREFIX + DEFAULT_PROFILE_NAME
 
   // Is there a default profile in localStorage
@@ -164,7 +163,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
   localStorage.setItem(ACTIVE_PROFILE, name)
 },
-  updateSelectedProfile: (data) => {
+  /*updateSelectedProfile: (data) => {
 
     const { selectedProfile } = get()
 
@@ -172,6 +171,22 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
     localStorage.setItem(STORAGE_PREFIX + selectedProfile.name, JSON.stringify(data))
     get().refresh()
+  }*/
+ updateSelectedProfile: (data) => {
+  const { selectedProfile } = get()
+  if (!selectedProfile) return
+
+  const dataToSave = {
+    layout: data.layout,
+    mode: data.mode,
+    displayedInfo: data.displayedInfo,
   }
+
+  localStorage.setItem(
+    STORAGE_PREFIX + selectedProfile.name,
+    JSON.stringify(dataToSave)
+  )
+  get().refresh()
+}
 
 }))

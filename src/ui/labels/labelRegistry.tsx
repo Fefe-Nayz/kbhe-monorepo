@@ -1,8 +1,7 @@
-import { IconBrandWindows } from "@tabler/icons-react";
+import { IconBrandWindows } from "@tabler/icons-react"
+import type { ReactNode } from "react"
 
-export const labelRegistry: Record<string, React.ReactNode> = {
+export const labelRegistry: Record<string, ReactNode> = {
   win: <IconBrandWindows />,
-  ctrl: "Ctrl",
-  shift: "Shift",
-  alt: "Alt",
-};
+  //Ctrl: "Hello",
+}

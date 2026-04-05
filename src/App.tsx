@@ -4,7 +4,7 @@ import { Routes, Route } from "react-router-dom"
 import { useProfileStore } from "./stores/profileStore"
 import { useKeyboardStore } from "./stores/keyboard-store"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 import Home from "./pages/Home"
 import Remap from "./pages/remap"
@@ -19,15 +19,23 @@ import Nav from "./components/Nav"
 
 
 export default function App() {
-
+  const [ready, setReady] = useState(false)
   useEffect(() => {
   // initialize the profile store (load profiles from localStorage)
   useProfileStore.getState().init()
 
+
+    //  Wait until the profile store is initialized before rendering the app
+    const unsub = useProfileStore.subscribe((state) => {
+      if (state.selectedProfile) {
+        setReady(true)
+        unsub()
+      }
+    })
+
   // Subscribe to keyboard store changes and update the selected profile in real-time
-  const unsubscribe = useKeyboardStore.subscribe((keyboardState, previousKeyboardState) => {
+  const unsubscribe = useKeyboardStore.subscribe((keyboardState) => {
     if (!keyboardState.saveEnabled) return
-    if (keyboardState === previousKeyboardState) return
 
     const selected = useProfileStore.getState().selectedProfile
     if (!selected) return

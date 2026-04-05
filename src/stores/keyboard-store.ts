@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import { defaultLayout, type KeyboardLayout, type KeyMode, type displayedInfo, type labelItems} from '@/constants/defaultLayout'
 
 //import { useProfileStore } from './profileStore'
@@ -30,14 +29,13 @@ export interface KeyboardState {
   setDisplayedInfo: (displayedInfo: displayedInfo) => void
   toggleKeySelection: (keyId: string) => void
   clearSelection: () => void
-  updateKeyConfig: (keyIds: string[], update: string) => void
+  updateKeyConfig: (keyIds: string[], update: Partial<KeyConfig>) => void
   updateLayout: (layout: KeyboardLayout) => void
   resetLayout: (save?: boolean) => void
   setSaveEnabled: (enabled: boolean) => void 
 }
 
 export const useKeyboardStore = create<KeyboardState>()(
-  persist(
     (set, get) => ({
 
       mode: "single",
@@ -89,6 +87,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         }
 
         set({ layout: newLayout })
+        
       },
 
       updateLayout: (layout) => set({ layout }),
@@ -101,16 +100,6 @@ export const useKeyboardStore = create<KeyboardState>()(
       }
 
     }),
-    {
-      name: "keyboard-storage",
-
-      storage: createJSONStorage(() => localStorage),
-
-      partialize: (state) => ({
-        layout: state.layout,
-        mode: state.mode
-      })
-    }
-  )
+    
 )
 
