@@ -48,7 +48,7 @@ export default function App() {
   // TODO: Use the subscribe method to save the layout in localStorage whenever it changes
 
 
-  return (
+if (!ready) return (
 
 
     <div className="h-screen flex flex-col">
