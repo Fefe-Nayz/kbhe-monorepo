@@ -1,13 +1,8 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import type { ReactNode } from "react"
 
-
-//import { invoke } from '@tauri-apps/api/core';
-
-// Types
 export type KeyMode = 'single' | 'multi';
 export type displayedInfo = "regular" | "actuationMode" | "analogValues"
-export type labelItems = React.ReactNode;
+export type labelItems = ReactNode;
 
 export interface KeyConfig {
   id: string;
@@ -23,25 +18,7 @@ export interface KeyboardLayout {
   keys: KeyConfig[][];
 }
 
-export interface KeyboardState {
-  
-  mode: KeyMode;
-  displayedInfo: displayedInfo;
-  selectedKeys: string[]; // Selected keys IDs
-  layout: KeyboardLayout;
-  
-  // Actions
-  setMode: (mode: KeyMode) => void;
-  setDisplayedInfo: (displayedInfo: displayedInfo) => void;
-  toggleKeySelection: (keyId: string) => void;
-  clearSelection: (selectedKeys: string[]) => void;
-  updateKeyConfig: (keyId: string[], updates: string) => void;
-  updateLayout: (layout: KeyboardLayout) => void;
-  resetLayout: (defaultLayout: KeyboardLayout) => void;
-}
-
-
-const defaultLayout: KeyboardLayout = {
+export const defaultLayout: KeyboardLayout = {
   keys: [
     [
       { id: "esc", label: ["Esc"], value: "Escape", width: 1, gap: 0 },
@@ -146,61 +123,3 @@ const defaultLayout: KeyboardLayout = {
 };
 
 
-
-export const useKeyboardStore = create<KeyboardState>()(
-  persist(
-    (set, get) => ({
-      mode: 'single',
-      displayedInfo: 'regular',
-      selectedKeys: [],
-      layout: defaultLayout,
-
-      setMode: (mode) => set({ mode }),
-      setDisplayedInfo: (displayedInfo) => set({ displayedInfo }),
-
-      toggleKeySelection: (keyId) => {
-        const { mode, selectedKeys } = get();
-        console.log(mode, selectedKeys);
-        /*
-        const { mode, selectedKeys } = get();
-        if (mode === 'single') {
-          set({ selectedKeys: selectedKeys.includes(keyId) ? [] : [keyId] });
-        } else {
-          set({
-            selectedKeys: selectedKeys.includes(keyId)
-              ? selectedKeys.filter((id) => id !== keyId)
-              : [...selectedKeys, keyId],
-          });
-        }*/
-       console.log(keyId)
-      },
-
-      clearSelection: () => set({ selectedKeys: [] }),
-
-
-      updateKeyConfig: (keyId, update) => {
-        /*
-        const { layout } = get();
-        const newKeys = layout.keys.map((item) =>
-          item.map((key) => (key.id === keyId ? key.label = update : key))
-        );
-        set({ layout: { ...newKeys} });*/
-
-        console.log(keyId, update)
-        //invoke("update_key")
-      },
-
-      updateLayout: (layout) => set({ layout }),
-
-      resetLayout: (defaultLayout) => set({
-        layout: defaultLayout,
-        selectedKeys: [],
-      }),
-    }),
-    {
-      name: 'keyboard-storage',
-      storage: createJSONStorage(() => localStorage),
-    
-    }
-  )
-);

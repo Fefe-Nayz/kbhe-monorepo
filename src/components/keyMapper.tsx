@@ -100,19 +100,24 @@ const AllKeys = [
 ];
 
 interface KeyMapperProps {
-  onButtonClick: (ids: string[] | string) => void;
-
+  //onButtonClick: (key: Omit<typeof AllKeys[number], "type">) => void
+  onButtonClick: (key: { id: string, label: string, value: string, width: number }) => void
 }
 
 
 export default function KeyMapper( { onButtonClick } : KeyMapperProps) {
-  const [clickedKeys, setClickedKeys] = useState<string[]>([]);
 
-  const handleKeyClick = (id: string) => {
+  /*const handleKeyClick = (id: string) => {
         setClickedKeys([id]);
         onButtonClick(id);
         clickedKeys
-    }
+    }*/
+
+  const handleKeyClick = (id: string) => {
+    const key = AllKeys.find(k => k.id === id)
+    if (!key) return
+    onButtonClick({ id: key.id, label: key.label, value: key.value, width: key.width })
+  }
   const groupedKeys = AllKeys.reduce((acc, key) => {
     if (!acc[key.type]) {
       acc[key.type] = [];
