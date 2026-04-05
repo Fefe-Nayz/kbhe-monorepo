@@ -19,6 +19,7 @@ import Nav from "./components/Nav"
 
 
 export default function App() {
+  //For now its works
   const [ready, setReady] = useState(false)
   useEffect(() => {
   // initialize the profile store (load profiles from localStorage)
@@ -48,7 +49,11 @@ export default function App() {
   // TODO: Use the subscribe method to save the layout in localStorage whenever it changes
 
 
-if (!ready) return (
+if (!ready) {
+  return null
+}
+
+return (
 
 
     <div className="h-screen flex flex-col">
