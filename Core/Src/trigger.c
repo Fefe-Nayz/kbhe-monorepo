@@ -337,8 +337,8 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   const int lastState = states[keyIndex];
   const int32_t lastDistanceUm = distances_um[keyIndex];
 
-  const int correctedCurrentVoltage = calibration_get_calibrated_value(keyIndex, currentVoltage);
-  const float currentDistanceMm = getValueFromLUT(correctedCurrentVoltage);
+  // const int correctedCurrentVoltage = calibration_get_calibrated_value(keyIndex, currentVoltage);
+  const float currentDistanceMm = getValueFromLUT(currentVoltage);
   const int32_t currentDistanceUm = (int32_t)(currentDistanceMm * 1000.0f);
 
   // Premier échantillon: initialiser sans déclencher d'événements

@@ -908,7 +908,7 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
 
   for (int i = 0; i < 6; i++) {
     resp->adc_raw[i] = analog_read_raw_value(i);
-    resp->adc_filtered[i] = get_filtered_adc_value((uint8_t)i);
+    resp->adc_filtered[i] = analog_read_filtered_value((uint8_t)i);
   }
 
   // Include timing information from main loop

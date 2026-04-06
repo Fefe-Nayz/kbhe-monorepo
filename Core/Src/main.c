@@ -124,7 +124,7 @@ static uint8_t filter_alpha_max_denom = ADC_EMA_ALPHA_MAX_DENOM_DEFAULT;
 //  * ADC VALUES FOR ALL MUX CHANNELS
 //  * Format: [MUX0_CH0, MUX0_CH1, ..., MUX0_CH5, MUX1_CH0, ..., MUX1_CH5]
 //  */
-uint16_t adc_values[NUM_MUX * NUM_MUX_CHANNELS];
+// uint16_t adc_values[NUM_MUX * NUM_MUX_CHANNELS];
 
 /**
  * EMA state per logical channel (mux input i, mux_channel).
@@ -188,12 +188,12 @@ void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
   reinit_ema_filters();
 }
 
-uint16_t get_filtered_adc_value(uint8_t key) {
-  if (key >= NUM_KEYS) {
-    return 0u;
-  }
-  return adc_values[key];
-}
+// uint16_t get_filtered_adc_value(uint8_t key) {
+//   if (key >= NUM_KEYS) {
+//     return 0u;
+//   }
+//   return adc_values[key];
+// }
 
 /* USER CODE END PV */
 
@@ -354,11 +354,13 @@ int main(void) {
   /**
    * INITIALIZE ADC VALUES ARRAY
    */
-  for (uint16_t i = 0; i < NUM_MUX * NUM_MUX_CHANNELS; i++) {
-    adc_values[i] = 0;
-  }
+  // for (uint16_t i = 0; i < NUM_MUX * NUM_MUX_CHANNELS; i++) {
+  //   adc_values[i] = 0;
+  // }
 
-  // Initialize analog module
+  /*
+   * INITIALIZE ANALOG MODULE
+   */
   AnalogConfig_t analog_config = {
     .hadc = &hadc1
   };
@@ -367,8 +369,13 @@ int main(void) {
 
   uint16_t *adc_buffer = analog_get_adc_buffer_ptr();
 
-  // Initialize EMA state for each logical ADC channel using runtime parameters
-  reinit_ema_filters();
+  /**
+   * INITIALIZE FILTER MODULE
+   */
+  filter_init();
+
+  // // Initialize EMA state for each logical ADC channel using runtime parameters
+  // reinit_ema_filters();
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -404,6 +411,10 @@ int main(void) {
   MX_TIM4_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+
+  /*
+   * INITIALIZE MULTIPLEXER MODULE
+   */
   multiplexer_init();
 
   // Affectation du buffer DMA non-cacheable au handle WS2812
@@ -452,25 +463,14 @@ int main(void) {
       adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
       adc_full_cycle_start_cycles = now;
 
-      // Filtrer les entrées
-      for (int key = 0; key < NUM_KEYS; key++) {
-        uint16_t raw_value = analog_read_raw_value(key);
-        uint16_t previous_filtered_value = adc_values[key];
+      analog_task();
 
-        // Apply EMA filtering if enabled
-        if (filter_enabled) {
-          // adc_values[key] = adc_ema_update(&adc_ema_states[key], raw_value);
-          adc_values[key] = filter_compute_next_filtered_value(raw_value, previous_filtered_value);
-        } else {
-          adc_values[key] = raw_value;
-        }
-      }
-
-      adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
+      // adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
 
       // Process all 6 keys with trigger logic
       for (int key = 0; key < 6; key++) {
-        handleTrigger(key, adc_values[key]);
+        uint16_t value = analog_read_filtered_value(key);
+        handleTrigger(key, value);
       }
 
       usb_hid_task();

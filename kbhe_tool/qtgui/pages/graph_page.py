@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -36,7 +39,7 @@ class GraphPage(QWidget):
     DATA_TYPES = [
         ("adc", "ADC Raw"),
         ("adc_filtered", "ADC Filtered"),
-        ("distance", "Distance (0.01 mm)"),
+        ("distance", "Distance (mm)"),
         ("normalized", "Normalized (%)"),
     ]
 
@@ -134,14 +137,14 @@ class GraphPage(QWidget):
         ymin_lbl = QLabel("Y min")
         ymin_lbl.setObjectName("Muted")
         y_row.addWidget(ymin_lbl)
-        self.ymin_spin = QSpinBox()
+        self.ymin_spin = QDoubleSpinBox()
         self.ymin_spin.setRange(-1000, 5000)
         self.ymin_spin.setValue(2000)
         y_row.addWidget(self.ymin_spin)
         ymax_lbl = QLabel("Y max")
         ymax_lbl.setObjectName("Muted")
         y_row.addWidget(ymax_lbl)
-        self.ymax_spin = QSpinBox()
+        self.ymax_spin = QDoubleSpinBox()
         self.ymax_spin.setRange(-1000, 5000)
         self.ymax_spin.setValue(2700)
         y_row.addWidget(self.ymax_spin)
@@ -244,26 +247,59 @@ class GraphPage(QWidget):
 
     def _set_default_y_range(self) -> None:
         dtype = self.dtype_combo.currentData()
+        self._configure_y_controls(dtype)
         if dtype in ("adc", "adc_filtered"):
             self.ymin_spin.setValue(2000)
             self.ymax_spin.setValue(2700)
         elif dtype == "distance":
-            self.ymin_spin.setValue(0)
-            self.ymax_spin.setValue(400)
+            self.ymin_spin.setValue(0.0)
+            self.ymax_spin.setValue(4.0)
         else:
             self.ymin_spin.setValue(0)
             self.ymax_spin.setValue(100)
         self._apply_axis_ranges()
 
+    def _configure_y_controls(self, dtype: str) -> None:
+        if dtype == "distance":
+            self.ymin_spin.setDecimals(2)
+            self.ymax_spin.setDecimals(2)
+            self.ymin_spin.setSingleStep(0.5)
+            self.ymax_spin.setSingleStep(0.5)
+        else:
+            self.ymin_spin.setDecimals(0)
+            self.ymax_spin.setDecimals(0)
+            self.ymin_spin.setSingleStep(1.0)
+            self.ymax_spin.setSingleStep(1.0)
+
+    def _set_axis_tick_type(self, tick_type_name: str) -> None:
+        tick_type = getattr(QValueAxis, tick_type_name, None)
+        if tick_type is None and hasattr(QValueAxis, "TickType"):
+            tick_type = getattr(QValueAxis.TickType, tick_type_name, None)
+        if tick_type is not None:
+            self.axis_y.setTickType(tick_type)
+
     def _apply_axis_ranges(self) -> None:
-        ymin = int(self.ymin_spin.value())
-        ymax = int(self.ymax_spin.value())
+        dtype = self.dtype_combo.currentData()
+        ymin = float(self.ymin_spin.value())
+        ymax = float(self.ymax_spin.value())
+        min_span = 0.5 if dtype == "distance" else 1.0
         if ymax <= ymin:
-            ymax = ymin + 1
+            ymax = ymin + min_span
             self.ymax_spin.setValue(ymax)
         max_len = max((len(v) for v in self.graph_data.values()), default=1)
         self.axis_x.setRange(0, max(1, max_len - 1))
         self.axis_y.setRange(ymin, ymax)
+        if dtype == "distance":
+            step = 0.5
+            anchor = math.floor(ymin / step) * step
+            self.axis_y.setLabelFormat("%.1f")
+            self._set_axis_tick_type("TicksDynamic")
+            self.axis_y.setTickAnchor(anchor)
+            self.axis_y.setTickInterval(step)
+        else:
+            self.axis_y.setLabelFormat("%d")
+            self._set_axis_tick_type("TicksFixed")
+            self.axis_y.setTickCount(8)
 
     def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
         if enabled:
@@ -281,7 +317,7 @@ class GraphPage(QWidget):
         for i, series in enumerate(self.series):
             series.setVisible(self.channel_checks[i].isChecked())
 
-    def _collect_samples(self) -> list[int]:
+    def _collect_samples(self) -> list[float]:
         dtype = self.dtype_combo.currentData()
         if dtype in ("adc", "adc_filtered"):
             payload = self.device.get_adc_values() or {}
@@ -289,12 +325,16 @@ class GraphPage(QWidget):
                 values = payload.get("adc_filtered") or payload.get("adc") or []
             else:
                 values = payload.get("adc_raw") or payload.get("adc") or []
-            return [int(v) for v in list(values)[:6]]
+            return [float(v) for v in list(values)[:6]]
         key_states = self.device.get_key_states() or {}
         if dtype == "distance":
-            return [int(v) for v in list(key_states.get("distances_01mm") or [])[:6]]
+            values_mm = list(key_states.get("distances_mm") or [])[:6]
+            if not values_mm:
+                values_01mm = list(key_states.get("distances_01mm") or [])[:6]
+                values_mm = [float(v) / 100.0 for v in values_01mm]
+            return [float(v) for v in values_mm]
         return [
-            max(0, min(255, int(v))) * 100 // 255
+            float(max(0, min(255, int(v))) * 100 // 255)
             for v in list(key_states.get("distances") or [])[:6]
         ]
 
@@ -322,6 +362,7 @@ class GraphPage(QWidget):
 
     def _refresh_chart(self) -> None:
         max_len = 1
+        dtype = self.dtype_combo.currentData()
         for i, series in enumerate(self.series):
             points = [QPointF(j, v) for j, v in enumerate(self.graph_data[i])]
             series.replace(points)
@@ -329,13 +370,23 @@ class GraphPage(QWidget):
             values = self.graph_data[i]
             if values:
                 self.stat_labels[i].setText(
-                    f"Key {i + 1}: {values[-1]}  (min {min(values)} / max {max(values)})"
+                    "Key "
+                    f"{i + 1}: {self._format_stat_value(values[-1], dtype)}  "
+                    f"(min {self._format_stat_value(min(values), dtype)} / "
+                    f"max {self._format_stat_value(max(values), dtype)})"
                 )
             else:
                 self.stat_labels[i].setText(f"Key {i + 1}: --")
         self.axis_x.setRange(0, max(1, max_len - 1))
         self._apply_axis_ranges()
         self._refresh_series_visibility()
+
+    def _format_stat_value(self, value: float, dtype: str) -> str:
+        if dtype == "distance":
+            return f"{value:.2f} mm"
+        if dtype == "normalized":
+            return f"{int(round(value))}%"
+        return str(int(round(value)))
 
     # ------------------------------------------------------------------
     # Actions
@@ -354,11 +405,17 @@ class GraphPage(QWidget):
         if not values:
             self._update_status("No samples available for auto-range yet.", "warning")
             return
+        dtype = self.dtype_combo.currentData()
         minimum = min(values)
         maximum = max(values)
-        margin = max(1, int((maximum - minimum or 1) * 0.1))
-        self.ymin_spin.setValue(minimum - margin)
-        self.ymax_spin.setValue(maximum + margin)
+        if dtype == "distance":
+            margin = max(0.5, (maximum - minimum or 0.5) * 0.1)
+            self.ymin_spin.setValue(minimum - margin)
+            self.ymax_spin.setValue(maximum + margin)
+        else:
+            margin = max(1.0, (maximum - minimum or 1.0) * 0.1)
+            self.ymin_spin.setValue(minimum - margin)
+            self.ymax_spin.setValue(maximum + margin)
         self._apply_axis_ranges()
         self._update_status("Y range auto-adjusted.", "success")
 

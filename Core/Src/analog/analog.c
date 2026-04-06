@@ -1,5 +1,8 @@
 #include "analog/analog.h"
 #include "analog/multiplexer.h"
+#include "analog/filter.h"
+#include "analog/lut.h"
+#include "analog/calibration.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -10,6 +13,8 @@ static uint16_t adc_buffer[ADC_BUFFER_LENGTH] __attribute__((aligned(ADC_BUFFER_
 static uint16_t raw_values[NUM_ANALOG_INPUTS];
 
 static uint16_t filtered_values[NUM_KEYS];
+
+static uint16_t distance_values[NUM_KEYS];
 
 static uint8_t current_mux_channel = 0;
 
@@ -55,6 +60,29 @@ void analog_init(AnalogConfig_t* config) {
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
         filtered_values[i] = 0;
     }
+
+    // Initialize distance values to 0
+    for (uint8_t i = 0; i < NUM_KEYS; i++) {
+        distance_values[i] = 0;
+    }
+}
+
+void analog_task() {
+    for (int key = 0; key < NUM_KEYS; key++) {
+        uint16_t raw_value = analog_read_raw_value(key);
+
+        uint16_t filtered_value = filter_compute_next_filtered_value(key, raw_value);
+        uint16_t calibrated_value = calibration_get_calibrated_value(key, filtered_value);
+
+        uint16_t distance_value = getDistanceFromVoltage(calibrated_value);
+
+        filtered_values[key] = calibrated_value;
+        distance_values[key] = distance_value;
+    }
+
+    if (!filter_is_initialized()) {
+        filter_set_initialized(true);
+    }
 }
 
 /*
@@ -84,6 +112,16 @@ uint16_t analog_read_filtered_value(uint8_t key) {
 
     // Return the filtered value
     return filtered_values[key];
+}
+
+int16_t analog_read_distance_value(uint8_t key) {
+    // Check if key is within valid range (0 to NUM_KEYS - 1)
+    if (key >= NUM_KEYS) {
+        return 0;
+    }
+
+    // Return the distance value
+    return distance_values[key];
 }
 
 /*
