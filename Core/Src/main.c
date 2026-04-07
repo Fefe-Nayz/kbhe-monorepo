@@ -28,7 +28,9 @@
 #include "analog/calibration.h"
 
 #include "settings.h"
+
 #include "trigger/trigger.h"
+#include "trigger/socd.h"
 
 #include "adc_capture.h"
 // #include "adc_ema.h"
@@ -436,6 +438,11 @@ int main(void) {
    */
   trigger_init();
 
+  /*
+   * INITIALIZE SOCD MODULE
+   */
+  socd_init();
+
   // Affectation du buffer DMA non-cacheable au handle WS2812
   led_ws2812_handle.dma_buffer = ws2812_dma_buffer;
 
@@ -485,6 +492,8 @@ int main(void) {
       analog_task();
       
       trigger_task();
+
+      socd_task();
 
       // // adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
 

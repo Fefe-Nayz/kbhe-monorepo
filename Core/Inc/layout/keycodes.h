@@ -214,8 +214,8 @@ typedef enum {
     KC_ASSISTANT = 0x00C0,
     KC_MISSION_CONTROL = 0x00C1,
     KC_LAUNCHPAD = 0x00C2,
-} keycodes_t;
+} keycode_t;
 
 typedef enum {
     CUSTOM_FN = 0xF000,
-} custom_keycodes_t;
+} custom_keycode_t;

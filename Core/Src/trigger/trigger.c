@@ -5,6 +5,9 @@
 #include "analog/analog.h"
 #include "hid/keyboard_hid.h"
 #include "layout/keycodes.h"
+#include "trigger/socd.h"
+#include "layout/layout.h"
+
 
 static key_trigger_settings_t key_trigger_settings[NUM_KEYS];
 
@@ -23,16 +26,17 @@ static inline void reset_rapid_trigger_extremums(uint8_t key, int16_t current_di
 
 static inline void press_key(uint8_t key) {
     if (key_states[key] == RELEASED) {
-        keyboard_hid_key_press(KC_A + key); // Example: map key index to HID code (KC_A, KC_B, etc.)
+        layout_press(key);
         key_states[key] = PRESSED;
-        return;
+        socd_on_press(key);
     }
 }
 
 static inline void release_key(uint8_t key) {
     if (key_states[key] == PRESSED) {
-        keyboard_hid_key_release(KC_A + key);
+        layout_release(key);
         key_states[key] = RELEASED;
+        socd_on_release(key);
     }
 }
 
@@ -111,13 +115,17 @@ static inline void handle_trigger(uint8_t key) {
     handle_rapid_trigger(key, current_distance, settings);
 }
 
+inline key_state_e trigger_get_key_state(uint8_t key) {
+    return key_states[key];
+}
+
 void trigger_init() {
     for (int i = 0; i < NUM_KEYS; i++) {
         // key_trigger_settings[i].actuation_point = DEFAULT_ACTUATION_POINT;
-        // key_trigger_settings[i].is_rapid_trigger_enabled = false;
+        key_trigger_settings[i].is_rapid_trigger_enabled = false;
         
         key_trigger_settings[i].actuation_point = 200;
-        key_trigger_settings[i].is_rapid_trigger_enabled = true;
+        // key_trigger_settings[i].is_rapid_trigger_enabled = true;
 
         key_trigger_settings[i].use_rapid_trigger_press_sensitivity = false;
         key_trigger_settings[i].rapid_trigger_press_sensitivity = DEFAULT_RAPID_TRIGGER_SENSITIVITY;

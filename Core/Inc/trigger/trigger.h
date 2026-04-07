@@ -34,6 +34,9 @@ typedef enum {
     KEY_DIRECTION_UP = 2
 } key_direction_e;
 
+
 void trigger_init(void);
 
 void trigger_task(void);
+
+key_state_e trigger_get_key_state(uint8_t key);
