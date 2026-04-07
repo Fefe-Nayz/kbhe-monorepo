@@ -83,12 +83,12 @@ extern uint32_t adc_full_cycle_us; // Time for full main loop cycle
 extern uint32_t adc_total_scan_us; // Time for ADC scan only
 
 // ADC EMA Filter control functions
-uint8_t get_filter_enabled(void);
-void set_filter_enabled(uint8_t enabled);
-void get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
-                       uint8_t *alpha_max_denom);
-void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
-                       uint8_t alpha_max_denom);
+// uint8_t get_filter_enabled(void);
+// void set_filter_enabled(uint8_t enabled);
+// void get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
+//                        uint8_t *alpha_max_denom);
+// void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
+//                        uint8_t alpha_max_denom);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

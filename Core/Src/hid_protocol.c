@@ -11,15 +11,16 @@
 #include "main.h"
 #include "settings.h"
 #include "updater_app.h"
-#include "trigger.h"
+// #include "trigger.h"
 #include "analog/calibration.h"
+#include <stdint.h>
 #include <string.h>
 
 //--------------------------------------------------------------------+
 // External declarations for debug data
 //--------------------------------------------------------------------+
-extern float distances[];     // From trigger.c
-extern int states[];          // From trigger.c
+float distances[6] = {0, 0, 0, 0, 0, 0};     // From trigger.c
+int states[6] = {0, 0, 0, 0, 0, 0};          // From trigger.c
 
 static inline bool is_valid_adc_calibration_value(int16_t value) {
   return value >= 0 && value <= 4095;
@@ -857,17 +858,17 @@ static void cmd_get_filter_enabled(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_FILTER_ENABLED;
   resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = get_filter_enabled();
+  // resp->payload[0] = get_filter_enabled();
 }
 
 static void cmd_set_filter_enabled(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *req = (hid_packet_t *)in;
+  // hid_packet_t *req = (hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_FILTER_ENABLED;
 
-  set_filter_enabled(req->payload[0]);
+  // set_filter_enabled(req->payload[0]);
   resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = get_filter_enabled();
+  // resp->payload[0] = get_filter_enabled();
 }
 
 static void cmd_get_filter_params(const uint8_t *in, uint8_t *out) {
@@ -875,26 +876,26 @@ static void cmd_get_filter_params(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_GET_FILTER_PARAMS;
   resp->status_or_len = HID_RESP_OK;
 
-  uint8_t noise_band, alpha_min, alpha_max;
-  get_filter_params(&noise_band, &alpha_min, &alpha_max);
-  resp->payload[0] = noise_band;
-  resp->payload[1] = alpha_min;
-  resp->payload[2] = alpha_max;
+  // uint8_t noise_band, alpha_min, alpha_max;
+  // get_filter_params(&noise_band, &alpha_min, &alpha_max);
+  // resp->payload[0] = noise_band;
+  // resp->payload[1] = alpha_min;
+  // resp->payload[2] = alpha_max;
 }
 
 static void cmd_set_filter_params(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *req = (hid_packet_t *)in;
+  // hid_packet_t *req = (hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_FILTER_PARAMS;
 
-  set_filter_params(req->payload[0], req->payload[1], req->payload[2]);
+  // set_filter_params(req->payload[0], req->payload[1], req->payload[2]);
   resp->status_or_len = HID_RESP_OK;
 
-  uint8_t noise_band, alpha_min, alpha_max;
-  get_filter_params(&noise_band, &alpha_min, &alpha_max);
-  resp->payload[0] = noise_band;
-  resp->payload[1] = alpha_min;
-  resp->payload[2] = alpha_max;
+  // uint8_t noise_band, alpha_min, alpha_max;
+  // get_filter_params(&noise_band, &alpha_min, &alpha_max);
+  // resp->payload[0] = noise_band;
+  // resp->payload[1] = alpha_min;
+  // resp->payload[2] = alpha_max;
 }
 
 //--------------------------------------------------------------------+
@@ -922,6 +923,18 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   }
 }
 
+uint16_t triggerGetDistance01mm(int keyIndex) {
+  if (keyIndex < 0 || keyIndex >= 6)
+    return 0;
+
+  int16_t um = analog_read_distance_value(keyIndex);
+  if (um < 0)
+    um = 0;
+
+  // Convert um to 0.01mm units (10um per step), rounded to nearest.
+  return (uint16_t)((um + 5) / 10);
+}
+
 static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
   hid_resp_key_states_t *resp = (hid_resp_key_states_t *)out;
   resp->command_id = CMD_GET_KEY_STATES;
@@ -940,6 +953,7 @@ static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
 
     // Raw distance in 0.01mm units from trigger state.
     resp->distances_mm[i] = triggerGetDistance01mm(i);
+    // resp->distances_mm[i] = (uint16_t) (analog_read_distance_value(i) / 10);
   }
 }
 

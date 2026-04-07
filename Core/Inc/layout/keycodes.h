@@ -1,4 +1,4 @@
-const enum KEYCODES {
+typedef enum {
     KC_LEFT_CTRL = 0x00E0,
     KC_LEFT_SHIFT = 0x00E1,
     KC_LEFT_ALT = 0x00E2,
@@ -214,8 +214,8 @@ const enum KEYCODES {
     KC_ASSISTANT = 0x00C0,
     KC_MISSION_CONTROL = 0x00C1,
     KC_LAUNCHPAD = 0x00C2,
-};
+} keycodes_t;
 
-const enum CUSTOM_KEYCODES {
+typedef enum {
     CUSTOM_FN = 0xF000,
-}
+} custom_keycodes_t;

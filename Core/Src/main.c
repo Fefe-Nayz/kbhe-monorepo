@@ -25,14 +25,17 @@
 #include "analog/lut.h"
 #include "analog/analog.h"
 #include "analog/filter.h"
+#include "analog/calibration.h"
+
+#include "trigger/trigger.h"
 
 #include "adc_capture.h"
-#include "adc_ema.h"
+// #include "adc_ema.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "raw_hid.h"
 #include "stm32f7xx_hal_adc.h"
-#include "trigger.h"
+// #include "trigger.h"
 #include "tusb.h"
 #include "updater_app.h"
 #include "usb_gamepad.h"
@@ -87,15 +90,15 @@ uint16_t ws2812_dma_buffer[BUFFER_SIZE * 2]
 /**
  * EMA FILTERING - Default values (can be overridden via settings)
  */
-#define ADC_EMA_NOISE_BAND_DEFAULT 30u
-#define ADC_EMA_ALPHA_MIN_DENOM_DEFAULT 32u
-#define ADC_EMA_ALPHA_MAX_DENOM_DEFAULT 4u
+// #define ADC_EMA_NOISE_BAND_DEFAULT 30u
+// #define ADC_EMA_ALPHA_MIN_DENOM_DEFAULT 32u
+// #define ADC_EMA_ALPHA_MAX_DENOM_DEFAULT 4u
 
-// Runtime filter parameters
-static uint8_t filter_enabled = 1;
-static uint8_t filter_noise_band = ADC_EMA_NOISE_BAND_DEFAULT;
-static uint8_t filter_alpha_min_denom = ADC_EMA_ALPHA_MIN_DENOM_DEFAULT;
-static uint8_t filter_alpha_max_denom = ADC_EMA_ALPHA_MAX_DENOM_DEFAULT;
+// // Runtime filter parameters
+// static uint8_t filter_enabled = 1;
+// static uint8_t filter_noise_band = ADC_EMA_NOISE_BAND_DEFAULT;
+// static uint8_t filter_alpha_min_denom = ADC_EMA_ALPHA_MIN_DENOM_DEFAULT;
+// static uint8_t filter_alpha_max_denom = ADC_EMA_ALPHA_MAX_DENOM_DEFAULT;
 
 // /**
 //  * MUX CONFIGURATION
@@ -129,16 +132,16 @@ static uint8_t filter_alpha_max_denom = ADC_EMA_ALPHA_MAX_DENOM_DEFAULT;
 /**
  * EMA state per logical channel (mux input i, mux_channel).
  */
-static adc_ema_t adc_ema_states[NUM_MUX * NUM_MUX_CHANNELS];
+// static adc_ema_t adc_ema_states[NUM_MUX * NUM_MUX_CHANNELS];
 
-/**
- * OVERSAMPLING
- */
+// /**
+//  * OVERSAMPLING
+//  */
 
-#define SAMPLE_COUNT 1
+// #define SAMPLE_COUNT 1
 
-uint16_t adc_samples_index = 0;
-uint16_t adc_samples[NUM_MUX * SAMPLE_COUNT];
+// uint16_t adc_samples_index = 0;
+// uint16_t adc_samples[NUM_MUX * SAMPLE_COUNT];
 
 /**
  * Timings measurement variables
@@ -151,42 +154,42 @@ uint32_t adc_full_cycle_start_cycles = 0;
 // Filter Management Functions
 //--------------------------------------------------------------------+
 
-/**
- * @brief Reinitialize all EMA filters with current parameters
- */
-static void reinit_ema_filters(void) {
-  uint16_t alpha_min = ADC_EMA_Q15_FROM_RATIO(1u, filter_alpha_min_denom);
-  uint16_t alpha_max = ADC_EMA_Q15_FROM_RATIO(1u, filter_alpha_max_denom);
+// /**
+//  * @brief Reinitialize all EMA filters with current parameters
+//  */
+// static void reinit_ema_filters(void) {
+//   uint16_t alpha_min = ADC_EMA_Q15_FROM_RATIO(1u, filter_alpha_min_denom);
+//   uint16_t alpha_max = ADC_EMA_Q15_FROM_RATIO(1u, filter_alpha_max_denom);
 
-  for (uint16_t i = 0; i < (uint16_t)(NUM_MUX * NUM_MUX_CHANNELS); i++) {
-    adc_ema_init(&adc_ema_states[i], filter_noise_band, alpha_min, alpha_max);
-  }
-}
+//   for (uint16_t i = 0; i < (uint16_t)(NUM_MUX * NUM_MUX_CHANNELS); i++) {
+//     adc_ema_init(&adc_ema_states[i], filter_noise_band, alpha_min, alpha_max);
+//   }
+// }
 
-uint8_t get_filter_enabled(void) { return filter_enabled; }
+// uint8_t get_filter_enabled(void) { return filter_enabled; }
 
-void set_filter_enabled(uint8_t enabled) { filter_enabled = enabled ? 1 : 0; }
+// void set_filter_enabled(uint8_t enabled) { filter_enabled = enabled ? 1 : 0; }
 
-void get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
-                       uint8_t *alpha_max_denom) {
-  if (noise_band)
-    *noise_band = filter_noise_band;
-  if (alpha_min_denom)
-    *alpha_min_denom = filter_alpha_min_denom;
-  if (alpha_max_denom)
-    *alpha_max_denom = filter_alpha_max_denom;
-}
+// void get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
+//                        uint8_t *alpha_max_denom) {
+//   if (noise_band)
+//     *noise_band = filter_noise_band;
+//   if (alpha_min_denom)
+//     *alpha_min_denom = filter_alpha_min_denom;
+//   if (alpha_max_denom)
+//     *alpha_max_denom = filter_alpha_max_denom;
+// }
 
-void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
-                       uint8_t alpha_max_denom) {
-  // Validate and clamp parameters
-  filter_noise_band = noise_band > 0 ? noise_band : 1;
-  filter_alpha_min_denom = alpha_min_denom > 0 ? alpha_min_denom : 1;
-  filter_alpha_max_denom = alpha_max_denom > 0 ? alpha_max_denom : 1;
+// void set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
+//                        uint8_t alpha_max_denom) {
+//   // Validate and clamp parameters
+//   filter_noise_band = noise_band > 0 ? noise_band : 1;
+//   filter_alpha_min_denom = alpha_min_denom > 0 ? alpha_min_denom : 1;
+//   filter_alpha_max_denom = alpha_max_denom > 0 ? alpha_max_denom : 1;
 
-  // Reinitialize filters with new parameters
-  reinit_ema_filters();
-}
+//   // Reinitialize filters with new parameters
+//   reinit_ema_filters();
+// }
 
 // uint16_t get_filtered_adc_value(uint8_t key) {
 //   if (key >= NUM_KEYS) {
@@ -374,6 +377,11 @@ int main(void) {
    */
   filter_init();
 
+  /*
+   * INITIALIZE CALIBRATION MODULE
+   */
+  calibration_init();
+
   // // Initialize EMA state for each logical ADC channel using runtime parameters
   // reinit_ema_filters();
   /* USER CODE END 1 */
@@ -417,6 +425,11 @@ int main(void) {
    */
   multiplexer_init();
 
+  /*
+   * INITIALIZE TRIGGER MODULE
+   */
+  trigger_init();
+
   // Affectation du buffer DMA non-cacheable au handle WS2812
   led_ws2812_handle.dma_buffer = ws2812_dma_buffer;
 
@@ -432,7 +445,7 @@ int main(void) {
 
   raw_hid_init();
 
-  triggerInit();
+  // triggerInit();
 
   // Initialize PE0 LED indicator for caps/num lock
   led_indicator_init();
@@ -464,14 +477,16 @@ int main(void) {
       adc_full_cycle_start_cycles = now;
 
       analog_task();
+      
+      trigger_task();
 
-      // adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
+      // // adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
 
-      // Process all 6 keys with trigger logic
-      for (int key = 0; key < 6; key++) {
-        uint16_t value = analog_read_filtered_value(key);
-        handleTrigger(key, value);
-      }
+      // // Process all 6 keys with trigger logic
+      // for (int key = 0; key < 6; key++) {
+      //   uint16_t value = analog_read_filtered_value(key);
+      //   handleTrigger(key, value);
+      // }
 
       usb_hid_task();
       usb_hid_nkro_task();

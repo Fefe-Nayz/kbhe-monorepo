@@ -5,7 +5,7 @@
 
 #include "led_matrix.h"
 #include "main.h"
-#include "trigger.h"
+// #include "trigger.h"
 #include "ws2812.h"
 #include <string.h>
 
@@ -700,7 +700,8 @@ static void effect_distance_sensor(void) {
   led_matrix_clear();
 
   for (uint8_t key = 0; key < 6; key++) {
-    uint16_t distance_01mm = triggerGetDistance01mm(key);
+    // uint16_t distance_01mm = triggerGetDistance01mm(key);
+    uint16_t distance_01mm = 0;
     if (distance_01mm > KEY_TRAVEL_MAX_01MM) {
       distance_01mm = KEY_TRAVEL_MAX_01MM;
     }

@@ -116,7 +116,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/filter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_capture.c
     # Key trigger logic
-    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/trigger.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/trigger/trigger.c
     # Settings and flash storage
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/flash_storage.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/settings.c

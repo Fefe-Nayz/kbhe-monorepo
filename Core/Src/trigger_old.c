@@ -31,27 +31,14 @@ static const uint8_t DEFAULT_KEY_HID_CODES[6] = {
     HID_KEY_D, // Key 5
 };
 
-// Default rapid trigger settings
-#define DEFAULT_RAPID_TRIGGER_DELTA_UM 500  // 0.5mm = 500um default sensitivity
+// // Valeur maximale d'appuie atteinte lorsque la touche est pressée puis en cours
+// // de relachement (en micromètres)
+// static int32_t maxBottomDistances_um[6] = {0, 0, 0, 0, 0, 0};
+// // Valeur minimale d'appuie atteinte lorsque la touche est relachée puis en
+// // cours d'appuie (en micromètres)
+// static int32_t minTopDistances_um[6] = {0, 0, 0, 0, 0, 0};
 
-// Default actuation point (1.2mm)
-#define DEFAULT_ACTUATION_POINT_UM 1200
-
-// Default release point (1.2mm)
-#define DEFAULT_RELEASE_POINT_UM 1200
-
-// Valeur maximale d'appuie atteinte lorsque la touche est pressée puis en cours
-// de relachement (en micromètres)
-static int32_t maxBottomDistances_um[6] = {0, 0, 0, 0, 0, 0};
-// Valeur minimale d'appuie atteinte lorsque la touche est relachée puis en
-// cours d'appuie (en micromètres)
-static int32_t minTopDistances_um[6] = {0, 0, 0, 0, 0, 0};
-
-// Dernière valeur d'appuie lue (en micromètres)
-static int32_t distances_um[6] = {0, 0, 0, 0, 0, 0};
-
-// Distance normalisée (0..1) gardée pour compatibilité debug/HID
-float distances[6] = {0, 0, 0, 0, 0, 0};
+static int16_t last_distance_values[NUM_KEYS];
 
 // Dernier état de la touche (0 = relachée, 1 = appuyée)
 int states[6] = {0, 0, 0, 0, 0, 0};
@@ -140,7 +127,6 @@ static int getSOCDPairedKey(int keyIndex) {
 }
 
 void triggerInit() {
-  calibration_init();
   usb_gamepad_init();
 
   // Apply compile-time flags
@@ -149,8 +135,8 @@ void triggerInit() {
   for (int i = 0; i < 6; i++) {
     maxBottomDistances_um[i] = 0;
     minTopDistances_um[i] = 0;
-    distances_um[i] = 0;
-    distances[i] = 0.0f;
+    // distances_um[i] = 0;
+    // distances[i] = 0.0f;
     states[i] = 0;
     key_initialized[i] = 0;
   }
@@ -162,17 +148,17 @@ int getKeyState(int keyIndex) {
   return states[keyIndex];
 }
 
-uint16_t triggerGetDistance01mm(int keyIndex) {
-  if (keyIndex < 0 || keyIndex >= 6)
-    return 0;
+// uint16_t triggerGetDistance01mm(int keyIndex) {
+//   if (keyIndex < 0 || keyIndex >= 6)
+//     return 0;
 
-  int32_t um = distances_um[keyIndex];
-  if (um < 0)
-    um = 0;
+//   int32_t um = distances_um[keyIndex];
+//   if (um < 0)
+//     um = 0;
 
-  // Convert um to 0.01mm units (10um per step), rounded to nearest.
-  return (uint16_t)((um + 5) / 10);
-}
+//   // Convert um to 0.01mm units (10um per step), rounded to nearest.
+//   return (uint16_t)((um + 5) / 10);
+// }
 
 static inline void updateKeyDataUm(int keyIndex, int32_t currentDistanceUm,
                                    int resetExtremums) {

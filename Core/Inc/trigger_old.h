@@ -12,6 +12,16 @@
 extern "C" {
 #endif
 
+// Default rapid trigger sensitivity (µm)
+#define DEFAULT_RAPID_TRIGGER_PRESS_SENSITIVITY 200
+#define DEFAULT_RAPID_TRIGGER_RELEASE_SENSITIVITY 200
+
+// Default release point (µm)
+#define DEFAULT_ACTUATION_POINT 1200
+
+// Default release point (µm)
+#define DEFAULT_RELEASE_POINT 1200
+
 /**
  * Handle trigger logic for a single key
  * @param keyIndex Index of the key (0-5)
