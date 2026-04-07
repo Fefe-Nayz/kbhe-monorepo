@@ -6,7 +6,7 @@
 #include "settings.h"
 #include "flash_storage.h"
 #include "led_matrix.h"
-#include "usb_gamepad.h"
+#include "hid/gamepad_hid.h"
 #include <string.h>
 
 //--------------------------------------------------------------------+
@@ -147,7 +147,7 @@ void settings_init(void) {
 #endif
 
   // Apply loaded settings to modules
-  usb_gamepad_set_enabled(current_settings.options.gamepad_enabled);
+  gamepad_hid_set_enabled(current_settings.options.gamepad_enabled);
 
   // Apply LED settings (LED matrix must be initialized first in main.c)
   led_matrix_set_brightness(current_settings.led.brightness);
@@ -181,7 +181,7 @@ bool settings_set_keyboard_enabled(bool enabled) {
 
 bool settings_set_gamepad_enabled(bool enabled) {
   current_settings.options.gamepad_enabled = enabled ? 1 : 0;
-  usb_gamepad_set_enabled(enabled);
+  gamepad_hid_set_enabled(enabled);
   return settings_save();
 }
 
@@ -197,7 +197,7 @@ bool settings_set_nkro_enabled(bool enabled) {
 
 bool settings_set_options(settings_options_t options) {
   current_settings.options = options;
-  usb_gamepad_set_enabled(options.gamepad_enabled);
+  gamepad_hid_set_enabled(options.gamepad_enabled);
   return settings_save();
 }
 
@@ -207,7 +207,7 @@ settings_options_t settings_get_options(void) {
 
 bool settings_reset(void) {
   settings_set_defaults();
-  usb_gamepad_set_enabled(current_settings.options.gamepad_enabled);
+  gamepad_hid_set_enabled(current_settings.options.gamepad_enabled);
   return settings_save();
 }
 

@@ -1,12 +1,12 @@
 /*
- * usb_hid.c
+ * keyboard_hid.c
  * Implémentation des callbacks HID TinyUSB
  * et fonctions d'envoi de rapport clavier
  */
 
-#include "usb_hid.h"
+#include "hid/keyboard_hid.h"
 #include "led_indicator.h"
-#include "raw_hid.h"
+#include "hid/raw_hid.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
 #include <string.h>
@@ -32,11 +32,11 @@ static volatile bool report_pending = false;
 // API Publique - Fonctions d'envoi de rapport clavier
 //--------------------------------------------------------------------+
 
-bool usb_hid_keyboard_is_ready(void) {
+bool keyboard_hid_is_ready(void) {
   return tud_hid_n_ready(HID_ITF_KEYBOARD);
 }
 
-bool usb_hid_keyboard_send_report(uint8_t modifier, const uint8_t keycodes[6]) {
+bool keyboard_hid_send_report(uint8_t modifier, const uint8_t keycodes[6]) {
   if (!tud_hid_n_ready(HID_ITF_KEYBOARD)) {
     return false;
   }
@@ -55,16 +55,16 @@ bool usb_hid_keyboard_send_report(uint8_t modifier, const uint8_t keycodes[6]) {
       HID_ITF_KEYBOARD, 0, keyboard_report.modifier, keyboard_report.keycode);
 }
 
-bool usb_hid_keyboard_press_key(uint8_t modifier, uint8_t keycode) {
+bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode) {
   uint8_t keycodes[6] = {keycode, 0, 0, 0, 0, 0};
-  return usb_hid_keyboard_send_report(modifier, keycodes);
+  return keyboard_hid_send_report(modifier, keycodes);
 }
 
-bool usb_hid_keyboard_release_all(void) {
-  return usb_hid_keyboard_send_report(0, NULL);
+bool keyboard_hid_release_all(void) {
+  return keyboard_hid_send_report(0, NULL);
 }
 
-void usb_hid_key_press(uint8_t keycode) {
+void keyboard_hid_key_press(uint8_t keycode) {
   if (keycode == 0)
     return;
 
@@ -82,7 +82,7 @@ void usb_hid_key_press(uint8_t keycode) {
   }
 }
 
-void usb_hid_key_release(uint8_t keycode) {
+void keyboard_hid_key_release(uint8_t keycode) {
   if (keycode == 0)
     return;
 
@@ -101,7 +101,7 @@ void usb_hid_key_release(uint8_t keycode) {
   }
 }
 
-bool usb_hid_send_report_if_changed(void) {
+bool keyboard_hid_send_report_if_changed(void) {
   if (!report_changed) {
     return false;
   }
@@ -116,16 +116,16 @@ bool usb_hid_send_report_if_changed(void) {
     keycodes[i] = pressed_keys[i];
   }
 
-  if (usb_hid_keyboard_send_report(0, keycodes)) {
+  if (keyboard_hid_send_report(0, keycodes)) {
     report_changed = false;
     return true;
   }
   return false;
 }
 
-void usb_hid_task(void) {
+void keyboard_hid_task(void) {
   // Send pending report if any
-  usb_hid_send_report_if_changed();
+  keyboard_hid_send_report_if_changed();
 }
 
 //--------------------------------------------------------------------+

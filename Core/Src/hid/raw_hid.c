@@ -1,5 +1,5 @@
 
-#include "raw_hid.h"
+#include "hid/raw_hid.h"
 #include "hid_protocol.h"
 #include "tusb.h"
 #include "updater_app.h"

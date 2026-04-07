@@ -1,10 +1,10 @@
 /*
- * usb_hid_nkro.h
+ * keyboard_nkro_hid.h
  * NKRO (N-Key Rollover) Keyboard HID support
  */
 
-#ifndef USB_HID_NKRO_H_
-#define USB_HID_NKRO_H_
+#ifndef KEYBOARD_NKRO_HID_H_
+#define KEYBOARD_NKRO_HID_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -35,38 +35,38 @@ typedef struct __attribute__((packed)) {
  * @brief Check if NKRO interface is ready to send a report
  * @return true if ready, false otherwise
  */
-bool usb_hid_nkro_is_ready(void);
+bool keyboard_nkro_hid_is_ready(void);
 
 /**
  * @brief Press a key in NKRO mode
  * @param keycode HID keycode (0-127)
  */
-void usb_hid_nkro_key_press(uint8_t keycode);
+void keyboard_nkro_hid_key_press(uint8_t keycode);
 
 /**
  * @brief Release a key in NKRO mode
  * @param keycode HID keycode (0-127)
  */
-void usb_hid_nkro_key_release(uint8_t keycode);
+void keyboard_nkro_hid_key_release(uint8_t keycode);
 
 /**
  * @brief Send NKRO report if changed
  * @return true if report was sent
  */
-bool usb_hid_nkro_send_report_if_changed(void);
+bool keyboard_nkro_hid_send_report_if_changed(void);
 
 /**
  * @brief NKRO task - call in main loop
  */
-void usb_hid_nkro_task(void);
+void keyboard_nkro_hid_task(void);
 
 /**
  * @brief Clear all pressed keys
  */
-void usb_hid_nkro_release_all(void);
+void keyboard_nkro_hid_release_all(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* USB_HID_NKRO_H_ */
+#endif /* KEYBOARD_NKRO_HID_H_ */

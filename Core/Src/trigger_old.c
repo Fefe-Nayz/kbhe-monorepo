@@ -3,9 +3,9 @@
 #include "analog/lut.h"
 #include "analog/calibration.h"
 #include "settings.h"
-#include "usb_gamepad.h"
-#include "usb_hid.h"
-#include "usb_hid_nkro.h"
+#include "hid/gamepad_hid.h"
+#include "hid/keyboard_hid.h"
+#include "hid/keyboard_nkro_hid.h"
 #include <stdint.h>
 #include "board_config.h"
 
@@ -127,10 +127,10 @@ static int getSOCDPairedKey(int keyIndex) {
 }
 
 void triggerInit() {
-  usb_gamepad_init();
+  gamepad_hid_init();
 
   // Apply compile-time flags
-  usb_gamepad_set_enabled(!DISABLE_GAMEPAD_OUTPUT);
+  gamepad_hid_set_enabled(!DISABLE_GAMEPAD_OUTPUT);
 
   for (int i = 0; i < 6; i++) {
     maxBottomDistances_um[i] = 0;
@@ -202,9 +202,9 @@ static void handleSOCDOnRelease(int keyIndex) {
   if (mappedKeyState == 1 && mappedKeyOverrideState == 1) {
     if (settings_is_keyboard_enabled()) {
       if (settings_is_nkro_enabled()) {
-        usb_hid_nkro_key_press(getKeyHIDCode(socdMappedKey));
+        keyboard_nkro_hid_key_press(getKeyHIDCode(socdMappedKey));
       } else {
-        usb_hid_key_press(getKeyHIDCode(socdMappedKey));
+        keyboard_hid_key_press(getKeyHIDCode(socdMappedKey));
       }
     }
   }
@@ -235,9 +235,9 @@ static void handleSOCDOnPress(int keyIndex) {
   // Release the opposing key
   if (settings_is_keyboard_enabled()) {
     if (settings_is_nkro_enabled()) {
-      usb_hid_nkro_key_release(getKeyHIDCode(socdMappedKey));
+      keyboard_nkro_hid_key_release(getKeyHIDCode(socdMappedKey));
     } else {
-      usb_hid_key_release(getKeyHIDCode(socdMappedKey));
+      keyboard_hid_key_release(getKeyHIDCode(socdMappedKey));
     }
   }
 }
@@ -273,9 +273,9 @@ void press(int keyIndex, int rapid) {
 
   // Send key press
   if (settings_is_nkro_enabled()) {
-    usb_hid_nkro_key_press(getKeyHIDCode(keyIndex));
+    keyboard_nkro_hid_key_press(getKeyHIDCode(keyIndex));
   } else {
-    usb_hid_key_press(getKeyHIDCode(keyIndex));
+    keyboard_hid_key_press(getKeyHIDCode(keyIndex));
   }
 }
 
@@ -310,9 +310,9 @@ void release(int keyIndex, int rapid) {
 
   // Send key release
   if (settings_is_nkro_enabled()) {
-    usb_hid_nkro_key_release(getKeyHIDCode(keyIndex));
+    keyboard_nkro_hid_key_release(getKeyHIDCode(keyIndex));
   } else {
-    usb_hid_key_release(getKeyHIDCode(keyIndex));
+    keyboard_hid_key_release(getKeyHIDCode(keyIndex));
   }
 }
 
@@ -336,7 +336,7 @@ void handleTrigger(int keyIndex, int currentVoltage) {
     if (norm0 < 0.0f) norm0 = 0.0f;
     if (norm0 > 1.0f) norm0 = 1.0f;
     distances[keyIndex] = norm0;
-    usb_gamepad_set_axis_from_distance(keyIndex, norm0);
+    gamepad_hid_set_axis_from_distance(keyIndex, norm0);
     return;
   }
 
@@ -352,7 +352,7 @@ void handleTrigger(int keyIndex, int currentVoltage) {
   if (normalizedDistance > 1.0f)
     normalizedDistance = 1.0f;
   distances[keyIndex] = normalizedDistance;
-  usb_gamepad_set_axis_from_distance(keyIndex, normalizedDistance);
+  gamepad_hid_set_axis_from_distance(keyIndex, normalizedDistance);
 
   // Get per-key settings (en µm)
   const int32_t actuationPointUm = getActuationPointUm(keyIndex);

@@ -1,10 +1,10 @@
 /*
- * usb_gamepad.c
+ * gamepad_hid.c
  * Implémentation du gamepad HID pour touches Hall Effect
  * Chaque touche est mappée sur un axe (X, Y, Z, Rx, Ry, Rz)
  */
 
-#include "usb_gamepad.h"
+#include "hid/gamepad_hid.h"
 #include "settings.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
@@ -69,7 +69,7 @@ static float apply_curve(float value, uint8_t curve_type) {
 // Public API Implementation
 //--------------------------------------------------------------------+
 
-void usb_gamepad_init(void) {
+void gamepad_hid_init(void) {
   // Initialize all axes to center (released position)
   memset(&gamepad_report, 0, sizeof(gamepad_report));
   memset(&prev_gamepad_report, 0, sizeof(prev_gamepad_report));
@@ -78,9 +78,9 @@ void usb_gamepad_init(void) {
   gamepad_enabled = true;
 }
 
-bool usb_gamepad_is_ready(void) { return tud_hid_n_ready(HID_ITF_GAMEPAD); }
+bool gamepad_hid_is_ready(void) { return tud_hid_n_ready(HID_ITF_GAMEPAD); }
 
-void usb_gamepad_set_axis(uint8_t axis_index, uint8_t value) {
+void gamepad_hid_set_axis(uint8_t axis_index, uint8_t value) {
   if (axis_index >= GAMEPAD_NUM_AXES)
     return;
 
@@ -90,7 +90,7 @@ void usb_gamepad_set_axis(uint8_t axis_index, uint8_t value) {
   }
 }
 
-void usb_gamepad_set_axis_from_distance(uint8_t axis_index, float distance) {
+void gamepad_hid_set_axis_from_distance(uint8_t axis_index, float distance) {
   if (axis_index >= GAMEPAD_NUM_AXES)
     return;
 
@@ -136,10 +136,10 @@ void usb_gamepad_set_axis_from_distance(uint8_t axis_index, float distance) {
   // Convert to 0-255 range
   uint8_t value = (uint8_t)(processed * 255.0f);
 
-  usb_gamepad_set_axis(axis_index, value);
+  gamepad_hid_set_axis(axis_index, value);
 }
 
-bool usb_gamepad_send_report_if_changed(void) {
+bool gamepad_hid_send_report_if_changed(void) {
   if (!gamepad_enabled) {
     return false;
   }
@@ -170,8 +170,8 @@ bool usb_gamepad_send_report_if_changed(void) {
   return false;
 }
 
-void usb_gamepad_task(void) { usb_gamepad_send_report_if_changed(); }
+void gamepad_hid_task(void) { gamepad_hid_send_report_if_changed(); }
 
-void usb_gamepad_set_enabled(bool enabled) { gamepad_enabled = enabled; }
+void gamepad_hid_set_enabled(bool enabled) { gamepad_enabled = enabled; }
 
-bool usb_gamepad_is_enabled(void) { return gamepad_enabled; }
+bool gamepad_hid_is_enabled(void) { return gamepad_enabled; }

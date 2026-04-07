@@ -1,10 +1,10 @@
 /*
- * usb_hid.h
+ * keyboard_hid.h
  * API pour le clavier HID USB 8kHz
  */
 
-#ifndef USB_HID_H_
-#define USB_HID_H_
+#ifndef KEYBOARD_HID_H_
+#define KEYBOARD_HID_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -95,7 +95,7 @@ extern "C" {
  * @brief Check if HID interface is ready to send a report
  * @return true if ready, false otherwise
  */
-bool usb_hid_keyboard_is_ready(void);
+bool keyboard_hid_is_ready(void);
 
 /**
  * @brief Send a keyboard report with specified modifier and keycodes
@@ -103,7 +103,7 @@ bool usb_hid_keyboard_is_ready(void);
  * @param keycodes Array of 6 keycodes (HID_KEY_*)
  * @return true if report was queued successfully
  */
-bool usb_hid_keyboard_send_report(uint8_t modifier, const uint8_t keycodes[6]);
+bool keyboard_hid_send_report(uint8_t modifier, const uint8_t keycodes[6]);
 
 /**
  * @brief Send a single key press
@@ -111,40 +111,40 @@ bool usb_hid_keyboard_send_report(uint8_t modifier, const uint8_t keycodes[6]);
  * @param keycode Single keycode to press
  * @return true if report was queued successfully
  */
-bool usb_hid_keyboard_press_key(uint8_t modifier, uint8_t keycode);
+bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode);
 
 /**
  * @brief Release all keys (send empty report)
  * @return true if report was queued successfully
  */
-bool usb_hid_keyboard_release_all(void);
+bool keyboard_hid_release_all(void);
 
 /**
  * @brief Register a key as pressed (add to report buffer)
  * @param keycode HID keycode to add
  */
-void usb_hid_key_press(uint8_t keycode);
+void keyboard_hid_key_press(uint8_t keycode);
 
 /**
  * @brief Register a key as released (remove from report buffer)
  * @param keycode HID keycode to remove
  */
-void usb_hid_key_release(uint8_t keycode);
+void keyboard_hid_key_release(uint8_t keycode);
 
 /**
  * @brief Send the current key state report if USB is ready
  * @return true if report was sent
  */
-bool usb_hid_send_report_if_changed(void);
+bool keyboard_hid_send_report_if_changed(void);
 
 /**
  * @brief HID task to be called in main loop
  *        Handles pending HID operations
  */
-void usb_hid_task(void);
+void keyboard_hid_task(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* USB_HID_H_ */
+#endif /* KEYBOARD_HID_H_ */

@@ -3,7 +3,7 @@
 #include "trigger/trigger.h"
 #include "board_config.h"
 #include "analog/analog.h"
-#include "usb_hid.h"
+#include "hid/keyboard_hid.h"
 #include "layout/keycodes.h"
 
 static key_trigger_settings_t key_trigger_settings[NUM_KEYS];
@@ -23,7 +23,7 @@ static inline void reset_rapid_trigger_extremums(uint8_t key, int16_t current_di
 
 static inline void press_key(uint8_t key) {
     if (key_states[key] == RELEASED) {
-        usb_hid_key_press(KC_A + key); // Example: map key index to HID code (KC_A, KC_B, etc.)
+        keyboard_hid_key_press(KC_A + key); // Example: map key index to HID code (KC_A, KC_B, etc.)
         key_states[key] = PRESSED;
         return;
     }
@@ -31,7 +31,7 @@ static inline void press_key(uint8_t key) {
 
 static inline void release_key(uint8_t key) {
     if (key_states[key] == PRESSED) {
-        usb_hid_key_release(KC_A + key);
+        keyboard_hid_key_release(KC_A + key);
         key_states[key] = RELEASED;
     }
 }

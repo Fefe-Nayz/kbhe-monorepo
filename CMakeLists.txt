@@ -107,10 +107,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${TINYUSB_SRC}
     # USB application sources
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_descriptors.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_hid.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_hid_nkro.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_gamepad.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/raw_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/keyboard_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/keyboard_nkro_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/gamepad_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/raw_hid.c
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/filter.c

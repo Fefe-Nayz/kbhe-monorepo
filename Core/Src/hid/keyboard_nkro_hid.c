@@ -1,9 +1,9 @@
 /*
- * usb_hid_nkro.c
+ * keyboard_nkro_hid.c
  * NKRO (N-Key Rollover) Keyboard HID implementation
  */
 
-#include "usb_hid_nkro.h"
+#include "hid/keyboard_nkro_hid.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
 #include <string.h>
@@ -45,9 +45,9 @@ static inline bool get_key_bit(uint8_t keycode) {
 // Public API
 //--------------------------------------------------------------------+
 
-bool usb_hid_nkro_is_ready(void) { return tud_hid_n_ready(HID_ITF_NKRO); }
+bool keyboard_nkro_hid_is_ready(void) { return tud_hid_n_ready(HID_ITF_NKRO); }
 
-void usb_hid_nkro_key_press(uint8_t keycode) {
+void keyboard_nkro_hid_key_press(uint8_t keycode) {
   if (keycode == 0)
     return;
 
@@ -67,7 +67,7 @@ void usb_hid_nkro_key_press(uint8_t keycode) {
   }
 }
 
-void usb_hid_nkro_key_release(uint8_t keycode) {
+void keyboard_nkro_hid_key_release(uint8_t keycode) {
   if (keycode == 0)
     return;
 
@@ -87,7 +87,7 @@ void usb_hid_nkro_key_release(uint8_t keycode) {
   }
 }
 
-bool usb_hid_nkro_send_report_if_changed(void) {
+bool keyboard_nkro_hid_send_report_if_changed(void) {
   if (!report_changed) {
     return false;
   }
@@ -105,9 +105,9 @@ bool usb_hid_nkro_send_report_if_changed(void) {
   return false;
 }
 
-void usb_hid_nkro_task(void) { usb_hid_nkro_send_report_if_changed(); }
+void keyboard_nkro_hid_task(void) { keyboard_nkro_hid_send_report_if_changed(); }
 
-void usb_hid_nkro_release_all(void) {
+void keyboard_nkro_hid_release_all(void) {
   memset(&nkro_report, 0, sizeof(nkro_report));
   report_changed = true;
 }

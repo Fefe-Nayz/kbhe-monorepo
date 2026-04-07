@@ -27,21 +27,22 @@
 #include "analog/filter.h"
 #include "analog/calibration.h"
 
+#include "settings.h"
 #include "trigger/trigger.h"
 
 #include "adc_capture.h"
 // #include "adc_ema.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
-#include "raw_hid.h"
+#include "hid/raw_hid.h"
 #include "stm32f7xx_hal_adc.h"
 // #include "trigger.h"
 #include "tusb.h"
 #include "updater_app.h"
-#include "usb_gamepad.h"
+#include "hid/gamepad_hid.h"
 #include "usb_descriptors.h"
-#include "usb_hid.h"
-#include "usb_hid_nkro.h"
+#include "hid/keyboard_hid.h"
+#include "hid/keyboard_nkro_hid.h"
 #include "ws2812.h" // Include WS2812 header
 #include <stdbool.h>
 #include <stdint.h>
@@ -361,6 +362,11 @@ int main(void) {
   //   adc_values[i] = 0;
   // }
 
+  /**
+   * INITIALIZE SETTINGS
+   */
+  settings_init();
+
   /*
    * INITIALIZE ANALOG MODULE
    */
@@ -488,9 +494,9 @@ int main(void) {
       //   handleTrigger(key, value);
       // }
 
-      usb_hid_task();
-      usb_hid_nkro_task();
-      usb_gamepad_task();
+      keyboard_hid_task();
+      keyboard_nkro_hid_task();
+      gamepad_hid_task();
 
       analog_set_scan_complete(false);
       TIM4_StartOneShot_TRGO();
