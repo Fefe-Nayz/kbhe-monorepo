@@ -1,7 +1,8 @@
 #include <stdint.h>
 #include "board_config.h"
 
-#define LUT_ZERO_VALUE 2117
+// #define LUT_ZERO_VALUE 2117
+#define LUT_ZERO_VALUE 2180
 
 void calibration_init(void);
 
