@@ -22,6 +22,10 @@ static bool is_scan_complete = false;
 
 static analog_task_monitor_t analog_task_monitor;
 
+static inline bool analog_is_valid_physical_index(uint8_t index) {
+    return index < NUM_ANALOG_INPUTS;
+}
+
 static inline uint32_t analog_cycles_to_us(uint32_t cycles) {
     if (SystemCoreClock == 0U) {
         return 0U;
@@ -112,9 +116,12 @@ void analog_task() {
 
     for (uint8_t key = 0; key < NUM_KEYS; key++) {
         uint32_t key_start_cycles = DWT->CYCCNT;
+        uint8_t physical_key_index = key_to_phys[key];
 
         uint32_t step_start_cycles = DWT->CYCCNT;
-        uint16_t raw_value = raw_values[key_to_phys[key]];
+        uint16_t raw_value = analog_is_valid_physical_index(physical_key_index)
+                                 ? raw_values[physical_key_index]
+                                 : 0;
         raw_cycles += (DWT->CYCCNT - step_start_cycles);
 
         if (raw_value != 0) {
@@ -178,6 +185,10 @@ uint16_t analog_read_raw_value(uint8_t key) {
 
     // Get the physical key index from the logical key
     uint8_t physical_key_index = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[key];
+
+    if (!analog_is_valid_physical_index(physical_key_index)) {
+        return 0;
+    }
 
     // Return the raw value for the corresponding physical key index
     return raw_values[physical_key_index];

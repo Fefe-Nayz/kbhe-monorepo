@@ -9,6 +9,7 @@ from .protocol import (
     GAMEPAD_AXES,
     GAMEPAD_BUTTONS,
     GAMEPAD_DIRECTIONS,
+    KEY_COUNT,
     PACKET_SIZE,
     PID,
     RAW_HID_INTERFACE,
@@ -685,6 +686,51 @@ class KBHEDevice:
                 'adc_payload_format': 'legacy'
             }
         return None
+
+    def get_raw_adc_chunk(self, start_index: int):
+        """Fetch one raw ADC chunk from the firmware."""
+        data = [0, max(0, min(255, int(start_index)))]
+        resp = self.send_command(Command.GET_RAW_ADC_CHUNK, data, timeout_ms=150)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            returned_start = resp[2]
+            value_count = min(resp[3], (len(resp) - 4) // 2)
+            values = []
+            for i in range(value_count):
+                base = 4 + i * 2
+                values.append(resp[base] | (resp[base + 1] << 8))
+            return {
+                "start_index": returned_start,
+                "values": values,
+            }
+        return None
+
+    def get_all_raw_adc_values(self, key_count: int = KEY_COUNT):
+        """Fetch raw ADC values for the whole keyboard in multiple HID chunks."""
+        values = [0] * key_count
+        next_index = 0
+
+        while next_index < key_count:
+            chunk = self.get_raw_adc_chunk(next_index)
+            if not chunk:
+                return None
+
+            start_index = int(chunk.get("start_index", next_index))
+            chunk_values = list(chunk.get("values", []))
+            if start_index >= key_count or not chunk_values:
+                return None
+
+            for offset, value in enumerate(chunk_values):
+                dst = start_index + offset
+                if dst >= key_count:
+                    break
+                values[dst] = int(value)
+
+            advanced_to = start_index + len(chunk_values)
+            if advanced_to <= next_index:
+                return None
+            next_index = advanced_to
+
+        return values
     
     def get_key_states(self):
         """Get key states (debug) with actual distances in mm."""

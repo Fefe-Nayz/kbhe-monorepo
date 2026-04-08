@@ -29,6 +29,7 @@ from .pages import (
     KeyboardPage,
     LightingPage,
     OverviewPage,
+    RawADCPage,
     TravelPage,
 )
 from .session import AppSession
@@ -52,6 +53,7 @@ _NAV: list[tuple[str, str, str | None]] = [
     ("lighting",     "Lighting",         "Lighting"),
     ("effects",      "Effects",          None),
     ("device",       "Device",           "Inspect"),
+    ("raw_adc",      "82 Raw ADC",       None),
     ("debug",        "Debug / Sensors",  None),
     ("graph",        "Live Graph",       None),
     ("firmware",     "Firmware",         "Maintain"),
@@ -231,6 +233,7 @@ class KBHEQtMainWindow(QMainWindow):
             "lighting":    LightingPage(d, controller=self),
             "effects":     EffectsPage(d, controller=self),
             "device":      DevicePage(d, controller=self),
+            "raw_adc":     RawADCPage(s),
             "debug":       DebugPage(s),
             "graph":       GraphPage(s),
             "firmware":    FirmwarePage(d, controller=self),
@@ -302,6 +305,7 @@ class KBHEQtMainWindow(QMainWindow):
         "lighting":    "Lighting",
         "effects":     "Effects",
         "device":      "Device",
+        "raw_adc":     "82 Raw ADC",
         "debug":       "Debug / Sensors",
         "graph":       "Live Graph",
         "firmware":    "Firmware",

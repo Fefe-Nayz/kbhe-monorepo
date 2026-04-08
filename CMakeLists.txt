@@ -21,6 +21,9 @@ endif()
 # Set the project name
 set(CMAKE_PROJECT_NAME kbhe)
 set(KBHE_BOOTLOADER_TARGET kbhe_bootloader)
+option(KBHE_ENABLE_CUSTOM_BOOTLOADER
+       "Build the main firmware for the resident custom bootloader layout"
+       ON)
 
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -39,6 +42,18 @@ add_executable(${CMAKE_PROJECT_NAME})
 add_subdirectory(cmake/stm32cubemx)
 
 set(STM32_SYSTEM_SRC ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/system_stm32f7xx.c)
+
+if(KBHE_ENABLE_CUSTOM_BOOTLOADER)
+    set(KBHE_APP_LINKER_SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/STM32F723XX_FLASH.ld)
+    set(KBHE_APP_VECT_TAB_OFFSET 0x00010000U)
+    set(KBHE_CUSTOM_BOOTLOADER_ENABLED_VALUE 1)
+else()
+    set(KBHE_APP_LINKER_SCRIPT
+        ${CMAKE_CURRENT_SOURCE_DIR}/STM32F723XX_FLASH_APPONLY.ld)
+    set(KBHE_APP_VECT_TAB_OFFSET 0x00000000U)
+    set(KBHE_CUSTOM_BOOTLOADER_ENABLED_VALUE 0)
+endif()
 
 #--------------------------------------------------------------------+
 # TinyUSB Configuration
@@ -149,6 +164,10 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Inc
 )
 
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    KBHE_CUSTOM_BOOTLOADER_ENABLED=${KBHE_CUSTOM_BOOTLOADER_ENABLED_VALUE}
+)
+
 # Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
@@ -168,8 +187,8 @@ set_source_files_properties(
 
 kbhe_configure_binary_target(
     ${CMAKE_PROJECT_NAME}
-    ${CMAKE_CURRENT_SOURCE_DIR}/STM32F723XX_FLASH.ld
-    0x00010000U
+    ${KBHE_APP_LINKER_SCRIPT}
+    ${KBHE_APP_VECT_TAB_OFFSET}
 )
 
 add_executable(${KBHE_BOOTLOADER_TARGET})

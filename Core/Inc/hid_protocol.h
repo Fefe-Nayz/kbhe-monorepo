@@ -101,6 +101,7 @@ typedef enum {
   CMD_ADC_CAPTURE_START = 0xE3,
   CMD_ADC_CAPTURE_STATUS = 0xE4,
   CMD_ADC_CAPTURE_READ = 0xE5,
+  CMD_GET_RAW_ADC_CHUNK = 0xE6,
 
   // Echo command for testing (0xFE)
   CMD_ECHO = 0xFE,
@@ -115,6 +116,8 @@ typedef enum {
 // Byte 1: Status (response) or Parameter length (request)
 // Bytes 2-63: Payload
 //--------------------------------------------------------------------+
+
+#define HID_RAW_ADC_VALUES_PER_CHUNK 30
 
 /**
  * @brief Generic command packet header
@@ -299,6 +302,27 @@ typedef struct __attribute__((packed)) {
   uint32_t overflow_count;
   uint8_t reserved[48];
 } hid_resp_adc_capture_status_t;
+
+/**
+ * @brief Request one chunk of raw ADC values.
+ */
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t start_index;
+  uint8_t reserved[61];
+} hid_req_raw_adc_chunk_t;
+
+/**
+ * @brief Response chunk containing raw ADC values for a range of keys.
+ */
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t start_index;
+  uint8_t value_count;
+  uint16_t adc_raw[HID_RAW_ADC_VALUES_PER_CHUNK];
+} hid_resp_raw_adc_chunk_t;
 
 /**
  * @brief ADC capture read request packet

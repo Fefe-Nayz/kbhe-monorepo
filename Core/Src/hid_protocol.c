@@ -944,6 +944,33 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   resp->analog_key_max_index = analog_monitor.key_max_index;
 }
 
+static void cmd_get_raw_adc_chunk(const uint8_t *in, uint8_t *out) {
+  const hid_req_raw_adc_chunk_t *req = (const hid_req_raw_adc_chunk_t *)in;
+  hid_resp_raw_adc_chunk_t *resp = (hid_resp_raw_adc_chunk_t *)out;
+
+  resp->command_id = CMD_GET_RAW_ADC_CHUNK;
+  resp->status = HID_RESP_OK;
+  resp->start_index = req->start_index;
+  resp->value_count = 0;
+  memset(resp->adc_raw, 0, sizeof(resp->adc_raw));
+
+  if (req->start_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  uint8_t remaining = (uint8_t)(NUM_KEYS - req->start_index);
+  uint8_t count = remaining;
+  if (count > HID_RAW_ADC_VALUES_PER_CHUNK) {
+    count = HID_RAW_ADC_VALUES_PER_CHUNK;
+  }
+
+  resp->value_count = count;
+  for (uint8_t i = 0; i < count; i++) {
+    resp->adc_raw[i] = analog_read_raw_value((uint8_t)(req->start_index + i));
+  }
+}
+
 uint16_t triggerGetDistance01mm(int keyIndex) {
   if (keyIndex < 0 || keyIndex >= 6)
     return 0;
@@ -1336,6 +1363,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_ADC_CAPTURE_READ:
     cmd_adc_capture_read(in_packet, out_packet);
+    break;
+
+  case CMD_GET_RAW_ADC_CHUNK:
+    cmd_get_raw_adc_chunk(in_packet, out_packet);
     break;
 
   // Echo for testing

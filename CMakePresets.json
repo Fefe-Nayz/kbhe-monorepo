@@ -23,6 +23,14 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "Release-apponly",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "KBHE_ENABLE_CUSTOM_BOOTLOADER": "OFF"
+            }
         }
     ],
     "buildPresets": [
@@ -33,6 +41,10 @@
         {
             "name": "Release",
             "configurePreset": "Release"
+        },
+        {
+            "name": "Release-apponly",
+            "configurePreset": "Release-apponly"
         }
     ]
 }
