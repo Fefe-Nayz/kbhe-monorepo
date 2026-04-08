@@ -136,6 +136,20 @@ class DebugPage(QWidget):
         self.monitor_state_label = QLabel("Stopped.")
         self.monitor_state_label.setProperty("muted", True)
         ml.addWidget(self.monitor_state_label)
+
+        self.task_times_label = QLabel(
+            "Tasks: analog -- us | trigger -- us | socd -- us | kb -- us | nkro -- us | gp -- us | total -- us"
+        )
+        self.task_times_label.setProperty("muted", True)
+        self.task_times_label.setWordWrap(True)
+        ml.addWidget(self.task_times_label)
+
+        self.analog_monitor_label = QLabel(
+            "Analog: raw -- us | filter -- us | cal -- us | lut -- us | store -- us | min -- us | max -- us | avg -- us | nz -- | max key --"
+        )
+        self.analog_monitor_label.setProperty("muted", True)
+        self.analog_monitor_label.setWordWrap(True)
+        ml.addWidget(self.analog_monitor_label)
         layout.addWidget(monitor)
 
         adc = self._card("ADC Sensor Values", "Raw ADC values and the derived distance estimates.")
@@ -473,6 +487,43 @@ class DebugPage(QWidget):
             self.hid_rate_value["value"].setText(f"{scan_rate} Hz / {scan_time} us")
         elif scan_rate is not None:
             self.hid_rate_value["value"].setText(f"{scan_rate} Hz")
+
+        task_times = adc_data.get("task_times_us") or {}
+        if task_times:
+            self.task_times_label.setText(
+                "Tasks: "
+                f"analog {task_times.get('analog', 0)} us | "
+                f"trigger {task_times.get('trigger', 0)} us | "
+                f"socd {task_times.get('socd', 0)} us | "
+                f"kb {task_times.get('keyboard', 0)} us | "
+                f"nkro {task_times.get('keyboard_nkro', 0)} us | "
+                f"gp {task_times.get('gamepad', 0)} us | "
+                f"total {task_times.get('total', 0)} us"
+            )
+        else:
+            self.task_times_label.setText(
+                "Tasks: analog -- us | trigger -- us | socd -- us | kb -- us | nkro -- us | gp -- us | total -- us"
+            )
+
+        analog_monitor = adc_data.get("analog_monitor_us") or {}
+        if analog_monitor:
+            self.analog_monitor_label.setText(
+                "Analog: "
+                f"raw {analog_monitor.get('raw', 0)} us | "
+                f"filter {analog_monitor.get('filter', 0)} us | "
+                f"cal {analog_monitor.get('calibration', 0)} us | "
+                f"lut {analog_monitor.get('lut', 0)} us | "
+                f"store {analog_monitor.get('store', 0)} us | "
+                f"min {analog_monitor.get('key_min', 0)} us | "
+                f"max {analog_monitor.get('key_max', 0)} us | "
+                f"avg {analog_monitor.get('key_avg', 0)} us | "
+                f"nz {analog_monitor.get('nonzero_keys', 0)} | "
+                f"max key {analog_monitor.get('key_max_index', 0)}"
+            )
+        else:
+            self.analog_monitor_label.setText(
+                "Analog: raw -- us | filter -- us | cal -- us | lut -- us | store -- us | min -- us | max -- us | avg -- us | nz -- | max key --"
+            )
 
     def _update_key_display(self, key_states: dict):
         states = list(key_states.get("states") or [])

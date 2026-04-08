@@ -129,6 +129,20 @@ class DebugPage(QWidget):
         rate_row.addStretch(1)
         card.body_layout.addLayout(rate_row)
 
+        self.task_times_label = QLabel(
+            "Tasks: analog -- us | trigger -- us | socd -- us | kb -- us | nkro -- us | gp -- us | total -- us"
+        )
+        self.task_times_label.setObjectName("Muted")
+        self.task_times_label.setWordWrap(True)
+        card.body_layout.addWidget(self.task_times_label)
+
+        self.analog_monitor_label = QLabel(
+            "Analog: raw -- us | filter -- us | cal -- us | lut -- us | store -- us | min -- us | max -- us | avg -- us | nz -- | max key --"
+        )
+        self.analog_monitor_label.setObjectName("Muted")
+        self.analog_monitor_label.setWordWrap(True)
+        card.body_layout.addWidget(self.analog_monitor_label)
+
         return card
 
     def _build_adc_card(self) -> SectionCard:
@@ -365,6 +379,43 @@ class DebugPage(QWidget):
             self.scan_rate_chip.setText(f"{scan_rate} Hz / {scan_time} us")
         else:
             self.scan_rate_chip.setText("-- Hz")
+
+        task_times = adc_data.get("task_times_us") or {}
+        if task_times:
+            self.task_times_label.setText(
+                "Tasks: "
+                f"analog {task_times.get('analog', 0)} us | "
+                f"trigger {task_times.get('trigger', 0)} us | "
+                f"socd {task_times.get('socd', 0)} us | "
+                f"kb {task_times.get('keyboard', 0)} us | "
+                f"nkro {task_times.get('keyboard_nkro', 0)} us | "
+                f"gp {task_times.get('gamepad', 0)} us | "
+                f"total {task_times.get('total', 0)} us"
+            )
+        else:
+            self.task_times_label.setText(
+                "Tasks: analog -- us | trigger -- us | socd -- us | kb -- us | nkro -- us | gp -- us | total -- us"
+            )
+
+        analog_monitor = adc_data.get("analog_monitor_us") or {}
+        if analog_monitor:
+            self.analog_monitor_label.setText(
+                "Analog: "
+                f"raw {analog_monitor.get('raw', 0)} us | "
+                f"filter {analog_monitor.get('filter', 0)} us | "
+                f"cal {analog_monitor.get('calibration', 0)} us | "
+                f"lut {analog_monitor.get('lut', 0)} us | "
+                f"store {analog_monitor.get('store', 0)} us | "
+                f"min {analog_monitor.get('key_min', 0)} us | "
+                f"max {analog_monitor.get('key_max', 0)} us | "
+                f"avg {analog_monitor.get('key_avg', 0)} us | "
+                f"nz {analog_monitor.get('nonzero_keys', 0)} | "
+                f"max key {analog_monitor.get('key_max_index', 0)}"
+            )
+        else:
+            self.analog_monitor_label.setText(
+                "Analog: raw -- us | filter -- us | cal -- us | lut -- us | store -- us | min -- us | max -- us | avg -- us | nz -- | max key --"
+            )
 
         self._tick_count += 1
         elapsed = time.monotonic() - self._tick_started

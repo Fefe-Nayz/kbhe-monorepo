@@ -81,6 +81,13 @@ void Error_Handler(void);
 // Timing measurement (accessible from other modules)
 extern uint32_t adc_full_cycle_us; // Time for full main loop cycle
 extern uint32_t adc_total_scan_us; // Time for ADC scan only
+extern uint32_t task_analog_us;
+extern uint32_t task_trigger_us;
+extern uint32_t task_socd_us;
+extern uint32_t task_keyboard_us;
+extern uint32_t task_keyboard_nkro_us;
+extern uint32_t task_gamepad_us;
+extern uint32_t task_total_us;
 
 // ADC EMA Filter control functions
 // uint8_t get_filter_enabled(void);

@@ -921,6 +921,27 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   } else {
     resp->scan_rate_hz = 0;
   }
+
+  resp->task_analog_us = (uint16_t)task_analog_us;
+  resp->task_trigger_us = (uint16_t)task_trigger_us;
+  resp->task_socd_us = (uint16_t)task_socd_us;
+  resp->task_keyboard_us = (uint16_t)task_keyboard_us;
+  resp->task_keyboard_nkro_us = (uint16_t)task_keyboard_nkro_us;
+  resp->task_gamepad_us = (uint16_t)task_gamepad_us;
+  resp->task_total_us = (uint16_t)task_total_us;
+
+  analog_task_monitor_t analog_monitor = {0};
+  analog_get_task_monitor(&analog_monitor);
+  resp->analog_raw_us = analog_monitor.raw_us;
+  resp->analog_filter_us = analog_monitor.filter_us;
+  resp->analog_calibration_us = analog_monitor.calibration_us;
+  resp->analog_lut_us = analog_monitor.lut_us;
+  resp->analog_store_us = analog_monitor.store_us;
+  resp->analog_key_min_us = analog_monitor.key_min_us;
+  resp->analog_key_max_us = analog_monitor.key_max_us;
+  resp->analog_key_avg_us = analog_monitor.key_avg_us;
+  resp->analog_nonzero_keys = analog_monitor.nonzero_keys;
+  resp->analog_key_max_index = analog_monitor.key_max_index;
 }
 
 uint16_t triggerGetDistance01mm(int keyIndex) {

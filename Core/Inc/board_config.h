@@ -17,7 +17,7 @@
  */
 
 // Number of keys
-#define NUM_KEYS 6
+#define NUM_KEYS 82
 
 // Number of multiplexers
 #define NUM_MUX 8

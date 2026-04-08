@@ -243,7 +243,23 @@ typedef struct __attribute__((packed)) {
   uint16_t adc_filtered[6]; // Filtered ADC values
   uint16_t scan_time_us;  // Main loop scan time in microseconds
   uint16_t scan_rate_hz;  // Calculated scan rate in Hz
-  uint8_t reserved[34];
+  uint16_t task_analog_us;
+  uint16_t task_trigger_us;
+  uint16_t task_socd_us;
+  uint16_t task_keyboard_us;
+  uint16_t task_keyboard_nkro_us;
+  uint16_t task_gamepad_us;
+  uint16_t task_total_us;
+  uint16_t analog_raw_us;
+  uint16_t analog_filter_us;
+  uint16_t analog_calibration_us;
+  uint16_t analog_lut_us;
+  uint16_t analog_store_us;
+  uint16_t analog_key_min_us;
+  uint16_t analog_key_max_us;
+  uint16_t analog_key_avg_us;
+  uint16_t analog_nonzero_keys;
+  uint16_t analog_key_max_index;
 } hid_resp_adc_values_t;
 
 /**

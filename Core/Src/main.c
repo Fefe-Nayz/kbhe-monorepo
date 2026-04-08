@@ -153,6 +153,15 @@ uint16_t ws2812_dma_buffer[BUFFER_SIZE * 2]
 uint32_t adc_full_cycle_us = 0;
 uint32_t adc_full_cycle_start_cycles = 0;
 
+// Time spent in each processing task after a full ADC scan.
+uint32_t task_analog_us = 0;
+uint32_t task_trigger_us = 0;
+uint32_t task_socd_us = 0;
+uint32_t task_keyboard_us = 0;
+uint32_t task_keyboard_nkro_us = 0;
+uint32_t task_gamepad_us = 0;
+uint32_t task_total_us = 0;
+
 //--------------------------------------------------------------------+
 // Filter Management Functions
 //--------------------------------------------------------------------+
@@ -489,11 +498,19 @@ int main(void) {
       adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
       adc_full_cycle_start_cycles = now;
 
-      analog_task();
-      
-      trigger_task();
+      uint32_t task_start_cycles = DWT->CYCCNT;
 
+      uint32_t step_start_cycles = DWT->CYCCNT;
+      analog_task();
+      task_analog_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+      
+      step_start_cycles = DWT->CYCCNT;
+      trigger_task();
+      task_trigger_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+
+      step_start_cycles = DWT->CYCCNT;
       socd_task();
+      task_socd_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
       // // adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
 
@@ -503,18 +520,28 @@ int main(void) {
       //   handleTrigger(key, value);
       // }
 
+      step_start_cycles = DWT->CYCCNT;
       keyboard_hid_task();
+      task_keyboard_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+
+      step_start_cycles = DWT->CYCCNT;
       keyboard_nkro_hid_task();
+      task_keyboard_nkro_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+
+      step_start_cycles = DWT->CYCCNT;
       gamepad_hid_task();
+      task_gamepad_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+
+      task_total_us = cycles_to_us(DWT->CYCCNT - task_start_cycles);
 
       analog_set_scan_complete(false);
       TIM4_StartOneShot_TRGO();
     } else {
-      // Update LED effects (uses HAL_GetTick for timing)
-      led_matrix_effect_tick(HAL_GetTick());
+      // // Update LED effects (uses HAL_GetTick for timing)
+      // led_matrix_effect_tick(HAL_GetTick());
 
-      // Update PE0 LED indicator blinking (for num lock)
-      led_indicator_tick(HAL_GetTick());
+      // // Update PE0 LED indicator blinking (for num lock)
+      // led_indicator_tick(HAL_GetTick());
     }
     /* USER CODE END WHILE */
 

@@ -20,6 +20,16 @@ static uint8_t current_mux_channel = 0;
 
 static bool is_scan_complete = false;
 
+static analog_task_monitor_t analog_task_monitor;
+
+static inline uint32_t analog_cycles_to_us(uint32_t cycles) {
+    if (SystemCoreClock == 0U) {
+        return 0U;
+    }
+
+    return (uint32_t)(((uint64_t)cycles * 1000000ULL) / (uint64_t)SystemCoreClock);
+}
+
 /*
  * Mapping from logical key index (0-81) to physical key index (0-87)
  * For example logical key index 0 corresponds to physical key index 43
@@ -39,13 +49,22 @@ static bool is_scan_complete = false;
 // };
 
 static const uint8_t LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[NUM_KEYS] = {
-    0, 8, 16, 24, 32, 40
+0, 8, 16, 24, 32, 40, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0, 0
 };
+
+// static const uint8_t LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[NUM_KEYS] = {
+//     0, 8, 16, 24, 32, 40
+// };
 
 void analog_init(AnalogConfig_t* config) {
     // Copy the configuration to the static variable
     analog_config = *config;
-
     // Initialize adc buffer to 0
     for (uint8_t i = 0; i < NUM_MUX; i++) {
         adc_buffer[i] = 0;
@@ -65,20 +84,83 @@ void analog_init(AnalogConfig_t* config) {
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
         distance_values[i] = 0;
     }
+
+    analog_task_monitor.raw_us = 0;
+    analog_task_monitor.filter_us = 0;
+    analog_task_monitor.calibration_us = 0;
+    analog_task_monitor.lut_us = 0;
+    analog_task_monitor.store_us = 0;
+    analog_task_monitor.key_min_us = 0;
+    analog_task_monitor.key_max_us = 0;
+    analog_task_monitor.key_avg_us = 0;
+    analog_task_monitor.nonzero_keys = 0;
+    analog_task_monitor.key_max_index = 0;
 }
 
 void analog_task() {
-    for (int key = 0; key < NUM_KEYS; key++) {
-        uint16_t raw_value = analog_read_raw_value(key);
+    const uint8_t* key_to_phys = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX;
+    uint32_t raw_cycles = 0;
+    uint32_t filter_cycles = 0;
+    uint32_t calibration_cycles = 0;
+    uint32_t lut_cycles = 0;
+    uint32_t store_cycles = 0;
+    uint32_t key_sum_cycles = 0;
+    uint32_t key_min_cycles = UINT32_MAX;
+    uint32_t key_max_cycles = 0;
+    uint8_t key_max_index = 0;
+    uint16_t nonzero_keys = 0;
 
+    for (uint8_t key = 0; key < NUM_KEYS; key++) {
+        uint32_t key_start_cycles = DWT->CYCCNT;
+
+        uint32_t step_start_cycles = DWT->CYCCNT;
+        uint16_t raw_value = raw_values[key_to_phys[key]];
+        raw_cycles += (DWT->CYCCNT - step_start_cycles);
+
+        if (raw_value != 0) {
+            nonzero_keys++;
+        }
+
+        step_start_cycles = DWT->CYCCNT;
         uint16_t filtered_value = filter_compute_next_filtered_value(key, raw_value);
+        filter_cycles += (DWT->CYCCNT - step_start_cycles);
+
+        step_start_cycles = DWT->CYCCNT;
         uint16_t calibrated_value = calibration_get_calibrated_value(key, filtered_value);
+        calibration_cycles += (DWT->CYCCNT - step_start_cycles);
 
+        step_start_cycles = DWT->CYCCNT;
         uint16_t distance_value = getDistanceFromVoltage(calibrated_value);
+        lut_cycles += (DWT->CYCCNT - step_start_cycles);
 
+        step_start_cycles = DWT->CYCCNT;
         filtered_values[key] = calibrated_value;
         distance_values[key] = distance_value;
+        store_cycles += (DWT->CYCCNT - step_start_cycles);
+
+        uint32_t key_cycles = DWT->CYCCNT - key_start_cycles;
+        key_sum_cycles += key_cycles;
+
+        if (key_cycles < key_min_cycles) {
+            key_min_cycles = key_cycles;
+        }
+
+        if (key_cycles >= key_max_cycles) {
+            key_max_cycles = key_cycles;
+            key_max_index = key;
+        }
     }
+
+    analog_task_monitor.raw_us = (uint16_t)analog_cycles_to_us(raw_cycles);
+    analog_task_monitor.filter_us = (uint16_t)analog_cycles_to_us(filter_cycles);
+    analog_task_monitor.calibration_us = (uint16_t)analog_cycles_to_us(calibration_cycles);
+    analog_task_monitor.lut_us = (uint16_t)analog_cycles_to_us(lut_cycles);
+    analog_task_monitor.store_us = (uint16_t)analog_cycles_to_us(store_cycles);
+    analog_task_monitor.key_min_us = (uint16_t)analog_cycles_to_us(key_min_cycles == UINT32_MAX ? 0 : key_min_cycles);
+    analog_task_monitor.key_max_us = (uint16_t)analog_cycles_to_us(key_max_cycles);
+    analog_task_monitor.key_avg_us = (uint16_t)analog_cycles_to_us(key_sum_cycles / NUM_KEYS);
+    analog_task_monitor.nonzero_keys = nonzero_keys;
+    analog_task_monitor.key_max_index = key_max_index;
 
     if (!filter_is_initialized()) {
         filter_set_initialized(true);
@@ -170,4 +252,12 @@ void analog_set_scan_complete(bool complete) {
 
 uint16_t* analog_get_adc_buffer_ptr(void) {
     return adc_buffer;
+}
+
+void analog_get_task_monitor(analog_task_monitor_t* monitor) {
+    if (monitor == NULL) {
+        return;
+    }
+
+    *monitor = analog_task_monitor;
 }

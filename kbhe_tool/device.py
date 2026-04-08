@@ -617,6 +617,33 @@ class KBHEDevice:
                 scan_time_us = resp[26] | (resp[27] << 8)
                 scan_rate_hz = resp[28] | (resp[29] << 8)
 
+                task_times_us = None
+                if len(resp) >= 44:
+                    task_times_us = {
+                        'analog': resp[30] | (resp[31] << 8),
+                        'trigger': resp[32] | (resp[33] << 8),
+                        'socd': resp[34] | (resp[35] << 8),
+                        'keyboard': resp[36] | (resp[37] << 8),
+                        'keyboard_nkro': resp[38] | (resp[39] << 8),
+                        'gamepad': resp[40] | (resp[41] << 8),
+                        'total': resp[42] | (resp[43] << 8),
+                    }
+
+                analog_monitor_us = None
+                if len(resp) >= 64:
+                    analog_monitor_us = {
+                        'raw': resp[44] | (resp[45] << 8),
+                        'filter': resp[46] | (resp[47] << 8),
+                        'calibration': resp[48] | (resp[49] << 8),
+                        'lut': resp[50] | (resp[51] << 8),
+                        'store': resp[52] | (resp[53] << 8),
+                        'key_min': resp[54] | (resp[55] << 8),
+                        'key_max': resp[56] | (resp[57] << 8),
+                        'key_avg': resp[58] | (resp[59] << 8),
+                        'nonzero_keys': resp[60] | (resp[61] << 8),
+                        'key_max_index': resp[62] | (resp[63] << 8),
+                    }
+
                 # If timing fields are zero here but valid in legacy position,
                 # we are most likely talking to legacy firmware.
                 if (
@@ -630,6 +657,8 @@ class KBHEDevice:
                         'adc_filtered': legacy_values,
                         'scan_time_us': legacy_scan_time_us,
                         'scan_rate_hz': legacy_scan_rate_hz,
+                        'task_times_us': None,
+                        'analog_monitor_us': None,
                         'adc_payload_format': 'legacy'
                     }
 
@@ -640,6 +669,8 @@ class KBHEDevice:
                     'adc_filtered': filtered_values,
                     'scan_time_us': scan_time_us,
                     'scan_rate_hz': scan_rate_hz,
+                    'task_times_us': task_times_us,
+                    'analog_monitor_us': analog_monitor_us,
                     'adc_payload_format': 'extended'
                 }
 
@@ -649,6 +680,8 @@ class KBHEDevice:
                 'adc_filtered': legacy_values,
                 'scan_time_us': legacy_scan_time_us,
                 'scan_rate_hz': legacy_scan_rate_hz,
+                'task_times_us': None,
+                'analog_monitor_us': None,
                 'adc_payload_format': 'legacy'
             }
         return None
