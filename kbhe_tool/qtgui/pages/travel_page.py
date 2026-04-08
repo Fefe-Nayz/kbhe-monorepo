@@ -19,6 +19,7 @@ from ..widgets import (
     PageScaffold,
     SectionCard,
     StatusChip,
+    SubCard,
     make_secondary_button,
 )
 
@@ -191,6 +192,49 @@ class KeyTravelBar(QWidget):
         )
 
 
+class SelectedTravelCard(SubCard):
+    def __init__(self, key_index: int, parent=None):
+        super().__init__(parent)
+        self.key_index = int(key_index)
+        self.title = QLabel(key_display_name(self.key_index))
+        self.title.setObjectName("CardTitle")
+        self.layout.addWidget(self.title)
+
+        self.travel_bar = KeyTravelBar(self.key_index)
+        self.travel_bar.setMinimumSize(150, 260)
+        self.layout.addWidget(self.travel_bar)
+
+        row = QHBoxLayout()
+        row.setSpacing(6)
+        self.state_chip = StatusChip("IDLE", "neutral")
+        self.distance_chip = StatusChip("0.00 mm", "info")
+        row.addWidget(self.state_chip)
+        row.addWidget(self.distance_chip)
+        row.addStretch(1)
+        self.layout.addLayout(row)
+
+        self.thresholds = QLabel("--")
+        self.thresholds.setObjectName("Muted")
+        self.thresholds.setWordWrap(True)
+        self.layout.addWidget(self.thresholds)
+
+    def set_key_index(self, key_index: int) -> None:
+        self.key_index = int(key_index)
+        self.title.setText(key_display_name(self.key_index))
+        self.travel_bar.set_key_index(self.key_index)
+
+    def apply_values(self, *, distance_mm: float, pressed: bool, thresholds: dict) -> None:
+        self.state_chip.set_text_and_level("PRESSED" if pressed else "IDLE", "ok" if pressed else "neutral")
+        self.distance_chip.set_text_and_level(f"{distance_mm:.2f} mm", "info")
+        self.travel_bar.set_thresholds(thresholds or {})
+        self.travel_bar.update_state(float(distance_mm), bool(pressed))
+        self.thresholds.setText(
+            f"Act {float(thresholds.get('actuation_point_mm', 0.0)):.2f} mm  ·  "
+            f"Rel {float(thresholds.get('release_point_mm', 0.0)):.2f} mm  ·  "
+            f"RT {float(thresholds.get('rapid_trigger_press', 0.0)):.2f}/{float(thresholds.get('rapid_trigger_release', 0.0)):.2f} mm"
+        )
+
+
 class TravelPage(QWidget):
     def __init__(self, session, parent=None):
         super().__init__(parent)
@@ -200,6 +244,8 @@ class TravelPage(QWidget):
         self._thresholds: list[dict] = [dict() for _ in range(KEY_COUNT)]
         self._states: list[bool] = [False] * KEY_COUNT
         self._distances_mm: list[float] = [0.0] * KEY_COUNT
+        self._selected_keys: list[int] = [max(0, min(KEY_COUNT - 1, int(self.session.selected_key)))]
+        self._selected_cards: dict[int, SelectedTravelCard] = {}
 
         try:
             self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
@@ -246,18 +292,42 @@ class TravelPage(QWidget):
         live_row.addWidget(focus_label)
         self.focus_chip = StatusChip("K01", "info")
         live_row.addWidget(self.focus_chip)
+        selected_label = QLabel("Selected")
+        selected_label.setObjectName("Muted")
+        live_row.addWidget(selected_label)
+        self.selected_chip = StatusChip("1 key", "neutral")
+        live_row.addWidget(self.selected_chip)
         live_row.addStretch(1)
+        live_row.addWidget(make_secondary_button("Add Focused", self.add_focused_key))
+        live_row.addWidget(make_secondary_button("Select All", self.select_all_keys))
+        live_row.addWidget(make_secondary_button("Clear Selection", self.clear_selected_keys))
         live_row.addWidget(make_secondary_button("Reload Thresholds", self._load_all_thresholds))
         overview_card.body_layout.addLayout(live_row)
 
         self.layout_view = KeyboardLayoutWidget(self.session, unit=38)
+        self.layout_view.keyClicked.connect(self._toggle_selected_key)
         overview_card.body_layout.addWidget(self.layout_view, 0, Qt.AlignTop | Qt.AlignLeft)
+
+        self.selection_label = QLabel()
+        self.selection_label.setObjectName("Muted")
+        self.selection_label.setWordWrap(True)
+        overview_card.body_layout.addWidget(self.selection_label)
 
         self.overview_hint = QLabel("Appuie sur une touche ou clique un keycap pour inspecter ses seuils.")
         self.overview_hint.setObjectName("Muted")
         self.overview_hint.setWordWrap(True)
         overview_card.body_layout.addWidget(self.overview_hint)
         scaffold.add_card(overview_card)
+
+        self.selected_travel_card = SectionCard(
+            "Selected Travel Graphs",
+            "Une jauge de course est affichée pour chaque touche sélectionnée dans le layout.",
+        )
+        self.selected_travel_grid = QGridLayout()
+        self.selected_travel_grid.setHorizontalSpacing(10)
+        self.selected_travel_grid.setVerticalSpacing(10)
+        self.selected_travel_card.body_layout.addLayout(self.selected_travel_grid)
+        scaffold.add_card(self.selected_travel_card)
 
         details_row = QHBoxLayout()
         details_row.setSpacing(14)
@@ -340,10 +410,51 @@ class TravelPage(QWidget):
 
     def _on_selected_key_changed(self, key_index: int) -> None:
         key_index = max(0, min(KEY_COUNT - 1, int(key_index)))
+        if key_index not in self._selected_keys:
+            self._selected_keys.append(key_index)
         self.focus_bar.set_key_index(key_index)
         self.focus_name.setText(key_display_name(key_index))
         self.focus_chip.set_text_and_level(f"K{key_index + 1:02d}", "info")
+        self._refresh_selected_keys_summary()
         self._update_focus_card()
+
+    def _refresh_selected_keys_summary(self) -> None:
+        if not self._selected_keys:
+            self._selected_keys = [max(0, min(KEY_COUNT - 1, int(self.session.selected_key)))]
+
+        count = len(self._selected_keys)
+        self.selected_chip.set_text_and_level(f"{count} key{'s' if count != 1 else ''}", "info")
+        labels = [key_display_name(index) for index in self._selected_keys[:6]]
+        suffix = "" if count <= 6 else f" … +{count - 6}"
+        self.selection_label.setText("Selected travel sensors: " + ", ".join(labels) + suffix)
+        self._refresh_selected_travel_cards()
+
+    def add_focused_key(self) -> None:
+        key_index = max(0, min(KEY_COUNT - 1, int(self.session.selected_key)))
+        if key_index not in self._selected_keys:
+            self._selected_keys.append(key_index)
+        self._refresh_selected_keys_summary()
+        self._apply_overview()
+
+    def clear_selected_keys(self) -> None:
+        self._selected_keys = [max(0, min(KEY_COUNT - 1, int(self.session.selected_key)))]
+        self._refresh_selected_keys_summary()
+        self._apply_overview()
+
+    def select_all_keys(self) -> None:
+        self._selected_keys = list(range(KEY_COUNT))
+        self._refresh_selected_keys_summary()
+        self._apply_overview()
+
+    def _toggle_selected_key(self, key_index: int) -> None:
+        key_index = max(0, min(KEY_COUNT - 1, int(key_index)))
+        if key_index in self._selected_keys:
+            if len(self._selected_keys) > 1:
+                self._selected_keys.remove(key_index)
+        else:
+            self._selected_keys.append(key_index)
+        self._refresh_selected_keys_summary()
+        self._apply_overview()
 
     def _load_all_thresholds(self) -> None:
         try:
@@ -388,6 +499,8 @@ class TravelPage(QWidget):
         pressed_count = 0
         max_distance = 0.0
         max_key = 0
+        focused_key = max(0, min(KEY_COUNT - 1, int(self.session.selected_key)))
+        selected_lookup = {idx: order for order, idx in enumerate(self._selected_keys)}
 
         for key_index in range(KEY_COUNT):
             distance = float(self._distances_mm[key_index])
@@ -401,6 +514,21 @@ class TravelPage(QWidget):
             ratio = max(0.0, min(1.0, distance / _MAX_MM))
             fill = _mix_colors(colors["surface_muted"], colors["accent_soft"], ratio)
             border = colors["success"] if pressed else colors["border"]
+            if key_index in selected_lookup:
+                palette = [
+                    colors["graph_1"],
+                    colors["graph_2"],
+                    colors["graph_3"],
+                    colors["graph_4"],
+                    colors["graph_5"],
+                    colors["graph_6"],
+                    colors["accent"],
+                    colors["warning"],
+                    colors["success"],
+                ]
+                border = palette[selected_lookup[key_index] % len(palette)]
+            if key_index == focused_key:
+                border = colors["accent"]
             if pressed:
                 fill = _mix_colors(fill, colors["success"], 0.38)
             tooltip = (
@@ -418,9 +546,41 @@ class TravelPage(QWidget):
             )
 
         self.pressed_chip.set_text_and_level(f"{pressed_count} / {KEY_COUNT}", "ok" if pressed_count else "neutral")
+        selected_distances = [self._distances_mm[index] for index in self._selected_keys]
+        avg_selected = sum(selected_distances) / len(selected_distances) if selected_distances else 0.0
         self.overview_hint.setText(
-            f"Max travel now: {key_display_name(max_key)} at {max_distance:.2f} mm."
+            f"Max travel now: {key_display_name(max_key)} at {max_distance:.2f} mm. "
+            f"Selected avg travel: {avg_selected:.2f} mm."
         )
+
+    def _refresh_selected_travel_cards(self) -> None:
+        selected = [idx for idx in self._selected_keys if 0 <= idx < KEY_COUNT]
+        wanted = set(selected)
+
+        for key_index in list(self._selected_cards):
+            if key_index in wanted:
+                continue
+            card = self._selected_cards.pop(key_index)
+            self.selected_travel_grid.removeWidget(card)
+            card.deleteLater()
+
+        for order, key_index in enumerate(selected):
+            card = self._selected_cards.get(key_index)
+            if card is None:
+                card = SelectedTravelCard(key_index)
+                self._selected_cards[key_index] = card
+            else:
+                card.set_key_index(key_index)
+
+            thresholds = self._thresholds[key_index] if key_index < len(self._thresholds) else {}
+            card.apply_values(
+                distance_mm=self._distances_mm[key_index],
+                pressed=bool(self._states[key_index]),
+                thresholds=thresholds,
+            )
+            row = order // 2
+            col = order % 2
+            self.selected_travel_grid.addWidget(card, row, col)
 
     def _poll(self) -> None:
         try:
@@ -435,6 +595,7 @@ class TravelPage(QWidget):
             self._states[key_index] = bool(states[key_index]) if key_index < len(states) else False
             self._distances_mm[key_index] = float(distances[key_index]) if key_index < len(distances) else 0.0
 
+        self._refresh_selected_keys_summary()
         self._apply_overview()
         self._update_focus_card()
 

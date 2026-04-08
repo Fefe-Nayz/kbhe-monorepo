@@ -30,6 +30,7 @@
 
 static uint8_t ws2812_led_storage[WS2812_MAX_LEDS * 3];
 
+#if WS2812_USE_SOFTWARE_BACKEND
 static inline void ws2812_enable_cycle_counter(void) {
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
@@ -39,6 +40,7 @@ static inline void ws2812_wait_until(uint32_t target_cycles) {
     while ((int32_t)(DWT->CYCCNT - target_cycles) < 0) {
     }
 }
+#endif
 
 /*
  * Update next 24 bits in the dma buffer - assume dma_buffer_pointer is pointing
@@ -62,7 +64,7 @@ inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint16_t *dma_buf
         // This one is simple - we got a bunch of zeros of the right size - just throw
         // that into the buffer.  Twice will do (two half buffers).
         if (ws2812->zero_halves < 2) {
-            memset(dma_buffer_pointer, 0, 2 * BUFFER_SIZE); // Fill the buffer with zeros
+            memset(dma_buffer_pointer, 0, BUFFER_SIZE * sizeof(uint16_t)); // Fill one half-buffer with zeros
             ws2812->zero_halves++; // We only need to update two half buffers
         }
 
@@ -167,15 +169,17 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
     ws2812->leds = leds;
 
     ws2812->led_state = LED_RES;
+    ws2812->led_cnt = 0;
+    ws2812->res_cnt = 0;
     ws2812->is_dirty = 0;
     ws2812->zero_halves = 2;
+    ws2812->dma_cbs = 0;
+    ws2812->dat_cbs = 0;
 
     ws2812->led = ws2812_led_storage;
     memset(ws2812->led, 0, leds * 3);
 
-    // Bring-up fallback: drive WS2812 directly from GPIO instead of the
-    // callback-heavy timer/DMA state machine. This makes LED validation
-    // independent from TIM/DMA routing while the firmware is in refactor.
+#if WS2812_USE_SOFTWARE_BACKEND
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     __HAL_RCC_GPIOA_CLK_ENABLE();
     GPIO_InitStruct.Pin = LED_DATA_Pin;
@@ -186,6 +190,21 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
     HAL_GPIO_WritePin(LED_DATA_GPIO_Port, LED_DATA_Pin, GPIO_PIN_RESET);
 
     ws2812_enable_cycle_counter();
+#else
+    if (ws2812->dma_buffer == NULL) {
+        return WS2812_Err;
+    }
+
+    memset(ws2812->dma_buffer, 0, BUFFER_SIZE * 2 * sizeof(uint16_t));
+
+    if (HAL_TIM_PWM_Start_DMA(
+            ws2812->timer,
+            ws2812->channel,
+            (uint32_t *)ws2812->dma_buffer,
+            BUFFER_SIZE * 2) != HAL_OK) {
+        return WS2812_Err;
+    }
+#endif
 
     return res;
 
@@ -196,6 +215,7 @@ void ws2812_show(ws2812_handleTypeDef *ws2812) {
         return;
     }
 
+#if WS2812_USE_SOFTWARE_BACKEND
     ws2812_enable_cycle_counter();
 
     const uint32_t bit_total_cycles =
@@ -240,6 +260,9 @@ void ws2812_show(ws2812_handleTypeDef *ws2812) {
     if (primask == 0U) {
         __enable_irq();
     }
+#else
+    ws2812->is_dirty = true;
+#endif
 }
 
 /* 

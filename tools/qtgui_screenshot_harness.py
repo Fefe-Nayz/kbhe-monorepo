@@ -52,6 +52,8 @@ class DummyDevice:
     def get_led_effect_speed(self): return 75
     def set_led_effect_speed(self, speed): return True
     def set_led_effect_color(self, r, g, b): return True
+    def get_led_effect_params(self, effect_mode): return [160, 96, 160, 255, 0, 0]
+    def set_led_effect_params(self, effect_mode, params): return True
     def get_led_fps_limit(self): return 60
     def set_led_fps_limit(self, fps): return True
     def get_led_diagnostic(self): return 0

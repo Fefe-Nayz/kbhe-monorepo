@@ -5,6 +5,7 @@
 
 #include "led_matrix.h"
 #include "analog/analog.h"
+#include "led_indicator.h"
 #include "main.h"
 // #include "trigger.h"
 #include "ws2812.h"
@@ -40,16 +41,13 @@ static uint8_t effect_color_g = 0;
 static uint8_t effect_color_b = 0;
 static uint8_t effect_speed = 50;
 static uint8_t fps_limit = 60; // Default 60 FPS
+static uint8_t effect_params[LED_EFFECT_PARAM_COUNT] = {128u, 128u};
 static uint32_t last_effect_tick = 0;
 static uint32_t last_render_tick = 0; // Separate tick for FPS limiting
 static uint16_t effect_offset = 0;
 
 // Effect renderer context flag: when true, pixel writes target runtime frame only.
 static bool effect_render_context = false;
-
-// Diagnostic mode: 0=normal, 1=DMA stress (no CPU computation), 2=CPU stress
-// (compute but no DMA)
-static uint8_t diagnostic_mode = 0;
 
 // Reactive effect state
 static uint8_t key_wave_energy[NUM_KEYS] = {0};
@@ -71,6 +69,8 @@ static const uint8_t LOGICAL_LED_INDEX_TO_PHYSICAL_LED_INDEX[NUM_KEYS] = {
     81, 80, 79, 78, 77, 76, 75, 74,
     73, 72
 };
+
+#define CAPS_LOCK_LED_INDEX 44u
 
 // Physical LED coordinates derived from the KiCad PCB placement (`75he`).
 // Stored in logical key order, normalized to the top-left of the board and
@@ -163,6 +163,17 @@ static inline uint8_t scale_coord_to_u8(uint16_t value, uint16_t max_value) {
   return (uint8_t)(((uint32_t)value * 255u) / max_value);
 }
 
+static inline uint8_t effect_param(uint8_t index, uint8_t fallback) {
+  if (index >= LED_EFFECT_PARAM_COUNT) {
+    return fallback;
+  }
+  return effect_params[index];
+}
+
+static inline bool effect_param_flag(uint8_t index, bool fallback) {
+  return effect_param(index, fallback ? 1u : 0u) != 0u;
+}
+
 static inline uint16_t led_layout_distance(uint8_t a, uint8_t b) {
   uint16_t dx = abs_u16_diff(led_pos_x[a], led_pos_x[b]);
   uint16_t dy = abs_u16_diff(led_pos_y[a], led_pos_y[b]);
@@ -176,9 +187,19 @@ static inline uint16_t led_layout_distance(uint8_t a, uint8_t b) {
  */
 static inline void push_runtime_pixel_to_ws2812(uint8_t index) {
   uint8_t physical_index = LOGICAL_LED_INDEX_TO_PHYSICAL_LED_INDEX[index];
-  uint8_t r = apply_brightness(pixels_runtime[index * 3 + 0], current_brightness);
-  uint8_t g = apply_brightness(pixels_runtime[index * 3 + 1], current_brightness);
-  uint8_t b = apply_brightness(pixels_runtime[index * 3 + 2], current_brightness);
+  uint8_t source_r = pixels_runtime[index * 3 + 0];
+  uint8_t source_g = pixels_runtime[index * 3 + 1];
+  uint8_t source_b = pixels_runtime[index * 3 + 2];
+
+  if (index == CAPS_LOCK_LED_INDEX && led_indicator_is_caps_lock()) {
+    source_r = 255u;
+    source_g = 255u;
+    source_b = 255u;
+  }
+
+  uint8_t r = apply_brightness(source_r, current_brightness);
+  uint8_t g = apply_brightness(source_g, current_brightness);
+  uint8_t b = apply_brightness(source_b, current_brightness);
   setLedValues(&led_ws2812_handle, physical_index, r, g, b);
 }
 
@@ -362,10 +383,6 @@ void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
 void led_matrix_clear(void) {
   if (effect_render_context) {
     memset(pixels_runtime, 0, sizeof(pixels_runtime));
-    if (initialized && display_enabled) {
-      zeroLedValues(&led_ws2812_handle);
-      ws2812_show(&led_ws2812_handle);
-    }
     return;
   }
 
@@ -540,6 +557,8 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
   effect_offset = 0;
   last_effect_tick = 0;
   last_render_tick = 0;
+  memset(key_wave_energy, 0, sizeof(key_wave_energy));
+  memset(key_wave_radius, 0, sizeof(key_wave_radius));
 
   // Restoring matrix mode must restore the exact saved pattern.
   if (mode == LED_EFFECT_STATIC_MATRIX && previous_effect != LED_EFFECT_STATIC_MATRIX) {
@@ -561,6 +580,22 @@ void led_matrix_set_effect_color(uint8_t r, uint8_t g, uint8_t b) {
   effect_color_b = b;
 }
 
+void led_matrix_set_effect_params(const uint8_t *params) {
+  if (params == NULL) {
+    return;
+  }
+
+  memcpy(effect_params, params, LED_EFFECT_PARAM_COUNT);
+}
+
+void led_matrix_get_effect_params(uint8_t *params) {
+  if (params == NULL) {
+    return;
+  }
+
+  memcpy(params, effect_params, LED_EFFECT_PARAM_COUNT);
+}
+
 void led_matrix_set_effect_speed(uint8_t speed) {
   effect_speed = speed > 0 ? speed : 1;
 }
@@ -572,50 +607,10 @@ void led_matrix_set_fps_limit(uint8_t fps) { fps_limit = fps; }
 uint8_t led_matrix_get_fps_limit(void) { return fps_limit; }
 
 void led_matrix_set_diagnostic_mode(uint8_t mode) {
-  uint8_t old_mode = diagnostic_mode;
-  diagnostic_mode = mode;
-
-  // Handle timer output enable/disable for Mode 3
-  if (mode == 3 && old_mode != 3) {
-    // Entering Mode 3: Disable timer output (GPIO to low)
-    // This keeps DMA running but no signal reaches LEDs
-    TIM_HandleTypeDef *timer = led_ws2812_handle.timer;
-    if (timer) {
-      // Disable the timer channel output
-      HAL_TIM_PWM_Stop(timer, led_ws2812_handle.channel);
-      // Restart DMA without PWM output - DMA still writes to CCR but pin stays
-      // low
-      HAL_TIM_PWM_Start_DMA(timer, led_ws2812_handle.channel,
-                            (uint32_t *)led_ws2812_handle.dma_buffer,
-                            BUFFER_SIZE * 2);
-      // Disable the output compare channel
-      __HAL_TIM_DISABLE_OCxPRELOAD(timer, led_ws2812_handle.channel);
-      // Force pin low by setting to GPIO output
-      GPIO_InitTypeDef GPIO_InitStruct = {0};
-      GPIO_InitStruct.Pin = LED_DATA_Pin;
-      GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-      GPIO_InitStruct.Pull = GPIO_NOPULL;
-      GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-      HAL_GPIO_Init(LED_DATA_GPIO_Port, &GPIO_InitStruct);
-      HAL_GPIO_WritePin(LED_DATA_GPIO_Port, LED_DATA_Pin, GPIO_PIN_RESET);
-    }
-  } else if (old_mode == 3 && mode != 3) {
-    // Exiting Mode 3: Re-enable timer output
-    TIM_HandleTypeDef *timer = led_ws2812_handle.timer;
-    if (timer) {
-      // Restore GPIO to alternate function for timer
-      GPIO_InitTypeDef GPIO_InitStruct = {0};
-      GPIO_InitStruct.Pin = LED_DATA_Pin;
-      GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-      GPIO_InitStruct.Pull = GPIO_NOPULL;
-      GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-      GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
-      HAL_GPIO_Init(LED_DATA_GPIO_Port, &GPIO_InitStruct);
-    }
-  }
+  (void)mode;
 }
 
-uint8_t led_matrix_get_diagnostic_mode(void) { return diagnostic_mode; }
+uint8_t led_matrix_get_diagnostic_mode(void) { return 0u; }
 
 void led_matrix_key_event(uint8_t key_index, bool pressed) {
   if (key_index >= NUM_KEYS)
@@ -630,12 +625,19 @@ void led_matrix_key_event(uint8_t key_index, bool pressed) {
  * @brief Rainbow Wave effect - diagonal rainbow cycling
  */
 static void effect_rainbow(void) {
+  uint8_t x_mul =
+      (uint8_t)(1u + ((uint16_t)effect_param(0, 160u) * 4u) / 255u);
+  uint8_t y_div = (uint8_t)(2u + ((uint16_t)effect_param(1, 96u) * 6u) / 255u);
+  uint8_t anim_mul =
+      (uint8_t)(1u + ((uint16_t)effect_param(2, 160u) * 5u) / 255u);
+  uint8_t sat = effect_param(3, 255u);
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t hue = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) +
-                  (scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y) / 3u) +
-                  (uint8_t)(effect_offset * 2u);
+    uint8_t hue = (uint8_t)(scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) *
+                            x_mul) +
+                  (scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y) / y_div) +
+                  (uint8_t)(effect_offset * anim_mul);
     uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+    led_matrix_hsv_to_rgb(hue, sat, 255, &r, &g, &b);
     led_matrix_set_pixel_idx(i, r, g, b);
   }
 }
@@ -644,10 +646,23 @@ static void effect_rainbow(void) {
  * @brief Breathing effect - fade in/out with selected color
  */
 static void effect_breathing(void) {
+  uint8_t min_brightness = effect_param(0, 24u);
+  uint8_t max_brightness = effect_param(1, 255u);
+  uint8_t plateau = (uint8_t)(((uint16_t)effect_param(2, 48u) * 20u) / 255u);
+  if (max_brightness < min_brightness) {
+    uint8_t tmp = max_brightness;
+    max_brightness = min_brightness;
+    min_brightness = tmp;
+  }
   uint8_t breath = (effect_offset % 128);
   if (breath > 64)
     breath = 128 - breath;
-  uint8_t brightness = (255 * breath) / 64;
+  if (plateau > 0u && breath > (uint8_t)(64u - plateau)) {
+    breath = 64u;
+  }
+  uint8_t brightness = (uint8_t)(
+      min_brightness +
+      (((uint16_t)(max_brightness - min_brightness) * breath) / 64u));
 
   uint8_t r = (uint8_t)((uint16_t)effect_color_r * brightness / 255);
   uint8_t g = (uint8_t)((uint16_t)effect_color_g * brightness / 255);
@@ -660,11 +675,17 @@ static void effect_breathing(void) {
  * @brief Static Rainbow - static rainbow pattern
  */
 static void effect_static_rainbow(void) {
+  uint8_t x_mul =
+      (uint8_t)(1u + ((uint16_t)effect_param(0, 160u) * 4u) / 255u);
+  uint8_t y_div = (uint8_t)(1u + ((uint16_t)effect_param(1, 120u) * 5u) / 255u);
+  uint8_t sat = effect_param(2, 144u);
+  uint8_t value = effect_param(3, 255u);
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t hue = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) +
-                  scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y);
+    uint8_t hue = (uint8_t)(scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) *
+                            x_mul) +
+                  (scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y) / y_div);
     uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+    led_matrix_hsv_to_rgb(hue, sat, value, &r, &g, &b);
     led_matrix_set_pixel_idx(i, r, g, b);
   }
 }
@@ -673,25 +694,34 @@ static void effect_static_rainbow(void) {
  * @brief Solid color effect
  */
 static void effect_solid(void) {
-  led_matrix_fill(effect_color_r, effect_color_g, effect_color_b);
+  uint8_t brightness = effect_param(0, 255u);
+  led_matrix_fill(
+      (uint8_t)(((uint16_t)effect_color_r * brightness) / 255u),
+      (uint8_t)(((uint16_t)effect_color_g * brightness) / 255u),
+      (uint8_t)(((uint16_t)effect_color_b * brightness) / 255u));
 }
 
 /**
  * @brief Plasma effect - psychedelic waves
  */
 static void effect_plasma(void) {
+  uint8_t anim_mul =
+      (uint8_t)(1u + ((uint16_t)effect_param(0, 96u) * 4u) / 255u);
+  uint8_t sat = effect_param(1, 192u);
+  uint8_t radial_div = (uint8_t)(12u + effect_param(2, 128u));
+  uint8_t value = effect_param(3, 255u);
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     uint16_t x = led_pos_x[i] / 12u;
     uint16_t y = led_pos_y[i] / 12u;
     int16_t cx = (int16_t)(led_pos_x[i] / 10u) - (int16_t)(LED_LAYOUT_CENTER_X / 10u);
     int16_t cy = (int16_t)(led_pos_y[i] / 10u) - (int16_t)(LED_LAYOUT_CENTER_Y / 10u);
-    uint8_t v1 = (uint8_t)(x + effect_offset);
-    uint8_t v2 = (uint8_t)(y + effect_offset);
-    uint8_t v3 = (uint8_t)(((x + y) * 3u) / 2u + effect_offset * 2u);
-    uint16_t radial = (uint16_t)((cx * cx + cy * cy) / 24);
+    uint8_t v1 = (uint8_t)(x + effect_offset * anim_mul);
+    uint8_t v2 = (uint8_t)(y + effect_offset * anim_mul);
+    uint8_t v3 = (uint8_t)(((x + y) * 3u) / 2u + effect_offset * (anim_mul + 1u));
+    uint16_t radial = (uint16_t)((cx * cx + cy * cy) / radial_div);
     uint8_t hue = (uint8_t)(v1 + v2 + v3 + radial);
     uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+    led_matrix_hsv_to_rgb(hue, sat, value, &r, &g, &b);
     led_matrix_set_pixel_idx(i, r, g, b);
   }
 }
@@ -700,30 +730,78 @@ static void effect_plasma(void) {
  * @brief Fire effect - flames rising from bottom
  */
 static void effect_fire(void) {
+  uint8_t heat_boost = (uint8_t)(((uint16_t)effect_param(0, 160u) * 64u) / 255u);
+  uint8_t ember_floor = (uint8_t)(((uint16_t)effect_param(1, 96u) * 80u) / 255u);
+  uint8_t cooling = (uint8_t)(16u + ((uint16_t)effect_param(2, 96u) * 96u) / 255u);
+  uint8_t palette = effect_param(3, 0u) % 3u;
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     uint8_t x_term = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X);
     uint8_t y_term = 255u - scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y);
-    uint8_t heat = (uint8_t)((y_term * 3u) / 4u + ((effect_offset + x_term) % 64u));
+    uint8_t heat = (uint8_t)((y_term * 3u) / 4u + ((effect_offset + x_term) % 64u) +
+                             heat_boost);
     uint8_t r, g, b;
+    heat = (heat > cooling) ? (uint8_t)(heat - cooling) : 0u;
 
-    if (heat > 220u) {
-      r = 255u;
-      g = 255u;
-      b = 160u;
-    } else if (heat > 170u) {
-      r = 255u;
-      g = 170u;
-      b = 0u;
-    } else if (heat > 100u) {
-      r = 255u;
-      g = 72u;
-      b = 0u;
-    } else if (heat > 45u) {
-      r = 140u;
-      g = 0u;
-      b = 0u;
+    if (palette == 1u) {
+      if (heat > 220u) {
+        r = 255u;
+        g = 200u;
+        b = 64u;
+      } else if (heat > 170u) {
+        r = 255u;
+        g = 120u;
+        b = 0u;
+      } else if (heat > 100u) {
+        r = 220u;
+        g = 32u;
+        b = 0u;
+      } else if (heat > ember_floor) {
+        r = (uint8_t)(96u + ember_floor);
+        g = 0u;
+        b = 0u;
+      } else {
+        r = g = b = 0u;
+      }
+    } else if (palette == 2u) {
+      if (heat > 220u) {
+        r = 180u;
+        g = 220u;
+        b = 255u;
+      } else if (heat > 170u) {
+        r = 32u;
+        g = 160u;
+        b = 255u;
+      } else if (heat > 100u) {
+        r = 0u;
+        g = 72u;
+        b = 255u;
+      } else if (heat > ember_floor) {
+        r = 0u;
+        g = (uint8_t)(32u + ember_floor / 2u);
+        b = (uint8_t)(96u + ember_floor);
+      } else {
+        r = g = b = 0u;
+      }
     } else {
-      r = g = b = 0u;
+      if (heat > 220u) {
+        r = 255u;
+        g = 255u;
+        b = 160u;
+      } else if (heat > 170u) {
+        r = 255u;
+        g = 170u;
+        b = 0u;
+      } else if (heat > 100u) {
+        r = 255u;
+        g = 72u;
+        b = 0u;
+      } else if (heat > ember_floor) {
+        r = (uint8_t)(96u + ember_floor);
+        g = 0u;
+        b = 0u;
+      } else {
+        r = g = b = 0u;
+      }
     }
 
     led_matrix_set_pixel_idx(i, r, g, b);
@@ -734,14 +812,25 @@ static void effect_fire(void) {
  * @brief Ocean waves effect - horizontal waves
  */
 static void effect_ocean(void) {
+  uint8_t hue_bias =
+      (uint8_t)(100u + ((uint16_t)effect_param(0, 160u) * 90u) / 255u);
+  uint8_t depth_dim = (uint8_t)(32u + ((uint16_t)effect_param(1, 64u) * 120u) / 255u);
+  bool foam_highlight = effect_param_flag(2, true);
+  uint8_t speed_mul =
+      (uint8_t)(1u + ((uint16_t)effect_param(3, 160u) * 4u) / 255u);
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     uint8_t x_term = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X);
     uint8_t y_term = scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y);
-    uint8_t wave = (uint8_t)(x_term + (effect_offset * 3u));
-    uint8_t hue = 140u + (wave / 12u) + (y_term / 16u);
-    uint8_t brightness = (uint8_t)(255u - (y_term / 2u));
+    uint8_t wave = (uint8_t)(x_term + (effect_offset * speed_mul));
+    uint8_t hue = (uint8_t)(hue_bias + (wave / 12u) + (y_term / 16u));
+    uint8_t brightness = (uint8_t)(255u - ((uint16_t)y_term * depth_dim / 255u));
     uint8_t r, g, b;
     led_matrix_hsv_to_rgb(hue, 255, brightness, &r, &g, &b);
+    if (foam_highlight && ((wave + y_term) & 0x1Fu) < 4u) {
+      r = (uint8_t)(r + ((255u - r) / 2u));
+      g = (uint8_t)(g + ((255u - g) / 2u));
+      b = (uint8_t)(b + ((255u - b) / 2u));
+    }
     led_matrix_set_pixel_idx(i, r, g, b);
   }
 }
@@ -750,21 +839,31 @@ static void effect_ocean(void) {
  * @brief Matrix rain effect - digital rain
  */
 static void effect_matrix(void) {
+  uint8_t trail = (uint8_t)(24u + ((uint16_t)effect_param(0, 64u) * 80u) / 255u);
+  uint8_t head = (uint8_t)(4u + ((uint16_t)effect_param(1, 160u) * 10u) / 255u);
+  uint8_t density = (uint8_t)(4u + ((uint16_t)effect_param(2, 96u) * 24u) / 255u);
+  bool white_heads = effect_param_flag(3, true);
+  uint8_t hue_bias = effect_param(4, 0u);
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t col_seed = (uint8_t)(scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) / 12u);
+    uint8_t col_seed =
+        (uint8_t)(scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) / density);
     uint8_t y_term = scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y);
     uint8_t drop_pos = (uint8_t)((effect_offset * 6u + col_seed * 17u) & 0xFFu);
     uint8_t dist = abs_u8_diff(y_term, drop_pos);
     uint8_t r, g, b;
 
-    if (dist < 8u) {
-      r = 255u;
-      g = 255u;
-      b = 255u;
-    } else if (dist < 64u) {
-      r = 0u;
-      g = (uint8_t)(255u - dist * 3u);
-      b = 0u;
+    if (dist < head) {
+      if (white_heads) {
+        r = 255u;
+        g = 255u;
+        b = 255u;
+      } else {
+        led_matrix_hsv_to_rgb((uint8_t)(96u + hue_bias), 255u, 255u, &r, &g, &b);
+      }
+    } else if (dist < trail) {
+      led_matrix_hsv_to_rgb((uint8_t)(96u + hue_bias), 255u,
+                            (uint8_t)(255u - ((uint16_t)dist * 255u) / trail),
+                            &r, &g, &b);
     } else {
       r = g = b = 0u;
     }
@@ -777,17 +876,23 @@ static void effect_matrix(void) {
  * @brief Sparkle/Twinkle effect
  */
 static void effect_sparkle(void) {
+  uint8_t density = (uint8_t)(2u + ((uint16_t)(255u - effect_param(0, 48u)) * 10u) / 255u);
+  uint8_t sparkle_value = effect_param(1, 224u);
+  uint8_t rainbow_mix = effect_param(2, 160u);
+  uint8_t ambient = effect_param(3, 0u);
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     uint8_t seed = (uint8_t)((led_pos_x[i] / 19u) + (led_pos_y[i] / 23u) + effect_offset) & 0x1Fu;
     uint8_t r, g, b;
 
-    if (seed == 0u) {
-      r = g = b = 255u;
-    } else if (seed < 3u) {
+    if ((seed % density) == 0u) {
+      r = g = b = sparkle_value;
+    } else if (seed < density) {
       uint8_t hue = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) + effect_offset;
-      led_matrix_hsv_to_rgb(hue, 255, 128, &r, &g, &b);
+      led_matrix_hsv_to_rgb(hue, rainbow_mix, sparkle_value / 2u, &r, &g, &b);
     } else {
-      r = g = b = 0u;
+      r = 0u;
+      g = ambient;
+      b = (uint8_t)(ambient / 3u);
     }
 
     led_matrix_set_pixel_idx(i, r, g, b);
@@ -798,13 +903,18 @@ static void effect_sparkle(void) {
  * @brief Breathing rainbow - color cycles while breathing
  */
 static void effect_breathing_rainbow(void) {
+  uint8_t min_brightness = effect_param(0, 24u);
+  uint8_t hue_mul =
+      (uint8_t)(1u + ((uint16_t)effect_param(1, 192u) * 4u) / 255u);
+  uint8_t sat = effect_param(2, 255u);
   uint8_t breath = (effect_offset % 128);
   if (breath > 64)
     breath = 128 - breath;
-  uint8_t brightness = (255 * breath) / 64;
-  uint8_t hue = effect_offset / 2; // Slowly cycle through colors
+  uint8_t brightness =
+      (uint8_t)(min_brightness + (((uint16_t)(255u - min_brightness) * breath) / 64u));
+  uint8_t hue = (uint8_t)((effect_offset * hue_mul) / 2u);
   uint8_t r, g, b;
-  led_matrix_hsv_to_rgb(hue, 255, brightness, &r, &g, &b);
+  led_matrix_hsv_to_rgb(hue, sat, brightness, &r, &g, &b);
   led_matrix_fill(r, g, b);
 }
 
@@ -812,14 +922,19 @@ static void effect_breathing_rainbow(void) {
  * @brief Spiral effect
  */
 static void effect_spiral(void) {
+  uint8_t twist = (uint8_t)(1u + ((uint16_t)effect_param(0, 160u) * 6u) / 255u);
+  uint8_t radial_div = (uint8_t)(48u + effect_param(1, 96u));
+  uint8_t orbit_mul =
+      (uint8_t)(1u + ((uint16_t)effect_param(2, 128u) * 4u) / 255u);
+  uint8_t sat = effect_param(3, 255u);
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     int16_t cx = (int16_t)led_pos_x[i] - (int16_t)LED_LAYOUT_CENTER_X;
     int16_t cy = (int16_t)led_pos_y[i] - (int16_t)LED_LAYOUT_CENTER_Y;
-    uint16_t dist = (uint16_t)((cx * cx + cy * cy) / 96);
-    uint8_t angle = (uint8_t)((cx / 12) + (cy / 12));
-    uint8_t hue = (uint8_t)(dist + angle + effect_offset * 3u);
+    uint16_t dist = (uint16_t)((cx * cx + cy * cy) / radial_div);
+    uint8_t angle = (uint8_t)(((cx / 12) + (cy / 12)) * twist);
+    uint8_t hue = (uint8_t)(dist + angle + effect_offset * orbit_mul);
     uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+    led_matrix_hsv_to_rgb(hue, sat, 255, &r, &g, &b);
     led_matrix_set_pixel_idx(i, r, g, b);
   }
 }
@@ -828,9 +943,25 @@ static void effect_spiral(void) {
  * @brief Solid color cycle - all LEDs same color, slowly changing
  */
 static void effect_color_cycle(void) {
-  uint8_t hue = effect_offset / 4; // Slow color change
+  uint8_t hue_step =
+      (uint8_t)(1u + ((uint16_t)effect_param(0, 64u) * 4u) / 255u);
+  uint8_t saturation = effect_param(1, 255u);
+  uint8_t value = effect_param(2, 255u);
+  uint8_t color_mix = effect_param(3, 0u);
+  uint8_t hue = (uint8_t)((effect_offset * hue_step) / 4u);
   uint8_t r, g, b;
-  led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+  led_matrix_hsv_to_rgb(hue, saturation, value, &r, &g, &b);
+  if (color_mix > 0u) {
+    r = (uint8_t)(((uint16_t)r * (255u - color_mix) +
+                   (uint16_t)effect_color_r * color_mix) /
+                  255u);
+    g = (uint8_t)(((uint16_t)g * (255u - color_mix) +
+                   (uint16_t)effect_color_g * color_mix) /
+                  255u);
+    b = (uint8_t)(((uint16_t)b * (255u - color_mix) +
+                   (uint16_t)effect_color_b * color_mix) /
+                  255u);
+  }
   led_matrix_fill(r, g, b);
 }
 
@@ -843,6 +974,13 @@ static void effect_color_cycle(void) {
  */
 static void effect_distance_sensor(void) {
   led_matrix_clear();
+  uint8_t min_value = effect_param(0, 32u);
+  uint8_t hue_span = effect_param(1, 170u);
+  uint8_t sat = effect_param(2, 255u);
+  bool reverse = effect_param_flag(3, false);
+  if (hue_span == 0u) {
+    hue_span = 1u;
+  }
 
   for (uint8_t key = 0; key < NUM_KEYS; key++) {
     int16_t distance_value = analog_read_distance_value(key);
@@ -859,12 +997,15 @@ static void effect_distance_sensor(void) {
     uint8_t level = (uint8_t)((distance_01mm * 255u) / KEY_TRAVEL_MAX_01MM);
 
     // Hue ramps from cyan/blue to red as distance increases.
-    uint8_t hue = (uint8_t)(170u - ((uint16_t)170u * level) / 255u);
+    uint8_t hue = reverse
+                      ? (uint8_t)(((uint16_t)hue_span * level) / 255u)
+                      : (uint8_t)(hue_span -
+                                  ((uint16_t)hue_span * level) / 255u);
     // Also increase brightness with travel for better readability.
-    uint8_t value = (uint8_t)(32u + ((uint16_t)223u * level) / 255u);
+    uint8_t value = (uint8_t)(min_value + ((uint16_t)(255u - min_value) * level) / 255u);
 
     uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, 255, value, &r, &g, &b);
+    led_matrix_hsv_to_rgb(hue, sat, value, &r, &g, &b);
     led_matrix_set_pixel_idx(key, r, g, b);
   }
 }
@@ -874,6 +1015,11 @@ static void effect_distance_sensor(void) {
  */
 static void effect_reactive(void) {
   led_matrix_clear();
+  uint8_t decay = (uint8_t)(6u + ((uint16_t)effect_param(0, 36u) * 24u) / 255u);
+  uint8_t spread = (uint8_t)(10u + ((uint16_t)effect_param(1, 96u) * 18u) / 255u);
+  uint8_t base_glow = effect_param(2, 0u);
+  bool white_core = effect_param_flag(3, true);
+  uint8_t gain = (uint8_t)(64u + ((uint16_t)effect_param(4, 192u) * 191u) / 255u);
 
   for (uint8_t led_idx = 0; led_idx < NUM_KEYS; led_idx++) {
     uint16_t intensity = 0;
@@ -884,7 +1030,7 @@ static void effect_reactive(void) {
         continue;
       }
 
-      uint16_t distance = led_layout_distance(led_idx, key) / 24u;
+      uint16_t distance = led_layout_distance(led_idx, key) / spread;
       uint16_t core =
           (energy > (uint16_t)(distance * 18u))
               ? (energy - (uint16_t)(distance * 18u))
@@ -907,9 +1053,26 @@ static void effect_reactive(void) {
       }
     }
 
-    uint8_t r = (uint8_t)((uint16_t)effect_color_r * intensity / 255u);
-    uint8_t g = (uint8_t)((uint16_t)effect_color_g * intensity / 255u);
-    uint8_t b = (uint8_t)((uint16_t)effect_color_b * intensity / 255u);
+    intensity = (uint16_t)(((uint32_t)intensity * gain) / 255u);
+    if (intensity > 255u) {
+      intensity = 255u;
+    }
+
+    uint16_t r_u16 =
+        (uint16_t)base_glow +
+        (((uint16_t)effect_color_r * intensity) / 255u);
+    uint16_t g_u16 =
+        (uint16_t)base_glow +
+        (((uint16_t)effect_color_g * intensity) / 255u);
+    uint16_t b_u16 =
+        (uint16_t)base_glow +
+        (((uint16_t)effect_color_b * intensity) / 255u);
+    uint8_t r = (uint8_t)((r_u16 > 255u) ? 255u : r_u16);
+    uint8_t g = (uint8_t)((g_u16 > 255u) ? 255u : g_u16);
+    uint8_t b = (uint8_t)((b_u16 > 255u) ? 255u : b_u16);
+    if (white_core && intensity > 220u) {
+      r = g = b = 255u;
+    }
     led_matrix_set_pixel_idx(led_idx, r, g, b);
   }
 
@@ -919,8 +1082,8 @@ static void effect_reactive(void) {
       continue;
     }
 
-    if (key_wave_energy[key] > 18u) {
-      key_wave_energy[key] -= 18u;
+    if (key_wave_energy[key] > decay) {
+      key_wave_energy[key] -= decay;
     } else {
       key_wave_energy[key] = 0;
     }
@@ -973,50 +1136,6 @@ void led_matrix_effect_tick(uint32_t tick) {
   }
 
   last_render_tick = tick;
-
-  // Handle diagnostic modes
-  if (diagnostic_mode == 1) {
-    // Mode 1: DMA Stress - trigger DMA transfer without CPU computation
-    // Just mark buffer dirty to cause DMA activity at current FPS rate
-    led_ws2812_handle.is_dirty = 1;
-    return;
-  }
-
-  if (diagnostic_mode == 2) {
-    // Mode 2: CPU Stress - do heavy computation but don't trigger DMA
-    // Run a rainbow-like computation to stress CPU
-    for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-      uint8_t hue = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) +
-                    scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y) +
-                    (uint8_t)(effect_offset * 2u);
-      uint8_t r, g, b;
-      led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
-      pixels_runtime[i * 3 + 0] = r;
-      pixels_runtime[i * 3 + 1] = g;
-      pixels_runtime[i * 3 + 2] = b;
-    }
-    // Explicitly clear dirty flag to prevent DMA
-    led_ws2812_handle.is_dirty = 0;
-    return;
-  }
-
-  if (diagnostic_mode == 3) {
-    // Mode 3: CPU + DMA Stress, no PWM output
-    // Compute effect AND fill DMA buffer, but timer output is disabled
-    // This tests if DMA memory access causes issues even without pin toggling
-    for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-      uint8_t hue = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) +
-                    scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y) +
-                    (uint8_t)(effect_offset * 2u);
-      uint8_t r, g, b;
-      uint8_t physical_index = LOGICAL_LED_INDEX_TO_PHYSICAL_LED_INDEX[i];
-      led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
-      setLedValues(&led_ws2812_handle, physical_index, r, g, b);
-    }
-    // Note: DMA still runs and updates the CCR register, but if timer output
-    // was disabled before entering this mode, no signal goes to LEDs
-    return;
-  }
 
   // Matrix static mode and third-party mode do not run internal animations.
   if (current_effect == LED_EFFECT_STATIC_MATRIX ||

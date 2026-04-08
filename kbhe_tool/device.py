@@ -14,6 +14,7 @@ from .protocol import (
     KEY_SETTINGS_PER_CHUNK,
     KEY_STATES_PER_CHUNK,
     LED_BYTES_PER_CHUNK,
+    LED_EFFECT_PARAM_COUNT,
     PACKET_SIZE,
     PID,
     RAW_HID_INTERFACE,
@@ -580,6 +581,24 @@ class KBHEDevice:
         data = [0, r, g, b]  # placeholder, r, g, b
         resp = self.send_command(Command.SET_LED_EFFECT_COLOR, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def get_led_effect_params(self, effect_mode):
+        """Get persisted tuning params for one LED effect."""
+        data = [0, int(effect_mode) & 0xFF]
+        resp = self.send_command(Command.GET_LED_EFFECT_PARAMS, data)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            count = min(int(resp[3]), LED_EFFECT_PARAM_COUNT, max(0, len(resp) - 4))
+            return list(resp[4:4 + count])
+        return None
+
+    def set_led_effect_params(self, effect_mode, params):
+        """Set persisted tuning params for one LED effect."""
+        values = [int(v) & 0xFF for v in list(params)[:LED_EFFECT_PARAM_COUNT]]
+        while len(values) < LED_EFFECT_PARAM_COUNT:
+            values.append(0)
+        data = [0, int(effect_mode) & 0xFF, *values]
+        resp = self.send_command(Command.SET_LED_EFFECT_PARAMS, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def get_led_fps_limit(self):
         """Get LED FPS limit (0 = unlimited)."""
@@ -682,7 +701,7 @@ class KBHEDevice:
                 scan_rate_hz = resp[28] | (resp[29] << 8)
 
                 task_times_us = None
-                if len(resp) >= 44:
+                if len(resp) >= 46:
                     task_times_us = {
                         'analog': resp[30] | (resp[31] << 8),
                         'trigger': resp[32] | (resp[33] << 8),
@@ -690,22 +709,22 @@ class KBHEDevice:
                         'keyboard': resp[36] | (resp[37] << 8),
                         'keyboard_nkro': resp[38] | (resp[39] << 8),
                         'gamepad': resp[40] | (resp[41] << 8),
-                        'total': resp[42] | (resp[43] << 8),
+                        'led': resp[42] | (resp[43] << 8),
+                        'total': resp[44] | (resp[45] << 8),
                     }
 
                 analog_monitor_us = None
                 if len(resp) >= 64:
                     analog_monitor_us = {
-                        'raw': resp[44] | (resp[45] << 8),
-                        'filter': resp[46] | (resp[47] << 8),
-                        'calibration': resp[48] | (resp[49] << 8),
-                        'lut': resp[50] | (resp[51] << 8),
-                        'store': resp[52] | (resp[53] << 8),
-                        'key_min': resp[54] | (resp[55] << 8),
-                        'key_max': resp[56] | (resp[57] << 8),
-                        'key_avg': resp[58] | (resp[59] << 8),
-                        'nonzero_keys': resp[60] | (resp[61] << 8),
-                        'key_max_index': resp[62] | (resp[63] << 8),
+                        'raw': resp[46] | (resp[47] << 8),
+                        'filter': resp[48] | (resp[49] << 8),
+                        'calibration': resp[50] | (resp[51] << 8),
+                        'lut': resp[52] | (resp[53] << 8),
+                        'store': resp[54] | (resp[55] << 8),
+                        'key_min': resp[56] | (resp[57] << 8),
+                        'key_max': resp[58] | (resp[59] << 8),
+                        'key_avg': resp[60] | (resp[61] << 8),
+                        'nonzero_keys': resp[62] | (resp[63] << 8),
                     }
 
                 # If timing fields are zero here but valid in legacy position,
@@ -767,6 +786,40 @@ class KBHEDevice:
             }
         return None
 
+    def get_filtered_adc_chunk(self, start_index: int):
+        """Fetch one EMA-filtered ADC chunk from the firmware."""
+        data = [0, max(0, min(255, int(start_index)))]
+        resp = self.send_command(Command.GET_FILTERED_ADC_CHUNK, data, timeout_ms=150)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            returned_start = resp[2]
+            value_count = min(resp[3], (len(resp) - 4) // 2)
+            values = []
+            for i in range(value_count):
+                base = 4 + i * 2
+                values.append(resp[base] | (resp[base + 1] << 8))
+            return {
+                "start_index": returned_start,
+                "values": values,
+            }
+        return None
+
+    def get_calibrated_adc_chunk(self, start_index: int):
+        """Fetch one calibrated ADC chunk from the firmware."""
+        data = [0, max(0, min(255, int(start_index)))]
+        resp = self.send_command(Command.GET_CALIBRATED_ADC_CHUNK, data, timeout_ms=150)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            returned_start = resp[2]
+            value_count = min(resp[3], (len(resp) - 4) // 2)
+            values = []
+            for i in range(value_count):
+                base = 4 + i * 2
+                values.append(resp[base] | (resp[base + 1] << 8))
+            return {
+                "start_index": returned_start,
+                "values": values,
+            }
+        return None
+
     def get_all_raw_adc_values(self, key_count: int = KEY_COUNT):
         """Fetch raw ADC values for the whole keyboard in multiple HID chunks."""
         values = [0] * key_count
@@ -774,6 +827,62 @@ class KBHEDevice:
 
         while next_index < key_count:
             chunk = self.get_raw_adc_chunk(next_index)
+            if not chunk:
+                return None
+
+            start_index = int(chunk.get("start_index", next_index))
+            chunk_values = list(chunk.get("values", []))
+            if start_index >= key_count or not chunk_values:
+                return None
+
+            for offset, value in enumerate(chunk_values):
+                dst = start_index + offset
+                if dst >= key_count:
+                    break
+                values[dst] = int(value)
+
+            advanced_to = start_index + len(chunk_values)
+            if advanced_to <= next_index:
+                return None
+            next_index = advanced_to
+
+        return values
+
+    def get_all_filtered_adc_values(self, key_count: int = KEY_COUNT):
+        """Fetch EMA-filtered ADC values for the whole keyboard in multiple HID chunks."""
+        values = [0] * key_count
+        next_index = 0
+
+        while next_index < key_count:
+            chunk = self.get_filtered_adc_chunk(next_index)
+            if not chunk:
+                return None
+
+            start_index = int(chunk.get("start_index", next_index))
+            chunk_values = list(chunk.get("values", []))
+            if start_index >= key_count or not chunk_values:
+                return None
+
+            for offset, value in enumerate(chunk_values):
+                dst = start_index + offset
+                if dst >= key_count:
+                    break
+                values[dst] = int(value)
+
+            advanced_to = start_index + len(chunk_values)
+            if advanced_to <= next_index:
+                return None
+            next_index = advanced_to
+
+        return values
+
+    def get_all_calibrated_adc_values(self, key_count: int = KEY_COUNT):
+        """Fetch calibrated ADC values for the whole keyboard in multiple HID chunks."""
+        values = [0] * key_count
+        next_index = 0
+
+        while next_index < key_count:
+            chunk = self.get_calibrated_adc_chunk(next_index)
             if not chunk:
                 return None
 

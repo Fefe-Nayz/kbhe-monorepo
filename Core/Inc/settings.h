@@ -6,7 +6,9 @@
 #ifndef SETTINGS_H_
 #define SETTINGS_H_
 
+#include "analog/filter.h"
 #include "board_config.h"
+#include "led_matrix.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -19,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x0008         // 82-key persistent settings + chunked HID
+#define SETTINGS_VERSION 0x000A         // Extended LED effect params + DMA cleanup
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -197,7 +199,7 @@ typedef struct __attribute__((packed)) {
   uint8_t led_effect_color_g;
   uint8_t led_effect_color_b;
   uint8_t led_fps_limit; // FPS limit for LED effects (0 = unlimited)
-  uint8_t led_reserved[2];
+  uint8_t led_effect_params[LED_EFFECT_MAX][LED_EFFECT_PARAM_COUNT];
 
   // ADC EMA Filter settings
   uint8_t filter_enabled;    // Enable/disable ADC EMA filtering
@@ -506,6 +508,50 @@ void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b);
  * @return true if successful
  */
 bool settings_set_led_effect_color(uint8_t r, uint8_t g, uint8_t b);
+
+/**
+ * @brief Get persisted parameters for one LED effect.
+ * @param effect_mode Effect mode id
+ * @param params Output array of LED_EFFECT_PARAM_COUNT bytes
+ */
+void settings_get_led_effect_params(uint8_t effect_mode, uint8_t *params);
+
+/**
+ * @brief Set persisted parameters for one LED effect.
+ * Applies them immediately if the effect is currently active.
+ * @param effect_mode Effect mode id
+ * @param params Input array of LED_EFFECT_PARAM_COUNT bytes
+ * @return true if successful
+ */
+bool settings_set_led_effect_params(uint8_t effect_mode, const uint8_t *params);
+
+//--------------------------------------------------------------------+
+// ADC Filter Settings API
+//--------------------------------------------------------------------+
+
+/**
+ * @brief Check if ADC EMA filtering is enabled
+ */
+bool settings_is_filter_enabled(void);
+
+/**
+ * @brief Enable/disable ADC EMA filtering live
+ * @param enabled true to enable filtering, false for raw passthrough
+ * @return true if successful
+ */
+bool settings_set_filter_enabled(bool enabled);
+
+/**
+ * @brief Get current ADC EMA parameters
+ */
+void settings_get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
+                                uint8_t *alpha_max_denom);
+
+/**
+ * @brief Set current ADC EMA parameters live
+ */
+bool settings_set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
+                                uint8_t alpha_max_denom);
 
 //--------------------------------------------------------------------+
 // Key Settings API

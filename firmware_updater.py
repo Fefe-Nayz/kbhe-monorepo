@@ -358,7 +358,12 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries, logger=d
     finally:
         device.close()
 
-    wait_for_path(find_app_path, max(timeout_s, 10.0), "application")
+    try:
+        wait_for_absence(find_updater_path, max(timeout_s, 5.0), "updater")
+    except RuntimeError:
+        logger("Updater still visible after BOOT, waiting for reboot path...")
+
+    wait_for_path(find_app_path, max(timeout_s, 15.0), "application")
     logger("Update complete, application is back online.")
 
 

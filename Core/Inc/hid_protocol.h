@@ -87,6 +87,8 @@ typedef enum {
   CMD_SET_LED_FPS_LIMIT = 0x74,    // Set LED FPS limit
   CMD_GET_LED_DIAGNOSTIC = 0x75,   // Get LED diagnostic mode
   CMD_SET_LED_DIAGNOSTIC = 0x76,   // Set LED diagnostic mode
+  CMD_GET_LED_EFFECT_PARAMS = 0x77, // Get persisted params for one effect
+  CMD_SET_LED_EFFECT_PARAMS = 0x78, // Set persisted params for one effect
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
@@ -102,6 +104,8 @@ typedef enum {
   CMD_ADC_CAPTURE_STATUS = 0xE4,
   CMD_ADC_CAPTURE_READ = 0xE5,
   CMD_GET_RAW_ADC_CHUNK = 0xE6,
+  CMD_GET_FILTERED_ADC_CHUNK = 0xE7,
+  CMD_GET_CALIBRATED_ADC_CHUNK = 0xE8,
 
   // Echo command for testing (0xFE)
   CMD_ECHO = 0xFE,
@@ -253,7 +257,7 @@ typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
   uint16_t adc_raw[6];      // Raw ADC values (12-bit)
-  uint16_t adc_filtered[6]; // Filtered ADC values
+  uint16_t adc_filtered[6]; // EMA-filtered ADC values before calibration/LUT
   uint16_t scan_time_us;  // Main loop scan time in microseconds
   uint16_t scan_rate_hz;  // Calculated scan rate in Hz
   uint16_t task_analog_us;
@@ -262,6 +266,7 @@ typedef struct __attribute__((packed)) {
   uint16_t task_keyboard_us;
   uint16_t task_keyboard_nkro_us;
   uint16_t task_gamepad_us;
+  uint16_t task_led_us;
   uint16_t task_total_us;
   uint16_t analog_raw_us;
   uint16_t analog_filter_us;
@@ -272,7 +277,6 @@ typedef struct __attribute__((packed)) {
   uint16_t analog_key_max_us;
   uint16_t analog_key_avg_us;
   uint16_t analog_nonzero_keys;
-  uint16_t analog_key_max_index;
 } hid_resp_adc_values_t;
 
 /**
@@ -334,8 +338,8 @@ typedef struct __attribute__((packed)) {
   uint8_t status;
   uint8_t start_index;
   uint8_t value_count;
-  uint16_t adc_raw[HID_RAW_ADC_VALUES_PER_CHUNK];
-} hid_resp_raw_adc_chunk_t;
+  uint16_t adc_values[HID_RAW_ADC_VALUES_PER_CHUNK];
+} hid_resp_adc_chunk_t;
 
 /**
  * @brief ADC capture read request packet

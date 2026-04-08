@@ -1,7 +1,5 @@
 #include <stdint.h>
 
-#define DISABLE_INPUT 1
-
 uint16_t layout_get_default_keycode(uint8_t key);
 
 uint16_t layout_get_active_keycode(uint8_t key);

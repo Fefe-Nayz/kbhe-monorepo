@@ -87,6 +87,7 @@ extern uint32_t task_socd_us;
 extern uint32_t task_keyboard_us;
 extern uint32_t task_keyboard_nkro_us;
 extern uint32_t task_gamepad_us;
+extern uint32_t task_led_us;
 extern uint32_t task_total_us;
 
 // ADC EMA Filter control functions

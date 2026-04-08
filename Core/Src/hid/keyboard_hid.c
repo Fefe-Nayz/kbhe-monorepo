@@ -6,6 +6,7 @@
 
 #include "hid/keyboard_hid.h"
 #include "led_indicator.h"
+#include "led_matrix.h"
 #include "hid/raw_hid.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
@@ -169,8 +170,10 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
   case HID_ITF_KEYBOARD: // Keyboard
     if (report_type == HID_REPORT_TYPE_OUTPUT && bufsize >= 1) {
       uint8_t led_state = buffer[0];
-      // Update PE0 LED indicator for Caps Lock / Num Lock
+      // Update lock-state tracking and refresh the matrix so the Caps Lock key
+      // LED can be overridden immediately.
       led_indicator_set_state(led_state);
+      led_matrix_update();
     }
     break;
 

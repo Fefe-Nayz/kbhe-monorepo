@@ -160,6 +160,7 @@ uint32_t task_socd_us = 0;
 uint32_t task_keyboard_us = 0;
 uint32_t task_keyboard_nkro_us = 0;
 uint32_t task_gamepad_us = 0;
+uint32_t task_led_us = 0;
 uint32_t task_total_us = 0;
 
 //--------------------------------------------------------------------+
@@ -464,7 +465,8 @@ int main(void) {
 
   // triggerInit();
 
-  // Initialize PE0 LED indicator for caps/num lock
+  // Initialize keyboard lock-state tracking (used to override the Caps Lock
+  // key LED inside the RGB matrix).
   led_indicator_init();
 
   /*
@@ -489,6 +491,9 @@ int main(void) {
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+    bool processed_scan = false;
+    uint32_t task_start_cycles = 0;
+
     tud_task(); // TinyUSB device task
     raw_hid_task();
     updater_app_task();
@@ -500,7 +505,8 @@ int main(void) {
       adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
       adc_full_cycle_start_cycles = now;
 
-      uint32_t task_start_cycles = DWT->CYCCNT;
+      task_start_cycles = DWT->CYCCNT;
+      processed_scan = true;
 
       uint32_t step_start_cycles = DWT->CYCCNT;
       analog_task();
@@ -534,8 +540,6 @@ int main(void) {
       gamepad_hid_task();
       task_gamepad_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
-      task_total_us = cycles_to_us(DWT->CYCCNT - task_start_cycles);
-
       analog_set_scan_complete(false);
       TIM4_StartOneShot_TRGO();
     }
@@ -543,8 +547,14 @@ int main(void) {
     // LED/UI timing should not depend on ADC scan state. The scan completes so
     // quickly on the 82-key board that gating animation updates behind the
     // "no scan complete" branch effectively starves LED effects.
+    uint32_t led_start_cycles = DWT->CYCCNT;
     led_matrix_effect_tick(HAL_GetTick());
     led_indicator_tick(HAL_GetTick());
+    task_led_us = cycles_to_us(DWT->CYCCNT - led_start_cycles);
+
+    if (processed_scan) {
+      task_total_us = cycles_to_us(DWT->CYCCNT - task_start_cycles);
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

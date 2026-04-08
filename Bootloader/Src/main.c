@@ -10,6 +10,7 @@ static bool s_hal_initialized = false;
 static void SystemClock_Config(void);
 static void USB_HS_Init(void);
 static void jump_to_application(bool runtime_cleanup);
+static void reboot_to_application(void);
 void Error_Handler(void);
 
 uint32_t tusb_time_millis_api(void) { return HAL_GetTick(); }
@@ -134,6 +135,25 @@ static void jump_to_application(bool runtime_cleanup) {
   }
 }
 
+static void reboot_to_application(void) {
+  if (tusb_inited()) {
+    (void)tud_disconnect();
+    HAL_Delay(30);
+    (void)tusb_deinit(USB_RHPORT_HS);
+  }
+
+  if (s_hal_initialized) {
+    HAL_NVIC_DisableIRQ(OTG_HS_IRQn);
+    __HAL_RCC_USB_OTG_HS_ULPI_CLK_DISABLE();
+    __HAL_RCC_USB_OTG_HS_CLK_DISABLE();
+    __HAL_RCC_OTGPHYC_CLK_DISABLE();
+  }
+
+  boot_request_clear();
+  HAL_Delay(10);
+  NVIC_SystemReset();
+}
+
 int main(void) {
   bool stay_in_updater = boot_request_take(BOOT_REQUEST_ACTION_ENTER_UPDATER);
 
@@ -156,7 +176,7 @@ int main(void) {
     bootloader_usb_task();
 
     if (updater_bootloader_should_jump_to_app()) {
-      jump_to_application(true);
+      reboot_to_application();
     }
   }
 }

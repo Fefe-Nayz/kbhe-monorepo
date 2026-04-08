@@ -28,6 +28,8 @@ extern "C" {
 #define LED_BRIGHTNESS_MIN 0
 #define LED_BRIGHTNESS_MAX 255
 #define LED_BRIGHTNESS_DEFAULT 50
+// Maximum number of persisted tuning bytes available per effect.
+#define LED_EFFECT_PARAM_COUNT 6
 
 //--------------------------------------------------------------------+
 // LED Effect Modes
@@ -215,6 +217,18 @@ led_effect_mode_t led_matrix_get_effect(void);
  * @param b Blue value
  */
 void led_matrix_set_effect_color(uint8_t r, uint8_t g, uint8_t b);
+
+/**
+ * @brief Load runtime parameters for the active effect.
+ * @param params Array of LED_EFFECT_PARAM_COUNT bytes.
+ */
+void led_matrix_set_effect_params(const uint8_t *params);
+
+/**
+ * @brief Read runtime parameters for the active effect.
+ * @param params Output array of LED_EFFECT_PARAM_COUNT bytes.
+ */
+void led_matrix_get_effect_params(uint8_t *params);
 
 /**
  * @brief Set effect speed (animation rate)

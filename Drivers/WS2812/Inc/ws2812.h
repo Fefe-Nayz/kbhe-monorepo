@@ -22,6 +22,10 @@
 
 #define WS2812_MAX_LEDS 128
 
+#ifndef WS2812_USE_SOFTWARE_BACKEND
+#define WS2812_USE_SOFTWARE_BACKEND 1
+#endif
+
 // One DMA half-buffer must carry exactly one LED frame: 24 PWM periods
 // (8 bits per color, 3 colors in GRB order). A larger value inserts extra
 // invalid slots between LEDs and corrupts the chain.

@@ -1,6 +1,6 @@
 /*
  * led_indicator.h
- * Status LED indicator on PE0 for caps lock and num lock
+ * Keyboard lock state tracking for Caps/Num/Scroll lock.
  */
 
 #ifndef LED_INDICATOR_H_
@@ -27,7 +27,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 
 /**
- * @brief Initialize the LED indicator (PE0)
+ * @brief Initialize lock-state tracking.
  */
 void led_indicator_init(void);
 
@@ -35,16 +35,13 @@ void led_indicator_init(void);
  * @brief Update LED state from HID keyboard LED report
  * @param led_state HID LED state byte
  *
- * Behavior:
- * - Caps Lock ON: LED solid ON
- * - Num Lock ON (no caps): LED blinking
- * - Both OFF: LED OFF
+ * Stores the host-provided keyboard LED byte so the firmware can react to
+ * Caps/Num/Scroll lock state changes.
  */
 void led_indicator_set_state(uint8_t led_state);
 
 /**
- * @brief Tick function for blinking, call from main loop
- * @param tick_ms Current system tick in ms (e.g., HAL_GetTick())
+ * @brief Tick hook kept for compatibility with existing main loop.
  */
 void led_indicator_tick(uint32_t tick_ms);
 
@@ -57,6 +54,11 @@ bool led_indicator_is_caps_lock(void);
  * @brief Get current num lock state
  */
 bool led_indicator_is_num_lock(void);
+
+/**
+ * @brief Get current scroll lock state
+ */
+bool led_indicator_is_scroll_lock(void);
 
 #ifdef __cplusplus
 }

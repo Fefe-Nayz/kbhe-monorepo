@@ -30,6 +30,7 @@ from ..widgets import (
     PageScaffold,
     SectionCard,
     StatusChip,
+    SubCard,
     make_primary_button,
     make_secondary_button,
 )
@@ -140,19 +141,14 @@ class GamepadPage(QWidget):
         )
         root.addWidget(scaffold, 1)
 
-        main_row = QHBoxLayout()
-        main_row.setSpacing(14)
-        main_row.setAlignment(Qt.AlignTop)
-        scaffold.content_layout.addLayout(main_row)
+        scaffold.add_card(self._build_focus_mapping_card())
 
-        main_row.addWidget(self._build_focus_mapping_card(), 2)
-
-        side_stack = QVBoxLayout()
-        side_stack.setSpacing(14)
-        side_stack.addWidget(self._build_settings_card())
-        side_stack.addWidget(self._build_preview_card())
-        side_stack.addStretch(1)
-        main_row.addLayout(side_stack, 1)
+        lower_row = QHBoxLayout()
+        lower_row.setSpacing(14)
+        lower_row.setAlignment(Qt.AlignTop)
+        lower_row.addWidget(self._build_settings_card(), 1)
+        lower_row.addWidget(self._build_preview_card(), 1)
+        scaffold.content_layout.addLayout(lower_row)
 
         scaffold.add_card(self._build_mapping_table_card())
 
@@ -182,6 +178,8 @@ class GamepadPage(QWidget):
         focused_row.addStretch(1)
         card.body_layout.addLayout(focused_row)
 
+        tuning = SubCard()
+
         # Deadzone slider
         dz_label_row = QHBoxLayout()
         dz_lbl = QLabel("Deadzone")
@@ -191,12 +189,12 @@ class GamepadPage(QWidget):
         self.deadzone_value_label = QLabel()
         self.deadzone_value_label.setObjectName("Muted")
         dz_label_row.addWidget(self.deadzone_value_label)
-        card.body_layout.addLayout(dz_label_row)
+        tuning.layout.addLayout(dz_label_row)
 
         self.deadzone_slider = QSlider(Qt.Orientation.Horizontal)
         self.deadzone_slider.setRange(0, 255)
         self.deadzone_slider.valueChanged.connect(self._update_deadzone_label)
-        card.body_layout.addWidget(self.deadzone_slider)
+        tuning.layout.addWidget(self.deadzone_slider)
 
         # Curve combo
         curve_row = QHBoxLayout()
@@ -207,14 +205,15 @@ class GamepadPage(QWidget):
         for value, label in self.CURVE_LABELS.items():
             self.curve_combo.addItem(label, value)
         curve_row.addWidget(self.curve_combo, 1)
-        card.body_layout.addLayout(curve_row)
+        tuning.layout.addLayout(curve_row)
 
         self.square_check = QCheckBox("Square mode")
         self.snappy_check = QCheckBox("Snappy mode")
         self.mirror_check = QCheckBox("Mirror keyboard output with gamepad")
-        card.body_layout.addWidget(self.square_check)
-        card.body_layout.addWidget(self.snappy_check)
-        card.body_layout.addWidget(self.mirror_check)
+        tuning.layout.addWidget(self.square_check)
+        tuning.layout.addWidget(self.snappy_check)
+        tuning.layout.addWidget(self.mirror_check)
+        card.body_layout.addWidget(tuning)
 
         actions = QHBoxLayout()
         actions.setSpacing(8)
@@ -243,12 +242,14 @@ class GamepadPage(QWidget):
         card.body_layout.addLayout(preview_header)
 
         self.preview_widget = StickPreview()
+        self.preview_widget.setMinimumSize(220, 220)
         card.body_layout.addWidget(self.preview_widget)
 
+        meters_card = SubCard()
         meters = QGridLayout()
         meters.setHorizontalSpacing(8)
         meters.setVerticalSpacing(8)
-        card.body_layout.addLayout(meters)
+        meters_card.layout.addLayout(meters)
 
         self.focus_axis_labels: dict[str, QLabel] = {}
         for row, key in enumerate(("normalized", "distance", "mapping")):
@@ -264,6 +265,7 @@ class GamepadPage(QWidget):
             meters.addWidget(label, row, 0)
             meters.addWidget(value, row, 1)
             self.focus_axis_labels[key] = value
+        card.body_layout.addWidget(meters_card)
         return card
 
     def _build_focus_mapping_card(self) -> SectionCard:
@@ -306,10 +308,11 @@ class GamepadPage(QWidget):
         body.addLayout(right, 1)
         body.setAlignment(right, Qt.AlignTop)
 
+        editor_card = SubCard()
         form = QGridLayout()
         form.setHorizontalSpacing(10)
         form.setVerticalSpacing(10)
-        right.addLayout(form)
+        editor_card.layout.addLayout(form)
 
         axis_label = QLabel("Axis")
         axis_label.setObjectName("Muted")
@@ -334,11 +337,13 @@ class GamepadPage(QWidget):
             self.focus_button_combo.addItem(label, value)
         form.addWidget(button_label, 2, 0)
         form.addWidget(self.focus_button_combo, 2, 1)
+        right.addWidget(editor_card)
 
+        stats_card = SubCard()
         focused_stats = QGridLayout()
         focused_stats.setHorizontalSpacing(8)
         focused_stats.setVerticalSpacing(8)
-        right.addLayout(focused_stats)
+        stats_card.layout.addLayout(focused_stats)
         self.focus_mapping_live_labels: dict[str, QLabel] = {}
         for row, key in enumerate(("normalized", "distance", "mapping")):
             label = QLabel(
@@ -353,6 +358,7 @@ class GamepadPage(QWidget):
             focused_stats.addWidget(label, row, 0)
             focused_stats.addWidget(value, row, 1)
             self.focus_mapping_live_labels[key] = value
+        right.addWidget(stats_card)
 
         actions = QHBoxLayout()
         actions.setSpacing(8)
@@ -377,7 +383,7 @@ class GamepadPage(QWidget):
         self.mapping_table.horizontalHeader().setStretchLastSection(True)
         self.mapping_table.setAlternatingRowColors(False)
         self.mapping_table.setMinimumHeight(260)
-        self.mapping_table.verticalHeader().setDefaultSectionSize(44)
+        self.mapping_table.verticalHeader().setDefaultSectionSize(34)
         self.mapping_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
 
         for row in range(KEY_COUNT):

@@ -14,6 +14,8 @@ static uint16_t raw_values[NUM_ANALOG_INPUTS];
 
 static uint16_t filtered_values[NUM_KEYS];
 
+static uint16_t calibrated_values[NUM_KEYS];
+
 static uint16_t distance_values[NUM_KEYS];
 
 static uint8_t current_mux_channel = 0;
@@ -82,10 +84,7 @@ void analog_init(AnalogConfig_t* config) {
     // Initialize filtered values to 0
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
         filtered_values[i] = 0;
-    }
-
-    // Initialize distance values to 0
-    for (uint8_t i = 0; i < NUM_KEYS; i++) {
+        calibrated_values[i] = 0;
         distance_values[i] = 0;
     }
 
@@ -141,7 +140,8 @@ void analog_task() {
         lut_cycles += (DWT->CYCCNT - step_start_cycles);
 
         step_start_cycles = DWT->CYCCNT;
-        filtered_values[key] = calibrated_value;
+        filtered_values[key] = filtered_value;
+        calibrated_values[key] = calibrated_value;
         distance_values[key] = distance_value;
         store_cycles += (DWT->CYCCNT - step_start_cycles);
 
@@ -195,7 +195,7 @@ uint16_t analog_read_raw_value(uint8_t key) {
 }
 
 /*
- * Read the filtered value for a key
+ * Read the EMA-filtered ADC value for a key, before calibration/LUT.
  */
 uint16_t analog_read_filtered_value(uint8_t key) {
     // Check if key is within valid range (0 to NUM_KEYS - 1)
@@ -205,6 +205,18 @@ uint16_t analog_read_filtered_value(uint8_t key) {
 
     // Return the filtered value
     return filtered_values[key];
+}
+
+/*
+ * Read the calibrated ADC value for a key, after EMA and calibration but
+ * before LUT distance conversion.
+ */
+uint16_t analog_read_calibrated_value(uint8_t key) {
+    if (key >= NUM_KEYS) {
+        return 0;
+    }
+
+    return calibrated_values[key];
 }
 
 int16_t analog_read_distance_value(uint8_t key) {

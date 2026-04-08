@@ -5,6 +5,7 @@
 
 #include "settings.h"
 #include "analog/calibration.h"
+#include "analog/filter.h"
 #include "flash_storage.h"
 #include "layout/layout.h"
 #include "led_matrix.h"
@@ -26,6 +27,101 @@ static settings_t current_settings;
 
 // Flag indicating if settings have been modified
 static bool settings_dirty = false;
+
+static void settings_default_effect_params(uint8_t effect_mode,
+                                           uint8_t *params) {
+  if (params == NULL) {
+    return;
+  }
+
+  memset(params, 0, LED_EFFECT_PARAM_COUNT);
+
+  switch ((led_effect_mode_t)effect_mode) {
+  case LED_EFFECT_RAINBOW:
+    params[0] = 160u; // Horizontal scale
+    params[1] = 96u;  // Vertical scale
+    params[2] = 160u; // Drift
+    params[3] = 255u; // Saturation
+    break;
+  case LED_EFFECT_BREATHING:
+    params[0] = 24u;  // Brightness floor
+    params[1] = 255u; // Brightness ceiling
+    params[2] = 48u;  // Plateau
+    break;
+  case LED_EFFECT_STATIC_RAINBOW:
+    params[0] = 160u; // Horizontal scale
+    params[1] = 120u; // Vertical scale
+    params[2] = 144u; // Saturation
+    params[3] = 255u; // Value
+    break;
+  case LED_EFFECT_SOLID:
+    params[0] = 255u; // Brightness trim
+    break;
+  case LED_EFFECT_PLASMA:
+    params[0] = 96u;  // Motion depth
+    params[1] = 192u; // Saturation
+    params[2] = 128u; // Radial warp
+    params[3] = 255u; // Value
+    break;
+  case LED_EFFECT_FIRE:
+    params[0] = 160u; // Heat boost
+    params[1] = 96u;  // Ember floor
+    params[2] = 96u;  // Cooling
+    params[3] = 0u;   // Palette
+    break;
+  case LED_EFFECT_OCEAN:
+    params[0] = 160u; // Hue bias
+    params[1] = 64u;  // Depth dimming
+    params[2] = 1u;   // Foam highlight
+    params[3] = 160u; // Crest speed
+    break;
+  case LED_EFFECT_MATRIX:
+    params[0] = 64u;  // Trail length
+    params[1] = 160u; // Head size
+    params[2] = 96u;  // Density
+    params[3] = 1u;   // White heads
+    params[4] = 0u;   // Hue bias
+    break;
+  case LED_EFFECT_SPARKLE:
+    params[0] = 48u;  // Density
+    params[1] = 224u; // Sparkle brightness
+    params[2] = 160u; // Rainbow mix
+    params[3] = 0u;   // Ambient glow
+    break;
+  case LED_EFFECT_BREATHING_RAINBOW:
+    params[0] = 24u;  // Brightness floor
+    params[1] = 192u; // Hue drift
+    params[2] = 255u; // Saturation
+    break;
+  case LED_EFFECT_SPIRAL:
+    params[0] = 160u; // Twist
+    params[1] = 96u;  // Radial scale
+    params[2] = 128u; // Orbit speed
+    params[3] = 255u; // Saturation
+    break;
+  case LED_EFFECT_COLOR_CYCLE:
+    params[0] = 64u;  // Hue step
+    params[1] = 255u; // Saturation
+    params[2] = 255u; // Value
+    params[3] = 0u;   // Effect-color mix
+    break;
+  case LED_EFFECT_REACTIVE:
+    params[0] = 36u;  // Decay
+    params[1] = 96u;  // Spread
+    params[2] = 0u;   // Base glow
+    params[3] = 1u;   // White core
+    params[4] = 192u; // Gain
+    break;
+  case LED_EFFECT_DISTANCE_SENSOR:
+    params[0] = 32u;  // Brightness floor
+    params[1] = 170u; // Hue span
+    params[2] = 255u; // Saturation
+    params[3] = 0u;   // Reverse gradient
+    break;
+  default:
+    break;
+  }
+}
 
 //--------------------------------------------------------------------+
 // CRC32 Implementation (Simple polynomial)
@@ -109,6 +205,15 @@ static void settings_set_defaults(void) {
   current_settings.led_effect_color_g = 0;
   current_settings.led_effect_color_b = 0;
   current_settings.led_fps_limit = 0; // Unlimited by default
+  for (uint8_t effect = 0; effect < LED_EFFECT_MAX; effect++) {
+    settings_default_effect_params(effect,
+                                   current_settings.led_effect_params[effect]);
+  }
+
+  current_settings.filter_enabled = FILTER_DEFAULT_ENABLED;
+  current_settings.filter_noise_band = FILTER_DEFAULT_NOISE_BAND;
+  current_settings.filter_alpha_min = FILTER_DEFAULT_ALPHA_MIN_DENOM;
+  current_settings.filter_alpha_max = FILTER_DEFAULT_ALPHA_MAX_DENOM;
 
   // Footer
   current_settings.magic_end = SETTINGS_MAGIC_END;
@@ -190,7 +295,14 @@ void settings_init(void) {
   led_matrix_set_effect_color(current_settings.led_effect_color_r,
                               current_settings.led_effect_color_g,
                               current_settings.led_effect_color_b);
+  led_matrix_set_effect_params(
+      current_settings.led_effect_params[current_settings.led_effect_mode]);
   led_matrix_set_fps_limit(current_settings.led_fps_limit);
+
+  filter_set_params(current_settings.filter_noise_band,
+                    current_settings.filter_alpha_min,
+                    current_settings.filter_alpha_max);
+  filter_set_enabled(current_settings.filter_enabled != 0);
 
   // Apply per-key runtime settings after the settings blob is loaded.
   trigger_reload_settings();
@@ -250,7 +362,13 @@ bool settings_reset(void) {
   led_matrix_set_effect_color(current_settings.led_effect_color_r,
                               current_settings.led_effect_color_g,
                               current_settings.led_effect_color_b);
+  led_matrix_set_effect_params(
+      current_settings.led_effect_params[current_settings.led_effect_mode]);
   led_matrix_set_fps_limit(current_settings.led_fps_limit);
+  filter_set_params(current_settings.filter_noise_band,
+                    current_settings.filter_alpha_min,
+                    current_settings.filter_alpha_max);
+  filter_set_enabled(current_settings.filter_enabled != 0);
   trigger_reload_settings();
   return settings_save();
 }
@@ -342,8 +460,12 @@ uint8_t settings_get_led_effect_mode(void) {
 }
 
 bool settings_set_led_effect_mode(uint8_t mode) {
+  if (mode >= LED_EFFECT_MAX) {
+    return false;
+  }
   current_settings.led_effect_mode = mode;
   led_matrix_set_effect((led_effect_mode_t)mode);
+  led_matrix_set_effect_params(current_settings.led_effect_params[mode]);
   return true; // Don't auto-save
 }
 
@@ -372,6 +494,71 @@ bool settings_set_led_effect_color(uint8_t r, uint8_t g, uint8_t b) {
   current_settings.led_effect_color_b = b;
   led_matrix_set_effect_color(r, g, b);
   return true; // Don't auto-save
+}
+
+void settings_get_led_effect_params(uint8_t effect_mode, uint8_t *params) {
+  if (params == NULL) {
+    return;
+  }
+
+  if (effect_mode >= LED_EFFECT_MAX) {
+    memset(params, 0, LED_EFFECT_PARAM_COUNT);
+    return;
+  }
+
+  memcpy(params, current_settings.led_effect_params[effect_mode],
+         LED_EFFECT_PARAM_COUNT);
+}
+
+bool settings_set_led_effect_params(uint8_t effect_mode, const uint8_t *params) {
+  if (effect_mode >= LED_EFFECT_MAX || params == NULL) {
+    return false;
+  }
+
+  memcpy(current_settings.led_effect_params[effect_mode], params,
+         LED_EFFECT_PARAM_COUNT);
+
+  if (current_settings.led_effect_mode == effect_mode) {
+    led_matrix_set_effect_params(current_settings.led_effect_params[effect_mode]);
+  }
+
+  return true;
+}
+
+//--------------------------------------------------------------------+
+// ADC Filter Settings API
+//--------------------------------------------------------------------+
+
+bool settings_is_filter_enabled(void) {
+  return current_settings.filter_enabled != 0;
+}
+
+bool settings_set_filter_enabled(bool enabled) {
+  current_settings.filter_enabled = enabled ? 1 : 0;
+  filter_set_enabled(enabled);
+  return true;
+}
+
+void settings_get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
+                                uint8_t *alpha_max_denom) {
+  if (noise_band != NULL) {
+    *noise_band = current_settings.filter_noise_band;
+  }
+  if (alpha_min_denom != NULL) {
+    *alpha_min_denom = current_settings.filter_alpha_min;
+  }
+  if (alpha_max_denom != NULL) {
+    *alpha_max_denom = current_settings.filter_alpha_max;
+  }
+}
+
+bool settings_set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
+                                uint8_t alpha_max_denom) {
+  filter_set_params(noise_band, alpha_min_denom, alpha_max_denom);
+  filter_get_params(&current_settings.filter_noise_band,
+                    &current_settings.filter_alpha_min,
+                    &current_settings.filter_alpha_max);
+  return true;
 }
 
 //--------------------------------------------------------------------+

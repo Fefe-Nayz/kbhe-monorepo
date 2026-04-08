@@ -324,6 +324,9 @@ class LightingPage(QWidget):
         return self._current_effect_mode
 
     def _deny_edit_if_read_only(self) -> bool:
+        # Re-sync the effect mode first so matrix edits immediately follow
+        # changes made from the Effects page or another controller surface.
+        self._sync_effect_mode_from_device()
         if self._matrix_editable:
             return False
         if self._current_effect_mode == LED_EFFECT_THIRD_PARTY:
@@ -392,6 +395,13 @@ class LightingPage(QWidget):
                 ),
             )
         self._on_selected_key_changed(getattr(self.session, "selected_key", 0))
+        self.layout_view.refresh()
+
+    def _flatten_pixels(self) -> list[int]:
+        flat: list[int] = []
+        for pixel in self.pixels:
+            flat.extend(_clamp(ch) for ch in pixel[:3])
+        return flat
 
     def _refresh_live_effect_frame(self) -> None:
         try:
@@ -447,6 +457,7 @@ class LightingPage(QWidget):
             self._refresh_layout()
             self._update_status(f"Device rejected LED {index + 1}.", "error")
             return
+        self._refresh_layout()
         self._update_status(
             f"{key_display_name(index)} set to RGB({rgb[0]}, {rgb[1]}, {rgb[2]}) live.",
             "success",
@@ -498,7 +509,10 @@ class LightingPage(QWidget):
         self._refresh_layout()
         self._sync_shared()
         try:
-            ok = self.device.led_clear()
+            if self._is_matrix_edit_mode(self._current_effect_mode):
+                ok = self.device.led_upload_all(self._flatten_pixels())
+            else:
+                ok = self.device.led_clear()
         except Exception as exc:
             self.pixels[:] = previous
             self._refresh_layout()
@@ -509,6 +523,7 @@ class LightingPage(QWidget):
             self._refresh_layout()
             self._update_status("Device rejected clear request.", "error")
             return
+        self._refresh_layout()
         self._update_status("All LEDs cleared live.", "success")
 
     def fill_color(self) -> None:
@@ -521,7 +536,10 @@ class LightingPage(QWidget):
         self._refresh_layout()
         self._sync_shared()
         try:
-            ok = self.device.led_fill(rgb[0], rgb[1], rgb[2])
+            if self._is_matrix_edit_mode(self._current_effect_mode):
+                ok = self.device.led_upload_all(self._flatten_pixels())
+            else:
+                ok = self.device.led_fill(rgb[0], rgb[1], rgb[2])
         except Exception as exc:
             self.pixels[:] = previous
             self._refresh_layout()
@@ -532,6 +550,7 @@ class LightingPage(QWidget):
             self._refresh_layout()
             self._update_status("Device rejected fill request.", "error")
             return
+        self._refresh_layout()
         self._update_status(
             f"All LEDs filled with RGB({rgb[0]}, {rgb[1]}, {rgb[2]}) live.",
             "success",

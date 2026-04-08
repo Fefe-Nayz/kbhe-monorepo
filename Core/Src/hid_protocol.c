@@ -906,6 +906,45 @@ static void cmd_set_led_effect_color(const uint8_t *in, uint8_t *out) {
   resp->status_or_len = HID_RESP_OK;
 }
 
+static void cmd_get_led_effect_params(const uint8_t *in, uint8_t *out) {
+  const hid_packet_t *req = (const hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  uint8_t effect_mode = req->payload[0];
+
+  resp->command_id = CMD_GET_LED_EFFECT_PARAMS;
+  if (effect_mode >= LED_EFFECT_MAX) {
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = effect_mode;
+  resp->payload[1] = LED_EFFECT_PARAM_COUNT;
+  settings_get_led_effect_params(effect_mode, &resp->payload[2]);
+}
+
+static void cmd_set_led_effect_params(const uint8_t *in, uint8_t *out) {
+  const hid_packet_t *req = (const hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  uint8_t effect_mode = req->payload[0];
+
+  resp->command_id = CMD_SET_LED_EFFECT_PARAMS;
+  if (effect_mode >= LED_EFFECT_MAX) {
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  if (!settings_set_led_effect_params(effect_mode, &req->payload[1])) {
+    resp->status_or_len = HID_RESP_ERROR;
+    return;
+  }
+
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = effect_mode;
+  resp->payload[1] = LED_EFFECT_PARAM_COUNT;
+  settings_get_led_effect_params(effect_mode, &resp->payload[2]);
+}
+
 static void cmd_get_led_fps_limit(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_LED_FPS_LIMIT;
@@ -946,46 +985,42 @@ static void cmd_set_led_diagnostic(const uint8_t *in, uint8_t *out) {
 
 static void cmd_get_filter_enabled(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
   resp->command_id = CMD_GET_FILTER_ENABLED;
   resp->status_or_len = HID_RESP_OK;
-  // resp->payload[0] = get_filter_enabled();
+  resp->payload[0] = settings_is_filter_enabled() ? 1u : 0u;
 }
 
 static void cmd_set_filter_enabled(const uint8_t *in, uint8_t *out) {
-  // hid_packet_t *req = (hid_packet_t *)in;
+  const hid_packet_t *req = (const hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_FILTER_ENABLED;
 
-  // set_filter_enabled(req->payload[0]);
-  resp->status_or_len = HID_RESP_OK;
-  // resp->payload[0] = get_filter_enabled();
+  bool success = settings_set_filter_enabled(req->payload[0] != 0);
+  resp->status_or_len = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->payload[0] = settings_is_filter_enabled() ? 1u : 0u;
 }
 
 static void cmd_get_filter_params(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
   resp->command_id = CMD_GET_FILTER_PARAMS;
   resp->status_or_len = HID_RESP_OK;
 
-  // uint8_t noise_band, alpha_min, alpha_max;
-  // get_filter_params(&noise_band, &alpha_min, &alpha_max);
-  // resp->payload[0] = noise_band;
-  // resp->payload[1] = alpha_min;
-  // resp->payload[2] = alpha_max;
+  settings_get_filter_params(&resp->payload[0], &resp->payload[1],
+                             &resp->payload[2]);
 }
 
 static void cmd_set_filter_params(const uint8_t *in, uint8_t *out) {
-  // hid_packet_t *req = (hid_packet_t *)in;
+  const hid_packet_t *req = (const hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_FILTER_PARAMS;
 
-  // set_filter_params(req->payload[0], req->payload[1], req->payload[2]);
-  resp->status_or_len = HID_RESP_OK;
-
-  // uint8_t noise_band, alpha_min, alpha_max;
-  // get_filter_params(&noise_band, &alpha_min, &alpha_max);
-  // resp->payload[0] = noise_band;
-  // resp->payload[1] = alpha_min;
-  // resp->payload[2] = alpha_max;
+  bool success =
+      settings_set_filter_params(req->payload[0], req->payload[1], req->payload[2]);
+  resp->status_or_len = success ? HID_RESP_OK : HID_RESP_ERROR;
+  settings_get_filter_params(&resp->payload[0], &resp->payload[1],
+                             &resp->payload[2]);
 }
 
 //--------------------------------------------------------------------+
@@ -994,6 +1029,7 @@ static void cmd_set_filter_params(const uint8_t *in, uint8_t *out) {
 
 static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   hid_resp_adc_values_t *resp = (hid_resp_adc_values_t *)out;
+  (void)in;
   resp->command_id = CMD_GET_ADC_VALUES;
   resp->status = HID_RESP_OK;
 
@@ -1018,6 +1054,7 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   resp->task_keyboard_us = (uint16_t)task_keyboard_us;
   resp->task_keyboard_nkro_us = (uint16_t)task_keyboard_nkro_us;
   resp->task_gamepad_us = (uint16_t)task_gamepad_us;
+  resp->task_led_us = (uint16_t)task_led_us;
   resp->task_total_us = (uint16_t)task_total_us;
 
   analog_task_monitor_t analog_monitor = {0};
@@ -1031,18 +1068,17 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   resp->analog_key_max_us = analog_monitor.key_max_us;
   resp->analog_key_avg_us = analog_monitor.key_avg_us;
   resp->analog_nonzero_keys = analog_monitor.nonzero_keys;
-  resp->analog_key_max_index = analog_monitor.key_max_index;
 }
 
 static void cmd_get_raw_adc_chunk(const uint8_t *in, uint8_t *out) {
   const hid_req_raw_adc_chunk_t *req = (const hid_req_raw_adc_chunk_t *)in;
-  hid_resp_raw_adc_chunk_t *resp = (hid_resp_raw_adc_chunk_t *)out;
+  hid_resp_adc_chunk_t *resp = (hid_resp_adc_chunk_t *)out;
 
   resp->command_id = CMD_GET_RAW_ADC_CHUNK;
   resp->status = HID_RESP_OK;
   resp->start_index = req->start_index;
   resp->value_count = 0;
-  memset(resp->adc_raw, 0, sizeof(resp->adc_raw));
+  memset(resp->adc_values, 0, sizeof(resp->adc_values));
 
   if (req->start_index >= NUM_KEYS) {
     resp->status = HID_RESP_INVALID_PARAM;
@@ -1057,7 +1093,63 @@ static void cmd_get_raw_adc_chunk(const uint8_t *in, uint8_t *out) {
 
   resp->value_count = count;
   for (uint8_t i = 0; i < count; i++) {
-    resp->adc_raw[i] = analog_read_raw_value((uint8_t)(req->start_index + i));
+    resp->adc_values[i] = analog_read_raw_value((uint8_t)(req->start_index + i));
+  }
+}
+
+static void cmd_get_filtered_adc_chunk(const uint8_t *in, uint8_t *out) {
+  const hid_req_raw_adc_chunk_t *req = (const hid_req_raw_adc_chunk_t *)in;
+  hid_resp_adc_chunk_t *resp = (hid_resp_adc_chunk_t *)out;
+
+  resp->command_id = CMD_GET_FILTERED_ADC_CHUNK;
+  resp->status = HID_RESP_OK;
+  resp->start_index = req->start_index;
+  resp->value_count = 0;
+  memset(resp->adc_values, 0, sizeof(resp->adc_values));
+
+  if (req->start_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  uint8_t remaining = (uint8_t)(NUM_KEYS - req->start_index);
+  uint8_t count = remaining;
+  if (count > HID_RAW_ADC_VALUES_PER_CHUNK) {
+    count = HID_RAW_ADC_VALUES_PER_CHUNK;
+  }
+
+  resp->value_count = count;
+  for (uint8_t i = 0; i < count; i++) {
+    resp->adc_values[i] =
+        analog_read_filtered_value((uint8_t)(req->start_index + i));
+  }
+}
+
+static void cmd_get_calibrated_adc_chunk(const uint8_t *in, uint8_t *out) {
+  const hid_req_raw_adc_chunk_t *req = (const hid_req_raw_adc_chunk_t *)in;
+  hid_resp_adc_chunk_t *resp = (hid_resp_adc_chunk_t *)out;
+
+  resp->command_id = CMD_GET_CALIBRATED_ADC_CHUNK;
+  resp->status = HID_RESP_OK;
+  resp->start_index = req->start_index;
+  resp->value_count = 0;
+  memset(resp->adc_values, 0, sizeof(resp->adc_values));
+
+  if (req->start_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  uint8_t remaining = (uint8_t)(NUM_KEYS - req->start_index);
+  uint8_t count = remaining;
+  if (count > HID_RAW_ADC_VALUES_PER_CHUNK) {
+    count = HID_RAW_ADC_VALUES_PER_CHUNK;
+  }
+
+  resp->value_count = count;
+  for (uint8_t i = 0; i < count; i++) {
+    resp->adc_values[i] =
+        analog_read_calibrated_value((uint8_t)(req->start_index + i));
   }
 }
 
@@ -1117,7 +1209,8 @@ static void cmd_get_lock_states(const uint8_t *in, uint8_t *out) {
     lock_state |= 0x01;
   if (led_indicator_is_caps_lock())
     lock_state |= 0x02;
-  // TODO: Add scroll lock when implemented
+  if (led_indicator_is_scroll_lock())
+    lock_state |= 0x04;
   resp->payload[0] = lock_state;
 }
 
@@ -1209,8 +1302,6 @@ static void cmd_unknown(const uint8_t *in, uint8_t *out) {
 //--------------------------------------------------------------------+
 
 void hid_protocol_init(void) {
-  // Initialize settings module
-  settings_init();
   adc_capture_init();
 }
 
@@ -1425,6 +1516,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_set_led_diagnostic(in_packet, out_packet);
     break;
 
+  case CMD_GET_LED_EFFECT_PARAMS:
+    cmd_get_led_effect_params(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_EFFECT_PARAMS:
+    cmd_set_led_effect_params(in_packet, out_packet);
+    break;
+
   // Filter commands
   case CMD_GET_FILTER_ENABLED:
     cmd_get_filter_enabled(in_packet, out_packet);
@@ -1469,6 +1568,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_GET_RAW_ADC_CHUNK:
     cmd_get_raw_adc_chunk(in_packet, out_packet);
+    break;
+
+  case CMD_GET_FILTERED_ADC_CHUNK:
+    cmd_get_filtered_adc_chunk(in_packet, out_packet);
+    break;
+
+  case CMD_GET_CALIBRATED_ADC_CHUNK:
+    cmd_get_calibrated_adc_chunk(in_packet, out_packet);
     break;
 
   // Echo for testing
