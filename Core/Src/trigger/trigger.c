@@ -4,6 +4,7 @@
 #include "board_config.h"
 #include "analog/analog.h"
 #include "hid/keyboard_hid.h"
+#include "led_matrix.h"
 #include "layout/keycodes.h"
 #include "trigger/socd.h"
 #include "layout/layout.h"
@@ -27,6 +28,7 @@ static inline void reset_rapid_trigger_extremums(uint8_t key, int16_t current_di
 static inline void press_key(uint8_t key) {
     if (key_states[key] == RELEASED) {
         layout_press(key);
+        led_matrix_key_event(key, true);
         key_states[key] = PRESSED;
         socd_on_press(key);
     }
@@ -35,6 +37,7 @@ static inline void press_key(uint8_t key) {
 static inline void release_key(uint8_t key) {
     if (key_states[key] == PRESSED) {
         layout_release(key);
+        led_matrix_key_event(key, false);
         key_states[key] = RELEASED;
         socd_on_release(key);
     }

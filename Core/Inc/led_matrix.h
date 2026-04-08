@@ -260,7 +260,7 @@ void led_matrix_effect_tick(uint32_t tick);
 
 /**
  * @brief Trigger reactive effect on key press
- * @param key_index Key index (0-5)
+ * @param key_index Key index (0-81)
  * @param pressed true if pressed, false if released
  */
 void led_matrix_key_event(uint8_t key_index, bool pressed);
