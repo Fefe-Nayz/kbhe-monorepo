@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from kbhe_tool.key_layout import key_display_name
 from ..widgets import (
     PageScaffold,
     SectionCard,
@@ -152,7 +153,7 @@ class OverviewPage(QWidget):
             "The selected key follows you across Keyboard, Calibration, and Gamepad.",
         )
 
-        self.focus_key_value = QLabel("Key 1")
+        self.focus_key_value = QLabel(key_display_name(0))
         self.focus_key_value.setObjectName("CardTitle")
         self.focus_key_value.setStyleSheet("font-size: 28pt; font-weight: 700; padding: 8px 0;")
         card.body_layout.addWidget(self.focus_key_value)
@@ -182,7 +183,7 @@ class OverviewPage(QWidget):
         card = SectionCard("Persistence Model")
         for text in [
             "Saved immediately: Keyboard HID, Gamepad HID, NKRO.",
-            "Live until Save to Flash: LED matrix enable, brightness, and the current 8×8 LED pattern.",
+            "Live until Save to Flash: LED enable, brightness, and the current 82-LED frame.",
             "Other tuning screens edit live RAM-backed settings; persist them with Save to Flash once the behavior feels correct.",
         ]:
             lbl = QLabel(text)
@@ -263,7 +264,7 @@ class OverviewPage(QWidget):
     # ------------------------------------------------------------------
 
     def on_selected_key_changed(self, key_index: int) -> None:
-        self.focus_key_value.setText(f"Key {int(key_index) + 1}")
+        self.focus_key_value.setText(key_display_name(int(key_index)))
 
     def on_page_activated(self) -> None:
         try:

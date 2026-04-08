@@ -34,7 +34,7 @@ from .pages import (
 )
 from .session import AppSession
 from .theme import apply_app_style, current_theme_mode
-from .widgets import KeySelector, StatusPill, make_primary_button, make_secondary_button
+from .widgets import StatusPill, make_primary_button, make_secondary_button
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +81,7 @@ class KBHEQtMainWindow(QMainWindow):
 
         self._build_ui()
         self._connect_signals()
+        self._on_selected_key_changed(self.session.selected_key)
         self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         self.session.refresh_snapshot()
         self.show_page("overview")
@@ -203,16 +204,26 @@ class KBHEQtMainWindow(QMainWindow):
 
         outer.addStretch(1)
 
-        # Key selector label + chips
+        focus_wrap = QVBoxLayout()
+        focus_wrap.setContentsMargins(0, 0, 0, 0)
+        focus_wrap.setSpacing(2)
         key_lbl = QLabel("FOCUSED KEY")
         key_lbl.setObjectName("SectionEyebrow")
-        key_lbl.setAlignment(Qt.AlignVCenter)
-        outer.addWidget(key_lbl, 0)
-
-        self.key_selector = KeySelector(self.session)
-        outer.addWidget(self.key_selector, 0)
-
-        outer.addSpacing(8)
+        focus_wrap.addWidget(key_lbl, 0)
+        focus_row = QHBoxLayout()
+        focus_row.setContentsMargins(0, 0, 0, 0)
+        focus_row.setSpacing(8)
+        self.prev_key_btn = make_secondary_button("◀", self._select_previous_key)
+        self.prev_key_btn.setFixedWidth(32)
+        self.next_key_btn = make_secondary_button("▶", self._select_next_key)
+        self.next_key_btn.setFixedWidth(32)
+        self.focus_key_chip = StatusPill("K01")
+        self.focus_key_chip.set_level("info")
+        focus_row.addWidget(self.prev_key_btn, 0)
+        focus_row.addWidget(self.focus_key_chip, 0)
+        focus_row.addWidget(self.next_key_btn, 0)
+        focus_wrap.addLayout(focus_row)
+        outer.addLayout(focus_wrap, 0)
 
         # Actions
         outer.addWidget(make_secondary_button("Refresh", self._refresh_active), 0)
@@ -248,6 +259,7 @@ class KBHEQtMainWindow(QMainWindow):
         self.session.snapshotChanged.connect(self._on_snapshot_changed)
         self.session.connectionChanged.connect(self._on_connection_changed)
         self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
+        self.session.selectedKeyChanged.connect(self._on_selected_key_changed)
 
     def _on_status_changed(self, message: str, level: str) -> None:
         self.status_pill.setText(message)
@@ -278,6 +290,9 @@ class KBHEQtMainWindow(QMainWindow):
             self.live_timer.start(max(20, int(interval_ms)))
         else:
             self.live_timer.stop()
+
+    def _on_selected_key_changed(self, key_index: int) -> None:
+        self.focus_key_chip.setText(f"K{int(key_index) + 1:02d}")
 
     def _on_live_tick(self) -> None:
         self.session.refresh_snapshot()
@@ -357,6 +372,14 @@ class KBHEQtMainWindow(QMainWindow):
 
     def _refresh_all(self) -> None:
         self.session.refresh_snapshot()
+
+    def _select_previous_key(self) -> None:
+        selected = int(getattr(self.session, "selected_key", 0))
+        self.session.set_selected_key(max(0, selected - 1))
+
+    def _select_next_key(self) -> None:
+        selected = int(getattr(self.session, "selected_key", 0))
+        self.session.set_selected_key(min(81, selected + 1))
         if not self.session.connected:
             return
         for page in self.pages.values():

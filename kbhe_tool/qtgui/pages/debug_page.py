@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -15,11 +16,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...key_layout import key_display_name, key_short_label
+from ...protocol import KEY_COUNT
+from ..theme import current_colors
 from ..widgets import (
+    KeyboardLayoutWidget,
     PageScaffold,
     SectionCard,
     StatusChip,
-    SubCard,
     make_primary_button,
     make_secondary_button,
 )
@@ -27,6 +31,19 @@ from ..widgets import (
 
 def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, int(value)))
+
+
+def _mix_colors(color_a: str, color_b: str, ratio: float) -> str:
+    ratio = max(0.0, min(1.0, float(ratio)))
+    a = current_colors()
+    from PySide6.QtGui import QColor
+
+    left = QColor(color_a or a["surface"])
+    right = QColor(color_b or a["accent"])
+    r = int(left.red() + (right.red() - left.red()) * ratio)
+    g = int(left.green() + (right.green() - left.green()) * ratio)
+    b = int(left.blue() + (right.blue() - left.blue()) * ratio)
+    return QColor(r, g, b).name()
 
 
 class DebugPage(QWidget):
@@ -45,17 +62,22 @@ class DebugPage(QWidget):
         self._last_error = None
         self._tick_started = time.monotonic()
         self._tick_count = 0
+        self._raw_values = [0] * KEY_COUNT
+        self._states = [0] * KEY_COUNT
+        self._distances_norm = [0] * KEY_COUNT
+        self._distances_mm = [0.0] * KEY_COUNT
+        self._scan_payload = {}
+
         try:
             self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
+            self.session.selectedKeyChanged.connect(self._on_selected_key_changed)
         except Exception:
             pass
+
         self._build_ui()
         self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
+        self._on_selected_key_changed(self.session.selected_key)
         self.reload()
-
-    # ------------------------------------------------------------------
-    # UI construction
-    # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
@@ -64,12 +86,10 @@ class DebugPage(QWidget):
 
         scaffold = PageScaffold(
             "Debug / Sensors",
-            "Inspect ADC values, live key travel, filter settings, lock indicators, "
-            "and LED diagnostic modes from one maintenance-focused screen.",
+            "Vue maintenance centrée sur les 82 capteurs: état live, ADC bruts, timings firmware et modes de diagnostic LED.",
         )
         root.addWidget(scaffold, 1)
 
-        # Two-column layout
         columns = QHBoxLayout()
         columns.setSpacing(14)
         scaffold.content_layout.addLayout(columns)
@@ -78,12 +98,12 @@ class DebugPage(QWidget):
         left.setSpacing(14)
         right = QVBoxLayout()
         right.setSpacing(14)
-        columns.addLayout(left, 1)
+        columns.addLayout(left, 2)
         columns.addLayout(right, 1)
 
         left.addWidget(self._build_monitor_card())
-        left.addWidget(self._build_adc_card())
-        left.addWidget(self._build_key_states_card())
+        left.addWidget(self._build_focus_card())
+        left.addWidget(self._build_overview_card())
         left.addWidget(self._build_lock_card())
         left.addStretch(1)
 
@@ -94,13 +114,12 @@ class DebugPage(QWidget):
 
         self.status_chip = StatusChip("Diagnostics page ready.", "neutral")
         scaffold.content_layout.addWidget(self.status_chip)
-
         scaffold.add_stretch()
 
     def _build_monitor_card(self) -> SectionCard:
         card = SectionCard(
             "Live Monitor",
-            "The page polls only while active and when live updates are enabled.",
+            "La page ne poll que lorsqu’elle est visible et que le live global est activé.",
         )
 
         controls = QHBoxLayout()
@@ -129,6 +148,11 @@ class DebugPage(QWidget):
         rate_row.addStretch(1)
         card.body_layout.addLayout(rate_row)
 
+        self.summary_label = QLabel("Pressed -- / 82  ·  Max raw --  ·  Max travel --")
+        self.summary_label.setObjectName("Muted")
+        self.summary_label.setWordWrap(True)
+        card.body_layout.addWidget(self.summary_label)
+
         self.task_times_label = QLabel(
             "Tasks: analog -- us | trigger -- us | socd -- us | kb -- us | nkro -- us | gp -- us | total -- us"
         )
@@ -142,63 +166,56 @@ class DebugPage(QWidget):
         self.analog_monitor_label.setObjectName("Muted")
         self.analog_monitor_label.setWordWrap(True)
         card.body_layout.addWidget(self.analog_monitor_label)
-
         return card
 
-    def _build_adc_card(self) -> SectionCard:
+    def _build_focus_card(self) -> SectionCard:
         card = SectionCard(
-            "ADC Values",
-            "Raw ADC readings, normalized against the expected Hall range.",
+            "Focused Key Signal",
+            "La touche sélectionnée dans le layout global sert de focus pour les mesures détaillées.",
         )
 
-        self.adc_rows: list[tuple[QProgressBar, QLabel, QLabel]] = []
-        for i in range(6):
-            row = QHBoxLayout()
-            name = QLabel(f"Key {i + 1}")
-            name.setObjectName("Muted")
-            bar = QProgressBar()
-            bar.setRange(0, 700)
-            value = QLabel("----")
-            distance = QLabel("-.-- mm")
-            distance.setObjectName("Muted")
-            row.addWidget(name)
-            row.addWidget(bar, 1)
-            row.addWidget(value)
-            row.addWidget(distance)
-            card.body_layout.addLayout(row)
-            self.adc_rows.append((bar, value, distance))
+        self.focus_name = QLabel(key_display_name(self.session.selected_key))
+        self.focus_name.setObjectName("CardTitle")
+        card.body_layout.addWidget(self.focus_name)
 
+        chips = QHBoxLayout()
+        chips.setSpacing(8)
+        self.focus_state_chip = StatusChip("IDLE", "neutral")
+        chips.addWidget(self.focus_state_chip)
+        self.focus_raw_chip = StatusChip("RAW --", "info")
+        chips.addWidget(self.focus_raw_chip)
+        self.focus_distance_chip = StatusChip("--.-- mm", "neutral")
+        chips.addWidget(self.focus_distance_chip)
+        chips.addStretch(1)
+        card.body_layout.addLayout(chips)
+
+        self.focus_norm_bar = QProgressBar()
+        self.focus_norm_bar.setRange(0, 255)
+        self.focus_norm_bar.setFormat("Normalized %p%")
+        card.body_layout.addWidget(self.focus_norm_bar)
+
+        self.focus_raw_bar = QProgressBar()
+        self.focus_raw_bar.setRange(0, 4095)
+        self.focus_raw_bar.setFormat("Raw ADC %v")
+        card.body_layout.addWidget(self.focus_raw_bar)
+
+        self.focus_hint = QLabel("Sélectionne une touche dans le layout pour inspecter sa mesure brute et sa distance.")
+        self.focus_hint.setObjectName("Muted")
+        self.focus_hint.setWordWrap(True)
+        card.body_layout.addWidget(self.focus_hint)
         return card
 
-    def _build_key_states_card(self) -> SectionCard:
-        card = SectionCard("Key States")
-
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
-        card.body_layout.addLayout(grid)
-
-        self.key_state_labels: list[StatusChip] = []
-        self.key_state_bars: list[QProgressBar] = []
-        for i in range(6):
-            sub = SubCard()
-            name = QLabel(f"Key {i + 1}")
-            name.setObjectName("Muted")
-            sub.layout.addWidget(name)
-            chip = StatusChip("IDLE", "neutral")
-            sub.layout.addWidget(chip)
-            bar = QProgressBar()
-            bar.setRange(0, 255)
-            sub.layout.addWidget(bar)
-            grid.addWidget(sub, i // 3, i % 3)
-            self.key_state_labels.append(chip)
-            self.key_state_bars.append(bar)
-
+    def _build_overview_card(self) -> SectionCard:
+        card = SectionCard(
+            "Keyboard State Overview",
+            "Heatmap des 82 touches. Le fond reflète la course mesurée, le contour vert indique une touche pressée.",
+        )
+        self.layout_view = KeyboardLayoutWidget(self.session, unit=38)
+        card.body_layout.addWidget(self.layout_view)
         return card
 
     def _build_lock_card(self) -> SectionCard:
         card = SectionCard("Lock Indicators")
-
         self.lock_rows: dict[str, StatusChip] = {}
         for name in ("Caps Lock", "Num Lock", "Scroll Lock", "PE0 LED"):
             row = QHBoxLayout()
@@ -210,15 +227,6 @@ class DebugPage(QWidget):
             row.addWidget(chip)
             card.body_layout.addLayout(row)
             self.lock_rows[name] = chip
-
-        helper = QLabel(
-            "The PE0 LED state is inferred from lock combinations, "
-            "matching the old diagnostic page."
-        )
-        helper.setObjectName("Muted")
-        helper.setWordWrap(True)
-        card.body_layout.addWidget(helper)
-
         return card
 
     def _build_config_card(self) -> SectionCard:
@@ -227,14 +235,11 @@ class DebugPage(QWidget):
         self.config_text.setReadOnly(True)
         self.config_text.setMinimumHeight(240)
         card.body_layout.addWidget(self.config_text)
-        card.body_layout.addWidget(
-            make_secondary_button("Refresh Snapshot", self.refresh_config_display)
-        )
+        card.body_layout.addWidget(make_secondary_button("Refresh Snapshot", self.refresh_config_display))
         return card
 
     def _build_filter_card(self) -> SectionCard:
         card = SectionCard("ADC EMA Filter")
-
         self.filter_enabled_check = QCheckBox("Enable filter")
         self.filter_enabled_check.toggled.connect(self.on_filter_enabled_change)
         card.body_layout.addWidget(self.filter_enabled_check)
@@ -250,11 +255,13 @@ class DebugPage(QWidget):
         self.alpha_max_spin = QSpinBox()
         self.alpha_max_spin.setRange(1, 32)
 
-        for row_i, (label, spin) in enumerate([
-            ("Noise band", self.noise_spin),
-            ("Alpha min denom", self.alpha_min_spin),
-            ("Alpha max denom", self.alpha_max_spin),
-        ]):
+        for row_i, (label, spin) in enumerate(
+            [
+                ("Noise band", self.noise_spin),
+                ("Alpha min denom", self.alpha_min_spin),
+                ("Alpha max denom", self.alpha_max_spin),
+            ]
+        ):
             lbl = QLabel(label)
             lbl.setObjectName("Muted")
             grid.addWidget(lbl, row_i, 0)
@@ -269,28 +276,19 @@ class DebugPage(QWidget):
         actions.addWidget(make_secondary_button("Reset Defaults", self.reset_filter_defaults))
         actions.addStretch(1)
         card.body_layout.addLayout(actions)
-
         return card
 
     def _build_diag_card(self) -> SectionCard:
         card = SectionCard(
             "LED Diagnostic Mode",
-            "Use these modes to isolate DMA load vs CPU load when chasing analog noise.",
+            "Modes de charge CPU / DMA pour isoler les interactions entre RGB, ADC et USB.",
         )
-
         self.diag_combo = QComboBox()
         for value, label in self.DIAG_MODES:
             self.diag_combo.addItem(label, value)
         card.body_layout.addWidget(self.diag_combo)
-        card.body_layout.addWidget(
-            make_primary_button("Apply Diagnostic Mode", self.on_diagnostic_mode_change)
-        )
-
+        card.body_layout.addWidget(make_primary_button("Apply Diagnostic Mode", self.on_diagnostic_mode_change))
         return card
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     def _update_status(self, message: str, kind: str = "info") -> None:
         level_map = {"success": "ok", "warning": "warn", "error": "bad", "info": "info"}
@@ -309,13 +307,67 @@ class DebugPage(QWidget):
         else:
             self.live_info.set_text_and_level("OFF", "neutral")
 
-    # ------------------------------------------------------------------
-    # Live polling
-    # ------------------------------------------------------------------
+    def _on_selected_key_changed(self, key_index: int) -> None:
+        key_index = max(0, min(KEY_COUNT - 1, int(key_index)))
+        self.focus_name.setText(key_display_name(key_index))
+        self._refresh_focus_card()
+
+    def _refresh_focus_card(self) -> None:
+        key_index = max(0, min(KEY_COUNT - 1, int(self.session.selected_key)))
+        pressed = bool(self._states[key_index])
+        raw_value = int(self._raw_values[key_index])
+        norm = int(self._distances_norm[key_index])
+        distance_mm = float(self._distances_mm[key_index])
+        self.focus_state_chip.set_text_and_level("PRESSED" if pressed else "IDLE", "ok" if pressed else "neutral")
+        self.focus_raw_chip.set_text_and_level(f"RAW {raw_value}", "info")
+        self.focus_distance_chip.set_text_and_level(f"{distance_mm:.2f} mm", "info")
+        self.focus_norm_bar.setValue(_clamp(norm, 0, 255))
+        self.focus_raw_bar.setValue(_clamp(raw_value, 0, 4095))
+        self.focus_hint.setText(
+            f"{key_display_name(key_index)}  ·  state={'pressed' if pressed else 'idle'}  ·  normalized={norm}/255"
+        )
+
+    def _refresh_layout_view(self) -> None:
+        colors = current_colors()
+        pressed_count = 0
+        max_raw = max(self._raw_values) if self._raw_values else 0
+        max_raw_key = self._raw_values.index(max_raw) if self._raw_values else 0
+        max_travel = max(self._distances_mm) if self._distances_mm else 0.0
+        max_travel_key = self._distances_mm.index(max_travel) if self._distances_mm else 0
+
+        for key_index in range(KEY_COUNT):
+            raw_value = int(self._raw_values[key_index])
+            norm = max(0.0, min(1.0, float(self._distances_norm[key_index]) / 255.0))
+            pressed = bool(self._states[key_index])
+            if pressed:
+                pressed_count += 1
+            fill = _mix_colors(colors["surface_muted"], colors["accent_soft"], norm)
+            if pressed:
+                fill = _mix_colors(fill, colors["success"], 0.38)
+            border = colors["success"] if pressed else colors["border"]
+            self.layout_view.set_key_state(
+                key_index,
+                title=key_short_label(key_index),
+                subtitle="",
+                fill=fill,
+                border=border,
+                tooltip=(
+                    f"{key_display_name(key_index)}\n"
+                    f"Raw ADC: {raw_value}\n"
+                    f"Distance: {self._distances_mm[key_index]:.2f} mm\n"
+                    f"State: {'PRESSED' if pressed else 'IDLE'}"
+                ),
+            )
+
+        self.summary_label.setText(
+            f"Pressed {pressed_count} / {KEY_COUNT}  ·  Max raw {key_display_name(max_raw_key)} = {max_raw}  ·  "
+            f"Max travel {key_display_name(max_travel_key)} = {max_travel:.2f} mm"
+        )
 
     def _poll_sensor_once(self) -> None:
         try:
             adc_data = self.device.get_adc_values() or {}
+            raw_values = self.device.get_all_raw_adc_values() or []
             key_states = self.device.get_key_states() or {}
             lock_states = self.device.get_lock_states() or {}
         except Exception as exc:
@@ -326,36 +378,21 @@ class DebugPage(QWidget):
             return
 
         self._last_error = None
+        self._scan_payload = adc_data
 
-        adc_raw = list(adc_data.get("adc_raw") or adc_data.get("adc") or [])
-        adc_filtered = list(adc_data.get("adc_filtered") or adc_raw)
-        distances_mm = list(key_states.get("distances_mm") or [])
-        for i, (bar, value_label, distance_label) in enumerate(self.adc_rows):
-            raw_value = int(adc_raw[i]) if i < len(adc_raw) else None
-            filtered_value = int(adc_filtered[i]) if i < len(adc_filtered) else None
-
-            if raw_value is None:
-                bar.setValue(0)
-                value_label.setText("----")
-            else:
-                shown = filtered_value if filtered_value is not None else raw_value
-                bar.setValue(_clamp(shown - 2000, 0, 700))
-                if filtered_value is None:
-                    value_label.setText(f"R:{raw_value:4d}")
-                else:
-                    value_label.setText(f"R:{raw_value:4d} F:{filtered_value:4d}")
-            distance_label.setText(
-                f"{distances_mm[i]:.2f} mm" if i < len(distances_mm) else "-.-- mm"
-            )
+        for key_index in range(KEY_COUNT):
+            self._raw_values[key_index] = int(raw_values[key_index]) if key_index < len(raw_values) else 0
 
         states = list(key_states.get("states") or [])
         normalized = list(key_states.get("distances") or [])
-        for i, chip in enumerate(self.key_state_labels):
-            active = bool(states[i]) if i < len(states) else False
-            chip.set_text_and_level("ACTIVE" if active else "IDLE", "ok" if active else "neutral")
-            self.key_state_bars[i].setValue(
-                int(normalized[i]) if i < len(normalized) else 0
-            )
+        distances_mm = list(key_states.get("distances_mm") or [])
+        for key_index in range(KEY_COUNT):
+            self._states[key_index] = int(states[key_index]) if key_index < len(states) else 0
+            self._distances_norm[key_index] = int(normalized[key_index]) if key_index < len(normalized) else 0
+            self._distances_mm[key_index] = float(distances_mm[key_index]) if key_index < len(distances_mm) else 0.0
+
+        self._refresh_layout_view()
+        self._refresh_focus_card()
 
         caps = bool(lock_states.get("caps_lock", False))
         num = bool(lock_states.get("num_lock", False))
@@ -363,7 +400,6 @@ class DebugPage(QWidget):
         self.lock_rows["Caps Lock"].set_text_and_level("ON" if caps else "OFF", "ok" if caps else "neutral")
         self.lock_rows["Num Lock"].set_text_and_level("ON" if num else "OFF", "ok" if num else "neutral")
         self.lock_rows["Scroll Lock"].set_text_and_level("ON" if scroll else "OFF", "ok" if scroll else "neutral")
-
         if caps and num:
             self.lock_rows["PE0 LED"].set_text_and_level("SOLID", "ok")
         elif caps and not num:
@@ -392,10 +428,6 @@ class DebugPage(QWidget):
                 f"gp {task_times.get('gamepad', 0)} us | "
                 f"total {task_times.get('total', 0)} us"
             )
-        else:
-            self.task_times_label.setText(
-                "Tasks: analog -- us | trigger -- us | socd -- us | kb -- us | nkro -- us | gp -- us | total -- us"
-            )
 
         analog_monitor = adc_data.get("analog_monitor_us") or {}
         if analog_monitor:
@@ -412,10 +444,6 @@ class DebugPage(QWidget):
                 f"nz {analog_monitor.get('nonzero_keys', 0)} | "
                 f"max key {analog_monitor.get('key_max_index', 0)}"
             )
-        else:
-            self.analog_monitor_label.setText(
-                "Analog: raw -- us | filter -- us | cal -- us | lut -- us | store -- us | min -- us | max -- us | avg -- us | nz -- | max key --"
-            )
 
         self._tick_count += 1
         elapsed = time.monotonic() - self._tick_started
@@ -423,15 +451,6 @@ class DebugPage(QWidget):
             self.gui_rate_chip.setText(f"{self._tick_count / elapsed:.1f} Hz")
             self._tick_started = time.monotonic()
             self._tick_count = 0
-
-    def on_live_tick(self) -> None:
-        if not self._page_active or not self.session.live_enabled:
-            return
-        self._poll_sensor_once()
-
-    # ------------------------------------------------------------------
-    # Data loading / actions
-    # ------------------------------------------------------------------
 
     def reload(self) -> None:
         self.load_filter_settings()
@@ -442,6 +461,8 @@ class DebugPage(QWidget):
             mode = None
         if mode is not None:
             self.diag_combo.setCurrentIndex(max(0, self.diag_combo.findData(int(mode))))
+        if self._page_active and self.session.live_enabled:
+            self._poll_sensor_once()
 
     def refresh_config_display(self) -> None:
         try:
@@ -536,10 +557,6 @@ class DebugPage(QWidget):
             return
         self._update_status(f"Diagnostic mode set to {self.diag_combo.currentText()}.", "success")
 
-    # ------------------------------------------------------------------
-    # Page lifecycle
-    # ------------------------------------------------------------------
-
     def on_page_activated(self) -> None:
         self._page_active = True
         if self.session.live_enabled:
@@ -547,3 +564,8 @@ class DebugPage(QWidget):
 
     def on_page_deactivated(self) -> None:
         self._page_active = False
+
+    def on_live_tick(self) -> None:
+        if not self._page_active or not self.session.live_enabled:
+            return
+        self._poll_sensor_once()

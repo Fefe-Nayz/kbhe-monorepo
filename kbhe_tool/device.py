@@ -5,11 +5,15 @@ import time
 import hid
 
 from .protocol import (
+    CALIBRATION_VALUES_PER_CHUNK,
     Command,
     GAMEPAD_AXES,
     GAMEPAD_BUTTONS,
     GAMEPAD_DIRECTIONS,
     KEY_COUNT,
+    KEY_SETTINGS_PER_CHUNK,
+    KEY_STATES_PER_CHUNK,
+    LED_BYTES_PER_CHUNK,
     PACKET_SIZE,
     PID,
     RAW_HID_INTERFACE,
@@ -111,6 +115,15 @@ class KBHEDevice:
                 time.sleep(0.001)
 
         return None
+
+    @staticmethod
+    def _unpack_u16(data, offset):
+        return data[offset] | (data[offset + 1] << 8)
+
+    @staticmethod
+    def _chunk_count(total_count, start_index, chunk_size):
+        remaining = max(0, int(total_count) - int(start_index))
+        return min(chunk_size, remaining)
     
     def get_firmware_version(self):
         """Get firmware version."""
@@ -204,6 +217,14 @@ class KBHEDevice:
         data = [0, index, r, g, b]  # 0 = placeholder for status byte
         resp = self.send_command(Command.SET_LED_PIXEL, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def led_get_pixel(self, index):
+        """Get a single LED pixel."""
+        data = [0, index]
+        resp = self.send_command(Command.GET_LED_PIXEL, data)
+        if resp and len(resp) >= 6 and resp[1] == Status.OK:
+            return [int(resp[3]), int(resp[4]), int(resp[5])]
+        return None
     
     def led_get_row(self, row):
         """Get a row of pixels (8 pixels = 24 bytes RGB)."""
@@ -237,39 +258,50 @@ class KBHEDevice:
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def led_upload_all(self, pixels):
-        """Upload all 64 LED pixels (192 bytes) in chunks."""
-        # Split into 4 chunks of 48 bytes each
-        for chunk_idx in range(4):
-            offset = chunk_idx * 48
-            chunk_size = min(48, len(pixels) - offset)
-            if chunk_size <= 0:
-                break
-            
-            # Packet format: [cmd] [status_placeholder] [chunk_index] [chunk_size] [data...]
-            data = [0, chunk_idx, chunk_size] + list(pixels[offset:offset+chunk_size])
-            resp = self.send_command(Command.SET_LED_ALL_CHUNK, data, timeout_ms=150)
-            if not resp:
-                print(f"  ❌ No response for chunk {chunk_idx}")
+        """Upload the full persisted LED frame in HID chunks."""
+        pixel_bytes = list(int(v) & 0xFF for v in pixels)
+        total_size = KEY_COUNT * 3
+        if len(pixel_bytes) < total_size:
+            pixel_bytes.extend([0] * (total_size - len(pixel_bytes)))
+        else:
+            pixel_bytes = pixel_bytes[:total_size]
+
+        chunk_idx = 0
+        for offset in range(0, total_size, LED_BYTES_PER_CHUNK):
+            chunk = pixel_bytes[offset:offset + LED_BYTES_PER_CHUNK]
+            data = [0, chunk_idx, len(chunk)] + chunk
+            resp = self.send_command(Command.SET_LED_ALL_CHUNK, data, timeout_ms=200)
+            if not resp or len(resp) < 4 or resp[1] != Status.OK:
                 return False
-            if len(resp) < 2:
-                print(f"  ❌ Short response for chunk {chunk_idx}: {list(resp)}")
-                return False
-            if resp[1] != Status.OK:
-                print(f"  ❌ Error response for chunk {chunk_idx}: status={resp[1]}")
-                return False
-            time.sleep(0.02)  # Small delay between chunks
+            chunk_idx += 1
+            time.sleep(0.01)
         return True
-    
+
     def led_download_all(self):
-        """Download all 64 LED pixels (192 bytes) from device."""
+        """Download the full live LED frame from the device."""
+        total_size = KEY_COUNT * 3
         pixels = []
-        for row in range(8):
-            row_data = self.led_get_row(row)
-            if row_data:
-                pixels.extend(row_data)
-            else:
-                pixels.extend([0] * 24)
-        return pixels
+        chunk_idx = 0
+
+        while len(pixels) < total_size:
+            data = [0, chunk_idx]
+            resp = self.send_command(Command.GET_LED_ALL, data, timeout_ms=200)
+            if not resp or len(resp) < 4 or resp[1] != Status.OK:
+                return None
+
+            returned_chunk = int(resp[2])
+            chunk_size = int(resp[3])
+            if returned_chunk != chunk_idx or chunk_size <= 0:
+                return None
+
+            payload_end = 4 + chunk_size
+            if payload_end > len(resp):
+                return None
+
+            pixels.extend(int(v) for v in resp[4:payload_end])
+            chunk_idx += 1
+
+        return pixels[:total_size]
     
     # --- Key Settings Commands ---
     
@@ -277,18 +309,18 @@ class KBHEDevice:
         """Get settings for a specific key (extended format)."""
         data = [0, key_index]  # 0 = placeholder for status
         resp = self.send_command(Command.GET_KEY_SETTINGS, data)
-        if resp and len(resp) >= 12 and resp[1] == Status.OK:
+        if resp and len(resp) >= 13 and resp[1] == Status.OK:
             return {
                 'key_index': resp[2],
-                'hid_keycode': resp[3],
-                'actuation_point_mm': resp[4] / 10.0,  # 0.1mm to mm
-                'release_point_mm': resp[5] / 10.0,
-                'rapid_trigger_activation': resp[6] / 10.0,  # 0.1mm
-                'rapid_trigger_press': resp[7] / 100.0,  # 0.01mm to mm
-                'rapid_trigger_release': resp[8] / 100.0,
-                'socd_pair': resp[9] if resp[9] != 255 else None,
-                'rapid_trigger_enabled': bool(resp[10]),
-                'disable_kb_on_gamepad': bool(resp[11])
+                'hid_keycode': self._unpack_u16(resp, 3),
+                'actuation_point_mm': resp[5] / 10.0,  # 0.1mm to mm
+                'release_point_mm': resp[6] / 10.0,
+                'rapid_trigger_activation': resp[7] / 10.0,  # 0.1mm
+                'rapid_trigger_press': resp[8] / 100.0,  # 0.01mm to mm
+                'rapid_trigger_release': resp[9] / 100.0,
+                'socd_pair': resp[10] if resp[10] != 255 else None,
+                'rapid_trigger_enabled': bool(resp[11]),
+                'disable_kb_on_gamepad': bool(resp[12])
             }
         return None
     
@@ -313,7 +345,8 @@ class KBHEDevice:
         data = [
             0,  # placeholder for status
             key_index,
-            settings.get('hid_keycode', 0x14),
+            settings.get('hid_keycode', 0x14) & 0xFF,
+            (settings.get('hid_keycode', 0x14) >> 8) & 0xFF,
             int(settings.get('actuation_point_mm', 2.0) * 10),  # mm to 0.1mm
             int(settings.get('release_point_mm', 1.8) * 10),
             int(settings.get('rapid_trigger_activation', 0.5) * 10),  # mm to 0.1mm
@@ -327,25 +360,39 @@ class KBHEDevice:
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def get_all_key_settings(self):
-        """Get settings for all 6 keys (extended format)."""
-        resp = self.send_command(Command.GET_ALL_KEY_SETTINGS)
-        if resp and len(resp) >= 56 and resp[1] == Status.OK:  # 2 header + 6*9 = 56 min
-            keys = []
-            for i in range(6):
-                offset = 2 + i * 9  # Each key: 9 bytes
+        """Get settings for all keys in multiple HID chunks."""
+        keys = []
+        next_index = 0
+
+        while next_index < KEY_COUNT:
+            resp = self.send_command(Command.GET_ALL_KEY_SETTINGS, [0, next_index], timeout_ms=150)
+            if not resp or len(resp) < 4 or resp[1] != Status.OK:
+                return None
+
+            start_index = int(resp[2])
+            key_count = int(resp[3])
+            if start_index != next_index or key_count <= 0 or key_count > KEY_SETTINGS_PER_CHUNK:
+                return None
+
+            for i in range(key_count):
+                offset = 4 + i * 9
+                hid_keycode = self._unpack_u16(resp, offset)
+                flags = resp[offset + 8]
                 keys.append({
-                    'hid_keycode': resp[offset],
-                    'actuation_point_mm': resp[offset + 1] / 10.0,
-                    'release_point_mm': resp[offset + 2] / 10.0,
-                    'rapid_trigger_activation': resp[offset + 3] / 10.0,
-                    'rapid_trigger_press': resp[offset + 4] / 100.0,
-                    'rapid_trigger_release': resp[offset + 5] / 100.0,
-                    'socd_pair': resp[offset + 6] if resp[offset + 6] != 255 else None,
-                    'rapid_trigger_enabled': bool(resp[offset + 7]),
-                    'disable_kb_on_gamepad': bool(resp[offset + 8])
+                    'hid_keycode': hid_keycode,
+                    'actuation_point_mm': resp[offset + 2] / 10.0,
+                    'release_point_mm': resp[offset + 3] / 10.0,
+                    'rapid_trigger_activation': resp[offset + 4] / 10.0,
+                    'rapid_trigger_press': resp[offset + 5] / 100.0,
+                    'rapid_trigger_release': resp[offset + 6] / 100.0,
+                    'socd_pair': resp[offset + 7] if resp[offset + 7] != 255 else None,
+                    'rapid_trigger_enabled': bool(flags & 0x01),
+                    'disable_kb_on_gamepad': bool(flags & 0x02),
                 })
-            return keys
-        return None
+
+            next_index += key_count
+
+        return keys
     
     # --- Gamepad Settings Commands ---
     
@@ -377,47 +424,63 @@ class KBHEDevice:
     
     def get_calibration(self):
         """Get calibration settings."""
-        resp = self.send_command(Command.GET_CALIBRATION)
-        if resp and len(resp) >= 16 and resp[1] == Status.OK:
-            lut_zero = struct.unpack('<h', bytes(resp[2:4]))[0]  # int16
-            key_zeros = []
-            for i in range(6):
-                val = struct.unpack('<h', bytes(resp[4 + i*2:6 + i*2]))[0]
-                key_zeros.append(val)
-            return {
-                'lut_zero_value': lut_zero,
-                'key_zero_values': key_zeros
-            }
-        return None
+        key_zeros = [0] * KEY_COUNT
+        lut_zero = None
+        next_index = 0
+
+        while next_index < KEY_COUNT:
+            resp = self.send_command(Command.GET_CALIBRATION, [0, next_index], timeout_ms=150)
+            if not resp or len(resp) < 6 or resp[1] != Status.OK:
+                return None
+
+            start_index = int(resp[2])
+            value_count = int(resp[3])
+            if start_index != next_index or value_count <= 0 or value_count > CALIBRATION_VALUES_PER_CHUNK:
+                return None
+
+            current_lut_zero = struct.unpack('<h', bytes(resp[4:6]))[0]
+            if lut_zero is None:
+                lut_zero = current_lut_zero
+
+            for i in range(value_count):
+                base = 6 + i * 2
+                key_zeros[start_index + i] = struct.unpack('<h', bytes(resp[base:base + 2]))[0]
+
+            next_index += value_count
+
+        return {
+            'lut_zero_value': lut_zero if lut_zero is not None else 0,
+            'key_zero_values': key_zeros,
+        }
     
     def set_calibration(self, lut_zero, key_zeros):
         """Set calibration settings."""
-        data = [0]  # placeholder
-        data.extend(struct.pack('<h', lut_zero))  # int16
-        for val in key_zeros[:6]:
-            data.extend(struct.pack('<h', val))
-        # Pad to expected size
-        while len(data) < 16:
-            data.append(0)
-        resp = self.send_command(Command.SET_CALIBRATION, data)
-        return resp and len(resp) >= 2 and resp[1] == Status.OK
+        key_zeros = list(key_zeros or [])
+        if len(key_zeros) < KEY_COUNT:
+            key_zeros = key_zeros + [int(lut_zero)] * (KEY_COUNT - len(key_zeros))
+        else:
+            key_zeros = key_zeros[:KEY_COUNT]
+
+        next_index = 0
+        while next_index < KEY_COUNT:
+            count = self._chunk_count(KEY_COUNT, next_index, CALIBRATION_VALUES_PER_CHUNK)
+            data = [0, next_index, count]
+            data.extend(struct.pack('<h', int(lut_zero)))
+            for value in key_zeros[next_index:next_index + count]:
+                data.extend(struct.pack('<h', int(value)))
+            resp = self.send_command(Command.SET_CALIBRATION, data, timeout_ms=300)
+            if not resp or len(resp) < 4 or resp[1] != Status.OK:
+                return False
+            next_index += count
+        return True
     
     def auto_calibrate(self, key_index=0xFF):
         """Auto-calibrate a key or all keys (0xFF = all)."""
         data = [0, key_index]  # placeholder, key_index
         resp = self.send_command(Command.AUTO_CALIBRATE, data)
-        if resp and len(resp) >= 16 and resp[1] == Status.OK:
-            # Return updated calibration
-            lut_zero = struct.unpack('<h', bytes(resp[2:4]))[0]
-            key_zeros = []
-            for i in range(6):
-                val = struct.unpack('<h', bytes(resp[4 + i*2:6 + i*2]))[0]
-                key_zeros.append(val)
-            return {
-                'lut_zero_value': lut_zero,
-                'key_zero_values': key_zeros
-            }
-        return None
+        if not resp or len(resp) < 2 or resp[1] != Status.OK:
+            return None
+        return self.get_calibration()
     
     # --- Per-Key Curve Commands ---
     
@@ -734,24 +797,39 @@ class KBHEDevice:
     
     def get_key_states(self):
         """Get key states (debug) with actual distances in mm."""
-        resp = self.send_command(Command.GET_KEY_STATES)
-        if resp and len(resp) >= 26 and resp[1] == Status.OK:
-            states = list(resp[2:8])
-            distances_norm = list(resp[8:14])  # Normalized 0-255
-            # Extract distances in 0.01mm units (6 x uint16)
-            distances_01mm = []
-            distances_mm = []
-            for i in range(6):
-                val = resp[14 + i*2] | (resp[15 + i*2] << 8)
-                distances_01mm.append(val)
-                distances_mm.append(val / 100.0)  # Convert to mm float
-            return {
-                'states': states, 
-                'distances': distances_norm,  # For progress bars
-                'distances_01mm': distances_01mm,  # Raw units for graphing
-                'distances_mm': distances_mm   # Actual mm values
-            }
-        return None
+        states = [0] * KEY_COUNT
+        distances_norm = [0] * KEY_COUNT
+        distances_01mm = [0] * KEY_COUNT
+        distances_mm = [0.0] * KEY_COUNT
+        next_index = 0
+
+        while next_index < KEY_COUNT:
+            resp = self.send_command(Command.GET_KEY_STATES, [0, next_index], timeout_ms=150)
+            if not resp or len(resp) < 4 or resp[1] != Status.OK:
+                return None
+
+            start_index = int(resp[2])
+            key_count = int(resp[3])
+            if start_index != next_index or key_count <= 0 or key_count > KEY_STATES_PER_CHUNK:
+                return None
+
+            for i in range(key_count):
+                offset = 4 + i * 4
+                key_index = start_index + i
+                states[key_index] = int(resp[offset])
+                distances_norm[key_index] = int(resp[offset + 1])
+                value_01mm = self._unpack_u16(resp, offset + 2)
+                distances_01mm[key_index] = value_01mm
+                distances_mm[key_index] = value_01mm / 100.0
+
+            next_index += key_count
+
+        return {
+            'states': states,
+            'distances': distances_norm,
+            'distances_01mm': distances_01mm,
+            'distances_mm': distances_mm,
+        }
 
     def adc_capture_start(self, key_index, duration_ms):
         """Start ADC capture in MCU RAM for one key and a fixed duration."""

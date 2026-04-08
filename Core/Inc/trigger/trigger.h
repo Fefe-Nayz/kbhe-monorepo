@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "settings.h"
+
 // Actuation point in µm
 #define DEFAULT_ACTUATION_POINT 1200 // 1.2mm
 
@@ -40,3 +42,9 @@ void trigger_init(void);
 void trigger_task(void);
 
 key_state_e trigger_get_key_state(uint8_t key);
+
+uint16_t trigger_get_distance_01mm(uint8_t key);
+
+void trigger_reload_settings(void);
+
+void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings);

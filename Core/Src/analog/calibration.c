@@ -25,7 +25,7 @@ void calibration_load_settings() {
         return;
     }
 
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < NUM_KEYS; ++i) {
         zero_offset[i] = cal->key_zero_values[i] - cal->lut_zero_value;
     }
 }

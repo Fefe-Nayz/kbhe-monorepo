@@ -4,8 +4,11 @@
  */
 
 #include "settings.h"
+#include "analog/calibration.h"
 #include "flash_storage.h"
+#include "layout/layout.h"
 #include "led_matrix.h"
+#include "trigger/trigger.h"
 #include "hid/gamepad_hid.h"
 #include <string.h>
 
@@ -45,6 +48,28 @@ static uint32_t crc32_compute(const void *data, uint32_t len) {
 // Internal Functions
 //--------------------------------------------------------------------+
 
+_Static_assert(sizeof(settings_t) <= FLASH_STORAGE_SIZE,
+               "settings_t must fit in the flash storage sector");
+
+static settings_key_t settings_default_key(uint8_t key_index) {
+  settings_key_t key = {
+      .hid_keycode = layout_get_default_keycode(key_index),
+      .actuation_point_mm = 20,
+      .release_point_mm = 18,
+      .rapid_trigger_activation = 5,
+      .rapid_trigger_press = 30,
+      .rapid_trigger_release = 30,
+      .socd_pair = 255,
+      .rapid_trigger_enabled = 0,
+      .disable_kb_on_gamepad = 0,
+      .curve_enabled = 0,
+      .reserved_bits = 0,
+      .curve = SETTINGS_DEFAULT_CURVE,
+      .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP,
+  };
+  return key;
+}
+
 static void settings_set_defaults(void) {
   memset(&current_settings, 0, sizeof(settings_t));
 
@@ -58,19 +83,20 @@ static void settings_set_defaults(void) {
   current_settings.options.raw_hid_echo = 0;
   current_settings.options.led_enabled = 1;
 
-  // Default per-key settings with keycodes and SOCD pairs
-  const settings_key_t default_keys[6] = {
-      SETTINGS_DEFAULT_KEY_0, SETTINGS_DEFAULT_KEY_1, SETTINGS_DEFAULT_KEY_2,
-      SETTINGS_DEFAULT_KEY_3, SETTINGS_DEFAULT_KEY_4, SETTINGS_DEFAULT_KEY_5};
-  memcpy(current_settings.keys, default_keys, sizeof(default_keys));
+  // Default per-key settings follow the physical keyboard layout.
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    current_settings.keys[i] = settings_default_key(i);
+  }
 
   // Default gamepad settings
   settings_gamepad_t default_gamepad = SETTINGS_DEFAULT_GAMEPAD;
   current_settings.gamepad = default_gamepad;
 
   // Default calibration settings
-  settings_calibration_t default_calibration = SETTINGS_DEFAULT_CALIBRATION;
-  current_settings.calibration = default_calibration;
+  current_settings.calibration.lut_zero_value = LUT_ZERO_VALUE;
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    current_settings.calibration.key_zero_values[i] = LUT_ZERO_VALUE;
+  }
 
   // Default LED settings
   memset(current_settings.led.pixels, 0, LED_MATRIX_DATA_BYTES);
@@ -166,6 +192,9 @@ void settings_init(void) {
                               current_settings.led_effect_color_b);
   led_matrix_set_fps_limit(current_settings.led_fps_limit);
 
+  // Apply per-key runtime settings after the settings blob is loaded.
+  trigger_reload_settings();
+
   settings_dirty = false;
 }
 
@@ -213,6 +242,16 @@ settings_options_t settings_get_options(void) {
 bool settings_reset(void) {
   settings_set_defaults();
   gamepad_hid_set_enabled(current_settings.options.gamepad_enabled);
+  led_matrix_set_brightness(current_settings.led.brightness);
+  led_matrix_set_raw_data(current_settings.led.pixels);
+  led_matrix_set_enabled(current_settings.options.led_enabled);
+  led_matrix_set_effect((led_effect_mode_t)current_settings.led_effect_mode);
+  led_matrix_set_effect_speed(current_settings.led_effect_speed);
+  led_matrix_set_effect_color(current_settings.led_effect_color_r,
+                              current_settings.led_effect_color_g,
+                              current_settings.led_effect_color_b);
+  led_matrix_set_fps_limit(current_settings.led_fps_limit);
+  trigger_reload_settings();
   return settings_save();
 }
 
@@ -340,16 +379,18 @@ bool settings_set_led_effect_color(uint8_t r, uint8_t g, uint8_t b) {
 //--------------------------------------------------------------------+
 
 const settings_key_t *settings_get_key(uint8_t key_index) {
-  if (key_index >= 6)
+  if (key_index >= NUM_KEYS)
     return NULL;
   return &current_settings.keys[key_index];
 }
 
 bool settings_set_key(uint8_t key_index, const settings_key_t *key) {
-  if (key_index >= 6 || key == NULL)
+  if (key_index >= NUM_KEYS || key == NULL)
     return false;
 
   memcpy(&current_settings.keys[key_index], key, sizeof(settings_key_t));
+  current_settings.keys[key_index].reserved_bits = 0;
+  trigger_apply_key_settings(key_index, &current_settings.keys[key_index]);
   return true; // Don't auto-save
 }
 
@@ -387,7 +428,7 @@ bool settings_set_calibration(const settings_calibration_t *calibration) {
 }
 
 bool settings_set_key_calibration(uint8_t key_index, int16_t zero_value) {
-  if (key_index >= 6)
+  if (key_index >= NUM_KEYS)
     return false;
 
   current_settings.calibration.key_zero_values[key_index] = zero_value;
@@ -399,13 +440,13 @@ bool settings_set_key_calibration(uint8_t key_index, int16_t zero_value) {
 //--------------------------------------------------------------------+
 
 const settings_curve_t *settings_get_key_curve(uint8_t key_index) {
-  if (key_index >= 6)
+  if (key_index >= NUM_KEYS)
     return NULL;
   return &current_settings.keys[key_index].curve;
 }
 
 bool settings_set_key_curve(uint8_t key_index, const settings_curve_t *curve) {
-  if (key_index >= 6 || curve == NULL)
+  if (key_index >= NUM_KEYS || curve == NULL)
     return false;
 
   memcpy(&current_settings.keys[key_index].curve, curve,
@@ -414,7 +455,7 @@ bool settings_set_key_curve(uint8_t key_index, const settings_curve_t *curve) {
 }
 
 bool settings_set_key_curve_enabled(uint8_t key_index, bool enabled) {
-  if (key_index >= 6)
+  if (key_index >= NUM_KEYS)
     return false;
 
   current_settings.keys[key_index].curve_enabled = enabled ? 1 : 0;
@@ -422,7 +463,7 @@ bool settings_set_key_curve_enabled(uint8_t key_index, bool enabled) {
 }
 
 bool settings_is_key_curve_enabled(uint8_t key_index) {
-  if (key_index >= 6)
+  if (key_index >= NUM_KEYS)
     return false;
   return current_settings.keys[key_index].curve_enabled;
 }
@@ -459,7 +500,7 @@ static uint8_t bezier_cubic(uint8_t t_byte, uint8_t p0, uint8_t p1, uint8_t p2,
 }
 
 uint8_t settings_apply_curve(uint8_t key_index, uint8_t input) {
-  if (key_index >= 6)
+  if (key_index >= NUM_KEYS)
     return input;
 
   // If curve is disabled, return linear
@@ -483,14 +524,14 @@ uint8_t settings_apply_curve(uint8_t key_index, uint8_t input) {
 
 const settings_gamepad_mapping_t *
 settings_get_key_gamepad_mapping(uint8_t key_index) {
-  if (key_index >= 6)
+  if (key_index >= NUM_KEYS)
     return NULL;
   return &current_settings.keys[key_index].gamepad_map;
 }
 
 bool settings_set_key_gamepad_mapping(
     uint8_t key_index, const settings_gamepad_mapping_t *mapping) {
-  if (key_index >= 6 || mapping == NULL)
+  if (key_index >= NUM_KEYS || mapping == NULL)
     return false;
 
   memcpy(&current_settings.keys[key_index].gamepad_map, mapping,

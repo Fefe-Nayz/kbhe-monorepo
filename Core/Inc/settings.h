@@ -19,7 +19,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x0007         // Bumped for 82-LED settings layout
+#define SETTINGS_VERSION 0x0008         // 82-key persistent settings + chunked HID
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -120,7 +120,7 @@ typedef struct __attribute__((packed)) {
  * @brief Key-specific settings
  */
 typedef struct __attribute__((packed)) {
-  uint8_t hid_keycode;        // HID keycode for this key
+  uint16_t hid_keycode;       // HID keycode / custom keycode for this key
   uint8_t actuation_point_mm; // Actuation point in 0.1mm (e.g., 20 = 2.0mm)
   uint8_t release_point_mm;   // Release point in 0.1mm
   uint8_t rapid_trigger_activation; // Initial activation distance in 0.1mm
@@ -142,7 +142,7 @@ typedef struct __attribute__((packed)) {
  */
 typedef struct __attribute__((packed)) {
   int16_t lut_zero_value;     // LUT reference zero value (default ~2118)
-  int16_t key_zero_values[6]; // Per-key zero values
+  int16_t key_zero_values[NUM_KEYS]; // Per-key zero values
 } settings_calibration_t;
 
 /**
@@ -178,8 +178,8 @@ typedef struct __attribute__((packed)) {
   settings_options_t options;
   uint8_t padding1[3]; // Alignment padding
 
-  // Per-key settings (6 keys)
-  settings_key_t keys[6];
+  // Per-key settings
+  settings_key_t keys[NUM_KEYS];
 
   // Gamepad settings
   settings_gamepad_t gamepad;
@@ -227,7 +227,7 @@ typedef struct __attribute__((packed)) {
    .led_enabled = 1,                                                           \
    .reserved = 0}
 
-// Default HID keycodes for keys 0-5 (Q, W, E, A, S, D)
+// Legacy default HID keycodes kept for compatibility with old bring-up code.
 #define HID_KEY_Q_CODE 0x14
 #define HID_KEY_W_CODE 0x1A
 #define HID_KEY_E_CODE 0x08
@@ -242,8 +242,8 @@ typedef struct __attribute__((packed)) {
 #define SETTINGS_DEFAULT_GAMEPAD_MAP                                           \
   {.axis = 0, .direction = 0, .button = 0, .reserved = 0}
 
-// Default key settings with keycodes and SOCD pairs (A↔D = keys 3↔5)
-// Rapid trigger disabled by default, with 2.0mm actuation point
+// Default key settings template used for all keys. The runtime default keycode is
+// derived from the physical keyboard layout in layout.c.
 #define SETTINGS_DEFAULT_KEY_0                                                 \
   {.hid_keycode = HID_KEY_Q_CODE,                                              \
    .actuation_point_mm = 20,                                                   \
@@ -322,8 +322,7 @@ typedef struct __attribute__((packed)) {
 
 // Default calibration values (from offset.c)
 #define SETTINGS_DEFAULT_CALIBRATION                                           \
-  {.lut_zero_value = 2118,                                                     \
-   .key_zero_values = {2100, 2110, 2118, 2130, 2114, 2094}}
+  {.lut_zero_value = 2118}
 
 //--------------------------------------------------------------------+
 // Settings API

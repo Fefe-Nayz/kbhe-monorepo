@@ -1,8 +1,23 @@
 from __future__ import annotations
 
 try:
+    from .theme import current_colors as _current_colors
     from .theme import current_theme_name as _current_theme_name
 except ImportError:
+    def _current_colors() -> dict[str, str]:  # type: ignore[misc]
+        return {
+            "surface": "#ffffff",
+            "surface_muted": "#f5f8fd",
+            "text": "#111827",
+            "text_muted": "#6b7280",
+            "accent": "#2563eb",
+            "accent_soft": "#dbeafe",
+            "border": "#e2e8f2",
+            "success": "#059669",
+            "warning": "#d97706",
+            "danger": "#dc2626",
+        }
+
     def _current_theme_name() -> str:  # type: ignore[misc]
         return "light"
 
@@ -12,12 +27,16 @@ from .common import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSize,
     QScrollArea,
+    QSizePolicy,
+    Signal,
     QToolButton,
     QVBoxLayout,
     QWidget,
     Qt,
 )
+from ..key_layout import KEY_LAYOUT, KEY_LAYOUT_HEIGHT, KEY_LAYOUT_WIDTH, key_display_name
 
 try:
     from PySide6.QtWidgets import QSlider
@@ -68,6 +87,7 @@ class SectionCard(QFrame):
         self.body_layout = QVBoxLayout(self.body)
         self.body_layout.setContentsMargins(0, 0, 0, 0)
         self.body_layout.setSpacing(10)
+        self.body_layout.setAlignment(Qt.AlignTop)
         root.addWidget(self.body)
 
     def add_header_widget(self, widget: QWidget) -> None:
@@ -299,43 +319,245 @@ class StatusPill(QLabel):
 
 
 # ---------------------------------------------------------------------------
-# KeySelector – 6-button shared focused-key picker
+# KeySelector – shared spatial keyboard picker
 # ---------------------------------------------------------------------------
 
 class KeySelector(QWidget):
+    _UNIT = 24
+    _GAP = 4
+
     def __init__(self, session, layout_mode: str = "row", parent=None):
         super().__init__(parent)
         self.session = session
         self.buttons: list[QPushButton] = []
 
-        if layout_mode == "column":
-            outer = QVBoxLayout(self)
-        elif layout_mode == "grid":
-            outer = QGridLayout(self)
-        else:
-            outer = QHBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(6)
+        canvas = QWidget(self)
+        canvas.setObjectName("KeySelectorCanvas")
+        canvas.setMinimumSize(
+            int(KEY_LAYOUT_WIDTH * self._UNIT) + self._GAP,
+            int(KEY_LAYOUT_HEIGHT * self._UNIT) + self._GAP,
+        )
+        self._canvas = canvas
+        self.setMinimumSize(canvas.minimumSize())
 
-        for i in range(6):
-            btn = QPushButton(f"K{i + 1}")
+        for entry in KEY_LAYOUT:
+            btn = QPushButton(entry.short_label, canvas)
             btn.setObjectName("KeyChip")
-            btn.setFixedWidth(44)
-            btn.clicked.connect(lambda _c=False, idx=i: session.set_selected_key(idx))
-            if layout_mode == "grid":
-                outer.addWidget(btn, i // 3, i % 3)
-            else:
-                outer.addWidget(btn)
+            btn.setToolTip(key_display_name(entry.index))
+            btn.clicked.connect(
+                lambda _c=False, idx=entry.index: session.set_selected_key(idx)
+            )
             self.buttons.append(btn)
 
         session.selectedKeyChanged.connect(self.refresh)
         self.refresh(session.selected_key)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._canvas.setGeometry(self.rect())
+        for entry, btn in zip(KEY_LAYOUT, self.buttons):
+            x = int(entry.x * self._UNIT)
+            y = int(entry.y * self._UNIT)
+            w = max(26, int(entry.w * self._UNIT) - self._GAP)
+            h = max(24, int(entry.h * self._UNIT) - self._GAP)
+            btn.setGeometry(x, y, w, h)
 
     def refresh(self, selected: int) -> None:
         for i, btn in enumerate(self.buttons):
             btn.setProperty("active", i == selected)
             btn.style().unpolish(btn)
             btn.style().polish(btn)
+
+
+class KeyboardLayoutWidget(QWidget):
+    keyClicked = Signal(int)
+
+    def __init__(
+        self,
+        session=None,
+        *,
+        unit: int = 34,
+        gap: int = 4,
+        interactive: bool = True,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.session = session
+        self._unit = int(unit)
+        self._gap = int(gap)
+        self._interactive = bool(interactive)
+        self._selected_index = -1
+        self._state: list[dict[str, object]] = []
+        self.buttons: list[QPushButton] = []
+
+        self._canvas = QWidget(self)
+        self._canvas.setObjectName("KeyboardLayoutCanvas")
+        fixed_size = QSize(
+            int(KEY_LAYOUT_WIDTH * self._unit) + self._gap,
+            int(KEY_LAYOUT_HEIGHT * self._unit) + self._gap,
+        )
+        self._canvas.setMinimumSize(fixed_size)
+        self.setMinimumSize(fixed_size)
+        self.setMaximumSize(fixed_size)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        for entry in KEY_LAYOUT:
+            btn = QPushButton(self._compose_text(entry.short_label, ""), self._canvas)
+            btn.setObjectName("KeyLayoutButton")
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn.clicked.connect(lambda _c=False, idx=entry.index: self._on_button_clicked(idx))
+            self.buttons.append(btn)
+            self._state.append(
+                {
+                    "title": entry.short_label,
+                    "subtitle": "",
+                    "fill": None,
+                    "text": None,
+                    "border": None,
+                    "tooltip": key_display_name(entry.index),
+                }
+            )
+
+        if self.session is not None and hasattr(self.session, "selectedKeyChanged"):
+            try:
+                self.session.selectedKeyChanged.connect(self.set_selected_key)
+                self._selected_index = int(getattr(self.session, "selected_key", -1))
+            except Exception:
+                pass
+
+        self.set_interactive(self._interactive)
+        self.refresh()
+
+    @staticmethod
+    def _compose_text(title: str, subtitle: str) -> str:
+        return title if not subtitle else f"{title}\n{subtitle}"
+
+    @staticmethod
+    def _auto_text_color(fill: str, fallback: str) -> str:
+        try:
+            hex_color = fill.lstrip("#")
+            if len(hex_color) != 6:
+                return fallback
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+            luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+            return "#0f172a" if luminance >= 0.62 else "#f8fafc"
+        except Exception:
+            return fallback
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._canvas.setGeometry(self.rect())
+        for entry, btn in zip(KEY_LAYOUT, self.buttons):
+            x = int(entry.x * self._unit)
+            y = int(entry.y * self._unit)
+            w = max(28, int(entry.w * self._unit) - self._gap)
+            h = max(26, int(entry.h * self._unit) - self._gap)
+            btn.setGeometry(x, y, w, h)
+
+    def _on_button_clicked(self, index: int) -> None:
+        if not self._interactive:
+            return
+        if self.session is not None and hasattr(self.session, "set_selected_key"):
+            try:
+                self.session.set_selected_key(index)
+            except Exception:
+                pass
+        else:
+            self.set_selected_key(index)
+        self.keyClicked.emit(index)
+
+    def set_interactive(self, interactive: bool) -> None:
+        self._interactive = bool(interactive)
+        for button in self.buttons:
+            button.setEnabled(True)
+            button.setCursor(
+                Qt.CursorShape.PointingHandCursor
+                if self._interactive
+                else Qt.CursorShape.ArrowCursor
+            )
+        self.refresh()
+
+    def set_selected_key(self, index: int) -> None:
+        self._selected_index = int(index)
+        self.refresh()
+
+    def set_key_state(
+        self,
+        index: int,
+        *,
+        title: str | None = None,
+        subtitle: str | None = None,
+        fill: str | None = None,
+        text: str | None = None,
+        border: str | None = None,
+        tooltip: str | None = None,
+    ) -> None:
+        if not (0 <= index < len(self._state)):
+            return
+        state = self._state[index]
+        if title is not None:
+            state["title"] = title
+        if subtitle is not None:
+            state["subtitle"] = subtitle
+        if fill is not None:
+            state["fill"] = fill
+        if text is not None:
+            state["text"] = text
+        if border is not None:
+            state["border"] = border
+        if tooltip is not None:
+            state["tooltip"] = tooltip
+        self._apply_button(index)
+
+    def reset(self) -> None:
+        for entry in KEY_LAYOUT:
+            self._state[entry.index] = {
+                "title": entry.short_label,
+                "subtitle": "",
+                "fill": None,
+                "text": None,
+                "border": None,
+                "tooltip": key_display_name(entry.index),
+            }
+        self.refresh()
+
+    def _apply_button(self, index: int) -> None:
+        colors = _current_colors()
+        state = self._state[index]
+        fill = str(state.get("fill") or colors["surface"])
+        border = str(state.get("border") or colors["border"])
+        text = str(state.get("text") or self._auto_text_color(fill, colors["text"]))
+        selected = index == self._selected_index
+        if selected:
+            border = colors["accent"]
+        button = self.buttons[index]
+        title = str(state.get("title") or KEY_LAYOUT[index].short_label)
+        subtitle = str(state.get("subtitle") or "")
+        button.setText(self._compose_text(title, subtitle))
+        button.setToolTip(str(state.get("tooltip") or key_display_name(index)))
+        button.setStyleSheet(
+            "QPushButton {"
+            f"background: {fill};"
+            f"color: {text};"
+            f"border: {'2px' if selected else '1px'} solid {border};"
+            "border-radius: 10px;"
+            "padding: 2px 4px;"
+            "font-weight: 600;"
+            "font-size: 8.5pt;"
+            "text-align: center;"
+            "}"
+            "QPushButton:disabled {"
+            f"background: {fill};"
+            f"color: {text};"
+            f"border: {'2px' if selected else '1px'} solid {border};"
+            "}"
+        )
+
+    def refresh(self) -> None:
+        for index in range(len(self.buttons)):
+            self._apply_button(index)
 
 
 # ---------------------------------------------------------------------------

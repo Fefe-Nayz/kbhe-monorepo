@@ -6,8 +6,13 @@ PACKET_SIZE = 64
 RAW_HID_USAGE_PAGE = 0xFF00
 RAW_HID_INTERFACE = 1
 KEY_COUNT = 82
+KEY_SETTINGS_PER_CHUNK = 6
+CALIBRATION_VALUES_PER_CHUNK = 29
+KEY_STATES_PER_CHUNK = 15
+LED_BYTES_PER_CHUNK = 60
 
-LED_MATRIX_SIZE = 64
+# The firmware stores one RGB triplet per logical key/LED.
+LED_MATRIX_SIZE = KEY_COUNT
 LED_MATRIX_WIDTH = 8
 LED_MATRIX_HEIGHT = 8
 
@@ -167,6 +172,7 @@ GAMEPAD_BUTTON_NAMES = {value: key for key, value in GAMEPAD_BUTTONS.items()}
 
 
 HID_KEYCODES = {
+    'NO': 0x0000,
     'A': 0x04, 'B': 0x05, 'C': 0x06, 'D': 0x07, 'E': 0x08, 'F': 0x09,
     'G': 0x0A, 'H': 0x0B, 'I': 0x0C, 'J': 0x0D, 'K': 0x0E, 'L': 0x0F,
     'M': 0x10, 'N': 0x11, 'O': 0x12, 'P': 0x13, 'Q': 0x14, 'R': 0x15,
@@ -192,6 +198,7 @@ HID_KEYCODES = {
     'LCTRL': 0xE0, 'LSHIFT': 0xE1, 'LALT': 0xE2, 'LGUI': 0xE3,
     'RCTRL': 0xE4, 'RSHIFT': 0xE5, 'RALT': 0xE6, 'RGUI': 0xE7,
     'MUTE': 0x7F, 'VOLUMEUP': 0x80, 'VOLUMEDOWN': 0x81,
+    'FN': 0xF000,
 }
 
 HID_KEYCODE_NAMES = {value: key for key, value in HID_KEYCODES.items()}

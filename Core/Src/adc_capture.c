@@ -1,5 +1,6 @@
 #include "adc_capture.h"
 #include "analog/analog.h"
+#include "board_config.h"
 
 #include <string.h>
 
@@ -22,7 +23,7 @@ void adc_capture_init(void) {
 }
 
 bool adc_capture_start(uint8_t key_index, uint32_t duration_ms) {
-  if (key_index >= 6u || duration_ms == 0u) {
+  if (key_index >= NUM_KEYS || duration_ms == 0u) {
     return false;
   }
 

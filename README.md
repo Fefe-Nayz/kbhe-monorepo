@@ -1,48 +1,102 @@
-# ATTENTION
-Si le DMA ne fonctionne plus après une génération de code par CubeMX remplacé la fonction ``MPU_Config()`` par
+# KBHE Firmware
 
-```c
-void MPU_Config(void)
-{
-  MPU_Region_InitTypeDef MPU_InitStruct = {0};
+## Premier flash avec le bootloader custom
 
-  /* Disables the MPU */
-  HAL_MPU_Disable();
+Cette procédure sert pour une carte neuve ou une carte entièrement effacée.
 
-  /** Initializes and configures the Region and the memory to be protected
-  */
-  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-  MPU_InitStruct.BaseAddress = (uint32_t)&adc_buffer;
-  MPU_InitStruct.Size = MPU_REGION_SIZE_256B;
-  MPU_InitStruct.SubRegionDisable = 0x00;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-  MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
-  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+### 1. Construire les binaires Release
 
-  HAL_MPU_ConfigRegion(&MPU_InitStruct);
+Le build `Release` génère les fichiers utiles :
 
-  /** Initializes and configures the Region and the memory to be protected
-  */
-  MPU_InitStruct.Number = MPU_REGION_NUMBER1;
-  MPU_InitStruct.BaseAddress = (uint32_t)&ws2812_dma_buffer;
-  MPU_InitStruct.Size = MPU_REGION_SIZE_128B;
-  MPU_InitStruct.SubRegionDisable = 0x0;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-  MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
-  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+- `build/Release/kbhe_bootloader.hex`
+- `build/Release/kbhe_bootloader.bin`
+- `build/Release/kbhe.hex`
+- `build/Release/kbhe.bin`
 
-  HAL_MPU_ConfigRegion(&MPU_InitStruct);
-  /* Enables the MPU */
-  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+### 2. Mettre la carte en DFU ROM ST
 
-}
+1. Basculer le switch physique sur le mode `DFU / FS`.
+2. Brancher le clavier en USB.
+3. Ouvrir `STM32CubeProgrammer`.
+4. Se connecter en `USB`.
+
+### 3. Effacer complètement la puce
+
+Dans `STM32CubeProgrammer` :
+
+1. Faire un `Full chip erase` / `Mass erase`.
+
+### 4. Flasher le bootloader puis l’application
+
+Toujours dans `STM32CubeProgrammer` :
+
+1. Ouvrir `build/Release/kbhe_bootloader.hex`
+2. Cliquer sur `Download`
+3. Ouvrir `build/Release/kbhe.hex`
+4. Cliquer sur `Download`
+5. Déconnecter la carte
+
+Important :
+
+- utiliser les `.hex` pour éviter les erreurs d’adresse
+- le bootloader va à `0x08000000`
+- l’application va à `0x08010000`
+- avec les `.hex`, CubeProgrammer applique déjà les bonnes adresses
+
+### 5. Premier boot en mode normal
+
+1. Repasser le switch physique en mode normal
+2. Rebrancher le clavier en USB
+
+Après ce premier flash ST, le clavier peut démarrer sur l’updater logiciel tant que le trailer d’application n’a pas encore été écrit.
+
+### 6. Reflasher une dernière fois via le CLI
+
+Installer la dépendance Python si besoin :
+
+```powershell
+pip install hidapi
 ```
 
-Cela est due au fait que CubeMX écrase les base adress
+Puis lancer :
+
+```powershell
+python raw_hid.py --flash build/Release/kbhe.bin
+```
+
+Cette étape :
+
+- parle au bootloader custom via RAW HID
+- réécrit l’application
+- écrit le trailer de validation
+- redémarre ensuite sur le firmware normal
+
+Une fois cette étape terminée, le clavier peut être mis à jour normalement via le logiciel Python.
+
+## Mises à jour suivantes
+
+Après l’installation initiale :
+
+- ne pas refaire toute la procédure CubeProgrammer
+- utiliser le logiciel Python ou le CLI :
+
+```powershell
+python raw_hid.py --flash build/Release/kbhe.bin
+```
+
+## Variante sans bootloader custom
+
+Pour un flash simple sans updater custom, utiliser la build `Release-apponly` :
+
+- `build/Release-apponly/kbhe.hex`
+
+Cette image se flashe directement à `0x08000000`.
+
+## Note CubeMX / DMA
+
+Si CubeMX régénère le code et casse ensuite le DMA, vérifier que `MPU_Config()` remet bien les buffers DMA critiques en non-cacheable, notamment :
+
+- `adc_buffer`
+- `ws2812_dma_buffer`
+
+Le symptôme typique est un DMA qui semble configuré correctement mais qui ne produit plus le comportement attendu après régénération. Dans ce cas, comparer `MPU_Config()` avec la version fonctionnelle du repo avant de continuer le debug firmware.

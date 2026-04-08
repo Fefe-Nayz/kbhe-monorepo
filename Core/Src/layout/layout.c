@@ -1,5 +1,7 @@
 #include "hid/keyboard_hid.h"
 #include "layout/keycodes.h"
+#include "settings.h"
+#include <stddef.h>
 #include <stdint.h>
 #include "board_config.h"
 #include "layout/layout.h"
@@ -47,8 +49,30 @@ static void set_active_layer(uint8_t layer) {
     active_layer = layer;
 }
 
+uint16_t layout_get_default_keycode(uint8_t key) {
+    if (key >= NUM_KEYS) {
+        return KC_NO;
+    }
+    return DEFAULT_BASE_LAYER[key];
+}
+
+uint16_t layout_get_active_keycode(uint8_t key) {
+    if (key >= NUM_KEYS) {
+        return KC_NO;
+    }
+
+    if (active_layer == 0) {
+        const settings_key_t *settings_key = settings_get_key(key);
+        if (settings_key != NULL) {
+            return settings_key->hid_keycode;
+        }
+    }
+
+    return layers[active_layer][key];
+}
+
 void layout_press(uint8_t key) {
-    uint16_t keycode = layers[active_layer][key];
+    uint16_t keycode = layout_get_active_keycode(key);
 
     if (DISABLE_INPUT) {
         return;
@@ -66,7 +90,7 @@ void layout_press(uint8_t key) {
 }
 
 void layout_release(uint8_t key) {
-    uint16_t keycode = layers[active_layer][key];
+    uint16_t keycode = layout_get_active_keycode(key);
 
     if (DISABLE_INPUT) {
         return;

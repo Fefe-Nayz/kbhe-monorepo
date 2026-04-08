@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...protocol import KEY_COUNT
 from ..widgets import (
     PageScaffold,
     SectionCard,
@@ -44,14 +45,17 @@ class DevicePage(QWidget):
     def _build_state(self) -> None:
         owner = self.controller
         if owner is not None and hasattr(owner, "pixels"):
-            self.pixels = getattr(owner, "pixels")
+            self.pixels = [list(pixel[:3]) for pixel in getattr(owner, "pixels")]
         else:
-            self.pixels = [[0, 0, 0] for _ in range(64)]
+            self.pixels = [[0, 0, 0] for _ in range(KEY_COUNT)]
             if owner is not None:
                 try:
                     setattr(owner, "pixels", self.pixels)
                 except Exception:
                     pass
+        if len(self.pixels) < KEY_COUNT:
+            self.pixels.extend([[0, 0, 0] for _ in range(KEY_COUNT - len(self.pixels))])
+        self.pixels = self.pixels[:KEY_COUNT]
 
         if owner is not None and hasattr(owner, "brightness"):
             self.brightness = int(getattr(owner, "brightness"))
@@ -146,7 +150,7 @@ class DevicePage(QWidget):
         card = SectionCard(
             "Save Settings",
             "Persists the LED matrix state stored in RAM: LED enable, brightness, "
-            "and the current 8×8 pattern.",
+            "and the current 82-LED pattern.",
         )
         card.body_layout.addWidget(
             make_primary_button("Save All Settings to Flash", self.save_to_device)
@@ -201,15 +205,15 @@ class DevicePage(QWidget):
 
     def _serialize_pixels(self) -> list[int]:
         payload = []
-        for pixel in self.pixels[:64]:
-            channels = list(pixel[:3]) + [0, 0, 0]
-            payload.extend(_clamp(ch) for ch in channels[:3])
-        return payload[:192]
+        for pixel in self.pixels[:KEY_COUNT]:
+            payload.extend(_clamp(ch) for ch in pixel[:3])
+        return payload[: KEY_COUNT * 3]
 
     def _load_pixels(self, payload: list[int]) -> bool:
-        if len(payload) < 192:
+        expected_size = KEY_COUNT * 3
+        if len(payload) < expected_size:
             return False
-        for i in range(64):
+        for i in range(KEY_COUNT):
             base = i * 3
             self.pixels[i] = [payload[base], payload[base + 1], payload[base + 2]]
         self._sync_shared()
@@ -267,10 +271,11 @@ class DevicePage(QWidget):
 
         try:
             pixels = self.device.led_download_all()
-            if pixels and len(pixels) >= 192:
-                self._load_pixels(pixels[:192])
+            expected_size = KEY_COUNT * 3
+            if pixels and len(pixels) >= expected_size:
+                self._load_pixels(pixels[:expected_size])
                 lit = sum(1 for p in self.pixels if any(ch for ch in p[:3]))
-                self.led_count_label.setText(f"Lit pixels: {lit} / 64")
+                self.led_count_label.setText(f"Lit pixels: {lit} / {KEY_COUNT}")
             elif pixels:
                 errors.append(f"pixel payload too short ({len(pixels)} bytes)")
         except Exception as exc:
@@ -337,23 +342,31 @@ class DevicePage(QWidget):
             self._update_status(f"Import failed: {exc}", "error")
             QMessageBox.critical(self, "Import failed", f"Could not read the LED pattern:\n{exc}")
             return
-        if len(data) < 193:
+        expected_new = 1 + KEY_COUNT * 3
+        expected_old = 193
+        if len(data) not in (expected_new, expected_old):
             self._update_status("Import failed: invalid file format.", "error")
             QMessageBox.warning(
-                self, "Import failed", "Invalid LED pattern file.\nExpected 193 bytes."
+                self,
+                "Import failed",
+                f"Invalid LED pattern file.\nExpected {expected_new} bytes (82 LEDs) or {expected_old} bytes (legacy 64 LEDs).",
             )
             return
 
         brightness = _clamp(data[0])
+        payload = list(data[1:])
+        if len(data) == expected_old:
+            payload.extend([0] * ((KEY_COUNT * 3) - len(payload)))
+        payload = payload[: KEY_COUNT * 3]
         try:
             self.brightness = brightness
             self._sync_shared()
             self.brightness_label.setText(f"Brightness: {brightness}")
             if not self.device.led_set_brightness(brightness):
                 raise RuntimeError("device rejected the brightness update")
-            if not self._load_pixels(list(data[1:193])):
+            if not self._load_pixels(payload):
                 raise RuntimeError("invalid LED payload")
-            if not self.device.led_upload_all(list(data[1:193])):
+            if not self.device.led_upload_all(payload):
                 raise RuntimeError("device rejected the LED payload")
         except Exception as exc:
             self._update_status(f"Import failed: {exc}", "error")

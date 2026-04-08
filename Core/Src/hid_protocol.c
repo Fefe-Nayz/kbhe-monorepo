@@ -10,6 +10,7 @@
 #include "led_matrix.h"
 #include "main.h"
 #include "settings.h"
+#include "trigger/trigger.h"
 #include "updater_app.h"
 // #include "trigger.h"
 #include "analog/calibration.h"
@@ -19,8 +20,6 @@
 //--------------------------------------------------------------------+
 // External declarations for debug data
 //--------------------------------------------------------------------+
-float distances[6] = {0, 0, 0, 0, 0, 0};     // From trigger.c
-int states[6] = {0, 0, 0, 0, 0, 0};          // From trigger.c
 
 static inline bool is_valid_adc_calibration_value(int16_t value) {
   return value >= 0 && value <= 4095;
@@ -28,6 +27,29 @@ static inline bool is_valid_adc_calibration_value(int16_t value) {
 
 static inline void refresh_runtime_calibration(void) {
   calibration_load_settings();
+}
+
+static inline uint8_t hid_key_flags_from_settings(const settings_key_t *key) {
+  uint8_t flags = 0;
+  if (key->rapid_trigger_enabled) {
+    flags |= 0x01;
+  }
+  if (key->disable_kb_on_gamepad) {
+    flags |= 0x02;
+  }
+  return flags;
+}
+
+static inline void hid_fill_key_settings_chunk_entry(
+    hid_key_settings_chunk_entry_t *entry, const settings_key_t *key) {
+  entry->hid_keycode = key->hid_keycode;
+  entry->actuation_point_mm = key->actuation_point_mm;
+  entry->release_point_mm = key->release_point_mm;
+  entry->rapid_trigger_activation = key->rapid_trigger_activation;
+  entry->rapid_trigger_press = key->rapid_trigger_press;
+  entry->rapid_trigger_release = key->rapid_trigger_release;
+  entry->socd_pair = key->socd_pair;
+  entry->flags = hid_key_flags_from_settings(key);
 }
 
 //--------------------------------------------------------------------+
@@ -178,7 +200,7 @@ static void cmd_get_key_settings(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_GET_KEY_SETTINGS;
 
-  if (req->key_index >= 6) {
+  if (req->key_index >= NUM_KEYS) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -205,7 +227,7 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_SET_KEY_SETTINGS;
 
-  if (req->key_index >= 6) {
+  if (req->key_index >= NUM_KEYS) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -244,23 +266,30 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
 }
 
 static void cmd_get_all_key_settings(const uint8_t *in, uint8_t *out) {
+  const hid_packet_all_keys_t *req = (const hid_packet_all_keys_t *)in;
   hid_packet_all_keys_t *resp = (hid_packet_all_keys_t *)out;
 
   resp->command_id = CMD_GET_ALL_KEY_SETTINGS;
-  resp->status = HID_RESP_OK;
+  resp->start_index = req->start_index;
+  resp->key_count = 0;
+
+  if (req->start_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
 
   const settings_t *s = settings_get();
-  for (int i = 0; i < 6; i++) {
-    resp->keys[i].hid_keycode = s->keys[i].hid_keycode;
-    resp->keys[i].actuation_point_mm = s->keys[i].actuation_point_mm;
-    resp->keys[i].release_point_mm = s->keys[i].release_point_mm;
-    resp->keys[i].rapid_trigger_activation =
-        s->keys[i].rapid_trigger_activation;
-    resp->keys[i].rapid_trigger_press = s->keys[i].rapid_trigger_press;
-    resp->keys[i].rapid_trigger_release = s->keys[i].rapid_trigger_release;
-    resp->keys[i].socd_pair = s->keys[i].socd_pair;
-    resp->keys[i].rapid_trigger_enabled = s->keys[i].rapid_trigger_enabled;
-    resp->keys[i].disable_kb_on_gamepad = s->keys[i].disable_kb_on_gamepad;
+  uint8_t count = (uint8_t)(NUM_KEYS - req->start_index);
+  if (count > HID_KEY_SETTINGS_PER_CHUNK) {
+    count = HID_KEY_SETTINGS_PER_CHUNK;
+  }
+
+  resp->status = HID_RESP_OK;
+  resp->key_count = count;
+  memset(resp->reserved, 0, sizeof(resp->reserved));
+  for (uint8_t i = 0; i < count; i++) {
+    hid_fill_key_settings_chunk_entry(
+        &resp->keys[i], &s->keys[req->start_index + i]);
   }
 }
 
@@ -270,9 +299,22 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_SET_ALL_KEY_SETTINGS;
 
+  if (req->start_index >= NUM_KEYS || req->key_count == 0 ||
+      req->key_count > HID_KEY_SETTINGS_PER_CHUNK ||
+      (uint16_t)req->start_index + req->key_count > NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    resp->start_index = req->start_index;
+    resp->key_count = 0;
+    return;
+  }
+
   bool success = true;
-  for (int i = 0; i < 6; i++) {
-    const settings_key_t *current_key = settings_get_key(i);
+  resp->start_index = req->start_index;
+  resp->key_count = req->key_count;
+
+  for (uint8_t i = 0; i < req->key_count; i++) {
+    uint8_t key_index = (uint8_t)(req->start_index + i);
+    const settings_key_t *current_key = settings_get_key(key_index);
     if (current_key == NULL) {
       success = false;
       continue;
@@ -286,23 +328,15 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
     key.rapid_trigger_press = req->keys[i].rapid_trigger_press;
     key.rapid_trigger_release = req->keys[i].rapid_trigger_release;
     key.socd_pair = req->keys[i].socd_pair;
-    key.rapid_trigger_enabled = req->keys[i].rapid_trigger_enabled ? 1 : 0;
-    key.disable_kb_on_gamepad = req->keys[i].disable_kb_on_gamepad ? 1 : 0;
+    key.rapid_trigger_enabled = (req->keys[i].flags & 0x01u) ? 1 : 0;
+    key.disable_kb_on_gamepad = (req->keys[i].flags & 0x02u) ? 1 : 0;
     key.reserved_bits = 0;
 
-    if (!settings_set_key(i, &key)) {
+    if (!settings_set_key(key_index, &key)) {
       success = false;
     }
 
-    resp->keys[i].hid_keycode = key.hid_keycode;
-    resp->keys[i].actuation_point_mm = key.actuation_point_mm;
-    resp->keys[i].release_point_mm = key.release_point_mm;
-    resp->keys[i].rapid_trigger_activation = key.rapid_trigger_activation;
-    resp->keys[i].rapid_trigger_press = key.rapid_trigger_press;
-    resp->keys[i].rapid_trigger_release = key.rapid_trigger_release;
-    resp->keys[i].socd_pair = key.socd_pair;
-    resp->keys[i].rapid_trigger_enabled = key.rapid_trigger_enabled;
-    resp->keys[i].disable_kb_on_gamepad = key.disable_kb_on_gamepad;
+    hid_fill_key_settings_chunk_entry(&resp->keys[i], &key);
   }
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
@@ -352,16 +386,29 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
 //--------------------------------------------------------------------+
 
 static void cmd_get_calibration(const uint8_t *in, uint8_t *out) {
+  const hid_packet_calibration_t *req = (const hid_packet_calibration_t *)in;
   hid_packet_calibration_t *resp = (hid_packet_calibration_t *)out;
-  (void)in;
 
   resp->command_id = CMD_GET_CALIBRATION;
-  resp->status = HID_RESP_OK;
+  resp->start_index = req->start_index;
+  resp->value_count = 0;
+
+  if (req->start_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
 
   const settings_calibration_t *cal = settings_get_calibration();
+  uint8_t count = (uint8_t)(NUM_KEYS - req->start_index);
+  if (count > HID_CALIBRATION_VALUES_PER_CHUNK) {
+    count = HID_CALIBRATION_VALUES_PER_CHUNK;
+  }
+
+  resp->status = HID_RESP_OK;
+  resp->value_count = count;
   resp->lut_zero_value = cal->lut_zero_value;
-  for (int i = 0; i < 6; i++) {
-    resp->key_zero_values[i] = cal->key_zero_values[i];
+  for (uint8_t i = 0; i < count; i++) {
+    resp->key_zero_values[i] = cal->key_zero_values[req->start_index + i];
   }
 }
 
@@ -371,10 +418,20 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_SET_CALIBRATION;
 
-  settings_calibration_t cal;
+  if (req->start_index >= NUM_KEYS || req->value_count == 0 ||
+      req->value_count > HID_CALIBRATION_VALUES_PER_CHUNK ||
+      (uint16_t)req->start_index + req->value_count > NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    resp->start_index = req->start_index;
+    resp->value_count = 0;
+    return;
+  }
+
+  const settings_calibration_t *current = settings_get_calibration();
+  settings_calibration_t cal = *current;
   cal.lut_zero_value = req->lut_zero_value;
-  for (int i = 0; i < 6; i++) {
-    cal.key_zero_values[i] = req->key_zero_values[i];
+  for (uint8_t i = 0; i < req->value_count; i++) {
+    cal.key_zero_values[req->start_index + i] = req->key_zero_values[i];
   }
 
   if (!is_valid_adc_calibration_value(cal.lut_zero_value)) {
@@ -382,7 +439,7 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  for (int i = 0; i < 6; i++) {
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
     if (!is_valid_adc_calibration_value(cal.key_zero_values[i])) {
       resp->status = HID_RESP_INVALID_PARAM;
       return;
@@ -397,9 +454,11 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
   }
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->start_index = req->start_index;
+  resp->value_count = req->value_count;
   resp->lut_zero_value = cal.lut_zero_value;
-  for (int i = 0; i < 6; i++) {
-    resp->key_zero_values[i] = cal.key_zero_values[i];
+  for (uint8_t i = 0; i < req->value_count; i++) {
+    resp->key_zero_values[i] = cal.key_zero_values[req->start_index + i];
   }
 }
 
@@ -416,12 +475,12 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
 
   if (key_index == 0xFF) {
     // Auto-calibrate all keys
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < NUM_KEYS; i++) {
       if (!settings_set_key_calibration(i, (int16_t)analog_read_raw_value(i))) {
         success = false;
       }
     }
-  } else if (key_index < 6) {
+  } else if (key_index < NUM_KEYS) {
     // Auto-calibrate single key
     success = settings_set_key_calibration(
         key_index, (int16_t)analog_read_raw_value(key_index));
@@ -440,8 +499,12 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
 
   // Return updated calibration
   const settings_calibration_t *cal = settings_get_calibration();
+  resp->start_index = 0;
+  resp->value_count =
+      (NUM_KEYS < HID_CALIBRATION_VALUES_PER_CHUNK) ? NUM_KEYS
+                                                    : HID_CALIBRATION_VALUES_PER_CHUNK;
   resp->lut_zero_value = cal->lut_zero_value;
-  for (int i = 0; i < 6; i++) {
+  for (uint8_t i = 0; i < resp->value_count; i++) {
     resp->key_zero_values[i] = cal->key_zero_values[i];
   }
 }
@@ -457,7 +520,7 @@ static void cmd_get_key_curve(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_GET_KEY_CURVE;
 
   uint8_t key_index = req->key_index;
-  if (key_index >= 6) {
+  if (key_index >= NUM_KEYS) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -480,7 +543,7 @@ static void cmd_set_key_curve(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_SET_KEY_CURVE;
 
   uint8_t key_index = req->key_index;
-  if (key_index >= 6) {
+  if (key_index >= NUM_KEYS) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -515,7 +578,7 @@ static void cmd_get_key_gamepad_map(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_GET_KEY_GAMEPAD_MAP;
 
   uint8_t key_index = req->key_index;
-  if (key_index >= 6) {
+  if (key_index >= NUM_KEYS) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -538,7 +601,7 @@ static void cmd_set_key_gamepad_map(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_SET_KEY_GAMEPAD_MAP;
 
   uint8_t key_index = req->key_index;
-  if (key_index >= 6) {
+  if (key_index >= NUM_KEYS) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -698,26 +761,54 @@ static void cmd_set_led_row(const uint8_t *in, uint8_t *out) {
   memcpy(resp->pixels, req->pixels, 24);
 }
 
-// LED chunk: 192 bytes / 48 bytes per chunk = 4 chunks
-#define LED_CHUNK_SIZE 48
+// LED bulk sync chunk size: max payload that still fits in one HID packet.
+#define LED_CHUNK_SIZE HID_LED_BYTES_PER_CHUNK
+
+static void cmd_get_led_all(const uint8_t *in, uint8_t *out) {
+  const hid_packet_led_chunk_t *req = (const hid_packet_led_chunk_t *)in;
+  hid_packet_led_chunk_t *resp = (hid_packet_led_chunk_t *)out;
+
+  resp->command_id = CMD_GET_LED_ALL;
+  resp->chunk_index = req->chunk_index;
+  resp->chunk_size = 0;
+
+  uint16_t offset = (uint16_t)req->chunk_index * LED_CHUNK_SIZE;
+  if (offset >= LED_MATRIX_DATA_BYTES) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  uint16_t remaining = LED_MATRIX_DATA_BYTES - offset;
+  uint8_t size = (remaining > LED_CHUNK_SIZE) ? LED_CHUNK_SIZE : (uint8_t)remaining;
+
+  const uint8_t *pixels = led_matrix_get_raw_data();
+  resp->status = HID_RESP_OK;
+  resp->chunk_size = size;
+  memcpy(resp->data, &pixels[offset], size);
+}
 
 static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
   const hid_packet_led_chunk_t *req = (const hid_packet_led_chunk_t *)in;
   hid_packet_led_chunk_t *resp = (hid_packet_led_chunk_t *)out;
 
   resp->command_id = CMD_SET_LED_ALL_CHUNK;
+  resp->chunk_index = req->chunk_index;
+  resp->chunk_size = 0;
 
-  if (req->chunk_index > 3) {
+  if (req->chunk_size == 0 || req->chunk_size > LED_CHUNK_SIZE) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
 
   uint16_t offset = req->chunk_index * LED_CHUNK_SIZE;
-  uint8_t size = (req->chunk_index == 3) ? (LED_MATRIX_DATA_BYTES - offset)
-                                         : LED_CHUNK_SIZE;
+  if (offset >= LED_MATRIX_DATA_BYTES ||
+      (uint32_t)offset + req->chunk_size > LED_MATRIX_DATA_BYTES) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
 
   // Set pixels from chunk
-  for (uint16_t i = 0; i < size; i += 3) {
+  for (uint16_t i = 0; i + 2 < req->chunk_size; i += 3) {
     uint8_t idx = (offset + i) / 3;
     if (idx < LED_MATRIX_SIZE) {
       settings_set_led_pixel(idx, req->data[i], req->data[i + 1],
@@ -726,8 +817,7 @@ static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
   }
 
   resp->status = HID_RESP_OK;
-  resp->chunk_index = req->chunk_index;
-  resp->chunk_size = size;
+  resp->chunk_size = req->chunk_size;
 }
 
 static void cmd_led_clear(const uint8_t *in, uint8_t *out) {
@@ -972,36 +1062,44 @@ static void cmd_get_raw_adc_chunk(const uint8_t *in, uint8_t *out) {
 }
 
 uint16_t triggerGetDistance01mm(int keyIndex) {
-  if (keyIndex < 0 || keyIndex >= 6)
+  if (keyIndex < 0 || keyIndex >= NUM_KEYS)
     return 0;
-
-  int16_t um = analog_read_distance_value(keyIndex);
-  if (um < 0)
-    um = 0;
-
-  // Convert um to 0.01mm units (10um per step), rounded to nearest.
-  return (uint16_t)((um + 5) / 10);
+  return trigger_get_distance_01mm((uint8_t)keyIndex);
 }
 
 static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
+  const hid_resp_key_states_t *req = (const hid_resp_key_states_t *)in;
   hid_resp_key_states_t *resp = (hid_resp_key_states_t *)out;
   resp->command_id = CMD_GET_KEY_STATES;
+  resp->start_index = req->start_index;
+  resp->key_count = 0;
+
+  if (req->start_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  uint8_t count = (uint8_t)(NUM_KEYS - req->start_index);
+  if (count > HID_KEY_STATES_PER_CHUNK) {
+    count = HID_KEY_STATES_PER_CHUNK;
+  }
+
   resp->status = HID_RESP_OK;
+  resp->key_count = count;
 
-  for (int i = 0; i < 6; i++) {
-    resp->key_states[i] = states[i] ? 1 : 0;
+  for (uint8_t i = 0; i < count; i++) {
+    uint8_t key = (uint8_t)(req->start_index + i);
+    resp->keys[i].state = trigger_get_key_state(key) == PRESSED ? 1 : 0;
 
-    // Normalized distance (0.0-1.0) to uint8 (0-255) for progress bars
-    float d = distances[i];
-    if (d < 0.0f)
-      d = 0.0f;
-    if (d > 1.0f)
-      d = 1.0f;
-    resp->distances_norm[i] = (uint8_t)(d * 255.0f);
-
-    // Raw distance in 0.01mm units from trigger state.
-    resp->distances_mm[i] = triggerGetDistance01mm(i);
-    // resp->distances_mm[i] = (uint16_t) (analog_read_distance_value(i) / 10);
+    int16_t um = analog_read_distance_value(key);
+    if (um < 0) {
+      um = 0;
+    }
+    if (um > 4000) {
+      um = 4000;
+    }
+    resp->keys[i].distance_norm = (uint8_t)((um * 255) / 4000);
+    resp->keys[i].distance_01mm = triggerGetDistance01mm(key);
   }
 }
 
@@ -1030,7 +1128,7 @@ static void cmd_adc_capture_start(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_ADC_CAPTURE_START;
 
-  if (req->key_index >= 6 || req->duration_ms == 0) {
+  if (req->key_index >= NUM_KEYS || req->duration_ms == 0) {
     resp->status = HID_RESP_INVALID_PARAM;
     resp->active = 0;
     resp->key_index = req->key_index;
@@ -1269,6 +1367,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_LED_ROW:
     cmd_set_led_row(in_packet, out_packet);
+    break;
+
+  case CMD_GET_LED_ALL:
+    cmd_get_led_all(in_packet, out_packet);
     break;
 
   case CMD_SET_LED_ALL_CHUNK:

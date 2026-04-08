@@ -119,17 +119,64 @@ static inline void handle_trigger(uint8_t key) {
 }
 
 inline key_state_e trigger_get_key_state(uint8_t key) {
+    if (key >= NUM_KEYS) {
+        return RELEASED;
+    }
     return key_states[key];
+}
+
+static uint16_t mm_tenths_to_um(uint8_t value) {
+    return (uint16_t)value * 100u;
+}
+
+static uint16_t mm_hundredths_to_um(uint8_t value) {
+    return (uint16_t)value * 10u;
+}
+
+void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings) {
+    if (key >= NUM_KEYS || settings == NULL) {
+        return;
+    }
+
+    key_trigger_settings_t *runtime = &key_trigger_settings[key];
+    runtime->is_rapid_trigger_enabled = settings->rapid_trigger_enabled ? true : false;
+    runtime->actuation_point = runtime->is_rapid_trigger_enabled
+                                   ? mm_tenths_to_um(settings->rapid_trigger_activation)
+                                   : mm_tenths_to_um(settings->actuation_point_mm);
+    runtime->use_rapid_trigger_press_sensitivity =
+        settings->rapid_trigger_press != settings->rapid_trigger_release;
+    runtime->rapid_trigger_press_sensitivity =
+        mm_hundredths_to_um(settings->rapid_trigger_press);
+    runtime->rapid_trigger_release_sensitivity =
+        mm_hundredths_to_um(settings->rapid_trigger_release);
+}
+
+void trigger_reload_settings(void) {
+    for (uint8_t i = 0; i < NUM_KEYS; i++) {
+        const settings_key_t *settings = settings_get_key(i);
+        if (settings != NULL) {
+            trigger_apply_key_settings(i, settings);
+        }
+    }
+}
+
+uint16_t trigger_get_distance_01mm(uint8_t key) {
+    if (key >= NUM_KEYS) {
+        return 0;
+    }
+
+    int16_t um = analog_read_distance_value(key);
+    if (um < 0) {
+        um = 0;
+    }
+
+    return (uint16_t)((um + 5) / 10);
 }
 
 void trigger_init() {
     for (int i = 0; i < NUM_KEYS; i++) {
-        // key_trigger_settings[i].actuation_point = DEFAULT_ACTUATION_POINT;
+        key_trigger_settings[i].actuation_point = DEFAULT_ACTUATION_POINT;
         key_trigger_settings[i].is_rapid_trigger_enabled = false;
-        
-        key_trigger_settings[i].actuation_point = 200;
-        // key_trigger_settings[i].is_rapid_trigger_enabled = true;
-
         key_trigger_settings[i].use_rapid_trigger_press_sensitivity = false;
         key_trigger_settings[i].rapid_trigger_press_sensitivity = DEFAULT_RAPID_TRIGGER_SENSITIVITY;
         key_trigger_settings[i].rapid_trigger_release_sensitivity = DEFAULT_RAPID_TRIGGER_SENSITIVITY;

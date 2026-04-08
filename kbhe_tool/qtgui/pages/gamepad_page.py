@@ -21,9 +21,12 @@ from kbhe_tool.protocol import (
     GAMEPAD_AXES,
     GAMEPAD_BUTTONS,
     GAMEPAD_DIRECTIONS,
+    KEY_COUNT,
 )
+from kbhe_tool.key_layout import key_display_name
 from ..theme import current_colors
 from ..widgets import (
+    KeyboardLayoutWidget,
     PageScaffold,
     SectionCard,
     StatusChip,
@@ -107,7 +110,7 @@ class GamepadPage(QWidget):
         super().__init__(parent)
         self.session = session
         self.device = session.device
-        self._current_key = int(getattr(session, "selected_key", 0))
+        self._current_key = _clamp(int(getattr(session, "selected_key", 0)), 0, KEY_COUNT - 1)
         self._page_active = False
         self._loading = False
         try:
@@ -137,15 +140,21 @@ class GamepadPage(QWidget):
         )
         root.addWidget(scaffold, 1)
 
-        # ── Top row: settings + live preview ──────────────────────────
-        top_row = QHBoxLayout()
-        top_row.setSpacing(14)
-        top_row.addWidget(self._build_settings_card(), 1)
-        top_row.addWidget(self._build_preview_card(), 1)
-        scaffold.content_layout.addLayout(top_row)
+        main_row = QHBoxLayout()
+        main_row.setSpacing(14)
+        main_row.setAlignment(Qt.AlignTop)
+        scaffold.content_layout.addLayout(main_row)
 
-        # ── Mapping table card ─────────────────────────────────────────
-        scaffold.add_card(self._build_mapping_card())
+        main_row.addWidget(self._build_focus_mapping_card(), 2)
+
+        side_stack = QVBoxLayout()
+        side_stack.setSpacing(14)
+        side_stack.addWidget(self._build_settings_card())
+        side_stack.addWidget(self._build_preview_card())
+        side_stack.addStretch(1)
+        main_row.addLayout(side_stack, 1)
+
+        scaffold.add_card(self._build_mapping_table_card())
 
         # ── Status chip ───────────────────────────────────────────────
         self.status_chip = StatusChip("Gamepad page ready.", "neutral")
@@ -168,7 +177,7 @@ class GamepadPage(QWidget):
         lbl = QLabel("Focused key")
         lbl.setObjectName("Muted")
         focused_row.addWidget(lbl)
-        self.focused_key_label = StatusChip("Key 1", "info")
+        self.focused_key_label = StatusChip(key_display_name(0), "info")
         focused_row.addWidget(self.focused_key_label)
         focused_row.addStretch(1)
         card.body_layout.addLayout(focused_row)
@@ -236,60 +245,143 @@ class GamepadPage(QWidget):
         self.preview_widget = StickPreview()
         card.body_layout.addWidget(self.preview_widget)
 
-        bar_grid = QGridLayout()
-        bar_grid.setHorizontalSpacing(8)
-        bar_grid.setVerticalSpacing(6)
-        self.key_distance_bars: list[QFrame] = []
-        self.key_distance_bar_hosts: list[QFrame] = []
-        self.key_distance_labels: list[QLabel] = []
-        c = current_colors()
-        for i in range(6):
-            row_lbl = QLabel(f"Key {i + 1}")
-            row_lbl.setObjectName("Muted")
-            val_lbl = QLabel("0%")
+        meters = QGridLayout()
+        meters.setHorizontalSpacing(8)
+        meters.setVerticalSpacing(8)
+        card.body_layout.addLayout(meters)
 
-            bar_host = QFrame()
-            bar_host.setStyleSheet(
-                f"background: {c['surface_alt']}; border-radius: 6px;"
+        self.focus_axis_labels: dict[str, QLabel] = {}
+        for row, key in enumerate(("normalized", "distance", "mapping")):
+            label = QLabel(
+                {
+                    "normalized": "Focused key travel",
+                    "distance": "Focused key distance",
+                    "mapping": "Focused mapping",
+                }[key]
             )
-            bar_host_layout = QHBoxLayout(bar_host)
-            bar_host_layout.setContentsMargins(0, 0, 0, 0)
-            fill = QFrame()
-            fill.setStyleSheet(
-                f"background: {c['accent']}; border-radius: 6px;"
-            )
-            fill.setMaximumWidth(0)
-            fill.setMinimumHeight(12)
-            bar_host_layout.addWidget(fill)
-
-            bar_grid.addWidget(row_lbl, i, 0)
-            bar_grid.addWidget(bar_host, i, 1)
-            bar_grid.addWidget(val_lbl, i, 2)
-            self.key_distance_bars.append(fill)
-            self.key_distance_bar_hosts.append(bar_host)
-            self.key_distance_labels.append(val_lbl)
-
-        card.body_layout.addLayout(bar_grid)
+            label.setObjectName("Muted")
+            value = QLabel("--")
+            meters.addWidget(label, row, 0)
+            meters.addWidget(value, row, 1)
+            self.focus_axis_labels[key] = value
         return card
 
-    def _build_mapping_card(self) -> SectionCard:
+    def _build_focus_mapping_card(self) -> SectionCard:
         card = SectionCard(
-            "Per-Key Mapping",
-            "Each key can drive one axis/direction pair and one optional gamepad button.",
+            "Focused Key Mapping",
+            "Le layout 82 touches sert de sélecteur principal. La colonne de droite édite le mapping gamepad de la touche focalisée.",
         )
 
-        self.mapping_table = QTableWidget(6, 5)
+        top = QHBoxLayout()
+        top.setSpacing(8)
+        self.focus_mapping_chip = StatusChip(key_display_name(self._current_key), "info")
+        self.focus_mapping_summary = StatusChip("Unassigned", "neutral")
+        top.addWidget(self.focus_mapping_chip)
+        top.addWidget(self.focus_mapping_summary)
+        top.addStretch(1)
+        card.body_layout.addLayout(top)
+
+        body = QHBoxLayout()
+        body.setSpacing(18)
+        body.setAlignment(Qt.AlignTop)
+        card.body_layout.addLayout(body)
+
+        left = QVBoxLayout()
+        left.setSpacing(10)
+        body.addLayout(left, 2)
+        body.setAlignment(left, Qt.AlignTop)
+
+        self.preview_layout = KeyboardLayoutWidget(self.session, unit=34)
+        left.addWidget(self.preview_layout, 0, Qt.AlignTop | Qt.AlignLeft)
+
+        layout_hint = QLabel(
+            "La teinte reflète la course live de chaque touche. Clique un keycap pour éditer directement son mapping."
+        )
+        layout_hint.setObjectName("Muted")
+        layout_hint.setWordWrap(True)
+        left.addWidget(layout_hint)
+
+        right = QVBoxLayout()
+        right.setSpacing(10)
+        body.addLayout(right, 1)
+        body.setAlignment(right, Qt.AlignTop)
+
+        form = QGridLayout()
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(10)
+        right.addLayout(form)
+
+        axis_label = QLabel("Axis")
+        axis_label.setObjectName("Muted")
+        self.focus_axis_combo = QComboBox()
+        for label, value in GAMEPAD_AXES.items():
+            self.focus_axis_combo.addItem(label, value)
+        form.addWidget(axis_label, 0, 0)
+        form.addWidget(self.focus_axis_combo, 0, 1)
+
+        direction_label = QLabel("Direction")
+        direction_label.setObjectName("Muted")
+        self.focus_direction_combo = QComboBox()
+        for label, value in GAMEPAD_DIRECTIONS.items():
+            self.focus_direction_combo.addItem(label, value)
+        form.addWidget(direction_label, 1, 0)
+        form.addWidget(self.focus_direction_combo, 1, 1)
+
+        button_label = QLabel("Button")
+        button_label.setObjectName("Muted")
+        self.focus_button_combo = QComboBox()
+        for label, value in GAMEPAD_BUTTONS.items():
+            self.focus_button_combo.addItem(label, value)
+        form.addWidget(button_label, 2, 0)
+        form.addWidget(self.focus_button_combo, 2, 1)
+
+        focused_stats = QGridLayout()
+        focused_stats.setHorizontalSpacing(8)
+        focused_stats.setVerticalSpacing(8)
+        right.addLayout(focused_stats)
+        self.focus_mapping_live_labels: dict[str, QLabel] = {}
+        for row, key in enumerate(("normalized", "distance", "mapping")):
+            label = QLabel(
+                {
+                    "normalized": "Focused key travel",
+                    "distance": "Focused key distance",
+                    "mapping": "Current summary",
+                }[key]
+            )
+            label.setObjectName("Muted")
+            value = QLabel("--")
+            focused_stats.addWidget(label, row, 0)
+            focused_stats.addWidget(value, row, 1)
+            self.focus_mapping_live_labels[key] = value
+
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        actions.addWidget(make_secondary_button("Load Focused Mapping", self.load_focused_mapping))
+        actions.addWidget(make_primary_button("Apply Focused Mapping", self.apply_focused_mapping))
+        actions.addStretch(1)
+        right.addLayout(actions)
+        right.addStretch(1)
+        return card
+
+    def _build_mapping_table_card(self) -> SectionCard:
+        card = SectionCard(
+            "Bulk Mapping Table",
+            "Vue d’ensemble des 82 mappings. Elle reste disponible pour les edits de masse, mais la carte ci-dessus est le workflow principal.",
+        )
+
+        self.mapping_table = QTableWidget(KEY_COUNT, 5)
         self.mapping_table.setHorizontalHeaderLabels(
             ["Key", "Axis", "Direction", "Button", "Summary"]
         )
         self.mapping_table.verticalHeader().setVisible(False)
         self.mapping_table.horizontalHeader().setStretchLastSection(True)
         self.mapping_table.setAlternatingRowColors(False)
-        self.mapping_table.setMinimumHeight(300)
+        self.mapping_table.setMinimumHeight(260)
         self.mapping_table.verticalHeader().setDefaultSectionSize(44)
+        self.mapping_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
 
-        for row in range(6):
-            self.mapping_table.setItem(row, 0, QTableWidgetItem(f"Key {row + 1}"))
+        for row in range(KEY_COUNT):
+            self.mapping_table.setItem(row, 0, QTableWidgetItem(key_display_name(row)))
             axis_combo = QComboBox()
             for label, value in GAMEPAD_AXES.items():
                 axis_combo.addItem(label, value)
@@ -312,6 +404,7 @@ class GamepadPage(QWidget):
             button_combo.currentIndexChanged.connect(
                 lambda _=None, r=row: self._refresh_mapping_summary(r)
             )
+        self.mapping_table.itemSelectionChanged.connect(self._on_table_selection_changed)
 
         card.body_layout.addWidget(self.mapping_table)
 
@@ -340,8 +433,10 @@ class GamepadPage(QWidget):
             pass
 
     def _set_selected_key_label(self) -> None:
-        self.focused_key_label.setText(f"Key {self._current_key + 1}")
+        self.focused_key_label.setText(key_display_name(self._current_key))
+        self.focus_mapping_chip.setText(key_display_name(self._current_key))
         self.mapping_table.selectRow(self._current_key)
+        self._sync_focused_mapping_from_table()
 
     def _update_deadzone_label(self, value: int) -> None:
         raw = _clamp(value, 0, 255)
@@ -367,6 +462,44 @@ class GamepadPage(QWidget):
         if button_name != "None":
             parts.append(button_name)
         self.mapping_table.item(row, 4).setText(" + ".join(parts) if parts else "Unassigned")
+        if row == self._current_key:
+            self.focus_mapping_summary.set_text_and_level(
+                self.mapping_table.item(row, 4).text(), "neutral"
+            )
+            self.focus_mapping_live_labels["mapping"].setText(self.mapping_table.item(row, 4).text())
+
+    def _sync_focused_mapping_from_table(self) -> None:
+        row = self._current_key
+        axis_combo = self.mapping_table.cellWidget(row, 1)
+        direction_combo = self.mapping_table.cellWidget(row, 2)
+        button_combo = self.mapping_table.cellWidget(row, 3)
+        self.focus_axis_combo.setCurrentIndex(max(0, self.focus_axis_combo.findData(int(axis_combo.currentData()))))
+        self.focus_direction_combo.setCurrentIndex(
+            max(0, self.focus_direction_combo.findData(int(direction_combo.currentData())))
+        )
+        self.focus_button_combo.setCurrentIndex(max(0, self.focus_button_combo.findData(int(button_combo.currentData()))))
+        self.focus_mapping_summary.set_text_and_level(self.mapping_table.item(row, 4).text(), "neutral")
+        self.focus_mapping_live_labels["mapping"].setText(self.mapping_table.item(row, 4).text())
+
+    def _copy_focused_mapping_to_table(self) -> None:
+        row = self._current_key
+        axis_combo = self.mapping_table.cellWidget(row, 1)
+        direction_combo = self.mapping_table.cellWidget(row, 2)
+        button_combo = self.mapping_table.cellWidget(row, 3)
+        axis_combo.setCurrentIndex(max(0, axis_combo.findData(int(self.focus_axis_combo.currentData()))))
+        direction_combo.setCurrentIndex(max(0, direction_combo.findData(int(self.focus_direction_combo.currentData()))))
+        button_combo.setCurrentIndex(max(0, button_combo.findData(int(self.focus_button_combo.currentData()))))
+        self._refresh_mapping_summary(row)
+
+    def _on_table_selection_changed(self) -> None:
+        row = self.mapping_table.currentRow()
+        if row < 0 or row >= KEY_COUNT:
+            return
+        try:
+            self.session.set_selected_key(row)
+        except Exception:
+            self._current_key = row
+            self._set_selected_key_label()
 
     # ------------------------------------------------------------------
     # Data loading / actions
@@ -414,7 +547,7 @@ class GamepadPage(QWidget):
 
     def load_gamepad_mapping(self) -> None:
         missing = []
-        for row in range(6):
+        for row in range(KEY_COUNT):
             try:
                 mapping = self.device.get_key_gamepad_map(row)
             except Exception:
@@ -438,9 +571,10 @@ class GamepadPage(QWidget):
                     max(0, button_combo.findData(int(mapping.get("button", 0))))
                 )
             self._refresh_mapping_summary(row)
+        self._sync_focused_mapping_from_table()
         if missing:
             self._update_status(
-                f"Loaded mappings with gaps: {', '.join(f'Key {n}' for n in missing)}.",
+                f"Loaded mappings with gaps: {', '.join(key_display_name(n - 1) for n in missing)}.",
                 "warning",
             )
         else:
@@ -448,7 +582,7 @@ class GamepadPage(QWidget):
 
     def apply_gamepad_mapping(self) -> None:
         failed = []
-        for row in range(6):
+        for row in range(KEY_COUNT):
             axis_combo = self.mapping_table.cellWidget(row, 1)
             direction_combo = self.mapping_table.cellWidget(row, 2)
             button_combo = self.mapping_table.cellWidget(row, 3)
@@ -465,23 +599,51 @@ class GamepadPage(QWidget):
                 failed.append(row + 1)
         if failed:
             self._update_status(
-                f"Mapping update failed for {', '.join(f'Key {n}' for n in failed)}.", "error"
+                f"Mapping update failed for {', '.join(key_display_name(n - 1) for n in failed)}.", "error"
             )
         else:
             self._update_status("All per-key mappings applied.", "success")
+
+    def load_focused_mapping(self) -> None:
+        row = self._current_key
+        try:
+            mapping = self.device.get_key_gamepad_map(row)
+        except Exception as exc:
+            self._update_status(f"Focused mapping load failed: {exc}", "error")
+            return
+        if not mapping:
+            self._update_status(f"No mapping returned for {key_display_name(row)}.", "warning")
+            return
+        self.focus_axis_combo.setCurrentIndex(max(0, self.focus_axis_combo.findData(int(mapping.get("axis", 0)))))
+        self.focus_direction_combo.setCurrentIndex(
+            max(0, self.focus_direction_combo.findData(int(mapping.get("direction", 0))))
+        )
+        self.focus_button_combo.setCurrentIndex(max(0, self.focus_button_combo.findData(int(mapping.get("button", 0)))))
+        self._copy_focused_mapping_to_table()
+        self._update_status(f"Loaded focused mapping for {key_display_name(row)}.", "success")
+
+    def apply_focused_mapping(self) -> None:
+        row = self._current_key
+        try:
+            ok = self.device.set_key_gamepad_map(
+                row,
+                int(self.focus_axis_combo.currentData()),
+                int(self.focus_direction_combo.currentData()),
+                int(self.focus_button_combo.currentData()),
+            )
+            if not ok:
+                raise RuntimeError("device rejected focused mapping")
+        except Exception as exc:
+            self._update_status(f"Focused mapping apply failed: {exc}", "error")
+            return
+        self._copy_focused_mapping_to_table()
+        self._update_status(f"Applied mapping for {key_display_name(row)}.", "success")
 
     def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
         if enabled:
             self.preview_live_info.set_text_and_level(f"ON @ {int(interval_ms)} ms", "info")
         else:
             self.preview_live_info.set_text_and_level("OFF", "neutral")
-
-    def _set_preview_bar(self, index: int, normalized_value: int) -> None:
-        fill = self.key_distance_bars[index]
-        bar_host = fill.parentWidget()
-        host_width = max(1, bar_host.width())
-        fill.setMaximumWidth(int((host_width - 4) * (normalized_value / 255.0)))
-        self.key_distance_labels[index].setText(f"{int(normalized_value * 100 / 255)}%")
 
     def _poll_preview(self) -> None:
         try:
@@ -490,15 +652,46 @@ class GamepadPage(QWidget):
             self._update_status(f"Preview error: {exc}", "warning")
             return
 
-        distances = list(key_states.get("distances") or [0] * 6)
-        for i in range(6):
-            self._set_preview_bar(i, int(distances[i]) if i < len(distances) else 0)
-
+        distances = list(key_states.get("distances") or [0] * KEY_COUNT)
+        distances_mm = list(key_states.get("distances_mm") or [0.0] * KEY_COUNT)
         x, y = 0.0, 0.0
         if len(distances) >= 4:
             x = (float(distances[1]) - float(distances[0])) / 255.0
             y = (float(distances[3]) - float(distances[2])) / 255.0
         self.preview_widget.set_state(x, y, self.square_check.isChecked(), self.deadzone_slider.value())
+
+        c = current_colors()
+        for i in range(KEY_COUNT):
+            norm = int(distances[i]) if i < len(distances) else 0
+            ratio = max(0.0, min(1.0, norm / 255.0))
+            fill = QColor(c["surface_muted"])
+            accent = QColor(c["accent_soft"])
+            if ratio > 0:
+                r = int(fill.red() + (accent.red() - fill.red()) * ratio)
+                g = int(fill.green() + (accent.green() - fill.green()) * ratio)
+                b = int(fill.blue() + (accent.blue() - fill.blue()) * ratio)
+                fill_hex = QColor(r, g, b).name()
+            else:
+                fill_hex = c["surface_muted"]
+            self.preview_layout.set_key_state(
+                i,
+                fill=fill_hex,
+                border=c["accent"] if i == self._current_key else c["border"],
+                tooltip=(
+                    f"{key_display_name(i)}\n"
+                    f"Normalized: {norm}/255\n"
+                    f"Distance: {float(distances_mm[i]) if i < len(distances_mm) else 0.0:.2f} mm"
+                ),
+            )
+
+        focused_norm = int(distances[self._current_key]) if self._current_key < len(distances) else 0
+        focused_mm = float(distances_mm[self._current_key]) if self._current_key < len(distances_mm) else 0.0
+        self.focus_axis_labels["normalized"].setText(f"{focused_norm}/255 ({focused_norm * 100 // 255}%)")
+        self.focus_axis_labels["distance"].setText(f"{focused_mm:.2f} mm")
+        self.focus_axis_labels["mapping"].setText(self.mapping_table.item(self._current_key, 4).text())
+        self.focus_mapping_live_labels["normalized"].setText(f"{focused_norm}/255 ({focused_norm * 100 // 255}%)")
+        self.focus_mapping_live_labels["distance"].setText(f"{focused_mm:.2f} mm")
+        self.focus_mapping_live_labels["mapping"].setText(self.mapping_table.item(self._current_key, 4).text())
 
     def on_live_tick(self) -> None:
         if not self._page_active or not self.session.live_enabled:
@@ -506,17 +699,14 @@ class GamepadPage(QWidget):
         self._poll_preview()
 
     def apply_theme(self) -> None:
-        c = current_colors()
-        for bar_host, fill in zip(self.key_distance_bar_hosts, self.key_distance_bars):
-            bar_host.setStyleSheet(f"background: {c['surface_alt']}; border-radius: 6px;")
-            fill.setStyleSheet(f"background: {c['accent']}; border-radius: 6px;")
+        pass
 
     # ------------------------------------------------------------------
     # Page lifecycle
     # ------------------------------------------------------------------
 
     def on_selected_key_changed(self, key_index: int) -> None:
-        self._current_key = _clamp(key_index, 0, 5)
+        self._current_key = _clamp(key_index, 0, KEY_COUNT - 1)
         self._set_selected_key_label()
 
     def on_page_activated(self) -> None:

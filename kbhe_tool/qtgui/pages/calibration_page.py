@@ -16,8 +16,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from kbhe_tool.key_layout import key_display_name
+from kbhe_tool.protocol import KEY_COUNT
 from ..theme import current_colors
 from ..widgets import (
+    KeyboardLayoutWidget,
     PageScaffold,
     SectionCard,
     StatusChip,
@@ -47,7 +50,8 @@ class CalibrationPage(QWidget):
         super().__init__(parent)
         self.session = session
         self.device = session.device
-        self._current_key = int(getattr(session, "selected_key", 0))
+        self._current_key = _clamp(int(getattr(session, "selected_key", 0)), 0, KEY_COUNT - 1)
+        self._key_zero_values = [0] * KEY_COUNT
         self._loading = False
         try:
             self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
@@ -78,12 +82,15 @@ class CalibrationPage(QWidget):
         )
         root.addWidget(scaffold, 1)
 
-        # ── Top row: baseline + auto-calibration ──────────────────────
+        # ── Top row: layout + baseline + auto-calibration ─────────────
         top_row = QHBoxLayout()
         top_row.setSpacing(14)
+        top_row.setAlignment(Qt.AlignTop)
 
+        layout_card = self._build_layout_card()
         baseline_card = self._build_baseline_card()
         auto_card = self._build_auto_card()
+        top_row.addWidget(layout_card, 2)
         top_row.addWidget(baseline_card, 2)
         top_row.addWidget(auto_card, 1)
 
@@ -97,6 +104,30 @@ class CalibrationPage(QWidget):
         scaffold.content_layout.addWidget(self.status_chip)
 
         scaffold.add_stretch()
+
+    def _build_layout_card(self) -> SectionCard:
+        card = SectionCard(
+            "Key Layout",
+            "Sélectionne la touche à calibrer sur le vrai clavier. La carte reflète les offsets zéro actuels.",
+        )
+
+        self.layout_view = KeyboardLayoutWidget(self.session, unit=32)
+        card.body_layout.addWidget(self.layout_view, 0, Qt.AlignTop | Qt.AlignLeft)
+
+        info_row = QHBoxLayout()
+        info_row.setSpacing(8)
+        self.layout_focus_chip = StatusChip(key_display_name(0), "info")
+        self.layout_zero_chip = StatusChip("Zero 0", "neutral")
+        info_row.addWidget(self.layout_focus_chip)
+        info_row.addWidget(self.layout_zero_chip)
+        info_row.addStretch(1)
+        card.body_layout.addLayout(info_row)
+
+        hint = QLabel("Bleu = touche sélectionnée. La teinte reflète l’écart entre le zéro de la touche et la référence LUT.")
+        hint.setObjectName("Muted")
+        hint.setWordWrap(True)
+        card.body_layout.addWidget(hint)
+        return card
 
     def _build_baseline_card(self) -> SectionCard:
         card = SectionCard(
@@ -114,18 +145,24 @@ class CalibrationPage(QWidget):
         lut_lbl.setObjectName("Muted")
         self.lut_zero_spin = QSpinBox()
         self.lut_zero_spin.setRange(-32768, 32767)
+        self.lut_zero_spin.valueChanged.connect(lambda _=None: (not self._loading) and self._refresh_layout_overview())
         grid.addWidget(lut_lbl, 0, 0)
         grid.addWidget(self.lut_zero_spin, 0, 1)
 
-        self.key_zero_spins: list[QSpinBox] = []
-        for i in range(6):
-            lbl = QLabel(f"Key {i + 1}")
-            lbl.setObjectName("Muted")
-            spin = QSpinBox()
-            spin.setRange(-32768, 32767)
-            grid.addWidget(lbl, i + 1, 0)
-            grid.addWidget(spin, i + 1, 1)
-            self.key_zero_spins.append(spin)
+        self.focused_key_zero_label = QLabel("Focused key")
+        self.focused_key_zero_label.setObjectName("Muted")
+        self.key_zero_spin = QSpinBox()
+        self.key_zero_spin.setRange(-32768, 32767)
+        self.key_zero_spin.valueChanged.connect(self._on_key_zero_changed)
+        grid.addWidget(self.focused_key_zero_label, 1, 0)
+        grid.addWidget(self.key_zero_spin, 1, 1)
+
+        hint = QLabel(
+            "Use the keyboard layout selector to edit any of the 82 per-key zero values."
+        )
+        hint.setObjectName("Muted")
+        hint.setWordWrap(True)
+        grid.addWidget(hint, 2, 0, 1, 2)
 
         actions = QHBoxLayout()
         actions.setSpacing(8)
@@ -146,7 +183,7 @@ class CalibrationPage(QWidget):
         focused_row = QHBoxLayout()
         focused_row.setSpacing(8)
         focused_row.addWidget(QLabel("Focused key"))
-        self.key_badge = StatusChip("Key 1", "info")
+        self.key_badge = StatusChip(key_display_name(0), "info")
         focused_row.addWidget(self.key_badge)
         focused_row.addStretch(1)
         card.body_layout.addLayout(focused_row)
@@ -174,7 +211,7 @@ class CalibrationPage(QWidget):
         editing_lbl = QLabel("Editing")
         editing_lbl.setObjectName("Muted")
         curve_header.addWidget(editing_lbl)
-        self.curve_key_badge = StatusChip("Key 1", "info")
+        self.curve_key_badge = StatusChip(key_display_name(0), "info")
         curve_header.addWidget(self.curve_key_badge)
         curve_header.addStretch(1)
         self.curve_enabled_check = QCheckBox("Enable custom curve for this key")
@@ -331,9 +368,18 @@ class CalibrationPage(QWidget):
             pass
 
     def _set_key_labels(self) -> None:
-        text = f"Key {self._current_key + 1}"
+        text = key_display_name(self._current_key)
         self.key_badge.setText(text)
         self.curve_key_badge.setText(text)
+        self.focused_key_zero_label.setText(f"{text} zero")
+        if hasattr(self, "layout_focus_chip"):
+            self.layout_focus_chip.setText(text)
+
+    def _on_key_zero_changed(self, value: int) -> None:
+        if self._loading:
+            return
+        self._key_zero_values[self._current_key] = int(value)
+        self._refresh_layout_overview()
 
     # ------------------------------------------------------------------
     # Bezier curve
@@ -397,7 +443,7 @@ class CalibrationPage(QWidget):
     def _update_position_dot(self) -> None:
         try:
             key_states = self.device.get_key_states()
-            distances = (key_states.get("distances") or [0] * 6) if key_states else [0] * 6
+            distances = (key_states.get("distances") or [0] * KEY_COUNT) if key_states else [0] * KEY_COUNT
             travel = float(distances[self._current_key]) if self._current_key < len(distances) else 0.0
         except Exception:
             return
@@ -451,6 +497,33 @@ class CalibrationPage(QWidget):
             axis.setGridLinePen(grid_pen)
             axis.setLinePen(line_pen)
 
+    def _refresh_layout_overview(self) -> None:
+        if not hasattr(self, "layout_view"):
+            return
+        lut_zero = int(self.lut_zero_spin.value())
+        max_delta = max(1, max(abs(int(value) - lut_zero) for value in self._key_zero_values))
+        for index in range(KEY_COUNT):
+            zero = int(self._key_zero_values[index])
+            delta = zero - lut_zero
+            magnitude = min(1.0, abs(delta) / max_delta)
+            if delta >= 0:
+                fill = QColor("#dbeafe")
+                target = QColor("#60a5fa")
+            else:
+                fill = QColor("#dcfce7")
+                target = QColor("#34d399")
+            r = int(fill.red() + (target.red() - fill.red()) * magnitude)
+            g = int(fill.green() + (target.green() - fill.green()) * magnitude)
+            b = int(fill.blue() + (target.blue() - fill.blue()) * magnitude)
+            self.layout_view.set_key_state(
+                index,
+                fill=QColor(r, g, b).name(),
+                border=current_colors()["accent"] if index == self._current_key else current_colors()["border"],
+                tooltip=f"{key_display_name(index)}\nZero: {zero}\nΔ vs LUT: {delta:+d}",
+            )
+        current_zero = int(self._key_zero_values[self._current_key])
+        self.layout_zero_chip.set_text_and_level(f"Zero {current_zero}", "neutral")
+
     # ------------------------------------------------------------------
     # Data loading / actions
     # ------------------------------------------------------------------
@@ -471,22 +544,26 @@ class CalibrationPage(QWidget):
 
         self._loading = True
         self.lut_zero_spin.setValue(int(calibration.get("lut_zero_value", 0)))
-        key_values = calibration.get("key_zero_values") or [0] * 6
-        for i, spin in enumerate(self.key_zero_spins):
-            spin.setValue(int(key_values[i]) if i < len(key_values) else 0)
+        key_values = list(calibration.get("key_zero_values") or [0] * KEY_COUNT)
+        if len(key_values) < KEY_COUNT:
+            key_values.extend([0] * (KEY_COUNT - len(key_values)))
+        self._key_zero_values = key_values[:KEY_COUNT]
+        self.key_zero_spin.setValue(int(self._key_zero_values[self._current_key]))
         self._loading = False
+        self._refresh_layout_overview()
         self._update_status("Calibration values loaded.", "success")
 
     def apply_manual_calibration(self) -> None:
         lut_zero = int(self.lut_zero_spin.value())
-        key_zeros = [int(s.value()) for s in self.key_zero_spins]
+        self._key_zero_values[self._current_key] = int(self.key_zero_spin.value())
         try:
-            if not self.device.set_calibration(lut_zero, key_zeros):
+            if not self.device.set_calibration(lut_zero, self._key_zero_values):
                 raise RuntimeError("device rejected calibration values")
         except Exception as exc:
             self._update_status(f"Error applying calibration: {exc}", "error")
             return
-        self._update_status("Manual calibration applied live.", "success")
+        self._refresh_layout_overview()
+        self._update_status(f"Manual calibration applied for {key_display_name(self._current_key)}.", "success")
 
     def auto_calibrate_selected_key(self) -> None:
         try:
@@ -497,7 +574,7 @@ class CalibrationPage(QWidget):
             self._update_status(f"Auto-calibration failed: {exc}", "error")
             return
         self.load_calibration()
-        self._update_status(f"Auto-calibrated Key {self._current_key + 1}.", "success")
+        self._update_status(f"Auto-calibrated {key_display_name(self._current_key)}.", "success")
 
     def auto_calibrate_all(self) -> None:
         reply = QMessageBox.question(
@@ -520,8 +597,9 @@ class CalibrationPage(QWidget):
     def load_key_curve(self, key_index: int | None = None) -> None:
         if key_index is None:
             key_index = self._current_key
-        self._current_key = _clamp(key_index, 0, 5)
+        self._current_key = _clamp(key_index, 0, KEY_COUNT - 1)
         self._set_key_labels()
+        self.key_zero_spin.setValue(int(self._key_zero_values[self._current_key]))
         try:
             curve = self.device.get_key_curve(self._current_key)
             if not curve:
@@ -547,7 +625,8 @@ class CalibrationPage(QWidget):
         self._loading = False
         self._update_curve_preview()
         self._on_spin_changed()  # sync preset combo
-        self._update_status(f"Loaded curve for Key {self._current_key + 1}.", "success")
+        self._refresh_layout_overview()
+        self._update_status(f"Loaded curve for {key_display_name(self._current_key)}.", "success")
 
     def apply_analog_curve(self) -> None:
         payload = {
@@ -571,7 +650,7 @@ class CalibrationPage(QWidget):
         except Exception as exc:
             self._update_status(f"Error applying curve: {exc}", "error")
             return
-        self._update_status(f"Applied curve to Key {self._current_key + 1}.", "success")
+        self._update_status(f"Applied curve to {key_display_name(self._current_key)}.", "success")
 
     # ------------------------------------------------------------------
     # Page lifecycle
@@ -579,6 +658,7 @@ class CalibrationPage(QWidget):
 
     def on_selected_key_changed(self, key_index: int) -> None:
         self.load_key_curve(key_index)
+        self._refresh_layout_overview()
 
     def on_page_activated(self) -> None:
         self.reload()

@@ -118,6 +118,10 @@ typedef enum {
 //--------------------------------------------------------------------+
 
 #define HID_RAW_ADC_VALUES_PER_CHUNK 30
+#define HID_KEY_SETTINGS_PER_CHUNK 6
+#define HID_CALIBRATION_VALUES_PER_CHUNK 29
+#define HID_KEY_STATES_PER_CHUNK 15
+#define HID_LED_BYTES_PER_CHUNK 60
 
 /**
  * @brief Generic command packet header
@@ -168,7 +172,7 @@ typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
   uint8_t key_index;
-  uint8_t hid_keycode; // HID keycode for this key
+  uint16_t hid_keycode; // HID/custom keycode for this key
   uint8_t
       actuation_point_mm;   // Fixed actuation point in 0.1mm (when RT disabled)
   uint8_t release_point_mm; // Fixed release point in 0.1mm (when RT disabled)
@@ -176,30 +180,35 @@ typedef struct __attribute__((packed)) {
   uint8_t rapid_trigger_press;      // RT press sensitivity in 0.01mm
   uint8_t rapid_trigger_release;    // RT release sensitivity in 0.01mm
   uint8_t socd_pair;                // SOCD paired key index (255 = none)
-  uint8_t rapid_trigger_enabled;    // RT enable flag
-  uint8_t disable_kb_on_gamepad;    // Disable keyboard when gamepad active
-  uint8_t reserved[52];
+  uint8_t rapid_trigger_enabled; // RT enable flag
+  uint8_t disable_kb_on_gamepad; // Disable keyboard when gamepad active
+  uint8_t reserved[51];
 } hid_packet_key_settings_t;
 
 /**
- * @brief All key settings packet
- * Updated for enhanced rapid trigger settings
+ * @brief Compact per-key settings entry for bulk HID transfers.
+ */
+typedef struct __attribute__((packed)) {
+  uint16_t hid_keycode;
+  uint8_t actuation_point_mm;
+  uint8_t release_point_mm;
+  uint8_t rapid_trigger_activation;
+  uint8_t rapid_trigger_press;
+  uint8_t rapid_trigger_release;
+  uint8_t socd_pair;
+  uint8_t flags; // bit0=rapid trigger, bit1=disable kb on gamepad
+} hid_key_settings_chunk_entry_t;
+
+/**
+ * @brief Bulk key settings chunk packet.
  */
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  struct {
-    uint8_t hid_keycode;
-    uint8_t actuation_point_mm;
-    uint8_t release_point_mm;
-    uint8_t rapid_trigger_activation;
-    uint8_t rapid_trigger_press;
-    uint8_t rapid_trigger_release;
-    uint8_t socd_pair;
-    uint8_t rapid_trigger_enabled;
-    uint8_t disable_kb_on_gamepad;
-  } keys[6];
-  uint8_t reserved[8];
+  uint8_t start_index;
+  uint8_t key_count;
+  hid_key_settings_chunk_entry_t keys[HID_KEY_SETTINGS_PER_CHUNK];
+  uint8_t reserved[6];
 } hid_packet_all_keys_t;
 
 /**
@@ -221,9 +230,10 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
+  uint8_t start_index;
+  uint8_t value_count;
   int16_t lut_zero_value;     // LUT reference zero
-  int16_t key_zero_values[6]; // Per-key zero values
-  uint8_t reserved[46];
+  int16_t key_zero_values[HID_CALIBRATION_VALUES_PER_CHUNK];
 } hid_packet_calibration_t;
 
 /**
@@ -232,7 +242,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t key_index; // Key to calibrate (0-5), or 0xFF for all
+  uint8_t key_index; // Key to calibrate (0-NUM_KEYS-1), or 0xFF for all
   uint8_t reserved[61];
 } hid_packet_auto_calibrate_t;
 
@@ -271,10 +281,13 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t key_states[6];     // 0 = released, 1 = pressed
-  uint8_t distances_norm[6]; // 0-255 normalized distance (for bars)
-  uint16_t distances_mm[6];  // Distance in 0.01mm units (e.g., 125 = 1.25mm)
-  uint8_t reserved[38];
+  uint8_t start_index;
+  uint8_t key_count;
+  struct {
+    uint8_t state;          // 0 = released, 1 = pressed
+    uint8_t distance_norm;  // 0-255 normalized distance (for bars)
+    uint16_t distance_01mm; // Distance in 0.01mm units
+  } keys[HID_KEY_STATES_PER_CHUNK];
 } hid_resp_key_states_t;
 
 /**
@@ -357,7 +370,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t index;   // LED index (0-63)
+  uint8_t index;   // LED index (0-LED_MATRIX_SIZE-1)
   uint8_t r, g, b; // RGB values
   uint8_t reserved[58];
 } hid_packet_led_pixel_t;
@@ -394,15 +407,15 @@ typedef struct __attribute__((packed)) {
 } hid_packet_led_fill_t;
 
 /**
- * @brief LED chunk packet for bulk transfer (60 bytes per chunk)
- * Total 192 bytes = 4 chunks of 48 bytes each
+ * @brief LED chunk packet for bulk transfer.
+ * Used both for GET_LED_ALL and SET_LED_ALL_CHUNK.
  */
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t chunk_index; // 0-3 (4 chunks for 192 bytes)
-  uint8_t chunk_size;  // Bytes in this chunk (48 max)
-  uint8_t data[60];    // Chunk data
+  uint8_t chunk_index;
+  uint8_t chunk_size;               // Bytes in this chunk (HID_LED_BYTES_PER_CHUNK max)
+  uint8_t data[HID_LED_BYTES_PER_CHUNK];
 } hid_packet_led_chunk_t;
 
 /**
@@ -411,7 +424,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t key_index;     // Key index (0-5)
+  uint8_t key_index;     // Key index (0-NUM_KEYS-1)
   uint8_t curve_enabled; // 0 = disabled (linear), 1 = enabled
   uint8_t p1_x;          // Control point 1 X (0-255)
   uint8_t p1_y;          // Control point 1 Y (0-255)
@@ -426,7 +439,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t key_index; // Key index (0-5)
+  uint8_t key_index; // Key index (0-NUM_KEYS-1)
   uint8_t axis;      // gamepad_axis_t (0=none, 1=LX, 2=LY, etc.)
   uint8_t direction; // 0=positive, 1=negative
   uint8_t button;    // gamepad_button_t (0=none, 1=A, 2=B, etc.)

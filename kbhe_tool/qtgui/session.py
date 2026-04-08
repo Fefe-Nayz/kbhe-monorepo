@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .common import HAS_GUI, QObject, Signal
+from ..protocol import KEY_COUNT
 
 
 class AppSession(QObject):
@@ -26,7 +27,7 @@ class AppSession(QObject):
         self.statusChanged.emit(message, level)
 
     def set_selected_key(self, key_index: int) -> None:
-        key_index = max(0, min(5, int(key_index)))
+        key_index = max(0, min(KEY_COUNT - 1, int(key_index)))
         if key_index == self.selected_key:
             return
         self.selected_key = key_index
