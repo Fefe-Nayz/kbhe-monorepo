@@ -1,6 +1,6 @@
 /*
  * led_matrix.c
- * 8x8 RGB LED Matrix driver using WS2812
+ * RGB LED strip/matrix driver using WS2812
  */
 
 #include "led_matrix.h"
@@ -62,6 +62,21 @@ static const uint8_t key_led_index[6] = {0, 1, 2, 3, 4, 5};
 // 4.00 mm => 400 units (0.01 mm).
 #define KEY_TRAVEL_MAX_01MM 400u
 
+static void effect_rainbow(void);
+static void effect_breathing(void);
+static void effect_static_rainbow(void);
+static void effect_solid(void);
+static void effect_plasma(void);
+static void effect_fire(void);
+static void effect_ocean(void);
+static void effect_matrix(void);
+static void effect_sparkle(void);
+static void effect_breathing_rainbow(void);
+static void effect_spiral(void);
+static void effect_color_cycle(void);
+static void effect_distance_sensor(void);
+static void effect_reactive(void);
+
 //--------------------------------------------------------------------+
 // Private Functions
 //--------------------------------------------------------------------+
@@ -107,12 +122,69 @@ static void update_ws2812(void) {
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     push_runtime_pixel_to_ws2812(i);
   }
+
+  ws2812_show(&led_ws2812_handle);
 }
 
 static void sync_runtime_from_static(void) {
   memcpy(pixels_runtime, pixels_static, LED_MATRIX_DATA_SIZE);
   if (initialized && display_enabled) {
     update_ws2812();
+  }
+}
+
+static void render_current_effect_frame(void) {
+  effect_render_context = true;
+  switch (current_effect) {
+  case LED_EFFECT_RAINBOW:
+    effect_rainbow();
+    break;
+  case LED_EFFECT_BREATHING:
+    effect_breathing();
+    break;
+  case LED_EFFECT_STATIC_RAINBOW:
+    effect_static_rainbow();
+    break;
+  case LED_EFFECT_SOLID:
+    effect_solid();
+    break;
+  case LED_EFFECT_PLASMA:
+    effect_plasma();
+    break;
+  case LED_EFFECT_FIRE:
+    effect_fire();
+    break;
+  case LED_EFFECT_OCEAN:
+    effect_ocean();
+    break;
+  case LED_EFFECT_MATRIX:
+    effect_matrix();
+    break;
+  case LED_EFFECT_SPARKLE:
+    effect_sparkle();
+    break;
+  case LED_EFFECT_BREATHING_RAINBOW:
+    effect_breathing_rainbow();
+    break;
+  case LED_EFFECT_SPIRAL:
+    effect_spiral();
+    break;
+  case LED_EFFECT_COLOR_CYCLE:
+    effect_color_cycle();
+    break;
+  case LED_EFFECT_REACTIVE:
+    effect_reactive();
+    break;
+  case LED_EFFECT_DISTANCE_SENSOR:
+    effect_distance_sensor();
+    break;
+  default:
+    break;
+  }
+  effect_render_context = false;
+
+  if (initialized && display_enabled) {
+    ws2812_show(&led_ws2812_handle);
   }
 }
 
@@ -191,6 +263,7 @@ void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
     pixels_runtime[index * 3 + 2] = b;
     if (initialized && display_enabled) {
       push_runtime_pixel_to_ws2812(index);
+      ws2812_show(&led_ws2812_handle);
     }
     return;
   }
@@ -203,6 +276,7 @@ void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
     pixels_runtime[index * 3 + 2] = b;
     if (initialized && display_enabled) {
       push_runtime_pixel_to_ws2812(index);
+      ws2812_show(&led_ws2812_handle);
     }
     return;
   }
@@ -219,6 +293,7 @@ void led_matrix_clear(void) {
     memset(pixels_runtime, 0, sizeof(pixels_runtime));
     if (initialized && display_enabled) {
       zeroLedValues(&led_ws2812_handle);
+      ws2812_show(&led_ws2812_handle);
     }
     return;
   }
@@ -228,6 +303,7 @@ void led_matrix_clear(void) {
     memset(pixels_runtime, 0, sizeof(pixels_runtime));
     if (initialized && display_enabled) {
       zeroLedValues(&led_ws2812_handle);
+      ws2812_show(&led_ws2812_handle);
     }
     return;
   }
@@ -236,6 +312,7 @@ void led_matrix_clear(void) {
     memset(pixels_runtime, 0, sizeof(pixels_runtime));
     if (initialized && display_enabled) {
       zeroLedValues(&led_ws2812_handle);
+      ws2812_show(&led_ws2812_handle);
     }
     return;
   }
@@ -268,6 +345,7 @@ void led_matrix_set_enabled(bool enabled) {
       update_ws2812();
     } else {
       zeroLedValues(&led_ws2812_handle);
+      ws2812_show(&led_ws2812_handle);
     }
   }
 }
@@ -317,6 +395,7 @@ void led_matrix_load_data(const led_matrix_data_t *data) {
       update_ws2812();
     } else {
       zeroLedValues(&led_ws2812_handle);
+      ws2812_show(&led_ws2812_handle);
     }
   }
 }
@@ -372,13 +451,11 @@ void led_matrix_hsv_to_rgb(uint8_t h, uint8_t s, uint8_t v, uint8_t *r,
 }
 
 void led_matrix_test_rainbow(uint8_t offset) {
-  for (uint8_t y = 0; y < LED_MATRIX_HEIGHT; y++) {
-    for (uint8_t x = 0; x < LED_MATRIX_WIDTH; x++) {
-      uint8_t hue = offset + x * 16 + y * 16;
-      uint8_t r, g, b;
-      led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
-      led_matrix_set_pixel(x, y, r, g, b);
-    }
+  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
+    uint8_t hue = offset + (uint8_t)(i * 3u);
+    uint8_t r, g, b;
+    led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+    led_matrix_set_pixel_idx(i, r, g, b);
   }
 }
 
@@ -390,10 +467,18 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
   led_effect_mode_t previous_effect = current_effect;
   current_effect = mode;
   effect_offset = 0;
+  last_effect_tick = 0;
+  last_render_tick = 0;
 
   // Restoring matrix mode must restore the exact saved pattern.
   if (mode == LED_EFFECT_STATIC_MATRIX && previous_effect != LED_EFFECT_STATIC_MATRIX) {
     sync_runtime_from_static();
+    return;
+  }
+
+  if (initialized && display_enabled && mode != LED_EFFECT_THIRD_PARTY &&
+      mode != LED_EFFECT_STATIC_MATRIX) {
+    render_current_effect_frame();
   }
 }
 
@@ -453,7 +538,7 @@ void led_matrix_set_diagnostic_mode(uint8_t mode) {
       GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
       GPIO_InitStruct.Pull = GPIO_NOPULL;
       GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-      GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
+      GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
       HAL_GPIO_Init(LED_DATA_GPIO_Port, &GPIO_InitStruct);
     }
   }
@@ -474,13 +559,11 @@ void led_matrix_key_event(uint8_t key_index, bool pressed) {
  * @brief Rainbow Wave effect - diagonal rainbow cycling
  */
 static void effect_rainbow(void) {
-  for (uint8_t y = 0; y < LED_MATRIX_HEIGHT; y++) {
-    for (uint8_t x = 0; x < LED_MATRIX_WIDTH; x++) {
-      uint8_t hue = (x * 20) + (y * 20) + (effect_offset * 2);
-      uint8_t r, g, b;
-      led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
-      led_matrix_set_pixel(x, y, r, g, b);
-    }
+  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
+    uint8_t hue = (uint8_t)(i * 3u) + (uint8_t)(effect_offset * 2u);
+    uint8_t r, g, b;
+    led_matrix_hsv_to_rgb(hue, 255, 255, &r, &g, &b);
+    led_matrix_set_pixel_idx(i, r, g, b);
   }
 }
 
@@ -887,52 +970,5 @@ void led_matrix_effect_tick(uint32_t tick) {
   }
 
   // Now render the effect using current effect_offset
-  effect_render_context = true;
-  switch (current_effect) {
-  case LED_EFFECT_RAINBOW:
-    effect_rainbow();
-    break;
-  case LED_EFFECT_BREATHING:
-    effect_breathing();
-    break;
-  case LED_EFFECT_STATIC_RAINBOW:
-    effect_static_rainbow();
-    break;
-  case LED_EFFECT_SOLID:
-    effect_solid();
-    break;
-  case LED_EFFECT_PLASMA:
-    effect_plasma();
-    break;
-  case LED_EFFECT_FIRE:
-    effect_fire();
-    break;
-  case LED_EFFECT_OCEAN:
-    effect_ocean();
-    break;
-  case LED_EFFECT_MATRIX:
-    effect_matrix();
-    break;
-  case LED_EFFECT_SPARKLE:
-    effect_sparkle();
-    break;
-  case LED_EFFECT_BREATHING_RAINBOW:
-    effect_breathing_rainbow();
-    break;
-  case LED_EFFECT_SPIRAL:
-    effect_spiral();
-    break;
-  case LED_EFFECT_COLOR_CYCLE:
-    effect_color_cycle();
-    break;
-  case LED_EFFECT_REACTIVE:
-    effect_reactive();
-    break;
-  case LED_EFFECT_DISTANCE_SENSOR:
-    effect_distance_sensor();
-    break;
-  default:
-    break;
-  }
-  effect_render_context = false;
+  render_current_effect_frame();
 }

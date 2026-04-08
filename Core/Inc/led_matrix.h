@@ -1,11 +1,12 @@
 /*
  * led_matrix.h
- * 8x8 RGB LED Matrix driver using WS2812
+ * RGB LED strip/matrix driver using WS2812
  */
 
 #ifndef LED_MATRIX_H_
 #define LED_MATRIX_H_
 
+#include "board_config.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -18,10 +19,10 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define LED_MATRIX_WIDTH 8
 #define LED_MATRIX_HEIGHT 8
-#define LED_MATRIX_NUM_LEDS (LED_MATRIX_WIDTH * LED_MATRIX_HEIGHT) // 64 LEDs
+#define LED_MATRIX_NUM_LEDS NUM_KEYS
 
 // Each LED has 3 bytes: R, G, B
-#define LED_MATRIX_DATA_SIZE (LED_MATRIX_NUM_LEDS * 3) // 192 bytes
+#define LED_MATRIX_DATA_SIZE (LED_MATRIX_NUM_LEDS * 3)
 
 // Brightness limits
 #define LED_BRIGHTNESS_MIN 0
@@ -57,8 +58,7 @@ typedef enum {
 // LED Matrix Data Structure (for storage)
 //--------------------------------------------------------------------+
 typedef struct __attribute__((packed)) {
-  uint8_t
-      pixels[LED_MATRIX_DATA_SIZE]; // 64 LEDs * 3 bytes (GRB order for WS2812)
+  uint8_t pixels[LED_MATRIX_DATA_SIZE];
   uint8_t brightness;               // Global brightness (0-255)
   uint8_t enabled;                  // Enable/disable display
   uint8_t reserved[2];              // Padding for alignment

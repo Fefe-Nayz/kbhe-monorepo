@@ -73,9 +73,9 @@
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
-TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
-DMA_HandleTypeDef hdma_tim3_ch2;
+DMA_HandleTypeDef hdma_tim2_ch1;
 
 PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
@@ -88,8 +88,7 @@ PCD_HandleTypeDef hpcd_USB_OTG_HS;
 /**
  * LED DMA BUFFER
  */
-uint16_t ws2812_dma_buffer[BUFFER_SIZE * 2]
-    __attribute__((aligned(BUFFER_SIZE * 2 * 2)));
+uint16_t ws2812_dma_buffer[BUFFER_SIZE * 2] __attribute__((aligned(128)));
 
 /**
  * EMA FILTERING - Default values (can be overridden via settings)
@@ -221,7 +220,7 @@ static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USB_OTG_HS_PCD_Init(void);
 static void MX_TIM4_Init(void);
-static void MX_TIM3_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -345,14 +344,14 @@ extern ws2812_handleTypeDef led_ws2812_handle;
 
 // DMA Half Transfer callback - update first half of buffer
 void HAL_TIM_PWM_PulseFinishedHalfCpltCallback(TIM_HandleTypeDef *htim) {
-  if (htim->Instance == TIM3) {
+  if (htim->Instance == TIM2) {
     ws2812_update_buffer(&led_ws2812_handle, led_ws2812_handle.dma_buffer);
   }
 }
 
 // DMA Transfer Complete callback - update second half of buffer
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim) {
-  if (htim->Instance == TIM3) {
+  if (htim->Instance == TIM2) {
     ws2812_update_buffer(&led_ws2812_handle,
                          &led_ws2812_handle.dma_buffer[BUFFER_SIZE]);
   }
@@ -373,11 +372,6 @@ int main(void) {
   // for (uint16_t i = 0; i < NUM_MUX * NUM_MUX_CHANNELS; i++) {
   //   adc_values[i] = 0;
   // }
-
-  /**
-   * INITIALIZE SETTINGS
-   */
-  settings_init();
 
   /*
    * INITIALIZE ANALOG MODULE
@@ -435,7 +429,7 @@ int main(void) {
   MX_ADC1_Init();
   MX_USB_OTG_HS_PCD_Init();
   MX_TIM4_Init();
-  MX_TIM3_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   /*
@@ -457,7 +451,7 @@ int main(void) {
   led_ws2812_handle.dma_buffer = ws2812_dma_buffer;
 
   // Initialize WS2812 LED Matrix (8x8 = 64 LEDs)
-  if (!led_matrix_init(&htim3, TIM_CHANNEL_2)) {
+  if (!led_matrix_init(&htim2, TIM_CHANNEL_1)) {
     // LED init failed, but continue anyway
   }
 
@@ -472,6 +466,13 @@ int main(void) {
 
   // Initialize PE0 LED indicator for caps/num lock
   led_indicator_init();
+
+  /*
+   * Load/apply persisted settings only after HAL, Flash and the LED driver are
+   * fully initialized. Calling this earlier causes LED defaults (effect,
+   * brightness) to be overwritten by led_matrix_init().
+   */
+  settings_init();
 
   DWT_CycleCounter_Init();
 
@@ -537,13 +538,13 @@ int main(void) {
 
       analog_set_scan_complete(false);
       TIM4_StartOneShot_TRGO();
-    } else {
-      // // Update LED effects (uses HAL_GetTick for timing)
-      // led_matrix_effect_tick(HAL_GetTick());
-
-      // // Update PE0 LED indicator blinking (for num lock)
-      // led_indicator_tick(HAL_GetTick());
     }
+
+    // LED/UI timing should not depend on ADC scan state. The scan completes so
+    // quickly on the 82-key board that gating animation updates behind the
+    // "no scan complete" branch effectively starves LED effects.
+    led_matrix_effect_tick(HAL_GetTick());
+    led_indicator_tick(HAL_GetTick());
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -736,55 +737,55 @@ static void MX_ADC1_Init(void) {
 }
 
 /**
- * @brief TIM3 Initialization Function
+ * @brief TIM2 Initialization Function
  * @param None
  * @retval None
  */
-static void MX_TIM3_Init(void) {
+static void MX_TIM2_Init(void) {
 
-  /* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE BEGIN TIM2_Init 0 */
 
-  /* USER CODE END TIM3_Init 0 */
+  /* USER CODE END TIM2_Init 0 */
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE BEGIN TIM2_Init 1 */
 
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 134;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 134;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK) {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK) {
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK) {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK) {
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK) {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK) {
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK) {
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK) {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM3_Init 2 */
+  /* USER CODE BEGIN TIM2_Init 2 */
 
-  /* USER CODE END TIM3_Init 2 */
-  HAL_TIM_MspPostInit(&htim3);
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 }
 
 /**

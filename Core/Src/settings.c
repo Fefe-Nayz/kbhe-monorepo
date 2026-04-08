@@ -12,7 +12,7 @@
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0102 // v1.2.0 (LED matrix support)
+#define FIRMWARE_VERSION 0x0103 // v1.3.0
 
 //--------------------------------------------------------------------+
 // Internal Variables
@@ -72,16 +72,17 @@ static void settings_set_defaults(void) {
   settings_calibration_t default_calibration = SETTINGS_DEFAULT_CALIBRATION;
   current_settings.calibration = default_calibration;
 
-  // Default LED settings (all LEDs off, medium brightness)
+  // Default LED settings
   memset(current_settings.led.pixels, 0, LED_MATRIX_DATA_BYTES);
   current_settings.led.brightness = 50; // Medium brightness
 
   // Default LED effect settings
-  current_settings.led_effect_mode = 0; // None
+  current_settings.led_effect_mode = 0; // None / static matrix
   current_settings.led_effect_speed = 50;
   current_settings.led_effect_color_r = 255;
   current_settings.led_effect_color_g = 0;
   current_settings.led_effect_color_b = 0;
+  current_settings.led_fps_limit = 0; // Unlimited by default
 
   // Footer
   current_settings.magic_end = SETTINGS_MAGIC_END;
@@ -94,6 +95,9 @@ static bool settings_validate(const settings_t *s) {
     return false;
   }
   if (s->magic_end != SETTINGS_MAGIC_END) {
+    return false;
+  }
+  if (s->version != SETTINGS_VERSION) {
     return false;
   }
 
@@ -160,6 +164,7 @@ void settings_init(void) {
   led_matrix_set_effect_color(current_settings.led_effect_color_r,
                               current_settings.led_effect_color_g,
                               current_settings.led_effect_color_b);
+  led_matrix_set_fps_limit(current_settings.led_fps_limit);
 
   settings_dirty = false;
 }

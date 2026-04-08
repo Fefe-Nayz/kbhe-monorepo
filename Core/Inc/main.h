@@ -59,8 +59,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define LED_DATA_Pin GPIO_PIN_7
-#define LED_DATA_GPIO_Port GPIOC
+#define LED_DATA_Pin GPIO_PIN_15
+#define LED_DATA_GPIO_Port GPIOA
 #define M3_Pin GPIO_PIN_11
 #define M3_GPIO_Port GPIOC
 #define M2_Pin GPIO_PIN_12
@@ -74,9 +74,9 @@ void Error_Handler(void);
 // // WS2812 LED timing: Timer period for 800kHz PWM (96MHz / 120 = 800kHz)
 // #define LED_CNT 120
 
-// // WS2812 output pin (TIM3_CH2 = PC7)
-// #define WS2812_Pin GPIO_PIN_7
-// #define WS2812_GPIO_Port GPIOC
+// // WS2812 output pin (TIM2_CH1 = PA15)
+// #define WS2812_Pin GPIO_PIN_15
+// #define WS2812_GPIO_Port GPIOA
 
 // Timing measurement (accessible from other modules)
 extern uint32_t adc_full_cycle_us; // Time for full main loop cycle

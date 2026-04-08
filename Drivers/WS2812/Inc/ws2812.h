@@ -20,12 +20,16 @@
 
 #include "main.h"
 
-// Buffer allocated will be twice this
-#define BUFFER_SIZE 32
+#define WS2812_MAX_LEDS 128
 
-// LED on/off counts.  PWM timer is running 125 counts.  LED_CNT need to be set to the total counts in the PWM.
-#define LED_OFF 43 // 32% duty cycle
-#define LED_ON 86   // 65% duty cycle
+// One DMA half-buffer must carry exactly one LED frame: 24 PWM periods
+// (8 bits per color, 3 colors in GRB order). A larger value inserts extra
+// invalid slots between LEDs and corrupts the chain.
+#define BUFFER_SIZE 24
+
+// LED on/off counts for a 135-count period (TIM2 ARR=134 @ 108 MHz => 800 kHz).
+#define LED_OFF 43 // ~0.40 us high
+#define LED_ON 86  // ~0.80 us high
 #define LED_RESET_CYCLES 10        // Full 24-bit cycles
 
 #define GL 0 // Green LED
@@ -50,7 +54,7 @@ typedef struct {
     uint32_t channel;                       // Timer channel
     uint16_t *dma_buffer;                   // Pointer to DMA buffer (non-cacheable, defined elsewhere)
     uint16_t leds;                          // Number of LEDs on the string
-    uint8_t *led;                           // Dynamically allocated array of LED RGB values
+    uint8_t *led;                           // LED RGB storage
     ws2812_stateTypeDef led_state;          // LED Transfer state machine
     uint8_t led_cnt;                        // Counts through the leds starting from zero up to "leds"
     uint8_t res_cnt;                        // Counts reset cycles when in reset state
@@ -63,6 +67,8 @@ typedef struct {
 ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef *timer, uint32_t channel, uint16_t leds);
 
 void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint16_t *dma_buffer_pointer);
+
+void ws2812_show(ws2812_handleTypeDef *ws2812);
 
 // Set all led values to zero
 ws2812_resultTypeDef zeroLedValues(ws2812_handleTypeDef *ws2812);

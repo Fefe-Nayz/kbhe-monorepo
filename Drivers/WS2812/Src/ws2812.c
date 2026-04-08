@@ -20,7 +20,6 @@
  * before this library is initialized.
  */
 
-#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
@@ -28,6 +27,18 @@
 
 #include "ws2812.h"
 #include "color_values.h"
+
+static uint8_t ws2812_led_storage[WS2812_MAX_LEDS * 3];
+
+static inline void ws2812_enable_cycle_counter(void) {
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+static inline void ws2812_wait_until(uint32_t target_cycles) {
+    while ((int32_t)(DWT->CYCCNT - target_cycles) < 0) {
+    }
+}
 
 /*
  * Update next 24 bits in the dma buffer - assume dma_buffer_pointer is pointing
@@ -143,6 +154,10 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
 
     ws2812_resultTypeDef res = WS2812_Ok;
 
+    if (leds > WS2812_MAX_LEDS) {
+        return WS2812_Err;
+    }
+
     // Store timer handle for later
     ws2812->timer = timer;
 
@@ -155,25 +170,76 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
     ws2812->is_dirty = 0;
     ws2812->zero_halves = 2;
 
-    ws2812->led = malloc(leds * 3);
-    if (ws2812->led != NULL) { // Memory for led values
+    ws2812->led = ws2812_led_storage;
+    memset(ws2812->led, 0, leds * 3);
 
-        memset(ws2812->led, 0, leds * 3); // Zero it all
+    // Bring-up fallback: drive WS2812 directly from GPIO instead of the
+    // callback-heavy timer/DMA state machine. This makes LED validation
+    // independent from TIM/DMA routing while the firmware is in refactor.
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    GPIO_InitStruct.Pin = LED_DATA_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    HAL_GPIO_Init(LED_DATA_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(LED_DATA_GPIO_Port, LED_DATA_Pin, GPIO_PIN_RESET);
 
-        // Start DMA to feed the PWM with values
-        // At this point the buffer should be empty - all zeros
-#ifdef STM32H562xx
-        HAL_TIM_PWM_Start_DMA(timer, channel, (uint32_t*) ws2812->dma_buffer, BUFFER_SIZE * 4); // I do NOT understand why 4 - but if 2 it won't work
-#else
-        HAL_TIM_PWM_Start_DMA(timer, channel, (uint32_t*) ws2812->dma_buffer, BUFFER_SIZE * 2);
-#endif
-
-    } else {
-        res = WS2812_Mem;
-    }
+    ws2812_enable_cycle_counter();
 
     return res;
 
+}
+
+void ws2812_show(ws2812_handleTypeDef *ws2812) {
+    if (ws2812 == NULL || ws2812->led == NULL) {
+        return;
+    }
+
+    ws2812_enable_cycle_counter();
+
+    const uint32_t bit_total_cycles =
+        (uint32_t)((((uint64_t)SystemCoreClock) + 400000ULL) / 800000ULL);
+    const uint32_t bit0_high_cycles =
+        (uint32_t)((((uint64_t)SystemCoreClock) * 350ULL) / 1000000000ULL);
+    const uint32_t bit1_high_cycles =
+        (uint32_t)((((uint64_t)SystemCoreClock) * 700ULL) / 1000000000ULL);
+    const uint32_t reset_cycles =
+        (uint32_t)((((uint64_t)SystemCoreClock) * 80ULL) / 1000000ULL);
+
+    const uint32_t pin_set_mask = LED_DATA_Pin;
+    const uint32_t pin_reset_mask = ((uint32_t)LED_DATA_Pin) << 16;
+    GPIO_TypeDef *port = LED_DATA_GPIO_Port;
+
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    port->BSRR = pin_reset_mask;
+
+    for (uint16_t led_idx = 0; led_idx < ws2812->leds; led_idx++) {
+        uint8_t *led = &ws2812->led[led_idx * 3];
+        for (uint8_t color_idx = 0; color_idx < 3; color_idx++) {
+            uint8_t value = led[color_idx];
+            for (int bit = 7; bit >= 0; bit--) {
+                uint32_t start_cycles = DWT->CYCCNT;
+                uint32_t high_cycles =
+                    (value & (1U << bit)) ? bit1_high_cycles : bit0_high_cycles;
+
+                port->BSRR = pin_set_mask;
+                ws2812_wait_until(start_cycles + high_cycles);
+                port->BSRR = pin_reset_mask;
+                ws2812_wait_until(start_cycles + bit_total_cycles);
+            }
+        }
+    }
+
+    uint32_t reset_start_cycles = DWT->CYCCNT;
+    port->BSRR = pin_reset_mask;
+    ws2812_wait_until(reset_start_cycles + reset_cycles);
+
+    if (primask == 0U) {
+        __enable_irq();
+    }
 }
 
 /* 

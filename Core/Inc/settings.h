@@ -6,6 +6,7 @@
 #ifndef SETTINGS_H_
 #define SETTINGS_H_
 
+#include "board_config.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -18,13 +19,13 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x0004         // Bumped for curves + gamepad mapping
+#define SETTINGS_VERSION 0x0007         // Bumped for 82-LED settings layout
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
 //--------------------------------------------------------------------+
-#define LED_MATRIX_SIZE 64                          // 8x8 = 64 LEDs
-#define LED_MATRIX_DATA_BYTES (LED_MATRIX_SIZE * 3) // 192 bytes (RGB)
+#define LED_MATRIX_SIZE NUM_KEYS
+#define LED_MATRIX_DATA_BYTES (LED_MATRIX_SIZE * 3)
 
 //--------------------------------------------------------------------+
 // Analog Curve Constants
@@ -159,7 +160,7 @@ typedef struct __attribute__((packed)) {
  * @brief LED matrix settings
  */
 typedef struct __attribute__((packed)) {
-  uint8_t pixels[LED_MATRIX_DATA_BYTES]; // 64 LEDs * 3 bytes (RGB)
+  uint8_t pixels[LED_MATRIX_DATA_BYTES];
   uint8_t brightness;                    // Global brightness (0-255)
   uint8_t reserved[3];                   // Padding for alignment
 } settings_led_t;
