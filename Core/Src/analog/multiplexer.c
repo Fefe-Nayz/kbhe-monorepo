@@ -23,25 +23,27 @@ void multiplexer_select_mux_channel(uint8_t channel) {
     //  * 75HE
     //  */
 
-    // // S0
-    // set_bsrr_mask_pin_state(&bsrr_mask, 4, channel & 0x01);
-    // // S1
-    // set_bsrr_mask_pin_state(&bsrr_mask, 5, channel & 0x02);
-    // // S2
-    // set_bsrr_mask_pin_state(&bsrr_mask, 6, channel & 0x04);
-
-    /*
-     * Prototype 6HE
-     */
-    set_bsrr_mask_pin_state(&bsrr_mask, 1, channel & 0x01);
-    set_bsrr_mask_pin_state(&bsrr_mask, 0, channel & 0x02);
+    // S0
+    set_bsrr_mask_pin_state(&bsrr_mask, 4, channel & 0x01);
+    // S1
+    set_bsrr_mask_pin_state(&bsrr_mask, 5, channel & 0x02);
+    // S2
+    set_bsrr_mask_pin_state(&bsrr_mask, 6, channel & 0x04);
 
     apply_bsrr_mask(GPIOD, bsrr_mask);
 
-    bsrr_mask = 0;
+    // /*
+    //  * Prototype 6HE
+    //  */
+    // set_bsrr_mask_pin_state(&bsrr_mask, 1, channel & 0x01);
+    // set_bsrr_mask_pin_state(&bsrr_mask, 0, channel & 0x02);
 
-    set_bsrr_mask_pin_state(&bsrr_mask, 12, channel & 0x04);
-    set_bsrr_mask_pin_state(&bsrr_mask, 11, channel & 0x08);
+    // apply_bsrr_mask(GPIOD, bsrr_mask);
 
-    apply_bsrr_mask(GPIOC, bsrr_mask);
+    // bsrr_mask = 0;
+
+    // set_bsrr_mask_pin_state(&bsrr_mask, 12, channel & 0x04);
+    // set_bsrr_mask_pin_state(&bsrr_mask, 11, channel & 0x08);
+
+    // apply_bsrr_mask(GPIOC, bsrr_mask);
 }
