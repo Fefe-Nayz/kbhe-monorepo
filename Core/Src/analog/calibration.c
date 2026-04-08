@@ -12,7 +12,8 @@ static int16_t zero_offset[NUM_KEYS];
 void calibration_init() {
     // Initialize zero offsets to 0
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
-        zero_offset[i] = 0;
+        // Set high offset to avoid accidental key presses before calibration
+        zero_offset[i] = 1000;
     }
 
     calibration_load_settings();

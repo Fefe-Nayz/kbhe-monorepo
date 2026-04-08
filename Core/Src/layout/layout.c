@@ -46,6 +46,10 @@ static void set_active_layer(uint8_t layer) {
 void layout_press(uint8_t key) {
     uint16_t keycode = layers[active_layer][key];
 
+    if (DISABLE_INPUT) {
+        return;
+    }
+
     switch(keycode) {
         case CUSTOM_FN:
             set_active_layer(1);
@@ -59,6 +63,10 @@ void layout_press(uint8_t key) {
 
 void layout_release(uint8_t key) {
     uint16_t keycode = layers[active_layer][key];
+
+    if (DISABLE_INPUT) {
+        return;
+    }
 
     switch(keycode) {
         case CUSTOM_FN:
