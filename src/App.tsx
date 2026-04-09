@@ -60,7 +60,7 @@ return (
         <AppSidebar />
 
         
-        <main className="bg-amber-300 w-screen overflow-hidden">
+        <main className="sky-300 w-screen overflow-hidden">
           {/*
         <div className="bg-amber-500">
             <SidebarTrigger />

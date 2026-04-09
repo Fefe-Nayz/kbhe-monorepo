@@ -18,7 +18,7 @@ export default function Profiles() {
   }, [])
 
   return (
-    <div className="p-8 bg-white">
+    <div className="p-8 gray-100">
       <h1 className="text-3xl font-bold">Profiles</h1>
       <p className="text-gray-600 mt-2">Different profiles management</p>
 
@@ -66,8 +66,8 @@ export default function Profiles() {
           key={profile.name}
           style={{
             border: selectedProfile?.name === profile.name
-              ? "2px solid green"
-              : "1px solid gray",
+              ? "1px solid stone-300"
+              : "5px solid gray",
             padding: 10,
             marginBottom: 10
           }}
