@@ -75,7 +75,7 @@ export default function BaseKeyboard({ mode = "single", onButtonClick }: BaseKey
                   onSelect={handleKeyClick}
                   className={`${
                     selectedKeys.includes(keyData.id)
-                      ? "bg-red-700 active:bg-red-500"
+                      ? "bg-red-500 active:bg-red-400"
                       : "bg-transparent active:bg-blue-300"
                   }`}
                 />
