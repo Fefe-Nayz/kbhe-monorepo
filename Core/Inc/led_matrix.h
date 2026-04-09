@@ -327,6 +327,18 @@ void led_matrix_show_host_volume_overlay(void);
  */
 void led_matrix_set_live_frame(const uint8_t *data);
 
+/**
+ * @brief Force a temporary full-frame output override on top of any effect or
+ *        third-party live stream.
+ * @param data RGB triplets in logical key order.
+ */
+void led_matrix_set_output_override_frame(const uint8_t *data);
+
+/**
+ * @brief Clear the temporary output override frame.
+ */
+void led_matrix_clear_output_override_frame(void);
+
 #ifdef __cplusplus
 }
 #endif

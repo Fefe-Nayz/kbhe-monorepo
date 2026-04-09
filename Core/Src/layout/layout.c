@@ -106,3 +106,7 @@ void layout_release(uint8_t key) {
             break;
     }
 }
+
+void layout_reset_state(void) {
+    set_active_layer(0);
+}

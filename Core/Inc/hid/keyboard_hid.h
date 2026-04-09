@@ -120,6 +120,12 @@ bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode);
 bool keyboard_hid_release_all(void);
 
 /**
+ * @brief Clear the internal pressed-key bookkeeping without sending a new
+ *        report. Useful when a higher-level mode takes exclusive input control.
+ */
+void keyboard_hid_reset_state(void);
+
+/**
  * @brief Register a key as pressed (add to report buffer)
  * @param keycode HID keycode to add
  */

@@ -68,26 +68,21 @@ static void calibration_recompute_key_max_distance(uint8_t key, uint16_t max_raw
 }
 
 static void calibration_restore_runtime_led_state(void) {
-    uint8_t effect_params[LED_EFFECT_PARAM_COUNT] = {0};
-    uint8_t r = 0u;
-    uint8_t g = 0u;
-    uint8_t b = 0u;
+    if (!settings_is_led_enabled()) {
+        led_matrix_set_enabled(false);
+    }
 
-    settings_get_led_effect_color(&r, &g, &b);
-    settings_get_led_effect_params(settings_get_led_effect_mode(), effect_params);
-    led_matrix_set_effect((led_effect_mode_t)settings_get_led_effect_mode());
-    led_matrix_set_effect_speed(settings_get_led_effect_speed());
-    led_matrix_set_effect_color(r, g, b);
-    led_matrix_set_effect_params(effect_params);
-    led_matrix_set_fps_limit(settings_get_led_fps_limit());
-    led_matrix_set_enabled(settings_is_led_enabled());
+    led_matrix_clear_output_override_frame();
+
+    if (settings_is_led_enabled()) {
+        led_matrix_update();
+    }
 }
 
 static void calibration_take_led_control(void) {
     led_matrix_set_enabled(true);
-    led_matrix_set_effect(LED_EFFECT_THIRD_PARTY);
     memset(guided_led_frame, 0, sizeof(guided_led_frame));
-    led_matrix_set_live_frame(guided_led_frame);
+    led_matrix_set_output_override_frame(guided_led_frame);
 }
 
 static uint8_t calibration_pulse_value(uint32_t now_ms, uint16_t period_ms,
@@ -105,7 +100,7 @@ static void calibration_render_all(uint8_t r, uint8_t g, uint8_t b) {
         guided_led_frame[key * 3 + 1] = g;
         guided_led_frame[key * 3 + 2] = b;
     }
-    led_matrix_set_live_frame(guided_led_frame);
+    led_matrix_set_output_override_frame(guided_led_frame);
 }
 
 static void calibration_render_single_key(uint8_t key_index, uint8_t r, uint8_t g, uint8_t b) {
@@ -115,7 +110,7 @@ static void calibration_render_single_key(uint8_t key_index, uint8_t r, uint8_t 
         guided_led_frame[key_index * 3 + 1] = g;
         guided_led_frame[key_index * 3 + 2] = b;
     }
-    led_matrix_set_live_frame(guided_led_frame);
+    led_matrix_set_output_override_frame(guided_led_frame);
 }
 
 static void calibration_finish_session(bool success) {
@@ -219,6 +214,10 @@ void calibration_guided_abort(void) {
 
     memset(&guided_state, 0, sizeof(guided_state));
     calibration_restore_runtime_led_state();
+}
+
+bool calibration_guided_is_active(void) {
+    return guided_state.active;
 }
 
 void calibration_guided_tick(uint32_t now_ms) {

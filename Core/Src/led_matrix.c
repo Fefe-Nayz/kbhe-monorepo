@@ -26,6 +26,10 @@ static uint8_t pixels_static[LED_MATRIX_DATA_SIZE];
 // Runtime frame currently displayed on LEDs (effects/third-party/live state)
 static uint8_t pixels_runtime[LED_MATRIX_DATA_SIZE];
 
+// Temporary high-priority output frame that masks runtime pixels while active.
+static uint8_t pixels_output_override[LED_MATRIX_DATA_SIZE];
+static bool output_override_active = false;
+
 // Current brightness
 static uint8_t current_brightness = LED_BRIGHTNESS_DEFAULT;
 
@@ -396,9 +400,11 @@ static bool volume_overlay_color_for_index(uint8_t index, uint32_t now_ms,
 static inline void push_runtime_pixel_to_ws2812_at(uint8_t index,
                                                    uint32_t now_ms) {
   uint8_t physical_index = LOGICAL_LED_INDEX_TO_PHYSICAL_LED_INDEX[index];
-  uint8_t source_r = pixels_runtime[index * 3 + 0];
-  uint8_t source_g = pixels_runtime[index * 3 + 1];
-  uint8_t source_b = pixels_runtime[index * 3 + 2];
+  const uint8_t *source_frame =
+      output_override_active ? pixels_output_override : pixels_runtime;
+  uint8_t source_r = source_frame[index * 3 + 0];
+  uint8_t source_g = source_frame[index * 3 + 1];
+  uint8_t source_b = source_frame[index * 3 + 2];
 
   if (volume_overlay_color_for_index(index, now_ms, &source_r, &source_g,
                                      &source_b)) {
@@ -513,6 +519,8 @@ bool led_matrix_init(void *htim, uint32_t channel) {
   // Clear pixels
   memset(pixels_static, 0, sizeof(pixels_static));
   memset(pixels_runtime, 0, sizeof(pixels_runtime));
+  memset(pixels_output_override, 0, sizeof(pixels_output_override));
+  output_override_active = false;
 
   // Reset brightness
   current_brightness = LED_BRIGHTNESS_DEFAULT;
@@ -958,6 +966,27 @@ void led_matrix_set_live_frame(const uint8_t *data) {
   }
 
   memcpy(pixels_runtime, data, LED_MATRIX_DATA_SIZE);
+
+  if (initialized && display_enabled) {
+    update_ws2812();
+  }
+}
+
+void led_matrix_set_output_override_frame(const uint8_t *data) {
+  if (data == NULL) {
+    return;
+  }
+
+  memcpy(pixels_output_override, data, LED_MATRIX_DATA_SIZE);
+  output_override_active = true;
+
+  if (initialized && display_enabled) {
+    update_ws2812();
+  }
+}
+
+void led_matrix_clear_output_override_frame(void) {
+  output_override_active = false;
 
   if (initialized && display_enabled) {
     update_ws2812();

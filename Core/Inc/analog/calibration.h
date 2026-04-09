@@ -44,6 +44,8 @@ bool calibration_guided_start(void);
 
 void calibration_guided_abort(void);
 
+bool calibration_guided_is_active(void);
+
 void calibration_guided_tick(uint32_t now_ms);
 
 void calibration_guided_on_scan(uint32_t now_ms);

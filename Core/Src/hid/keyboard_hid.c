@@ -66,6 +66,14 @@ bool keyboard_hid_release_all(void) {
   return keyboard_hid_send_report(0, NULL);
 }
 
+void keyboard_hid_reset_state(void) {
+  memset(&keyboard_report, 0, sizeof(keyboard_report));
+  memset(pressed_keys, 0, sizeof(pressed_keys));
+  num_pressed_keys = 0;
+  report_changed = false;
+  report_pending = false;
+}
+
 void keyboard_hid_key_press(uint8_t keycode) {
   if (keycode == 0)
     return;

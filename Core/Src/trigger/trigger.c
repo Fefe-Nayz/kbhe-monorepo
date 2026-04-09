@@ -1,9 +1,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "trigger/trigger.h"
+#include "analog/calibration.h"
 #include "board_config.h"
 #include "analog/analog.h"
 #include "hid/keyboard_hid.h"
+#include "hid/keyboard_nkro_hid.h"
 #include "led_matrix.h"
 #include "layout/keycodes.h"
 #include "trigger/socd.h"
@@ -15,6 +17,7 @@ static key_trigger_settings_t key_trigger_settings[NUM_KEYS];
 static key_rapid_trigger_data_t key_rapid_trigger_states[NUM_KEYS];
 
 static key_state_e key_states[NUM_KEYS];
+static bool keyboard_blocked_for_calibration = false;
 
 static inline bool is_below_actuation_point(int16_t distance, uint16_t actuation_point) {
     return distance >= actuation_point;
@@ -23,6 +26,25 @@ static inline bool is_below_actuation_point(int16_t distance, uint16_t actuation
 static inline void reset_rapid_trigger_extremums(uint8_t key, int16_t current_distance) {
     key_rapid_trigger_states[key].max_bottom_distance = current_distance;
     key_rapid_trigger_states[key].min_top_distance = current_distance;
+}
+
+static void trigger_reset_runtime_state(bool release_keyboard_reports) {
+    if (release_keyboard_reports) {
+        keyboard_hid_release_all();
+        keyboard_hid_reset_state();
+        keyboard_nkro_hid_release_all();
+    }
+
+    layout_reset_state();
+    socd_load_settings();
+
+    for (uint8_t key = 0; key < NUM_KEYS; key++) {
+        int16_t current_distance = analog_read_distance_value(key);
+
+        key_states[key] = RELEASED;
+        key_rapid_trigger_states[key].last_distance = current_distance;
+        reset_rapid_trigger_extremums(key, current_distance);
+    }
 }
 
 static inline void press_key(uint8_t key) {
@@ -194,6 +216,19 @@ void trigger_init() {
 }
 
 void trigger_task() {
+    if (calibration_guided_is_active()) {
+        if (!keyboard_blocked_for_calibration) {
+            trigger_reset_runtime_state(true);
+            keyboard_blocked_for_calibration = true;
+        }
+        return;
+    }
+
+    if (keyboard_blocked_for_calibration) {
+        trigger_reset_runtime_state(false);
+        keyboard_blocked_for_calibration = false;
+    }
+
     for (uint8_t key = 0; key < NUM_KEYS; key++) {
         // Handle trigger logic
         handle_trigger(key);

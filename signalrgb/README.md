@@ -1,10 +1,10 @@
-# KBHE SignalRGB Plugin (6-Key Prototype)
+# KBHE SignalRGB Plugin (82-Key)
 
 This folder contains a SignalRGB device plugin for the KBHE keyboard RAW HID interface.
 
 ## Files
 
-- `kbhe_6key_rawhid.js`: SignalRGB plugin script.
+- `kbhe_6key_rawhid.js`: SignalRGB plugin script for the full 82-key board.
 
 ## Firmware Expectations
 
@@ -32,19 +32,11 @@ The plugin expects firmware with:
 ## Behavior
 
 - On Initialize: plugin enables third-party mode (`effect=14`).
-- On Render: plugin sends a full 64-LED frame using 4 chunk packets.
+- On Render: plugin sends a full 82-LED frame in chunked RAW HID packets.
 - On Shutdown: plugin asks the firmware to restore the RGB effect that was
   active before SignalRGB enabled third-party live mode.
 
-## 6-Key Mapping
+## Layout
 
-The plugin maps keys to firmware LED indices:
-
-- Q -> LED 0
-- W -> LED 1
-- E -> LED 2
-- A -> LED 3
-- S -> LED 4
-- D -> LED 5
-
-Update `ledIndexMap` in `kbhe_6key_rawhid.js` if your prototype wiring uses different indices.
+The plugin exposes the full logical 82-key layout in SignalRGB canvas space,
+matching the firmware `NUM_KEYS` order used by the keyboard.
