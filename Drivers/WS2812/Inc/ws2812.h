@@ -23,7 +23,7 @@
 #define WS2812_MAX_LEDS 128
 
 #ifndef WS2812_USE_SOFTWARE_BACKEND
-#define WS2812_USE_SOFTWARE_BACKEND 1
+#define WS2812_USE_SOFTWARE_BACKEND 0
 #endif
 
 // One DMA half-buffer must carry exactly one LED frame: 24 PWM periods
@@ -56,7 +56,7 @@ typedef enum {
 typedef struct {
     TIM_HandleTypeDef *timer;               // Timer running the PWM - MUST run at 800 kHz
     uint32_t channel;                       // Timer channel
-    uint16_t *dma_buffer;                   // Pointer to DMA buffer (non-cacheable, defined elsewhere)
+    uint32_t *dma_buffer;                   // Pointer to DMA buffer (non-cacheable, defined elsewhere)
     uint16_t leds;                          // Number of LEDs on the string
     uint8_t *led;                           // LED RGB storage
     ws2812_stateTypeDef led_state;          // LED Transfer state machine
@@ -70,7 +70,7 @@ typedef struct {
 
 ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef *timer, uint32_t channel, uint16_t leds);
 
-void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint16_t *dma_buffer_pointer);
+void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint32_t *dma_buffer_pointer);
 
 void ws2812_show(ws2812_handleTypeDef *ws2812);
 

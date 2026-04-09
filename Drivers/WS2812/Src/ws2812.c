@@ -47,7 +47,7 @@ static inline void ws2812_wait_until(uint32_t target_cycles) {
  * to the buffer that is safe to update.  The dma_buffer_pointer and the call to
  * this function is handled by the dma callbacks.
  */
-inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint16_t *dma_buffer_pointer) {
+inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint32_t *dma_buffer_pointer) {
 
 #ifdef BUFF_GPIO_Port
 	HAL_GPIO_WritePin(BUFF_GPIO_Port, BUFF_Pin, GPIO_PIN_SET);
@@ -64,7 +64,7 @@ inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint16_t *dma_buf
         // This one is simple - we got a bunch of zeros of the right size - just throw
         // that into the buffer.  Twice will do (two half buffers).
         if (ws2812->zero_halves < 2) {
-            memset(dma_buffer_pointer, 0, BUFFER_SIZE * sizeof(uint16_t)); // Fill one half-buffer with zeros
+            memset(dma_buffer_pointer, 0, BUFFER_SIZE * sizeof(uint32_t)); // Fill one half-buffer with zeros
             ws2812->zero_halves++; // We only need to update two half buffers
         }
 
@@ -97,7 +97,7 @@ inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint16_t *dma_buf
         for (uint8_t c = 0; c < 3; c++) { // Deal with the 3 color leds in one led package
 
             // Copy values from the pre-filled color_value buffer
-            memcpy(dma_buffer_pointer, color_value[led[c]], 16); // Lookup the actual buffer data
+            memcpy(dma_buffer_pointer, color_value[led[c]], 8 * sizeof(uint32_t)); // Lookup the actual buffer data
             dma_buffer_pointer += 8; // next 8 bytes
 
         }
@@ -195,7 +195,7 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
         return WS2812_Err;
     }
 
-    memset(ws2812->dma_buffer, 0, BUFFER_SIZE * 2 * sizeof(uint16_t));
+    memset(ws2812->dma_buffer, 0, BUFFER_SIZE * 2 * sizeof(uint32_t));
 
     if (HAL_TIM_PWM_Start_DMA(
             ws2812->timer,

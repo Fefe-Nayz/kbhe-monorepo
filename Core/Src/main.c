@@ -89,7 +89,7 @@ PCD_HandleTypeDef hpcd_USB_OTG_HS;
 /**
  * LED DMA BUFFER
  */
-uint16_t ws2812_dma_buffer[BUFFER_SIZE * 2] __attribute__((aligned(128)));
+uint32_t ws2812_dma_buffer[BUFFER_SIZE * 2] __attribute__((aligned(256)));
 
 /**
  * EMA FILTERING - Default values (can be overridden via settings)
@@ -407,6 +407,9 @@ int main(void) {
 
   /* Enable I-Cache---------------------------------------------------------*/
   SCB_EnableICache();
+
+  /* Enable D-Cache---------------------------------------------------------*/
+  SCB_EnableDCache();
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -1063,7 +1066,7 @@ void MPU_Config(void) {
    */
   MPU_InitStruct.Number = MPU_REGION_NUMBER1;
   MPU_InitStruct.BaseAddress = (uint32_t)&ws2812_dma_buffer;
-  MPU_InitStruct.Size = MPU_REGION_SIZE_128B;
+  MPU_InitStruct.Size = MPU_REGION_SIZE_256B;
   MPU_InitStruct.SubRegionDisable = 0x0;
   MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
   MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;

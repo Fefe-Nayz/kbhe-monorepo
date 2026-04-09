@@ -18,6 +18,6 @@
 #ifndef COLOR_VALUES_H_
 #define COLOR_VALUES_H_
 
-extern const uint16_t color_value[256][8];
+extern const uint32_t color_value[256][8];
 
 #endif /* COLOR_VALUES_H_ */
