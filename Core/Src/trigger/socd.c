@@ -11,6 +11,13 @@ static socd_key_settings_t socd_key_settings[NUM_KEYS];
 
 static bool socd_override_states[NUM_KEYS];
 
+static void socd_reset_key_config(uint8_t key) {
+    socd_override_states[key] = false;
+    socd_key_settings[key].resolution_mode = SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS;
+    socd_key_settings[key].is_socd_enabled = false;
+    socd_key_settings[key].linked_key = key;
+}
+
 /*
  * Most pressed wins resolution logic
  */
@@ -51,7 +58,7 @@ inline void socd_on_press(uint8_t key) {
 
     uint8_t linked_key = settings->linked_key;
 
-    if (settings->resolution_mode == LAST_INPUT_WINS) {
+    if (settings->resolution_mode == SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS) {
         // Release the linked key
         layout_release(linked_key);
         socd_override_states[linked_key] = true;
@@ -67,7 +74,7 @@ inline void socd_on_release(uint8_t key) {
 
     uint8_t linked_key = settings->linked_key;
 
-    if (settings->resolution_mode == LAST_INPUT_WINS) {
+    if (settings->resolution_mode == SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS) {
         key_state_e linked_key_state = trigger_get_key_state(linked_key);
 
         // If the linked key is still pressed and was overridden, clear the override state and press it again
@@ -80,25 +87,32 @@ inline void socd_on_release(uint8_t key) {
 
 void socd_init() {
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
-        socd_override_states[i] = false;
-
-        socd_key_settings[i].resolution_mode = LAST_INPUT_WINS;
-        socd_key_settings[i].is_socd_enabled = false;
-        socd_key_settings[i].linked_key = i;
+        socd_reset_key_config(i);
     }
 
     socd_load_settings();
 }
 
 void socd_load_settings() {
-    // Debug settings
-    socd_key_settings[3].resolution_mode = MOST_PRESSED_INPUT_WINS;
-    socd_key_settings[3].is_socd_enabled = true;
-    socd_key_settings[3].linked_key = 5;
+    for (uint8_t i = 0; i < NUM_KEYS; i++) {
+        const settings_key_t *key_settings = settings_get_key(i);
+        uint8_t linked_key = SETTINGS_SOCD_PAIR_NONE;
 
-    socd_key_settings[5].resolution_mode = MOST_PRESSED_INPUT_WINS;
-    socd_key_settings[5].is_socd_enabled = true;
-    socd_key_settings[5].linked_key = 3;
+        socd_reset_key_config(i);
+        if (key_settings == NULL) {
+            continue;
+        }
+
+        linked_key = key_settings->socd_pair;
+        if (linked_key == SETTINGS_SOCD_PAIR_NONE || linked_key >= NUM_KEYS || linked_key == i) {
+            continue;
+        }
+
+        socd_key_settings[i].resolution_mode =
+            (socd_resolution_e)settings_key_get_socd_resolution(key_settings);
+        socd_key_settings[i].is_socd_enabled = true;
+        socd_key_settings[i].linked_key = linked_key;
+    }
 }
 
 void socd_task() {
@@ -115,7 +129,7 @@ void socd_task() {
             continue;
         }
 
-        if (settings->resolution_mode != MOST_PRESSED_INPUT_WINS) {
+        if (settings->resolution_mode != SETTINGS_SOCD_RESOLUTION_MOST_PRESSED_WINS) {
             continue;
         }
 

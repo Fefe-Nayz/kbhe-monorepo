@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x000B         // Guided zero/max calibration + normalized travel
+#define SETTINGS_VERSION 0x000C         // Rotary encoder block + progress bar styling
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -99,14 +99,26 @@ typedef enum {
   ROTARY_RGB_BEHAVIOR_MAX
 } rotary_rgb_behavior_t;
 
+typedef enum {
+  ROTARY_PROGRESS_STYLE_SOLID = 0,
+  ROTARY_PROGRESS_STYLE_RAINBOW = 1,
+  ROTARY_PROGRESS_STYLE_EFFECT_PALETTE = 2,
+  ROTARY_PROGRESS_STYLE_MAX
+} rotary_progress_style_t;
+
 typedef struct __attribute__((packed)) {
   uint8_t rotation_action;
   uint8_t button_action;
   uint8_t sensitivity;
+  uint8_t step_size;
   uint8_t invert_direction;
   uint8_t rgb_behavior;
   uint8_t rgb_effect_mode;
-  uint8_t rgb_step;
+  uint8_t progress_style;
+  uint8_t progress_effect_mode;
+  uint8_t progress_color_r;
+  uint8_t progress_color_g;
+  uint8_t progress_color_b;
 } settings_rotary_encoder_t;
 
 //--------------------------------------------------------------------+
@@ -154,6 +166,15 @@ typedef struct __attribute__((packed)) {
   uint8_t reserved;  // Padding
 } settings_gamepad_mapping_t;
 
+typedef enum {
+  SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS = 0,
+  SETTINGS_SOCD_RESOLUTION_MOST_PRESSED_WINS = 1,
+  SETTINGS_SOCD_RESOLUTION_MAX
+} settings_socd_resolution_t;
+
+#define SETTINGS_SOCD_PAIR_NONE 0xFFu
+#define SETTINGS_KEY_SOCD_RESOLUTION_MASK 0x03u
+
 /**
  * @brief Key-specific settings
  */
@@ -174,6 +195,37 @@ typedef struct __attribute__((packed)) {
   settings_curve_t curve;        // Per-key analog curve (4 bytes)
   settings_gamepad_mapping_t gamepad_map; // Per-key gamepad mapping (4 bytes)
 } settings_key_t;
+
+static inline settings_socd_resolution_t
+settings_key_get_socd_resolution(const settings_key_t *key) {
+  uint8_t raw = 0u;
+  if (key == 0) {
+    return SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS;
+  }
+
+  raw = key->reserved_bits & SETTINGS_KEY_SOCD_RESOLUTION_MASK;
+  if (raw >= SETTINGS_SOCD_RESOLUTION_MAX) {
+    return SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS;
+  }
+
+  return (settings_socd_resolution_t)raw;
+}
+
+static inline void settings_key_set_socd_resolution(
+    settings_key_t *key, settings_socd_resolution_t resolution) {
+  uint8_t sanitized = (uint8_t)SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS;
+  if (key == 0) {
+    return;
+  }
+
+  if ((uint8_t)resolution < (uint8_t)SETTINGS_SOCD_RESOLUTION_MAX) {
+    sanitized = (uint8_t)resolution;
+  }
+
+  key->reserved_bits =
+      (uint8_t)((key->reserved_bits & (uint8_t)(~SETTINGS_KEY_SOCD_RESOLUTION_MASK)) |
+                (sanitized & SETTINGS_KEY_SOCD_RESOLUTION_MASK));
+}
 
 /**
  * @brief Calibration settings for ADC offset correction
@@ -237,6 +289,7 @@ typedef struct __attribute__((packed)) {
   uint8_t led_effect_color_b;
   uint8_t led_fps_limit; // FPS limit for LED effects (0 = unlimited)
   uint8_t led_effect_params[LED_EFFECT_MAX][LED_EFFECT_PARAM_COUNT];
+  settings_rotary_encoder_t rotary;
 
   // ADC EMA Filter settings
   uint8_t filter_enabled;    // Enable/disable ADC EMA filtering

@@ -13,7 +13,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from kbhe_tool.protocol import HID_KEYCODES, HID_KEYCODE_NAMES, KEY_COUNT
+from kbhe_tool.protocol import (
+    HID_KEYCODES,
+    HID_KEYCODE_NAMES,
+    KEY_COUNT,
+    SOCD_RESOLUTIONS,
+)
 from kbhe_tool.key_layout import key_display_name
 from ..widgets import (
     KeyboardLayoutWidget,
@@ -229,7 +234,7 @@ class KeyboardPage(QWidget):
         bl.addWidget(hint)
 
     def _build_socd_card(self, parent: QVBoxLayout) -> None:
-        card = SectionCard("SOCD", "Pair a key for last-input priority when opposing directions are pressed.")
+        card = SectionCard("SOCD", "Pair a key and choose how simultaneous opposite inputs are resolved.")
         parent.addWidget(card)
         bl = card.body_layout
 
@@ -243,15 +248,30 @@ class KeyboardPage(QWidget):
         self.socd_combo.addItem("None", 255)
         for i in range(KEY_COUNT):
             self.socd_combo.addItem(key_display_name(i), i)
-        self.socd_combo.currentIndexChanged.connect(self._on_changed)
+        self.socd_combo.currentIndexChanged.connect(self._on_socd_changed)
         self._controls.append(self.socd_combo)
         row.addWidget(self.socd_combo, 1)
         bl.addLayout(row)
 
-        hint = QLabel("When both keys are pressed simultaneously, the last input wins.")
-        hint.setObjectName("Muted")
-        hint.setWordWrap(True)
-        bl.addWidget(hint)
+        resolution_row = QHBoxLayout()
+        resolution_row.setSpacing(10)
+        resolution_lbl = QLabel("Resolution")
+        resolution_lbl.setObjectName("Muted")
+        resolution_lbl.setFixedWidth(165)
+        resolution_row.addWidget(resolution_lbl)
+        self.socd_resolution_combo = QComboBox()
+        for label, value in SOCD_RESOLUTIONS.items():
+            self.socd_resolution_combo.addItem(label, value)
+        self.socd_resolution_combo.currentIndexChanged.connect(self._on_socd_changed)
+        self._controls.append(self.socd_resolution_combo)
+        resolution_row.addWidget(self.socd_resolution_combo, 1)
+        bl.addLayout(resolution_row)
+
+        self.socd_hint = QLabel()
+        self.socd_hint.setObjectName("Muted")
+        self.socd_hint.setWordWrap(True)
+        bl.addWidget(self.socd_hint)
+        self._update_socd_hint()
 
     def _build_rapid_card(self, parent: QVBoxLayout) -> None:
         card = SectionCard("Rapid Trigger", "Enables re-activation based on movement distance, not a fixed point.")
@@ -345,6 +365,10 @@ class KeyboardPage(QWidget):
         self._update_rapid_visibility()
         self._on_changed()
 
+    def _on_socd_changed(self, *_) -> None:
+        self._update_socd_hint()
+        self._on_changed()
+
     # ------------------------------------------------------------------
     # Session wiring
     # ------------------------------------------------------------------
@@ -383,6 +407,11 @@ class KeyboardPage(QWidget):
 
     def _build_payload(self) -> dict:
         socd = int(self.socd_combo.currentData()) if self.socd_combo.currentIndex() >= 0 else 255
+        socd_resolution = (
+            int(self.socd_resolution_combo.currentData())
+            if self.socd_resolution_combo.currentIndex() >= 0
+            else 0
+        )
 
         rt_press = self.rt_press_row.get_value()
         rt_release = (
@@ -399,6 +428,7 @@ class KeyboardPage(QWidget):
             "rapid_trigger_press":    rt_press,
             "rapid_trigger_release":  rt_release,
             "socd_pair":              socd,
+            "socd_resolution":        socd_resolution,
             "disable_kb_on_gamepad":  self.disable_kb_check.isChecked(),
         }
 
@@ -425,12 +455,31 @@ class KeyboardPage(QWidget):
             self.socd_combo.setCurrentIndex(
                 max(0, self.socd_combo.findData(255 if socd is None else int(socd)))
             )
+            socd_resolution = int(s.get("socd_resolution", 0))
+            self.socd_resolution_combo.setCurrentIndex(
+                max(0, self.socd_resolution_combo.findData(socd_resolution))
+            )
 
             self.disable_kb_check.setChecked(bool(s.get("disable_kb_on_gamepad", False)))
             self._update_rapid_visibility()
+            self._update_socd_hint()
             self._update_layout_summary(s)
         finally:
             self._loading = False
+
+    def _update_socd_hint(self) -> None:
+        pair = int(self.socd_combo.currentData()) if self.socd_combo.currentIndex() >= 0 else 255
+        resolution = (
+            int(self.socd_resolution_combo.currentData())
+            if self.socd_resolution_combo.currentIndex() >= 0
+            else 0
+        )
+        if pair == 255:
+            self.socd_hint.setText("SOCD is disabled until a paired key is selected.")
+        elif resolution == SOCD_RESOLUTIONS["Most Pressed Wins"]:
+            self.socd_hint.setText("When both paired keys are held, the deeper press wins.")
+        else:
+            self.socd_hint.setText("When both paired keys are held, the last pressed key wins.")
 
     def _update_layout_summary(self, settings: dict | None = None) -> None:
         if settings is None:

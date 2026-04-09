@@ -219,6 +219,21 @@ ROTARY_RGB_BEHAVIOR_NAMES = {
     value: key for key, value in ROTARY_RGB_BEHAVIORS.items()
 }
 
+ROTARY_PROGRESS_STYLES = {
+    "Solid Color": 0,
+    "Rainbow Bar": 1,
+    "Effect Palette": 2,
+}
+ROTARY_PROGRESS_STYLE_NAMES = {
+    value: key for key, value in ROTARY_PROGRESS_STYLES.items()
+}
+
+SOCD_RESOLUTIONS = {
+    "Last Input Wins": 0,
+    "Most Pressed Wins": 1,
+}
+SOCD_RESOLUTION_NAMES = {value: key for key, value in SOCD_RESOLUTIONS.items()}
+
 
 HID_KEYCODES = {
     'NO': 0x0000,

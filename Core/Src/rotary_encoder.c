@@ -12,6 +12,7 @@
 #define ROTARY_QUAD_TIMEOUT_MS 80u
 #define ROTARY_BRIGHTNESS_STEP_UNIT 4u
 #define ROTARY_EFFECT_SPEED_STEP_UNIT 4u
+#define ROTARY_HUE_STEP_UNIT 4u
 
 // Quadrature decode table using state bits [A:B].
 // Delta is accumulated until a full step is reached.
@@ -55,6 +56,52 @@ static inline uint8_t clamp_u8_from_i16(int16_t value) {
     return 255u;
   }
   return (uint8_t)value;
+}
+
+static uint8_t rotary_step_size(const settings_rotary_encoder_t *rotary) {
+  if (rotary == NULL || rotary->step_size == 0u) {
+    return 1u;
+  }
+
+  return rotary->step_size;
+}
+
+static uint8_t rotary_transition_threshold(uint8_t sensitivity) {
+  if (sensitivity >= 13u) {
+    return 1u;
+  }
+  if (sensitivity >= 9u) {
+    return 2u;
+  }
+  if (sensitivity >= 5u) {
+    return 3u;
+  }
+
+  return 4u;
+}
+
+static uint8_t rotary_effect_index(uint8_t effect) {
+  uint8_t effect_count = (uint8_t)(sizeof(ROTARY_CYCLABLE_LED_EFFECTS) /
+                                   sizeof(ROTARY_CYCLABLE_LED_EFFECTS[0]));
+
+  for (uint8_t i = 0; i < effect_count; i++) {
+    if (ROTARY_CYCLABLE_LED_EFFECTS[i] == effect) {
+      return i;
+    }
+  }
+
+  return 0u;
+}
+
+static uint8_t rotary_effect_level(uint8_t effect) {
+  uint8_t effect_count = (uint8_t)(sizeof(ROTARY_CYCLABLE_LED_EFFECTS) /
+                                   sizeof(ROTARY_CYCLABLE_LED_EFFECTS[0]));
+  if (effect_count <= 1u) {
+    return 255u;
+  }
+
+  return (uint8_t)(((uint16_t)rotary_effect_index(effect) * 255u) /
+                   (uint16_t)(effect_count - 1u));
 }
 
 static void rotary_rgb_to_hsv(uint8_t r, uint8_t g, uint8_t b, uint8_t *h,
@@ -190,10 +237,65 @@ static void rotary_adjust_effect_hue(int16_t delta) {
   settings_set_led_effect_color(r, g, b);
 }
 
+static uint8_t rotary_rgb_customizer_overlay_level(
+    const settings_rotary_encoder_t *rotary) {
+  uint8_t r = 0u;
+  uint8_t g = 0u;
+  uint8_t b = 0u;
+  uint8_t h = 0u;
+  uint8_t s = 0u;
+  uint8_t v = 0u;
+
+  if (rotary == NULL) {
+    return 0u;
+  }
+
+  switch ((rotary_rgb_behavior_t)rotary->rgb_behavior) {
+  case ROTARY_RGB_BEHAVIOR_HUE:
+    settings_get_led_effect_color(&r, &g, &b);
+    rotary_rgb_to_hsv(r, g, b, &h, &s, &v);
+    return h;
+  case ROTARY_RGB_BEHAVIOR_BRIGHTNESS:
+    return settings_get_led_brightness();
+  case ROTARY_RGB_BEHAVIOR_EFFECT_SPEED:
+    return settings_get_led_effect_speed();
+  case ROTARY_RGB_BEHAVIOR_EFFECT_CYCLE:
+    return rotary_effect_level(settings_get_led_effect_mode());
+  default:
+    return 0u;
+  }
+}
+
+static void rotary_show_action_overlay(const settings_rotary_encoder_t *rotary) {
+  if (rotary == NULL) {
+    return;
+  }
+
+  switch ((rotary_action_t)rotary->rotation_action) {
+  case ROTARY_ACTION_VOLUME:
+    led_matrix_show_host_volume_overlay();
+    break;
+  case ROTARY_ACTION_LED_BRIGHTNESS:
+    led_matrix_set_progress_overlay(settings_get_led_brightness());
+    break;
+  case ROTARY_ACTION_LED_EFFECT_SPEED:
+    led_matrix_set_progress_overlay(settings_get_led_effect_speed());
+    break;
+  case ROTARY_ACTION_LED_EFFECT_CYCLE:
+    led_matrix_set_progress_overlay(
+        rotary_effect_level(settings_get_led_effect_mode()));
+    break;
+  case ROTARY_ACTION_RGB_CUSTOMIZER:
+    led_matrix_set_progress_overlay(rotary_rgb_customizer_overlay_level(rotary));
+    break;
+  default:
+    break;
+  }
+}
+
 static void rotary_apply_rgb_customizer(
     const settings_rotary_encoder_t *rotary, int8_t direction) {
-  uint16_t amount =
-      (uint16_t)rotary->sensitivity * (uint16_t)rotary->rgb_step;
+  uint8_t amount = rotary_step_size(rotary);
 
   if (rotary->rgb_behavior != ROTARY_RGB_BEHAVIOR_EFFECT_CYCLE &&
       settings_get_led_effect_mode() != rotary->rgb_effect_mode) {
@@ -202,18 +304,21 @@ static void rotary_apply_rgb_customizer(
 
   switch ((rotary_rgb_behavior_t)rotary->rgb_behavior) {
   case ROTARY_RGB_BEHAVIOR_HUE:
-    rotary_adjust_effect_hue((int16_t)direction * (int16_t)amount);
+    rotary_adjust_effect_hue((int16_t)direction *
+                             (int16_t)(amount * ROTARY_HUE_STEP_UNIT));
     break;
   case ROTARY_RGB_BEHAVIOR_BRIGHTNESS:
-    rotary_adjust_led_brightness((int16_t)direction * (int16_t)amount);
+    rotary_adjust_led_brightness((int16_t)direction *
+                                 (int16_t)(amount * ROTARY_BRIGHTNESS_STEP_UNIT));
     break;
   case ROTARY_RGB_BEHAVIOR_EFFECT_SPEED:
-    rotary_adjust_effect_speed((int16_t)direction * (int16_t)amount);
+    rotary_adjust_effect_speed((int16_t)direction *
+                               (int16_t)(amount * ROTARY_EFFECT_SPEED_STEP_UNIT));
     break;
   case ROTARY_RGB_BEHAVIOR_EFFECT_CYCLE: {
     uint8_t next_effect =
         rotary_cycle_led_effect(settings_get_led_effect_mode(), direction,
-                                (uint8_t)((amount > 32u) ? 32u : amount));
+                                amount);
     settings_set_led_effect_mode(next_effect);
     break;
   }
@@ -252,9 +357,14 @@ static void rotary_handle_button_action(void) {
   }
 }
 
-static void emit_rotation_step(int8_t direction) {
+static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
+                               int8_t direction) {
   settings_rotary_encoder_t rotary = {0};
-  settings_get_rotary_encoder(&rotary);
+  if (rotary_cfg == NULL) {
+    settings_get_rotary_encoder(&rotary);
+  } else {
+    rotary = *rotary_cfg;
+  }
 
   if (rotary.invert_direction) {
     direction = (int8_t)-direction;
@@ -262,29 +372,28 @@ static void emit_rotation_step(int8_t direction) {
 
   switch ((rotary_action_t)rotary.rotation_action) {
   case ROTARY_ACTION_VOLUME:
-    for (uint8_t i = 0; i < rotary.sensitivity; i++) {
+    for (uint8_t i = 0; i < rotary_step_size(&rotary); i++) {
       if (direction > 0) {
         (void)consumer_hid_volume_up();
       } else {
         (void)consumer_hid_volume_down();
       }
     }
-    led_matrix_show_host_volume_overlay();
     break;
   case ROTARY_ACTION_LED_BRIGHTNESS:
     rotary_adjust_led_brightness((int16_t)direction *
-                                 (int16_t)(rotary.sensitivity *
+                                 (int16_t)(rotary_step_size(&rotary) *
                                            ROTARY_BRIGHTNESS_STEP_UNIT));
     break;
   case ROTARY_ACTION_LED_EFFECT_SPEED:
     rotary_adjust_effect_speed((int16_t)direction *
-                               (int16_t)(rotary.sensitivity *
+                               (int16_t)(rotary_step_size(&rotary) *
                                          ROTARY_EFFECT_SPEED_STEP_UNIT));
     break;
   case ROTARY_ACTION_LED_EFFECT_CYCLE: {
     uint8_t next_effect =
         rotary_cycle_led_effect(settings_get_led_effect_mode(), direction,
-                                rotary.sensitivity);
+                                rotary_step_size(&rotary));
     (void)settings_set_led_effect_mode(next_effect);
     break;
   }
@@ -294,6 +403,8 @@ static void emit_rotation_step(int8_t direction) {
   default:
     break;
   }
+
+  rotary_show_action_overlay(&rotary);
 }
 
 void rotary_encoder_init(void) {
@@ -307,9 +418,12 @@ void rotary_encoder_init(void) {
 }
 
 void rotary_encoder_task(uint32_t now_ms) {
+  settings_rotary_encoder_t rotary = {0};
+  settings_get_rotary_encoder(&rotary);
   uint8_t ab_state = read_ab_state();
   if (ab_state != last_ab_state) {
     int8_t delta = QUAD_TABLE[(last_ab_state << 2) | ab_state];
+    uint8_t threshold = rotary_transition_threshold(rotary.sensitivity);
 
     if ((uint32_t)(now_ms - last_quad_transition_ms) > ROTARY_QUAD_TIMEOUT_MS) {
       quadrature_accum = 0;
@@ -320,12 +434,12 @@ void rotary_encoder_task(uint32_t now_ms) {
 
     if (delta != 0) {
       quadrature_accum += delta;
-      if (quadrature_accum >= 4) {
+      if (quadrature_accum >= (int8_t)threshold) {
         quadrature_accum = 0;
-        emit_rotation_step(+1);
-      } else if (quadrature_accum <= -4) {
+        emit_rotation_step(&rotary, +1);
+      } else if (quadrature_accum <= -(int8_t)threshold) {
         quadrature_accum = 0;
-        emit_rotation_step(-1);
+        emit_rotation_step(&rotary, -1);
       }
     }
   } else if (quadrature_accum != 0 &&

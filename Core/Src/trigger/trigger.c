@@ -158,6 +158,8 @@ void trigger_reload_settings(void) {
             trigger_apply_key_settings(i, settings);
         }
     }
+
+    socd_load_settings();
 }
 
 uint16_t trigger_get_distance_01mm(uint8_t key) {

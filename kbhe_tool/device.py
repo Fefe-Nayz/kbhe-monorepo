@@ -125,6 +125,14 @@ class KBHEDevice:
     def _chunk_count(total_count, start_index, chunk_size):
         remaining = max(0, int(total_count) - int(start_index))
         return min(chunk_size, remaining)
+
+    @staticmethod
+    def _sanitize_socd_resolution(value):
+        try:
+            value = int(value)
+        except Exception:
+            return 0
+        return value if value in (0, 1) else 0
     
     def get_firmware_version(self):
         """Get firmware version."""
@@ -322,6 +330,12 @@ class KBHEDevice:
         data = [0, key_index]  # 0 = placeholder for status
         resp = self.send_command(Command.GET_KEY_SETTINGS, data)
         if resp and len(resp) >= 13 and resp[1] == Status.OK:
+            has_socd_resolution = len(resp) >= 14
+            socd_resolution = (
+                self._sanitize_socd_resolution(resp[11]) if has_socd_resolution else 0
+            )
+            rapid_idx = 12 if has_socd_resolution else 11
+            disable_idx = 13 if has_socd_resolution else 12
             return {
                 'key_index': resp[2],
                 'hid_keycode': self._unpack_u16(resp, 3),
@@ -331,12 +345,13 @@ class KBHEDevice:
                 'rapid_trigger_press': resp[8] / 100.0,  # 0.01mm to mm
                 'rapid_trigger_release': resp[9] / 100.0,
                 'socd_pair': resp[10] if resp[10] != 255 else None,
-                'rapid_trigger_enabled': bool(resp[11]),
-                'disable_kb_on_gamepad': bool(resp[12])
+                'socd_resolution': socd_resolution,
+                'rapid_trigger_enabled': bool(resp[rapid_idx]),
+                'disable_kb_on_gamepad': bool(resp[disable_idx])
             }
         return None
     
-    def set_key_settings(self, key_index, hid_keycode, actuation_mm, release_mm, rapid_trigger_mm, socd_pair=None):
+    def set_key_settings(self, key_index, hid_keycode, actuation_mm, release_mm, rapid_trigger_mm, socd_pair=None, socd_resolution=0):
         """Set settings for a specific key (legacy format for backwards compatibility)."""
         # Use extended format with defaults
         settings = {
@@ -348,6 +363,7 @@ class KBHEDevice:
             'rapid_trigger_press': rapid_trigger_mm,
             'rapid_trigger_release': rapid_trigger_mm,
             'socd_pair': socd_pair if socd_pair is not None else 255,
+            'socd_resolution': self._sanitize_socd_resolution(socd_resolution),
             'disable_kb_on_gamepad': False
         }
         return self.set_key_settings_extended(key_index, settings)
@@ -365,6 +381,7 @@ class KBHEDevice:
             int(settings.get('rapid_trigger_press', 0.3) * 100),  # mm to 0.01mm
             int(settings.get('rapid_trigger_release', 0.3) * 100),
             settings.get('socd_pair', 255),
+            self._sanitize_socd_resolution(settings.get('socd_resolution', 0)),
             1 if settings.get('rapid_trigger_enabled', False) else 0,
             1 if settings.get('disable_kb_on_gamepad', False) else 0
         ]
@@ -398,6 +415,7 @@ class KBHEDevice:
                     'rapid_trigger_press': resp[offset + 5] / 100.0,
                     'rapid_trigger_release': resp[offset + 6] / 100.0,
                     'socd_pair': resp[offset + 7] if resp[offset + 7] != 255 else None,
+                    'socd_resolution': self._sanitize_socd_resolution((flags >> 2) & 0x03),
                     'rapid_trigger_enabled': bool(flags & 0x01),
                     'disable_kb_on_gamepad': bool(flags & 0x02),
                 })
@@ -435,29 +453,40 @@ class KBHEDevice:
     def get_rotary_encoder_settings(self):
         """Get rotary encoder settings."""
         resp = self.send_command(Command.GET_ROTARY_ENCODER_SETTINGS)
-        if resp and len(resp) >= 9 and resp[1] == Status.OK:
+        if resp and len(resp) >= 14 and resp[1] == Status.OK:
             return {
                 'rotation_action': int(resp[2]),
                 'button_action': int(resp[3]),
                 'sensitivity': int(resp[4]),
-                'invert_direction': bool(resp[5]),
-                'rgb_behavior': int(resp[6]),
-                'rgb_effect_mode': int(resp[7]),
-                'rgb_step': int(resp[8]),
+                'step_size': int(resp[5]),
+                'invert_direction': bool(resp[6]),
+                'rgb_behavior': int(resp[7]),
+                'rgb_effect_mode': int(resp[8]),
+                'progress_style': int(resp[9]),
+                'progress_effect_mode': int(resp[10]),
+                'progress_color': [int(resp[11]), int(resp[12]), int(resp[13])],
             }
         return None
 
     def set_rotary_encoder_settings(self, settings):
         """Set rotary encoder settings."""
+        progress_color = list(settings.get('progress_color', [40, 210, 64]))
+        while len(progress_color) < 3:
+            progress_color.append(0)
         data = [
             0,
             int(settings.get('rotation_action', 0)) & 0xFF,
             int(settings.get('button_action', 0)) & 0xFF,
             int(settings.get('sensitivity', 1)) & 0xFF,
+            int(settings.get('step_size', 1)) & 0xFF,
             1 if settings.get('invert_direction', False) else 0,
             int(settings.get('rgb_behavior', 0)) & 0xFF,
             int(settings.get('rgb_effect_mode', 4)) & 0xFF,
-            int(settings.get('rgb_step', 8)) & 0xFF,
+            int(settings.get('progress_style', 0)) & 0xFF,
+            int(settings.get('progress_effect_mode', 1)) & 0xFF,
+            int(progress_color[0]) & 0xFF,
+            int(progress_color[1]) & 0xFF,
+            int(progress_color[2]) & 0xFF,
         ]
         resp = self.send_command(Command.SET_ROTARY_ENCODER_SETTINGS, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK

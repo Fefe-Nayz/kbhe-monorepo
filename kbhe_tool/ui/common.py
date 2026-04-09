@@ -29,6 +29,8 @@ from ..protocol import (
     HID_KEYCODE_NAMES,
     LEDEffect,
     LED_EFFECT_NAMES,
+    SOCD_RESOLUTIONS,
+    SOCD_RESOLUTION_NAMES,
 )
 
 __all__ = [
@@ -50,6 +52,8 @@ __all__ = [
     'HID_KEYCODE_NAMES',
     'LEDEffect',
     'LED_EFFECT_NAMES',
+    'SOCD_RESOLUTIONS',
+    'SOCD_RESOLUTION_NAMES',
     'GAMEPAD_AXES',
     'GAMEPAD_AXIS_NAMES',
     'GAMEPAD_DIRECTIONS',

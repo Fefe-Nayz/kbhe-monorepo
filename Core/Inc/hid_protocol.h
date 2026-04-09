@@ -193,9 +193,10 @@ typedef struct __attribute__((packed)) {
   uint8_t rapid_trigger_press;      // RT press sensitivity in 0.01mm
   uint8_t rapid_trigger_release;    // RT release sensitivity in 0.01mm
   uint8_t socd_pair;                // SOCD paired key index (255 = none)
+  uint8_t socd_resolution;          // settings_socd_resolution_t
   uint8_t rapid_trigger_enabled; // RT enable flag
   uint8_t disable_kb_on_gamepad; // Disable keyboard when gamepad active
-  uint8_t reserved[51];
+  uint8_t reserved[50];
 } hid_packet_key_settings_t;
 
 /**
@@ -209,7 +210,7 @@ typedef struct __attribute__((packed)) {
   uint8_t rapid_trigger_press;
   uint8_t rapid_trigger_release;
   uint8_t socd_pair;
-  uint8_t flags; // bit0=rapid trigger, bit1=disable kb on gamepad
+  uint8_t flags; // bit0=rapid trigger, bit1=disable kb on gamepad, bit2-3=SOCD resolution
 } hid_key_settings_chunk_entry_t;
 
 /**
@@ -243,11 +244,16 @@ typedef struct __attribute__((packed)) {
   uint8_t rotation_action;
   uint8_t button_action;
   uint8_t sensitivity;
+  uint8_t step_size;
   uint8_t invert_direction;
   uint8_t rgb_behavior;
   uint8_t rgb_effect_mode;
-  uint8_t rgb_step;
-  uint8_t reserved[55];
+  uint8_t progress_style;
+  uint8_t progress_effect_mode;
+  uint8_t progress_color_r;
+  uint8_t progress_color_g;
+  uint8_t progress_color_b;
+  uint8_t reserved[50];
 } hid_packet_rotary_encoder_settings_t;
 
 /**

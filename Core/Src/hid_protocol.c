@@ -29,6 +29,26 @@ static inline void refresh_runtime_calibration(void) {
   calibration_load_settings();
 }
 
+static inline uint8_t hid_sanitize_socd_resolution(uint8_t resolution) {
+  if (resolution >= (uint8_t)SETTINGS_SOCD_RESOLUTION_MAX) {
+    return (uint8_t)SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS;
+  }
+  return resolution;
+}
+
+static inline bool hid_is_valid_socd_pair(uint8_t key_index, uint8_t socd_pair) {
+  return socd_pair == SETTINGS_SOCD_PAIR_NONE ||
+         (socd_pair < NUM_KEYS && socd_pair != key_index);
+}
+
+static inline uint8_t hid_socd_resolution_flags(uint8_t resolution) {
+  return (uint8_t)(hid_sanitize_socd_resolution(resolution) << 2);
+}
+
+static inline uint8_t hid_socd_resolution_from_flags(uint8_t flags) {
+  return hid_sanitize_socd_resolution((uint8_t)((flags >> 2) & 0x03u));
+}
+
 static inline uint8_t hid_key_flags_from_settings(const settings_key_t *key) {
   uint8_t flags = 0;
   if (key->rapid_trigger_enabled) {
@@ -37,6 +57,8 @@ static inline uint8_t hid_key_flags_from_settings(const settings_key_t *key) {
   if (key->disable_kb_on_gamepad) {
     flags |= 0x02;
   }
+  flags |= hid_socd_resolution_flags(
+      (uint8_t)settings_key_get_socd_resolution(key));
   return flags;
 }
 
@@ -217,6 +239,7 @@ static void cmd_get_key_settings(const uint8_t *in, uint8_t *out) {
   resp->rapid_trigger_press = key->rapid_trigger_press;
   resp->rapid_trigger_release = key->rapid_trigger_release;
   resp->socd_pair = key->socd_pair;
+  resp->socd_resolution = (uint8_t)settings_key_get_socd_resolution(key);
   resp->rapid_trigger_enabled = key->rapid_trigger_enabled;
   resp->disable_kb_on_gamepad = key->disable_kb_on_gamepad;
 }
@@ -228,6 +251,11 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_SET_KEY_SETTINGS;
 
   if (req->key_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+  if (!hid_is_valid_socd_pair(req->key_index, req->socd_pair) ||
+      req->socd_resolution >= (uint8_t)SETTINGS_SOCD_RESOLUTION_MAX) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -246,9 +274,10 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   key.rapid_trigger_press = req->rapid_trigger_press;
   key.rapid_trigger_release = req->rapid_trigger_release;
   key.socd_pair = req->socd_pair;
+  settings_key_set_socd_resolution(
+      &key, (settings_socd_resolution_t)req->socd_resolution);
   key.rapid_trigger_enabled = req->rapid_trigger_enabled ? 1 : 0;
   key.disable_kb_on_gamepad = req->disable_kb_on_gamepad ? 1 : 0;
-  key.reserved_bits = 0;
 
   bool success = settings_set_key(req->key_index, &key);
 
@@ -261,6 +290,7 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   resp->rapid_trigger_press = key.rapid_trigger_press;
   resp->rapid_trigger_release = key.rapid_trigger_release;
   resp->socd_pair = key.socd_pair;
+  resp->socd_resolution = (uint8_t)settings_key_get_socd_resolution(&key);
   resp->rapid_trigger_enabled = key.rapid_trigger_enabled;
   resp->disable_kb_on_gamepad = key.disable_kb_on_gamepad;
 }
@@ -321,6 +351,14 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
     }
 
     settings_key_t key = *current_key;
+    uint8_t socd_resolution = hid_socd_resolution_from_flags(req->keys[i].flags);
+
+    if (!hid_is_valid_socd_pair(key_index, req->keys[i].socd_pair)) {
+      success = false;
+      hid_fill_key_settings_chunk_entry(&resp->keys[i], current_key);
+      continue;
+    }
+
     key.hid_keycode = req->keys[i].hid_keycode;
     key.actuation_point_mm = req->keys[i].actuation_point_mm;
     key.release_point_mm = req->keys[i].release_point_mm;
@@ -328,9 +366,10 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
     key.rapid_trigger_press = req->keys[i].rapid_trigger_press;
     key.rapid_trigger_release = req->keys[i].rapid_trigger_release;
     key.socd_pair = req->keys[i].socd_pair;
+    settings_key_set_socd_resolution(
+        &key, (settings_socd_resolution_t)socd_resolution);
     key.rapid_trigger_enabled = (req->keys[i].flags & 0x01u) ? 1 : 0;
     key.disable_kb_on_gamepad = (req->keys[i].flags & 0x02u) ? 1 : 0;
-    key.reserved_bits = 0;
 
     if (!settings_set_key(key_index, &key)) {
       success = false;
@@ -394,10 +433,15 @@ static void cmd_get_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   resp->rotation_action = rotary.rotation_action;
   resp->button_action = rotary.button_action;
   resp->sensitivity = rotary.sensitivity;
+  resp->step_size = rotary.step_size;
   resp->invert_direction = rotary.invert_direction;
   resp->rgb_behavior = rotary.rgb_behavior;
   resp->rgb_effect_mode = rotary.rgb_effect_mode;
-  resp->rgb_step = rotary.rgb_step;
+  resp->progress_style = rotary.progress_style;
+  resp->progress_effect_mode = rotary.progress_effect_mode;
+  resp->progress_color_r = rotary.progress_color_r;
+  resp->progress_color_g = rotary.progress_color_g;
+  resp->progress_color_b = rotary.progress_color_b;
 }
 
 static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
@@ -410,10 +454,13 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
       req->rotation_action >= ROTARY_ACTION_MAX ||
       req->button_action >= ROTARY_BUTTON_ACTION_MAX ||
       req->sensitivity == 0u || req->sensitivity > 16u ||
+      req->step_size == 0u || req->step_size > 64u ||
       req->rgb_behavior >= ROTARY_RGB_BEHAVIOR_MAX ||
       req->rgb_effect_mode >= LED_EFFECT_MAX ||
-      req->rgb_effect_mode == LED_EFFECT_THIRD_PARTY || req->rgb_step == 0u ||
-      req->rgb_step > 32u;
+      req->rgb_effect_mode == LED_EFFECT_THIRD_PARTY ||
+      req->progress_style >= ROTARY_PROGRESS_STYLE_MAX ||
+      req->progress_effect_mode >= LED_EFFECT_MAX ||
+      req->progress_effect_mode == LED_EFFECT_THIRD_PARTY;
 
   resp->command_id = CMD_SET_ROTARY_ENCODER_SETTINGS;
   if (invalid) {
@@ -424,10 +471,15 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   rotary.rotation_action = req->rotation_action;
   rotary.button_action = req->button_action;
   rotary.sensitivity = req->sensitivity;
+  rotary.step_size = req->step_size;
   rotary.invert_direction = req->invert_direction ? 1u : 0u;
   rotary.rgb_behavior = req->rgb_behavior;
   rotary.rgb_effect_mode = req->rgb_effect_mode;
-  rotary.rgb_step = req->rgb_step;
+  rotary.progress_style = req->progress_style;
+  rotary.progress_effect_mode = req->progress_effect_mode;
+  rotary.progress_color_r = req->progress_color_r;
+  rotary.progress_color_g = req->progress_color_g;
+  rotary.progress_color_b = req->progress_color_b;
 
   if (!settings_set_rotary_encoder(&rotary)) {
     resp->status = HID_RESP_ERROR;
@@ -438,10 +490,15 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   resp->rotation_action = rotary.rotation_action;
   resp->button_action = rotary.button_action;
   resp->sensitivity = rotary.sensitivity;
+  resp->step_size = rotary.step_size;
   resp->invert_direction = rotary.invert_direction;
   resp->rgb_behavior = rotary.rgb_behavior;
   resp->rgb_effect_mode = rotary.rgb_effect_mode;
-  resp->rgb_step = rotary.rgb_step;
+  resp->progress_style = rotary.progress_style;
+  resp->progress_effect_mode = rotary.progress_effect_mode;
+  resp->progress_color_r = rotary.progress_color_r;
+  resp->progress_color_g = rotary.progress_color_g;
+  resp->progress_color_b = rotary.progress_color_b;
 }
 
 //--------------------------------------------------------------------+

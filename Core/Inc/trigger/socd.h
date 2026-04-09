@@ -1,10 +1,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef enum {
-    LAST_INPUT_WINS = 0,
-    MOST_PRESSED_INPUT_WINS = 1,
-} socd_resolution_e;
+#include "settings.h"
+
+typedef settings_socd_resolution_t socd_resolution_e;
 
 typedef struct {
     bool is_socd_enabled;

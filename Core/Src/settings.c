@@ -10,6 +10,7 @@
 #include "flash_storage.h"
 #include "layout/layout.h"
 #include "led_matrix.h"
+#include "trigger/socd.h"
 #include "trigger/trigger.h"
 #include "hid/gamepad_hid.h"
 #include <string.h>
@@ -17,7 +18,8 @@
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0104 // v1.4.0
+#define FIRMWARE_VERSION 0x0105 // v1.5.0
+#define SETTINGS_VERSION_PREVIOUS 0x000B
 
 //--------------------------------------------------------------------+
 // Internal Variables
@@ -29,6 +31,58 @@ static settings_t current_settings;
 // Flag indicating if settings have been modified
 static bool settings_dirty = false;
 
+typedef struct __attribute__((packed)) {
+  uint8_t rotation_action;
+  uint8_t button_action;
+  uint8_t sensitivity;
+  uint8_t invert_direction;
+  uint8_t rgb_behavior;
+  uint8_t rgb_effect_mode;
+  uint8_t rgb_step;
+} settings_legacy_rotary_encoder_t;
+
+typedef struct __attribute__((packed)) {
+  // Header
+  uint32_t magic_start;
+  uint16_t version;
+  uint16_t reserved;
+
+  // Global options
+  settings_options_t options;
+  uint8_t padding1[3];
+
+  // Per-key settings
+  settings_key_t keys[NUM_KEYS];
+
+  // Gamepad settings
+  settings_gamepad_t gamepad;
+
+  // Calibration settings
+  settings_calibration_t calibration;
+
+  // LED matrix data
+  settings_led_t led;
+
+  // LED effect settings
+  uint8_t led_effect_mode;
+  uint8_t led_effect_speed;
+  uint8_t led_effect_color_r;
+  uint8_t led_effect_color_g;
+  uint8_t led_effect_color_b;
+  uint8_t led_fps_limit;
+  uint8_t led_effect_params[LED_EFFECT_MAX][LED_EFFECT_PARAM_COUNT];
+
+  // ADC EMA Filter settings
+  uint8_t filter_enabled;
+  uint8_t filter_noise_band;
+  uint8_t filter_alpha_min;
+  uint8_t filter_alpha_max;
+
+  // Footer
+  uint32_t magic_end;
+  uint32_t crc32;
+} settings_v11_t;
+
 static void settings_default_rotary_encoder(settings_rotary_encoder_t *rotary) {
   if (rotary == NULL) {
     return;
@@ -36,21 +90,48 @@ static void settings_default_rotary_encoder(settings_rotary_encoder_t *rotary) {
 
   rotary->rotation_action = ROTARY_ACTION_VOLUME;
   rotary->button_action = ROTARY_BUTTON_ACTION_PLAY_PAUSE;
-  rotary->sensitivity = 1u;
+  rotary->sensitivity = 4u;
+  rotary->step_size = 1u;
   rotary->invert_direction = 0u;
   rotary->rgb_behavior = ROTARY_RGB_BEHAVIOR_HUE;
   rotary->rgb_effect_mode = LED_EFFECT_SOLID;
-  rotary->rgb_step = 8u;
+  rotary->progress_style = ROTARY_PROGRESS_STYLE_SOLID;
+  rotary->progress_effect_mode = LED_EFFECT_RAINBOW;
+  rotary->progress_color_r = 40u;
+  rotary->progress_color_g = 210u;
+  rotary->progress_color_b = 64u;
 }
 
-static void settings_rotary_encoder_store(
-    const settings_rotary_encoder_t *rotary) {
-  if (rotary == NULL) {
+static void settings_rotary_encoder_from_legacy(
+    settings_rotary_encoder_t *rotary,
+    const settings_legacy_rotary_encoder_t *legacy) {
+  bool all_zero = true;
+
+  if (rotary == NULL || legacy == NULL) {
     return;
   }
 
-  memcpy(current_settings.gamepad.reserved, rotary, 4u);
-  memcpy(current_settings.led.reserved, ((const uint8_t *)rotary) + 4u, 3u);
+  settings_default_rotary_encoder(rotary);
+
+  for (uint8_t i = 0; i < sizeof(settings_legacy_rotary_encoder_t); i++) {
+    if (((const uint8_t *)legacy)[i] != 0u) {
+      all_zero = false;
+      break;
+    }
+  }
+
+  if (all_zero) {
+    return;
+  }
+
+  rotary->rotation_action = legacy->rotation_action;
+  rotary->button_action = legacy->button_action;
+  rotary->sensitivity = legacy->sensitivity;
+  rotary->step_size = legacy->rgb_step;
+  rotary->invert_direction = legacy->invert_direction;
+  rotary->rgb_behavior = legacy->rgb_behavior;
+  rotary->rgb_effect_mode = legacy->rgb_effect_mode;
+  rotary->progress_effect_mode = legacy->rgb_effect_mode;
 }
 
 static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) {
@@ -72,6 +153,11 @@ static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) 
   } else if (rotary->sensitivity > 16u) {
     rotary->sensitivity = 16u;
   }
+  if (rotary->step_size == 0u) {
+    rotary->step_size = defaults.step_size;
+  } else if (rotary->step_size > 64u) {
+    rotary->step_size = 64u;
+  }
   rotary->invert_direction = rotary->invert_direction ? 1u : 0u;
   if (rotary->rgb_behavior >= ROTARY_RGB_BEHAVIOR_MAX) {
     rotary->rgb_behavior = defaults.rgb_behavior;
@@ -80,34 +166,21 @@ static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) 
       rotary->rgb_effect_mode == LED_EFFECT_THIRD_PARTY) {
     rotary->rgb_effect_mode = defaults.rgb_effect_mode;
   }
-  if (rotary->rgb_step == 0u) {
-    rotary->rgb_step = defaults.rgb_step;
-  } else if (rotary->rgb_step > 32u) {
-    rotary->rgb_step = 32u;
+  if (rotary->progress_style >= ROTARY_PROGRESS_STYLE_MAX) {
+    rotary->progress_style = defaults.progress_style;
+  }
+  if (rotary->progress_effect_mode >= LED_EFFECT_MAX ||
+      rotary->progress_effect_mode == LED_EFFECT_THIRD_PARTY) {
+    rotary->progress_effect_mode = defaults.progress_effect_mode;
   }
 }
 
 static void settings_rotary_encoder_load(settings_rotary_encoder_t *rotary) {
-  bool all_zero = true;
   if (rotary == NULL) {
     return;
   }
 
-  memcpy(rotary, current_settings.gamepad.reserved, 4u);
-  memcpy(((uint8_t *)rotary) + 4u, current_settings.led.reserved, 3u);
-
-  for (uint8_t i = 0; i < sizeof(settings_rotary_encoder_t); i++) {
-    if (((const uint8_t *)rotary)[i] != 0u) {
-      all_zero = false;
-      break;
-    }
-  }
-
-  if (all_zero) {
-    settings_default_rotary_encoder(rotary);
-    return;
-  }
-
+  memcpy(rotary, &current_settings.rotary, sizeof(*rotary));
   settings_rotary_encoder_sanitize(rotary);
 }
 
@@ -229,6 +302,8 @@ static uint32_t crc32_compute(const void *data, uint32_t len) {
 
 _Static_assert(sizeof(settings_t) <= FLASH_STORAGE_SIZE,
                "settings_t must fit in the flash storage sector");
+_Static_assert(sizeof(settings_v11_t) <= FLASH_STORAGE_SIZE,
+               "settings_v11_t must fit in the flash storage sector");
 
 static settings_key_t settings_default_key(uint8_t key_index) {
   settings_key_t key = {
@@ -247,6 +322,21 @@ static settings_key_t settings_default_key(uint8_t key_index) {
       .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP,
   };
   return key;
+}
+
+static void settings_sanitize_key_config(uint8_t key_index, settings_key_t *key) {
+  settings_socd_resolution_t resolution = SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS;
+
+  if (key == NULL) {
+    return;
+  }
+
+  if (key->socd_pair >= NUM_KEYS || key->socd_pair == key_index) {
+    key->socd_pair = SETTINGS_SOCD_PAIR_NONE;
+  }
+
+  resolution = settings_key_get_socd_resolution(key);
+  settings_key_set_socd_resolution(key, resolution);
 }
 
 static void settings_set_defaults(void) {
@@ -302,14 +392,14 @@ static void settings_set_defaults(void) {
   current_settings.filter_alpha_max = FILTER_DEFAULT_ALPHA_MAX_DENOM;
 
   settings_default_rotary_encoder(&default_rotary);
-  settings_rotary_encoder_store(&default_rotary);
+  current_settings.rotary = default_rotary;
 
   // Footer
   current_settings.magic_end = SETTINGS_MAGIC_END;
   current_settings.crc32 = 0; // Will be computed on save
 }
 
-static bool settings_validate(const settings_t *s) {
+static bool settings_validate_current(const settings_t *s) {
   // Check magic numbers
   if (s->magic_start != SETTINGS_MAGIC_START) {
     return false;
@@ -331,8 +421,71 @@ static bool settings_validate(const settings_t *s) {
   return true;
 }
 
-static bool settings_load_from_flash(void) {
+static bool settings_validate_v11(const settings_v11_t *s) {
+  if (s->magic_start != SETTINGS_MAGIC_START) {
+    return false;
+  }
+  if (s->magic_end != SETTINGS_MAGIC_END) {
+    return false;
+  }
+  if (s->version != SETTINGS_VERSION_PREVIOUS) {
+    return false;
+  }
+
+  if (s->crc32 !=
+      crc32_compute(s, sizeof(settings_v11_t) - sizeof(uint32_t))) {
+    return false;
+  }
+
+  return true;
+}
+
+static void settings_migrate_v11(const settings_v11_t *legacy) {
+  settings_legacy_rotary_encoder_t legacy_rotary = {0};
+
+  memset(&current_settings, 0, sizeof(current_settings));
+  current_settings.magic_start = SETTINGS_MAGIC_START;
+  current_settings.version = SETTINGS_VERSION;
+  current_settings.reserved = legacy->reserved;
+  current_settings.options = legacy->options;
+  memcpy(current_settings.padding1, legacy->padding1,
+         sizeof(current_settings.padding1));
+  memcpy(current_settings.keys, legacy->keys, sizeof(current_settings.keys));
+  current_settings.gamepad = legacy->gamepad;
+  current_settings.calibration = legacy->calibration;
+  current_settings.led = legacy->led;
+  current_settings.led_effect_mode = legacy->led_effect_mode;
+  current_settings.led_effect_speed = legacy->led_effect_speed;
+  current_settings.led_effect_color_r = legacy->led_effect_color_r;
+  current_settings.led_effect_color_g = legacy->led_effect_color_g;
+  current_settings.led_effect_color_b = legacy->led_effect_color_b;
+  current_settings.led_fps_limit = legacy->led_fps_limit;
+  memcpy(current_settings.led_effect_params, legacy->led_effect_params,
+         sizeof(current_settings.led_effect_params));
+  current_settings.filter_enabled = legacy->filter_enabled;
+  current_settings.filter_noise_band = legacy->filter_noise_band;
+  current_settings.filter_alpha_min = legacy->filter_alpha_min;
+  current_settings.filter_alpha_max = legacy->filter_alpha_max;
+
+  memcpy(&legacy_rotary, legacy->gamepad.reserved, 4u);
+  memcpy(((uint8_t *)&legacy_rotary) + 4u, legacy->led.reserved, 3u);
+  settings_rotary_encoder_from_legacy(&current_settings.rotary, &legacy_rotary);
+  settings_rotary_encoder_sanitize(&current_settings.rotary);
+
+  memset(current_settings.gamepad.reserved, 0,
+         sizeof(current_settings.gamepad.reserved));
+  memset(current_settings.led.reserved, 0, sizeof(current_settings.led.reserved));
+  current_settings.magic_end = SETTINGS_MAGIC_END;
+  current_settings.crc32 = 0u;
+}
+
+static bool settings_load_from_flash(bool *migrated) {
   settings_t temp;
+  settings_v11_t legacy;
+
+  if (migrated != NULL) {
+    *migrated = false;
+  }
 
   // Read settings from flash
   if (!flash_storage_read(0, &temp, sizeof(settings_t))) {
@@ -340,12 +493,23 @@ static bool settings_load_from_flash(void) {
   }
 
   // Validate
-  if (!settings_validate(&temp)) {
+  if (settings_validate_current(&temp)) {
+    memcpy(&current_settings, &temp, sizeof(settings_t));
+    return true;
+  }
+
+  if (!flash_storage_read(0, &legacy, sizeof(settings_v11_t))) {
     return false;
   }
 
-  // Copy to RAM
-  memcpy(&current_settings, &temp, sizeof(settings_t));
+  if (!settings_validate_v11(&legacy)) {
+    return false;
+  }
+
+  settings_migrate_v11(&legacy);
+  if (migrated != NULL) {
+    *migrated = true;
+  }
 
   return true;
 }
@@ -356,6 +520,7 @@ static bool settings_load_from_flash(void) {
 
 void settings_init(void) {
   flash_storage_init();
+  bool migrated = false;
 
 #if SETTINGS_FORCE_DEFAULTS
   // Force defaults (useful for development or recovery)
@@ -363,9 +528,11 @@ void settings_init(void) {
   settings_save();
 #else
   // Try to load settings from flash
-  if (!settings_load_from_flash()) {
+  if (!settings_load_from_flash(&migrated)) {
     // Load failed, use defaults and save
     settings_set_defaults();
+    settings_save();
+  } else if (migrated) {
     settings_save();
   }
 #endif
@@ -671,8 +838,9 @@ bool settings_set_key(uint8_t key_index, const settings_key_t *key) {
     return false;
 
   memcpy(&current_settings.keys[key_index], key, sizeof(settings_key_t));
-  current_settings.keys[key_index].reserved_bits = 0;
+  settings_sanitize_key_config(key_index, &current_settings.keys[key_index]);
   trigger_apply_key_settings(key_index, &current_settings.keys[key_index]);
+  socd_load_settings();
   return true; // Don't auto-save
 }
 
@@ -685,15 +853,10 @@ const settings_gamepad_t *settings_get_gamepad(void) {
 }
 
 bool settings_set_gamepad(const settings_gamepad_t *gamepad) {
-  uint8_t rotary_reserved[sizeof(current_settings.gamepad.reserved)];
   if (gamepad == NULL)
     return false;
 
-  memcpy(rotary_reserved, current_settings.gamepad.reserved,
-         sizeof(rotary_reserved));
   memcpy(&current_settings.gamepad, gamepad, sizeof(settings_gamepad_t));
-  memcpy(current_settings.gamepad.reserved, rotary_reserved,
-         sizeof(rotary_reserved));
   return true; // Don't auto-save
 }
 
@@ -709,7 +872,7 @@ bool settings_set_rotary_encoder(const settings_rotary_encoder_t *rotary) {
 
   memcpy(&sanitized, rotary, sizeof(sanitized));
   settings_rotary_encoder_sanitize(&sanitized);
-  settings_rotary_encoder_store(&sanitized);
+  current_settings.rotary = sanitized;
   return true;
 }
 

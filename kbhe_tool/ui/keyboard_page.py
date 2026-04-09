@@ -152,23 +152,41 @@ class KeyboardPageMixin:
         socd_card = create_card(
             body,
             "SOCD",
-            "Set a paired key for last-input priority behavior when opposing directions are pressed together.",
+            "Set a paired key and choose how simultaneous opposite inputs are resolved.",
         )
         socd_row = create_section_row(socd_card)
         ttk.Label(socd_row, text="Paired Key:", width=20).pack(side=tk.LEFT)
         self.key_socd_var = tk.StringVar(value="None")
-        ttk.Combobox(
+        self.key_socd_combo = ttk.Combobox(
             socd_row,
             textvariable=self.key_socd_var,
             values=["None", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5", "Key 6"],
             width=12,
             state="readonly",
-        ).pack(side=tk.LEFT, padx=5)
+        )
+        self.key_socd_combo.pack(side=tk.LEFT, padx=5)
+
+        socd_resolution_row = create_section_row(socd_card)
+        ttk.Label(socd_resolution_row, text="Resolution:", width=20).pack(side=tk.LEFT)
+        self.key_socd_resolution_var = tk.StringVar(value="Last Input Wins")
+        self.key_socd_resolution_combo = ttk.Combobox(
+            socd_resolution_row,
+            textvariable=self.key_socd_resolution_var,
+            values=list(SOCD_RESOLUTIONS.keys()),
+            width=18,
+            state="readonly",
+        )
+        self.key_socd_resolution_combo.pack(side=tk.LEFT, padx=5)
+
+        self.socd_hint_var = tk.StringVar(value="")
         ttk.Label(
             socd_card,
-            text="When both keys are pressed, the last input wins.",
+            textvariable=self.socd_hint_var,
             style="SurfaceSubtle.TLabel",
         ).pack(anchor=tk.W, pady=(6, 0))
+        self.key_socd_combo.bind("<<ComboboxSelected>>", lambda _event: self._update_socd_hint())
+        self.key_socd_resolution_combo.bind("<<ComboboxSelected>>", lambda _event: self._update_socd_hint())
+        self._update_socd_hint()
 
         gamepad_card = create_card(
             body,
@@ -259,6 +277,10 @@ class KeyboardPageMixin:
                 else self.key_rapid_press_var.get()
             ),
             "socd_pair": socd,
+            "socd_resolution": SOCD_RESOLUTIONS.get(
+                self.key_socd_resolution_var.get(),
+                SOCD_RESOLUTIONS["Last Input Wins"],
+            ),
             "disable_kb_on_gamepad": self.key_disable_kb_var.get(),
         }
 
@@ -311,6 +333,13 @@ class KeyboardPageMixin:
                 self.key_socd_var.set(f"Key {int(socd) + 1}")
             else:
                 self.key_socd_var.set("None")
+            self.key_socd_resolution_var.set(
+                SOCD_RESOLUTION_NAMES.get(
+                    int(settings.get("socd_resolution", 0)),
+                    "Last Input Wins",
+                )
+            )
+            self._update_socd_hint()
 
             self.key_disable_kb_var.set(bool(settings.get("disable_kb_on_gamepad", False)))
 
@@ -360,3 +389,17 @@ class KeyboardPageMixin:
                 self._set_keyboard_status("Applied settings to all 6 keys - live only, not saved.", "ok")
         except Exception as exc:
             self._set_keyboard_status(f"Error applying settings to all keys: {exc}", "danger")
+
+    def _update_socd_hint(self):
+        socd = self.key_socd_var.get()
+        resolution = SOCD_RESOLUTIONS.get(
+            self.key_socd_resolution_var.get(),
+            SOCD_RESOLUTIONS["Last Input Wins"],
+        )
+
+        if socd == "None":
+            self.socd_hint_var.set("SOCD is disabled until a paired key is selected.")
+        elif resolution == SOCD_RESOLUTIONS["Most Pressed Wins"]:
+            self.socd_hint_var.set("When both paired keys are held, the deeper press wins.")
+        else:
+            self.socd_hint_var.set("When both paired keys are held, the last pressed key wins.")

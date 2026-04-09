@@ -280,13 +280,24 @@ void led_matrix_effect_tick(uint32_t tick);
 void led_matrix_key_event(uint8_t key_index, bool pressed);
 
 /**
- * @brief Show a temporary volume progress bar on the function row.
+ * @brief Show a temporary progress bar on the function row.
+ * @param level Progress level in the 0-255 range.
+ */
+void led_matrix_set_progress_overlay(uint8_t level);
+
+/**
+ * @brief Clear the temporary progress overlay immediately.
+ */
+void led_matrix_clear_progress_overlay(void);
+
+/**
+ * @brief Backward-compatible wrapper for the host volume progress bar.
  * @param level Volume level in the 0-255 range.
  */
 void led_matrix_set_volume_overlay(uint8_t level);
 
 /**
- * @brief Clear the temporary volume overlay immediately.
+ * @brief Backward-compatible wrapper to clear the host volume overlay.
  */
 void led_matrix_clear_volume_overlay(void);
 
