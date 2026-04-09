@@ -58,6 +58,8 @@ class Command(IntEnum):
     GUIDED_CALIBRATION_START = 0x51
     GUIDED_CALIBRATION_STATUS = 0x52
     GUIDED_CALIBRATION_ABORT = 0x53
+    GET_ROTARY_ENCODER_SETTINGS = 0x54
+    SET_ROTARY_ENCODER_SETTINGS = 0x55
 
     GET_LED_ENABLED = 0x60
     SET_LED_ENABLED = 0x61
@@ -185,6 +187,37 @@ GAMEPAD_BUTTONS = {
     "Home": 17,
 }
 GAMEPAD_BUTTON_NAMES = {value: key for key, value in GAMEPAD_BUTTONS.items()}
+
+
+ROTARY_ACTIONS = {
+    "Volume": 0,
+    "LED Brightness": 1,
+    "Effect Speed": 2,
+    "Effect Cycle": 3,
+    "RGB Customizer": 4,
+}
+ROTARY_ACTION_NAMES = {value: key for key, value in ROTARY_ACTIONS.items()}
+
+ROTARY_BUTTON_ACTIONS = {
+    "Play / Pause": 0,
+    "Mute": 1,
+    "Toggle LEDs": 2,
+    "Next Effect": 3,
+    "Cycle Rotary Action": 4,
+}
+ROTARY_BUTTON_ACTION_NAMES = {
+    value: key for key, value in ROTARY_BUTTON_ACTIONS.items()
+}
+
+ROTARY_RGB_BEHAVIORS = {
+    "Hue": 0,
+    "Brightness": 1,
+    "Effect Speed": 2,
+    "Effect Cycle": 3,
+}
+ROTARY_RGB_BEHAVIOR_NAMES = {
+    value: key for key, value in ROTARY_RGB_BEHAVIORS.items()
+}
 
 
 HID_KEYCODES = {

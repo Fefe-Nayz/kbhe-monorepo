@@ -10,6 +10,7 @@ from .keyboard_page import KeyboardPage
 from .lighting_page import LightingPage
 from .overview_page import OverviewPage
 from .raw_adc_page import RawADCPage
+from .rotary_encoder_page import RotaryEncoderPage
 from .travel_page import TravelPage
 from .workspace_page import WorkspacePage
 
@@ -26,6 +27,7 @@ __all__ = [
     "LightingPage",
     "OverviewPage",
     "RawADCPage",
+    "RotaryEncoderPage",
     "TravelPage",
     "WorkspacePage",
 ]

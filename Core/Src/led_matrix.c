@@ -51,7 +51,9 @@ static bool effect_render_context = false;
 
 // Reactive effect state
 static uint8_t key_wave_energy[NUM_KEYS] = {0};
-static uint8_t key_wave_radius[NUM_KEYS] = {0};
+static uint16_t key_wave_age_ms[NUM_KEYS] = {0};
+static uint8_t key_wave_hue[NUM_KEYS] = {0};
+static uint16_t reactive_frame_delta_ms = 16u;
 
 // Temporary volume overlay shown on the function row.
 static bool volume_overlay_active = false;
@@ -62,7 +64,7 @@ static uint8_t host_volume_level = 0u;
 static uint32_t host_volume_level_refresh_ms = 0u;
 
 static const uint8_t volume_overlay_keys[] = {
-    0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u, 11u, 12u
+    0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u, 11u, 12u, 13u
 };
 #define VOLUME_OVERLAY_KEY_COUNT                                                \
   (sizeof(volume_overlay_keys) / sizeof(volume_overlay_keys[0]))
@@ -166,6 +168,14 @@ static inline uint16_t abs_u16_diff(uint16_t a, uint16_t b) {
   return (a > b) ? (a - b) : (b - a);
 }
 
+static inline uint8_t clamp_u16_to_u8(uint16_t value) {
+  return (uint8_t)((value > 255u) ? 255u : value);
+}
+
+static inline uint8_t scale_u8(uint8_t value, uint8_t scale) {
+  return (uint8_t)(((uint16_t)value * scale) / 255u);
+}
+
 static inline uint8_t scale_coord_to_u8(uint16_t value, uint16_t max_value) {
   if (max_value == 0u) {
     return 0u;
@@ -193,6 +203,21 @@ static inline uint16_t led_layout_distance(uint8_t a, uint8_t b) {
   return major + (minor / 2u);
 }
 
+static inline void add_scaled_rgb(uint16_t *r_acc, uint16_t *g_acc,
+                                  uint16_t *b_acc, uint8_t r, uint8_t g,
+                                  uint8_t b, uint8_t intensity) {
+  *r_acc += ((uint16_t)r * intensity) / 255u;
+  *g_acc += ((uint16_t)g * intensity) / 255u;
+  *b_acc += ((uint16_t)b * intensity) / 255u;
+}
+
+static inline void mix_rgb_towards_white(uint8_t *r, uint8_t *g, uint8_t *b,
+                                         uint8_t amount) {
+  *r = (uint8_t)(*r + (((uint16_t)(255u - *r) * amount) / 255u));
+  *g = (uint8_t)(*g + (((uint16_t)(255u - *g) * amount) / 255u));
+  *b = (uint8_t)(*b + (((uint16_t)(255u - *b) * amount) / 255u));
+}
+
 static inline bool volume_overlay_is_expired(uint32_t now_ms) {
   return volume_overlay_active &&
          ((int32_t)(now_ms - volume_overlay_expire_ms) >= 0);
@@ -200,10 +225,6 @@ static inline bool volume_overlay_is_expired(uint32_t now_ms) {
 
 static void apply_volume_overlay_to_ws2812(uint32_t now_ms) {
   if (!volume_overlay_active) {
-    return;
-  }
-
-  if (current_effect == LED_EFFECT_THIRD_PARTY) {
     return;
   }
 
@@ -235,9 +256,12 @@ static void apply_volume_overlay_to_ws2812(uint32_t now_ms) {
     }
 
     setLedValues(&led_ws2812_handle, physical_index,
-                 apply_brightness(base_r, scale),
-                 apply_brightness(base_g, scale),
-                 apply_brightness(base_b, scale));
+                 apply_brightness(apply_brightness(base_r, scale),
+                                  current_brightness),
+                 apply_brightness(apply_brightness(base_g, scale),
+                                  current_brightness),
+                 apply_brightness(apply_brightness(base_b, scale),
+                                  current_brightness));
   }
 }
 
@@ -338,6 +362,7 @@ static void render_current_effect_frame(void) {
   effect_render_context = false;
 
   if (initialized && display_enabled) {
+    apply_volume_overlay_to_ws2812(HAL_GetTick());
     ws2812_show(&led_ws2812_handle);
   }
 }
@@ -600,6 +625,57 @@ void led_matrix_hsv_to_rgb(uint8_t h, uint8_t s, uint8_t v, uint8_t *r,
   }
 }
 
+static void led_matrix_rgb_to_hsv(uint8_t r, uint8_t g, uint8_t b, uint8_t *h,
+                                  uint8_t *s, uint8_t *v) {
+  uint8_t rgb_min = r;
+  uint8_t rgb_max = r;
+
+  if (g < rgb_min) {
+    rgb_min = g;
+  }
+  if (b < rgb_min) {
+    rgb_min = b;
+  }
+  if (g > rgb_max) {
+    rgb_max = g;
+  }
+  if (b > rgb_max) {
+    rgb_max = b;
+  }
+
+  *v = rgb_max;
+
+  {
+    uint8_t delta = rgb_max - rgb_min;
+    if (rgb_max == 0u || delta == 0u) {
+      *h = 0u;
+      *s = 0u;
+      return;
+    }
+
+    *s = (uint8_t)(((uint16_t)delta * 255u) / rgb_max);
+
+    {
+      int16_t hue;
+      if (rgb_max == r) {
+        hue = (int16_t)(((int16_t)(g - b) * 43) / delta);
+      } else if (rgb_max == g) {
+        hue = (int16_t)(85 + (((int16_t)(b - r) * 43) / delta));
+      } else {
+        hue = (int16_t)(171 + (((int16_t)(r - g) * 43) / delta));
+      }
+
+      if (hue < 0) {
+        hue += 255;
+      } else if (hue > 255) {
+        hue -= 255;
+      }
+
+      *h = (uint8_t)hue;
+    }
+  }
+}
+
 void led_matrix_test_rainbow(uint8_t offset) {
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     uint8_t hue = offset + (uint8_t)(i * 3u);
@@ -620,7 +696,9 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
   last_effect_tick = 0;
   last_render_tick = 0;
   memset(key_wave_energy, 0, sizeof(key_wave_energy));
-  memset(key_wave_radius, 0, sizeof(key_wave_radius));
+  memset(key_wave_age_ms, 0, sizeof(key_wave_age_ms));
+  memset(key_wave_hue, 0, sizeof(key_wave_hue));
+  reactive_frame_delta_ms = 16u;
 
   // Restoring matrix mode must restore the exact saved pattern.
   if (mode == LED_EFFECT_STATIC_MATRIX && previous_effect != LED_EFFECT_STATIC_MATRIX) {
@@ -678,8 +756,18 @@ void led_matrix_key_event(uint8_t key_index, bool pressed) {
   if (key_index >= NUM_KEYS)
     return;
   if (pressed) {
+    uint8_t anchor_hue = 0u;
+    uint8_t ignored_sat = 0u;
+    uint8_t ignored_value = 0u;
+    uint8_t x_bias = scale_coord_to_u8(led_pos_x[key_index], LED_LAYOUT_MAX_X);
+    uint8_t y_bias = scale_coord_to_u8(led_pos_y[key_index], LED_LAYOUT_MAX_Y);
+
+    led_matrix_rgb_to_hsv(effect_color_r, effect_color_g, effect_color_b,
+                          &anchor_hue, &ignored_sat, &ignored_value);
     key_wave_energy[key_index] = 255;
-    key_wave_radius[key_index] = 0;
+    key_wave_age_ms[key_index] = 0u;
+    key_wave_hue[key_index] =
+        (uint8_t)(anchor_hue + (x_bias / 7u) + (y_bias / 11u));
   }
 }
 
@@ -1120,88 +1208,177 @@ static void effect_distance_sensor(void) {
  * @brief Reactive effect - lights up on key presses
  */
 static void effect_reactive(void) {
-  led_matrix_clear();
-  uint8_t decay = (uint8_t)(6u + ((uint16_t)effect_param(0, 36u) * 24u) / 255u);
-  uint8_t spread = (uint8_t)(10u + ((uint16_t)effect_param(1, 96u) * 18u) / 255u);
+  uint16_t accum_r[NUM_KEYS];
+  uint16_t accum_g[NUM_KEYS];
+  uint16_t accum_b[NUM_KEYS];
+  uint8_t core_peak[NUM_KEYS];
+  uint16_t lifetime_ms =
+      (uint16_t)(320u + (((uint32_t)(255u - effect_param(0, 36u)) * 930u) /
+                         255u));
+  uint16_t spread =
+      (uint16_t)(7u + (((uint32_t)effect_param(1, 96u) * 17u) / 255u));
   uint8_t base_glow = effect_param(2, 0u);
   bool white_core = effect_param_flag(3, true);
-  uint8_t gain = (uint8_t)(64u + ((uint16_t)effect_param(4, 192u) * 191u) / 255u);
+  uint16_t gain =
+      (uint16_t)(160u + (((uint32_t)effect_param(4, 192u) * 160u) / 255u));
+  uint16_t ring_width =
+      (uint16_t)(10u + (((uint32_t)effect_param(1, 96u) * 12u) / 255u));
+  uint16_t trail_length =
+      (uint16_t)(28u + (((uint32_t)effect_param(1, 96u) * 52u) / 255u));
+  uint16_t core_radius =
+      (uint16_t)(12u + (((uint32_t)effect_param(1, 96u) * 8u) / 255u));
+  uint16_t wave_speed_q8 =
+      (uint16_t)(84u + (((uint32_t)effect_speed * 172u) / 255u));
+  uint8_t anchor_sat = 0u;
+  uint8_t ignored_hue = 0u;
+  uint8_t ignored_value = 0u;
+  uint8_t ring_sat;
+  uint8_t trail_sat;
+  uint8_t base_r;
+  uint8_t base_g;
+  uint8_t base_b;
+
+  led_matrix_rgb_to_hsv(effect_color_r, effect_color_g, effect_color_b,
+                        &ignored_hue, &anchor_sat, &ignored_value);
+  ring_sat = (anchor_sat > 176u) ? anchor_sat : 176u;
+  trail_sat = (ring_sat > 56u) ? (uint8_t)(ring_sat - 56u) : 120u;
+  base_r = scale_u8(effect_color_r, base_glow);
+  base_g = scale_u8(effect_color_g, base_glow);
+  base_b = scale_u8(effect_color_b, base_glow);
 
   for (uint8_t led_idx = 0; led_idx < NUM_KEYS; led_idx++) {
-    uint16_t intensity = 0;
-
-    for (uint8_t key = 0; key < NUM_KEYS; key++) {
-      uint8_t energy = key_wave_energy[key];
-      if (energy == 0) {
-        continue;
-      }
-
-      uint16_t distance = led_layout_distance(led_idx, key) / spread;
-      uint16_t core =
-          (energy > (uint16_t)(distance * 18u))
-              ? (energy - (uint16_t)(distance * 18u))
-              : 0u;
-
-      int16_t ring_delta =
-          (int16_t)key_wave_radius[key] - (int16_t)(distance * 8u);
-      if (ring_delta < 0) {
-        ring_delta = -ring_delta;
-      }
-
-      uint16_t ring = 0u;
-      if (ring_delta < 12) {
-        ring = ((uint16_t)(12 - ring_delta) * energy) / 12u;
-      }
-
-      uint16_t contribution = (core > ring) ? core : ring;
-      if (contribution > intensity) {
-        intensity = contribution;
-      }
-    }
-
-    intensity = (uint16_t)(((uint32_t)intensity * gain) / 255u);
-    if (intensity > 255u) {
-      intensity = 255u;
-    }
-
-    uint16_t r_u16 =
-        (uint16_t)base_glow +
-        (((uint16_t)effect_color_r * intensity) / 255u);
-    uint16_t g_u16 =
-        (uint16_t)base_glow +
-        (((uint16_t)effect_color_g * intensity) / 255u);
-    uint16_t b_u16 =
-        (uint16_t)base_glow +
-        (((uint16_t)effect_color_b * intensity) / 255u);
-    uint8_t r = (uint8_t)((r_u16 > 255u) ? 255u : r_u16);
-    uint8_t g = (uint8_t)((g_u16 > 255u) ? 255u : g_u16);
-    uint8_t b = (uint8_t)((b_u16 > 255u) ? 255u : b_u16);
-    if (white_core && intensity > 220u) {
-      r = g = b = 255u;
-    }
-    led_matrix_set_pixel_idx(led_idx, r, g, b);
+    accum_r[led_idx] = base_r;
+    accum_g[led_idx] = base_g;
+    accum_b[led_idx] = base_b;
+    core_peak[led_idx] = 0u;
   }
 
-  // Advance and decay all active key waves.
   for (uint8_t key = 0; key < NUM_KEYS; key++) {
-    if (key_wave_energy[key] == 0) {
+    if (key_wave_energy[key] == 0u) {
       continue;
     }
 
-    if (key_wave_energy[key] > decay) {
-      key_wave_energy[key] -= decay;
-    } else {
-      key_wave_energy[key] = 0;
+    uint16_t age_ms = key_wave_age_ms[key];
+    if (age_ms >= lifetime_ms) {
+      key_wave_energy[key] = 0u;
+      key_wave_age_ms[key] = 0u;
+      continue;
     }
 
-    if (key_wave_radius[key] < (255u - 12u)) {
-      key_wave_radius[key] += 12u;
-    } else {
-      key_wave_radius[key] = 255u;
+    uint8_t energy = (uint8_t)(((uint32_t)(lifetime_ms - age_ms) * 255u) /
+                               lifetime_ms);
+    if (energy == 0u) {
+      key_wave_energy[key] = 0u;
+      key_wave_age_ms[key] = 0u;
+      continue;
     }
 
-    if (key_wave_energy[key] == 0) {
-      key_wave_radius[key] = 0u;
+    uint16_t front = (uint16_t)(((uint32_t)age_ms * wave_speed_q8) >> 8);
+    uint8_t ring_hue = (uint8_t)(key_wave_hue[key] + (front / 6u) +
+                                 (uint8_t)(age_ms / 14u));
+    uint8_t trail_hue = (uint8_t)(ring_hue + 18u);
+    uint8_t ring_r = 0u;
+    uint8_t ring_g = 0u;
+    uint8_t ring_b = 0u;
+    uint8_t trail_r = 0u;
+    uint8_t trail_g = 0u;
+    uint8_t trail_b = 0u;
+
+    led_matrix_hsv_to_rgb(ring_hue, ring_sat, 255u, &ring_r, &ring_g, &ring_b);
+    led_matrix_hsv_to_rgb(trail_hue, trail_sat, 255u, &trail_r, &trail_g,
+                          &trail_b);
+
+    for (uint8_t led_idx = 0; led_idx < NUM_KEYS; led_idx++) {
+      uint16_t distance = led_layout_distance(led_idx, key) / spread;
+      uint16_t ring_delta =
+          (front > distance) ? (front - distance) : (distance - front);
+      uint16_t ring_raw = 0u;
+      uint16_t trail_raw = 0u;
+      uint16_t core_raw = 0u;
+
+      if (ring_delta < ring_width) {
+        ring_raw = ((ring_width - ring_delta) * energy) / ring_width;
+      }
+
+      if (front >= distance) {
+        uint16_t trail_depth = front - distance;
+        if (trail_depth < trail_length) {
+          trail_raw = ((trail_length - trail_depth) * energy) / trail_length;
+        }
+      }
+
+      if (distance < core_radius && age_ms < 160u) {
+        uint16_t spatial = ((core_radius - distance) * 255u) / core_radius;
+        uint16_t temporal = 255u - (((uint32_t)age_ms * 255u) / 160u);
+        core_raw = (spatial * temporal) / 255u;
+      }
+
+      {
+        uint8_t ring_value =
+            clamp_u16_to_u8((uint16_t)(((uint32_t)ring_raw * gain) / 255u));
+        uint8_t trail_value = clamp_u16_to_u8(
+            (uint16_t)(((uint32_t)trail_raw * (gain - 48u)) / 255u));
+        uint8_t core_value = clamp_u16_to_u8(
+            (uint16_t)(((uint32_t)core_raw * (gain + 32u)) / 255u));
+
+        if (ring_value > 0u) {
+          add_scaled_rgb(&accum_r[led_idx], &accum_g[led_idx],
+                         &accum_b[led_idx], ring_r, ring_g, ring_b,
+                         ring_value);
+        }
+        if (trail_value > 0u) {
+          add_scaled_rgb(&accum_r[led_idx], &accum_g[led_idx],
+                         &accum_b[led_idx], trail_r, trail_g, trail_b,
+                         trail_value);
+        }
+        if (core_value > 0u) {
+          add_scaled_rgb(&accum_r[led_idx], &accum_g[led_idx],
+                         &accum_b[led_idx], effect_color_r, effect_color_g,
+                         effect_color_b, core_value);
+          if (core_value > core_peak[led_idx]) {
+            core_peak[led_idx] = core_value;
+          }
+        }
+      }
+    }
+  }
+
+  for (uint8_t led_idx = 0; led_idx < NUM_KEYS; led_idx++) {
+    uint8_t r = clamp_u16_to_u8(accum_r[led_idx]);
+    uint8_t g = clamp_u16_to_u8(accum_g[led_idx]);
+    uint8_t b = clamp_u16_to_u8(accum_b[led_idx]);
+
+    if (white_core && core_peak[led_idx] > 96u) {
+      uint8_t white_mix =
+          (uint8_t)(((uint16_t)(core_peak[led_idx] - 96u) * 255u) / 159u);
+      mix_rgb_towards_white(&r, &g, &b, white_mix);
+    }
+
+    led_matrix_set_pixel_idx(led_idx, r, g, b);
+  }
+
+  {
+    uint16_t delta_ms = reactive_frame_delta_ms;
+    if (delta_ms == 0u) {
+      delta_ms = 1u;
+    } else if (delta_ms > 120u) {
+      delta_ms = 120u;
+    }
+
+    for (uint8_t key = 0; key < NUM_KEYS; key++) {
+      if (key_wave_energy[key] == 0u) {
+        continue;
+      }
+
+      {
+        uint32_t next_age = (uint32_t)key_wave_age_ms[key] + delta_ms;
+        if (next_age >= lifetime_ms) {
+          key_wave_energy[key] = 0u;
+          key_wave_age_ms[key] = 0u;
+        } else {
+          key_wave_age_ms[key] = (uint16_t)next_age;
+        }
+      }
     }
   }
 }
@@ -1246,6 +1423,8 @@ void led_matrix_effect_tick(uint32_t tick) {
     }
   }
 
+  reactive_frame_delta_ms =
+      (uint16_t)((render_delta > 65535u) ? 65535u : render_delta);
   last_render_tick = tick;
 
   // Matrix static mode and third-party mode do not run internal animations.

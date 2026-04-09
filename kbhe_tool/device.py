@@ -431,6 +431,36 @@ class KBHEDevice:
         ]
         resp = self.send_command(Command.SET_GAMEPAD_SETTINGS, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def get_rotary_encoder_settings(self):
+        """Get rotary encoder settings."""
+        resp = self.send_command(Command.GET_ROTARY_ENCODER_SETTINGS)
+        if resp and len(resp) >= 9 and resp[1] == Status.OK:
+            return {
+                'rotation_action': int(resp[2]),
+                'button_action': int(resp[3]),
+                'sensitivity': int(resp[4]),
+                'invert_direction': bool(resp[5]),
+                'rgb_behavior': int(resp[6]),
+                'rgb_effect_mode': int(resp[7]),
+                'rgb_step': int(resp[8]),
+            }
+        return None
+
+    def set_rotary_encoder_settings(self, settings):
+        """Set rotary encoder settings."""
+        data = [
+            0,
+            int(settings.get('rotation_action', 0)) & 0xFF,
+            int(settings.get('button_action', 0)) & 0xFF,
+            int(settings.get('sensitivity', 1)) & 0xFF,
+            1 if settings.get('invert_direction', False) else 0,
+            int(settings.get('rgb_behavior', 0)) & 0xFF,
+            int(settings.get('rgb_effect_mode', 4)) & 0xFF,
+            int(settings.get('rgb_step', 8)) & 0xFF,
+        ]
+        resp = self.send_command(Command.SET_ROTARY_ENCODER_SETTINGS, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     # --- Calibration Commands ---
     

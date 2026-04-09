@@ -31,6 +31,7 @@ from .pages import (
     LightingPage,
     OverviewPage,
     RawADCPage,
+    RotaryEncoderPage,
     TravelPage,
 )
 from .session import AppSession
@@ -52,6 +53,7 @@ _NAV: list[tuple[str, str, str | None]] = [
     ("calibration",  "Calibration",      None),
     ("travel",       "Travel",           None),
     ("gamepad",      "Gamepad",          None),
+    ("rotary",       "Rotary Encoder",   None),
     ("lighting",     "Lighting",         "Lighting"),
     ("effects",      "Effects",          None),
     ("device",       "Device",           "Inspect"),
@@ -249,6 +251,7 @@ class KBHEQtMainWindow(QMainWindow):
             "calibration": CalibrationPage(s),
             "travel":      TravelPage(s),
             "gamepad":     GamepadPage(s),
+            "rotary":      RotaryEncoderPage(d, controller=self),
             "lighting":    LightingPage(d, controller=self),
             "effects":     EffectsPage(d, controller=self),
             "device":      DevicePage(d, controller=self),

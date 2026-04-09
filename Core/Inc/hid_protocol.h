@@ -67,6 +67,8 @@ typedef enum {
   CMD_GUIDED_CALIBRATION_START = 0x51,
   CMD_GUIDED_CALIBRATION_STATUS = 0x52,
   CMD_GUIDED_CALIBRATION_ABORT = 0x53,
+  CMD_GET_ROTARY_ENCODER_SETTINGS = 0x54,
+  CMD_SET_ROTARY_ENCODER_SETTINGS = 0x55,
 
   // LED Matrix commands (0x60 - 0x7F)
   CMD_GET_LED_ENABLED = 0x60,
@@ -234,6 +236,19 @@ typedef struct __attribute__((packed)) {
   uint8_t snappy_mode; // 0 or 1
   uint8_t reserved[58];
 } hid_packet_gamepad_settings_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t rotation_action;
+  uint8_t button_action;
+  uint8_t sensitivity;
+  uint8_t invert_direction;
+  uint8_t rgb_behavior;
+  uint8_t rgb_effect_mode;
+  uint8_t rgb_step;
+  uint8_t reserved[55];
+} hid_packet_rotary_encoder_settings_t;
 
 /**
  * @brief Calibration settings packet

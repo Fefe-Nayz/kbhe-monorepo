@@ -381,6 +381,69 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
   resp->snappy_mode = gamepad.snappy_mode;
 }
 
+static void cmd_get_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
+  hid_packet_rotary_encoder_settings_t *resp =
+      (hid_packet_rotary_encoder_settings_t *)out;
+  settings_rotary_encoder_t rotary = {0};
+  (void)in;
+
+  settings_get_rotary_encoder(&rotary);
+
+  resp->command_id = CMD_GET_ROTARY_ENCODER_SETTINGS;
+  resp->status = HID_RESP_OK;
+  resp->rotation_action = rotary.rotation_action;
+  resp->button_action = rotary.button_action;
+  resp->sensitivity = rotary.sensitivity;
+  resp->invert_direction = rotary.invert_direction;
+  resp->rgb_behavior = rotary.rgb_behavior;
+  resp->rgb_effect_mode = rotary.rgb_effect_mode;
+  resp->rgb_step = rotary.rgb_step;
+}
+
+static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
+  const hid_packet_rotary_encoder_settings_t *req =
+      (const hid_packet_rotary_encoder_settings_t *)in;
+  hid_packet_rotary_encoder_settings_t *resp =
+      (hid_packet_rotary_encoder_settings_t *)out;
+  settings_rotary_encoder_t rotary = {0};
+  bool invalid =
+      req->rotation_action >= ROTARY_ACTION_MAX ||
+      req->button_action >= ROTARY_BUTTON_ACTION_MAX ||
+      req->sensitivity == 0u || req->sensitivity > 16u ||
+      req->rgb_behavior >= ROTARY_RGB_BEHAVIOR_MAX ||
+      req->rgb_effect_mode >= LED_EFFECT_MAX ||
+      req->rgb_effect_mode == LED_EFFECT_THIRD_PARTY || req->rgb_step == 0u ||
+      req->rgb_step > 32u;
+
+  resp->command_id = CMD_SET_ROTARY_ENCODER_SETTINGS;
+  if (invalid) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  rotary.rotation_action = req->rotation_action;
+  rotary.button_action = req->button_action;
+  rotary.sensitivity = req->sensitivity;
+  rotary.invert_direction = req->invert_direction ? 1u : 0u;
+  rotary.rgb_behavior = req->rgb_behavior;
+  rotary.rgb_effect_mode = req->rgb_effect_mode;
+  rotary.rgb_step = req->rgb_step;
+
+  if (!settings_set_rotary_encoder(&rotary)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  resp->status = HID_RESP_OK;
+  resp->rotation_action = rotary.rotation_action;
+  resp->button_action = rotary.button_action;
+  resp->sensitivity = rotary.sensitivity;
+  resp->invert_direction = rotary.invert_direction;
+  resp->rgb_behavior = rotary.rgb_behavior;
+  resp->rgb_effect_mode = rotary.rgb_effect_mode;
+  resp->rgb_step = rotary.rgb_step;
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Calibration Commands
 //--------------------------------------------------------------------+
@@ -1583,6 +1646,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_GUIDED_CALIBRATION_ABORT:
     cmd_guided_calibration_abort(in_packet, out_packet);
+    break;
+
+  case CMD_GET_ROTARY_ENCODER_SETTINGS:
+    cmd_get_rotary_encoder_settings(in_packet, out_packet);
+    break;
+
+  case CMD_SET_ROTARY_ENCODER_SETTINGS:
+    cmd_set_rotary_encoder_settings(in_packet, out_packet);
     break;
 
   // LED Matrix commands

@@ -73,6 +73,42 @@ typedef enum {
   GAMEPAD_BUTTON_HOME = 17
 } gamepad_button_t;
 
+typedef enum {
+  ROTARY_ACTION_VOLUME = 0,
+  ROTARY_ACTION_LED_BRIGHTNESS = 1,
+  ROTARY_ACTION_LED_EFFECT_SPEED = 2,
+  ROTARY_ACTION_LED_EFFECT_CYCLE = 3,
+  ROTARY_ACTION_RGB_CUSTOMIZER = 4,
+  ROTARY_ACTION_MAX
+} rotary_action_t;
+
+typedef enum {
+  ROTARY_BUTTON_ACTION_PLAY_PAUSE = 0,
+  ROTARY_BUTTON_ACTION_MUTE = 1,
+  ROTARY_BUTTON_ACTION_TOGGLE_LED = 2,
+  ROTARY_BUTTON_ACTION_CYCLE_LED_EFFECT = 3,
+  ROTARY_BUTTON_ACTION_CYCLE_ROTARY_ACTION = 4,
+  ROTARY_BUTTON_ACTION_MAX
+} rotary_button_action_t;
+
+typedef enum {
+  ROTARY_RGB_BEHAVIOR_HUE = 0,
+  ROTARY_RGB_BEHAVIOR_BRIGHTNESS = 1,
+  ROTARY_RGB_BEHAVIOR_EFFECT_SPEED = 2,
+  ROTARY_RGB_BEHAVIOR_EFFECT_CYCLE = 3,
+  ROTARY_RGB_BEHAVIOR_MAX
+} rotary_rgb_behavior_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t rotation_action;
+  uint8_t button_action;
+  uint8_t sensitivity;
+  uint8_t invert_direction;
+  uint8_t rgb_behavior;
+  uint8_t rgb_effect_mode;
+  uint8_t rgb_step;
+} settings_rotary_encoder_t;
+
 //--------------------------------------------------------------------+
 // Settings Structure
 //--------------------------------------------------------------------+
@@ -595,6 +631,23 @@ const settings_gamepad_t *settings_get_gamepad(void);
  * @return true if successful
  */
 bool settings_set_gamepad(const settings_gamepad_t *gamepad);
+
+//--------------------------------------------------------------------+
+// Rotary Encoder Settings API
+//--------------------------------------------------------------------+
+
+/**
+ * @brief Read the current rotary encoder configuration.
+ * @param rotary Output structure
+ */
+void settings_get_rotary_encoder(settings_rotary_encoder_t *rotary);
+
+/**
+ * @brief Update the rotary encoder configuration live.
+ * @param rotary Input structure
+ * @return true if successful
+ */
+bool settings_set_rotary_encoder(const settings_rotary_encoder_t *rotary);
 
 //--------------------------------------------------------------------+
 // Calibration Settings API

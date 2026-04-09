@@ -17,7 +17,7 @@
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0103 // v1.3.0
+#define FIRMWARE_VERSION 0x0104 // v1.4.0
 
 //--------------------------------------------------------------------+
 // Internal Variables
@@ -28,6 +28,88 @@ static settings_t current_settings;
 
 // Flag indicating if settings have been modified
 static bool settings_dirty = false;
+
+static void settings_default_rotary_encoder(settings_rotary_encoder_t *rotary) {
+  if (rotary == NULL) {
+    return;
+  }
+
+  rotary->rotation_action = ROTARY_ACTION_VOLUME;
+  rotary->button_action = ROTARY_BUTTON_ACTION_PLAY_PAUSE;
+  rotary->sensitivity = 1u;
+  rotary->invert_direction = 0u;
+  rotary->rgb_behavior = ROTARY_RGB_BEHAVIOR_HUE;
+  rotary->rgb_effect_mode = LED_EFFECT_SOLID;
+  rotary->rgb_step = 8u;
+}
+
+static void settings_rotary_encoder_store(
+    const settings_rotary_encoder_t *rotary) {
+  if (rotary == NULL) {
+    return;
+  }
+
+  memcpy(current_settings.gamepad.reserved, rotary, 4u);
+  memcpy(current_settings.led.reserved, ((const uint8_t *)rotary) + 4u, 3u);
+}
+
+static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) {
+  settings_rotary_encoder_t defaults = {0};
+  if (rotary == NULL) {
+    return;
+  }
+
+  settings_default_rotary_encoder(&defaults);
+
+  if (rotary->rotation_action >= ROTARY_ACTION_MAX) {
+    rotary->rotation_action = defaults.rotation_action;
+  }
+  if (rotary->button_action >= ROTARY_BUTTON_ACTION_MAX) {
+    rotary->button_action = defaults.button_action;
+  }
+  if (rotary->sensitivity == 0u) {
+    rotary->sensitivity = defaults.sensitivity;
+  } else if (rotary->sensitivity > 16u) {
+    rotary->sensitivity = 16u;
+  }
+  rotary->invert_direction = rotary->invert_direction ? 1u : 0u;
+  if (rotary->rgb_behavior >= ROTARY_RGB_BEHAVIOR_MAX) {
+    rotary->rgb_behavior = defaults.rgb_behavior;
+  }
+  if (rotary->rgb_effect_mode >= LED_EFFECT_MAX ||
+      rotary->rgb_effect_mode == LED_EFFECT_THIRD_PARTY) {
+    rotary->rgb_effect_mode = defaults.rgb_effect_mode;
+  }
+  if (rotary->rgb_step == 0u) {
+    rotary->rgb_step = defaults.rgb_step;
+  } else if (rotary->rgb_step > 32u) {
+    rotary->rgb_step = 32u;
+  }
+}
+
+static void settings_rotary_encoder_load(settings_rotary_encoder_t *rotary) {
+  bool all_zero = true;
+  if (rotary == NULL) {
+    return;
+  }
+
+  memcpy(rotary, current_settings.gamepad.reserved, 4u);
+  memcpy(((uint8_t *)rotary) + 4u, current_settings.led.reserved, 3u);
+
+  for (uint8_t i = 0; i < sizeof(settings_rotary_encoder_t); i++) {
+    if (((const uint8_t *)rotary)[i] != 0u) {
+      all_zero = false;
+      break;
+    }
+  }
+
+  if (all_zero) {
+    settings_default_rotary_encoder(rotary);
+    return;
+  }
+
+  settings_rotary_encoder_sanitize(rotary);
+}
 
 static void settings_default_effect_params(uint8_t effect_mode,
                                            uint8_t *params) {
@@ -107,11 +189,11 @@ static void settings_default_effect_params(uint8_t effect_mode,
     params[3] = 0u;   // Effect-color mix
     break;
   case LED_EFFECT_REACTIVE:
-    params[0] = 36u;  // Decay
-    params[1] = 96u;  // Spread
+    params[0] = 72u;  // Decay
+    params[1] = 128u; // Spread
     params[2] = 0u;   // Base glow
     params[3] = 1u;   // White core
-    params[4] = 192u; // Gain
+    params[4] = 224u; // Gain
     break;
   case LED_EFFECT_DISTANCE_SENSOR:
     params[0] = 32u;  // Brightness floor
@@ -169,6 +251,7 @@ static settings_key_t settings_default_key(uint8_t key_index) {
 
 static void settings_set_defaults(void) {
   memset(&current_settings, 0, sizeof(settings_t));
+  settings_rotary_encoder_t default_rotary = {0};
 
   // Header
   current_settings.magic_start = SETTINGS_MAGIC_START;
@@ -217,6 +300,9 @@ static void settings_set_defaults(void) {
   current_settings.filter_noise_band = FILTER_DEFAULT_NOISE_BAND;
   current_settings.filter_alpha_min = FILTER_DEFAULT_ALPHA_MIN_DENOM;
   current_settings.filter_alpha_max = FILTER_DEFAULT_ALPHA_MAX_DENOM;
+
+  settings_default_rotary_encoder(&default_rotary);
+  settings_rotary_encoder_store(&default_rotary);
 
   // Footer
   current_settings.magic_end = SETTINGS_MAGIC_END;
@@ -599,11 +685,32 @@ const settings_gamepad_t *settings_get_gamepad(void) {
 }
 
 bool settings_set_gamepad(const settings_gamepad_t *gamepad) {
+  uint8_t rotary_reserved[sizeof(current_settings.gamepad.reserved)];
   if (gamepad == NULL)
     return false;
 
+  memcpy(rotary_reserved, current_settings.gamepad.reserved,
+         sizeof(rotary_reserved));
   memcpy(&current_settings.gamepad, gamepad, sizeof(settings_gamepad_t));
+  memcpy(current_settings.gamepad.reserved, rotary_reserved,
+         sizeof(rotary_reserved));
   return true; // Don't auto-save
+}
+
+void settings_get_rotary_encoder(settings_rotary_encoder_t *rotary) {
+  settings_rotary_encoder_load(rotary);
+}
+
+bool settings_set_rotary_encoder(const settings_rotary_encoder_t *rotary) {
+  settings_rotary_encoder_t sanitized = {0};
+  if (rotary == NULL) {
+    return false;
+  }
+
+  memcpy(&sanitized, rotary, sizeof(sanitized));
+  settings_rotary_encoder_sanitize(&sanitized);
+  settings_rotary_encoder_store(&sanitized);
+  return true;
 }
 
 //--------------------------------------------------------------------+

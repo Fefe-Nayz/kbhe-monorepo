@@ -51,7 +51,7 @@ class EffectsPageMixin:
         10: ("Breathing Rainbow", "Breathing animation that cycles through rainbow colors."),
         11: ("Spiral", "Spinning spiral motion pattern."),
         12: ("Color Cycle", "Continuous cycling through the selected effect color palette."),
-        13: ("Reactive (Key Press)", "Responds to key presses using the selected effect color."),
+        13: ("Reactive (Key Press)", "Launches expanding color ripples from each key press."),
         14: ("Third-Party Live", "Matrix is read-only in this app; live frame is displayed from device state."),
         15: ("Sensor Distance", "Each key LED color changes live according to its sensor travel distance."),
     }

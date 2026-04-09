@@ -51,6 +51,14 @@ bool consumer_hid_volume_down(void) {
   return consumer_hid_send_usage(HID_USAGE_CONSUMER_VOLUME_DECREMENT);
 }
 
+bool consumer_hid_mute(void) {
+#ifdef HID_USAGE_CONSUMER_MUTE
+  return consumer_hid_send_usage(HID_USAGE_CONSUMER_MUTE);
+#else
+  return consumer_hid_send_usage(0x00E2u);
+#endif
+}
+
 bool consumer_hid_play_pause(void) {
   return consumer_hid_send_usage(HID_USAGE_CONSUMER_PLAY_PAUSE);
 }
