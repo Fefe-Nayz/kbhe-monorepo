@@ -1,4 +1,3 @@
-"use client"
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { HexColorPicker, HexColorInput } from "react-colorful"
@@ -16,7 +15,7 @@ export default function ColorPickerCard() {
   const rgb = hexToRgb(color)
 
   return (
-    <Card className="bg-blue-600 w-68 rounded-2xl border border-border shadow-sm shrink-0 pb-0 pt-0">
+    <Card className="bg-blue-600 w-68 h-auto rounded-2xl border border-border shadow-sm shrink-0 pb-0 pt-0">
       {/*<CardHeader className="pb-1 bg-black" />*/}
 
       <CardContent className="p-2 space-y-1 bg-red-600 h-fit">
