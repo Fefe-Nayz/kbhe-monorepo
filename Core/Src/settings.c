@@ -31,6 +31,9 @@ static settings_t current_settings;
 // Flag indicating if settings have been modified
 static bool settings_dirty = false;
 
+static uint8_t led_effect_restore_mode = LED_EFFECT_STATIC_MATRIX;
+static bool led_effect_restore_valid = false;
+
 typedef struct __attribute__((packed)) {
   uint8_t rotation_action;
   uint8_t button_action;
@@ -182,6 +185,11 @@ static void settings_rotary_encoder_load(settings_rotary_encoder_t *rotary) {
 
   memcpy(rotary, &current_settings.rotary, sizeof(*rotary));
   settings_rotary_encoder_sanitize(rotary);
+}
+
+static void settings_reset_led_effect_restore_state(void) {
+  led_effect_restore_mode = current_settings.led_effect_mode;
+  led_effect_restore_valid = false;
 }
 
 static void settings_default_effect_params(uint8_t effect_mode,
@@ -393,6 +401,7 @@ static void settings_set_defaults(void) {
 
   settings_default_rotary_encoder(&default_rotary);
   current_settings.rotary = default_rotary;
+  settings_reset_led_effect_restore_state();
 
   // Footer
   current_settings.magic_end = SETTINGS_MAGIC_END;
@@ -471,6 +480,7 @@ static void settings_migrate_v11(const settings_v11_t *legacy) {
   memcpy(((uint8_t *)&legacy_rotary) + 4u, legacy->led.reserved, 3u);
   settings_rotary_encoder_from_legacy(&current_settings.rotary, &legacy_rotary);
   settings_rotary_encoder_sanitize(&current_settings.rotary);
+  settings_reset_led_effect_restore_state();
 
   memset(current_settings.gamepad.reserved, 0,
          sizeof(current_settings.gamepad.reserved));
@@ -563,6 +573,7 @@ void settings_init(void) {
 
   // Apply per-key runtime settings after the settings blob is loaded.
   trigger_reload_settings();
+  settings_reset_led_effect_restore_state();
 
   settings_dirty = false;
 }
@@ -721,6 +732,17 @@ bool settings_set_led_effect_mode(uint8_t mode) {
   if (mode >= LED_EFFECT_MAX) {
     return false;
   }
+
+  if (mode == LED_EFFECT_THIRD_PARTY) {
+    if (current_settings.led_effect_mode != LED_EFFECT_THIRD_PARTY) {
+      led_effect_restore_mode = current_settings.led_effect_mode;
+    }
+    led_effect_restore_valid = true;
+  } else {
+    led_effect_restore_mode = mode;
+    led_effect_restore_valid = false;
+  }
+
   current_settings.led_effect_mode = mode;
   led_matrix_set_effect((led_effect_mode_t)mode);
   led_matrix_set_effect_params(current_settings.led_effect_params[mode]);
@@ -785,6 +807,14 @@ bool settings_set_led_effect_params(uint8_t effect_mode, const uint8_t *params) 
   }
 
   return true;
+}
+
+bool settings_restore_led_effect_before_third_party(void) {
+  if (!led_effect_restore_valid) {
+    return false;
+  }
+
+  return settings_set_led_effect_mode(led_effect_restore_mode);
 }
 
 //--------------------------------------------------------------------+

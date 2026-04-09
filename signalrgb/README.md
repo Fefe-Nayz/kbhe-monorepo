@@ -16,6 +16,7 @@ The plugin expects firmware with:
 - `CMD_SET_LED_ENABLED (0x61)`
 - `CMD_SET_LED_EFFECT (0x6F)`
 - `CMD_SET_LED_ALL_CHUNK (0x6A)`
+- `CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY (0x7B)`
 - Effect mode values:
 - `0`: Matrix (software/static)
 - `14`: Third-party live mode
@@ -32,7 +33,8 @@ The plugin expects firmware with:
 
 - On Initialize: plugin enables third-party mode (`effect=14`).
 - On Render: plugin sends a full 64-LED frame using 4 chunk packets.
-- On Shutdown: plugin returns device to Matrix software mode (`effect=0`).
+- On Shutdown: plugin asks the firmware to restore the RGB effect that was
+  active before SignalRGB enabled third-party live mode.
 
 ## 6-Key Mapping
 

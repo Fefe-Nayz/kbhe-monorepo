@@ -98,6 +98,7 @@ typedef enum {
   CMD_SET_LED_EFFECT_PARAMS = 0x78, // Set persisted params for one effect
   CMD_SET_LED_VOLUME_OVERLAY = 0x79, // Host-driven volume overlay
   CMD_CLEAR_LED_VOLUME_OVERLAY = 0x7A, // Clear host-driven volume overlay
+  CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x7B, // Restore effect active before third-party live override
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state

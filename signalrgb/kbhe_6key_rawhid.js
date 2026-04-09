@@ -8,6 +8,7 @@
 const CMD_SET_LED_ENABLED = 0x61;
 const CMD_SET_LED_EFFECT = 0x6F;
 const CMD_SET_LED_ALL_CHUNK = 0x6A;
+const CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x7B;
 
 const LED_EFFECT_MATRIX_SOFTWARE = 0;
 const LED_EFFECT_THIRD_PARTY = 14;
@@ -97,8 +98,8 @@ function setThirdPartyMode() {
   sendCommand(CMD_SET_LED_EFFECT, [LED_EFFECT_THIRD_PARTY]);
 }
 
-function setMatrixSoftwareMode() {
-  sendCommand(CMD_SET_LED_EFFECT, [LED_EFFECT_MATRIX_SOFTWARE]);
+function restoreEffectBeforeThirdParty() {
+  sendCommand(CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY, []);
 }
 
 function collectFrameFromCanvas() {
@@ -142,5 +143,5 @@ export function Render() {
 }
 
 export function Shutdown(_SystemSuspending) {
-  setMatrixSoftwareMode();
+  restoreEffectBeforeThirdParty();
 }

@@ -621,6 +621,13 @@ void settings_get_led_effect_params(uint8_t effect_mode, uint8_t *params);
  */
 bool settings_set_led_effect_params(uint8_t effect_mode, const uint8_t *params);
 
+/**
+ * @brief Restore the non-third-party LED effect that was active before a live
+ * third-party override took over.
+ * @return true if a previous effect was available and restored
+ */
+bool settings_restore_led_effect_before_third_party(void);
+
 //--------------------------------------------------------------------+
 // ADC Filter Settings API
 //--------------------------------------------------------------------+

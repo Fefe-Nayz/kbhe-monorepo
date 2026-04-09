@@ -116,6 +116,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='KBHE Raw HID configuration tool')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--gui', action='store_true', help='Launch the PySide6 configurator')
+    group.add_argument('--demo', action='store_true', help='Launch the PySide6 configurator with a fake demo device')
     group.add_argument('--flash', metavar='FIRMWARE_BIN', help='Flash a firmware .bin over HS HID updater')
     parser.add_argument('--fw-version', type=lambda value: int(value, 0), default=None)
     parser.add_argument('--timeout', type=float, default=5.0)
@@ -129,6 +130,14 @@ def main():
 
     if args.retries < 1:
         print('❌ Error: --retries must be at least 1')
+        return 1
+
+    from .demo import DemoDevice
+
+    if args.demo:
+        if HAS_GUI:
+            return launch_gui(DemoDevice())
+        print('❌ GUI not available (PySide6 not installed)')
         return 1
 
     try:
@@ -168,7 +177,7 @@ def main():
             if HAS_GUI:
                 launch_gui(device)
             else:
-                print('❌ GUI not available')
+                print('❌ GUI not available (PySide6 not installed)')
                 interactive_menu(device)
         else:
             interactive_menu(device)

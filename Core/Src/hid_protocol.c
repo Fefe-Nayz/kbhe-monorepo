@@ -1245,6 +1245,18 @@ static void cmd_clear_led_volume_overlay(const uint8_t *in, uint8_t *out) {
   resp->status_or_len = HID_RESP_OK;
 }
 
+static void cmd_restore_led_effect_before_third_party(const uint8_t *in,
+                                                      uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY;
+  resp->status_or_len = settings_restore_led_effect_before_third_party()
+                            ? HID_RESP_OK
+                            : HID_RESP_ERROR;
+  resp->payload[0] = settings_get_led_effect_mode();
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Filter Commands
 //--------------------------------------------------------------------+
@@ -1816,6 +1828,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_CLEAR_LED_VOLUME_OVERLAY:
     cmd_clear_led_volume_overlay(in_packet, out_packet);
+    break;
+
+  case CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY:
+    cmd_restore_led_effect_before_third_party(in_packet, out_packet);
     break;
 
   // Filter commands
