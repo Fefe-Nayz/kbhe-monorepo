@@ -6,6 +6,7 @@
 #include "settings.h"
 #include "analog/calibration.h"
 #include "analog/filter.h"
+#include "analog/lut.h"
 #include "flash_storage.h"
 #include "layout/layout.h"
 #include "led_matrix.h"
@@ -192,6 +193,8 @@ static void settings_set_defaults(void) {
   current_settings.calibration.lut_zero_value = LUT_ZERO_VALUE;
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
     current_settings.calibration.key_zero_values[i] = LUT_ZERO_VALUE;
+    current_settings.calibration.key_max_values[i] =
+        (int16_t)(LUT_BASE_VOLTAGE + LUT_SIZE - 1);
   }
 
   // Default LED settings
@@ -303,6 +306,7 @@ void settings_init(void) {
                     current_settings.filter_alpha_min,
                     current_settings.filter_alpha_max);
   filter_set_enabled(current_settings.filter_enabled != 0);
+  calibration_load_settings();
 
   // Apply per-key runtime settings after the settings blob is loaded.
   trigger_reload_settings();
@@ -369,6 +373,7 @@ bool settings_reset(void) {
                     current_settings.filter_alpha_min,
                     current_settings.filter_alpha_max);
   filter_set_enabled(current_settings.filter_enabled != 0);
+  calibration_load_settings();
   trigger_reload_settings();
   return settings_save();
 }
@@ -477,6 +482,10 @@ bool settings_set_led_effect_speed(uint8_t speed) {
   current_settings.led_effect_speed = speed;
   led_matrix_set_effect_speed(speed);
   return true; // Don't auto-save
+}
+
+uint8_t settings_get_led_fps_limit(void) {
+  return current_settings.led_fps_limit;
 }
 
 void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b) {
@@ -611,6 +620,7 @@ bool settings_set_calibration(const settings_calibration_t *calibration) {
 
   memcpy(&current_settings.calibration, calibration,
          sizeof(settings_calibration_t));
+  calibration_load_settings();
   return true; // Don't auto-save
 }
 
@@ -619,6 +629,17 @@ bool settings_set_key_calibration(uint8_t key_index, int16_t zero_value) {
     return false;
 
   current_settings.calibration.key_zero_values[key_index] = zero_value;
+  calibration_load_settings();
+  return true; // Don't auto-save
+}
+
+bool settings_set_key_calibration_max(uint8_t key_index, int16_t max_value) {
+  if (key_index >= NUM_KEYS) {
+    return false;
+  }
+
+  current_settings.calibration.key_max_values[key_index] = max_value;
+  calibration_load_settings();
   return true; // Don't auto-save
 }
 

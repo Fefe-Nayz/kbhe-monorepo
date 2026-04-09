@@ -125,6 +125,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/keyboard_hid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/keyboard_nkro_hid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/gamepad_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/consumer_hid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/raw_hid.c
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
@@ -152,6 +153,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Src/color_values.c
     # LED Indicator (PE0)
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/led_indicator.c
+    # Rotary encoder support
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/rotary_encoder.c
 )
 
 # Add include paths

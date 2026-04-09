@@ -46,6 +46,7 @@
 #include "usb_descriptors.h"
 #include "hid/keyboard_hid.h"
 #include "hid/keyboard_nkro_hid.h"
+#include "rotary_encoder.h"
 #include "ws2812.h" // Include WS2812 header
 #include <stdbool.h>
 #include <stdint.h>
@@ -476,6 +477,8 @@ int main(void) {
    */
   settings_init();
 
+  rotary_encoder_init();
+
   DWT_CycleCounter_Init();
 
   multiplexer_select_mux_channel(0U);
@@ -511,6 +514,8 @@ int main(void) {
       uint32_t step_start_cycles = DWT->CYCCNT;
       analog_task();
       task_analog_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+
+      calibration_guided_on_scan(HAL_GetTick());
       
       step_start_cycles = DWT->CYCCNT;
       trigger_task();
@@ -548,8 +553,11 @@ int main(void) {
     // quickly on the 82-key board that gating animation updates behind the
     // "no scan complete" branch effectively starves LED effects.
     uint32_t led_start_cycles = DWT->CYCCNT;
-    led_matrix_effect_tick(HAL_GetTick());
-    led_indicator_tick(HAL_GetTick());
+    uint32_t now_ms = HAL_GetTick();
+    calibration_guided_tick(now_ms);
+    rotary_encoder_task(now_ms);
+    led_matrix_effect_tick(now_ms);
+    led_indicator_tick(now_ms);
     task_led_us = cycles_to_us(DWT->CYCCNT - led_start_cycles);
 
     if (processed_scan) {
@@ -961,6 +969,13 @@ static void MX_GPIO_Init(void) {
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : ENCODER_SW_Pin ENCODER_WAVE_1_Pin ENCODER_WAVE_2_Pin */
+  GPIO_InitStruct.Pin = ENCODER_SW_Pin | ENCODER_WAVE_1_Pin | ENCODER_WAVE_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

@@ -279,6 +279,43 @@ void led_matrix_effect_tick(uint32_t tick);
  */
 void led_matrix_key_event(uint8_t key_index, bool pressed);
 
+/**
+ * @brief Show a temporary volume progress bar on the function row.
+ * @param level Volume level in the 0-255 range.
+ */
+void led_matrix_set_volume_overlay(uint8_t level);
+
+/**
+ * @brief Clear the temporary volume overlay immediately.
+ */
+void led_matrix_clear_volume_overlay(void);
+
+/**
+ * @brief Cache the last host-reported PC volume level.
+ * The cached value is only displayed when explicitly triggered,
+ * typically by the rotary encoder.
+ */
+void led_matrix_set_host_volume_level(uint8_t level);
+
+/**
+ * @brief Clear the cached host volume level.
+ */
+void led_matrix_clear_host_volume_level(void);
+
+/**
+ * @brief Display the cached host volume level as a temporary overlay.
+ * If the host has not refreshed a recent volume value, nothing is shown.
+ */
+void led_matrix_show_host_volume_overlay(void);
+
+/**
+ * @brief Replace the live runtime frame in one shot.
+ * Useful for third-party/live rendering paths that must avoid
+ * intermediate per-pixel WS2812 updates.
+ * @param data RGB triplets in logical key order.
+ */
+void led_matrix_set_live_frame(const uint8_t *data);
+
 #ifdef __cplusplus
 }
 #endif

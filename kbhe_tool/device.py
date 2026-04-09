@@ -257,6 +257,17 @@ class KBHEDevice:
         """Show rainbow test pattern."""
         resp = self.send_command(Command.LED_TEST_RAINBOW)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def led_set_volume_overlay(self, level):
+        """Push a host-driven volume overlay level (0-255)."""
+        data = [0, min(255, max(0, int(level)))]
+        resp = self.send_command(Command.SET_LED_VOLUME_OVERLAY, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def led_clear_volume_overlay(self):
+        """Clear the host-driven volume overlay."""
+        resp = self.send_command(Command.CLEAR_LED_VOLUME_OVERLAY)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def led_upload_all(self, pixels):
         """Upload the full persisted LED frame in HID chunks."""
@@ -426,6 +437,7 @@ class KBHEDevice:
     def get_calibration(self):
         """Get calibration settings."""
         key_zeros = [0] * KEY_COUNT
+        key_maxs = [0] * KEY_COUNT
         lut_zero = None
         next_index = 0
 
@@ -449,18 +461,43 @@ class KBHEDevice:
 
             next_index += value_count
 
+        next_index = 0
+        while next_index < KEY_COUNT:
+            resp = self.send_command(Command.GET_CALIBRATION_MAX, [0, next_index], timeout_ms=150)
+            if not resp or len(resp) < 6 or resp[1] != Status.OK:
+                return None
+
+            start_index = int(resp[2])
+            value_count = int(resp[3])
+            if start_index != next_index or value_count <= 0 or value_count > CALIBRATION_VALUES_PER_CHUNK:
+                return None
+
+            for i in range(value_count):
+                base = 6 + i * 2
+                key_maxs[start_index + i] = struct.unpack('<h', bytes(resp[base:base + 2]))[0]
+
+            next_index += value_count
+
         return {
             'lut_zero_value': lut_zero if lut_zero is not None else 0,
             'key_zero_values': key_zeros,
+            'key_max_values': key_maxs,
         }
     
-    def set_calibration(self, lut_zero, key_zeros):
+    def set_calibration(self, lut_zero, key_zeros, key_maxs=None):
         """Set calibration settings."""
         key_zeros = list(key_zeros or [])
         if len(key_zeros) < KEY_COUNT:
             key_zeros = key_zeros + [int(lut_zero)] * (KEY_COUNT - len(key_zeros))
         else:
             key_zeros = key_zeros[:KEY_COUNT]
+
+        key_maxs = list(key_maxs or [])
+        if len(key_maxs) < KEY_COUNT:
+            default_max = 4095
+            key_maxs = key_maxs + [default_max] * (KEY_COUNT - len(key_maxs))
+        else:
+            key_maxs = key_maxs[:KEY_COUNT]
 
         next_index = 0
         while next_index < KEY_COUNT:
@@ -473,6 +510,18 @@ class KBHEDevice:
             if not resp or len(resp) < 4 or resp[1] != Status.OK:
                 return False
             next_index += count
+
+        next_index = 0
+        while next_index < KEY_COUNT:
+            count = self._chunk_count(KEY_COUNT, next_index, CALIBRATION_VALUES_PER_CHUNK)
+            data = [0, next_index, count]
+            data.extend(struct.pack('<h', int(lut_zero)))
+            for value in key_maxs[next_index:next_index + count]:
+                data.extend(struct.pack('<h', int(value)))
+            resp = self.send_command(Command.SET_CALIBRATION_MAX, data, timeout_ms=300)
+            if not resp or len(resp) < 4 or resp[1] != Status.OK:
+                return False
+            next_index += count
         return True
     
     def auto_calibrate(self, key_index=0xFF):
@@ -482,6 +531,36 @@ class KBHEDevice:
         if not resp or len(resp) < 2 or resp[1] != Status.OK:
             return None
         return self.get_calibration()
+
+    def guided_calibration_start(self):
+        resp = self.send_command(Command.GUIDED_CALIBRATION_START, timeout_ms=500)
+        if not resp or len(resp) < 10 or resp[1] != Status.OK:
+            return None
+        return self.guided_calibration_status()
+
+    def guided_calibration_status(self):
+        resp = self.send_command(Command.GUIDED_CALIBRATION_STATUS, timeout_ms=150)
+        if not resp or len(resp) < 10 or resp[1] != Status.OK:
+            return None
+        return {
+            'active': bool(resp[2]),
+            'phase': int(resp[3]),
+            'current_key': int(resp[4]),
+            'progress_percent': int(resp[5]),
+            'sample_count': self._unpack_u16(resp, 6),
+            'phase_elapsed_ms': self._unpack_u16(resp, 8),
+        }
+
+    def guided_calibration_abort(self):
+        resp = self.send_command(Command.GUIDED_CALIBRATION_ABORT, timeout_ms=300)
+        if not resp or len(resp) < 2 or resp[1] != Status.OK:
+            return None
+        return {
+            'active': bool(resp[2]) if len(resp) >= 3 else False,
+            'phase': int(resp[3]) if len(resp) >= 4 else 0,
+            'current_key': int(resp[4]) if len(resp) >= 5 else 0,
+            'progress_percent': int(resp[5]) if len(resp) >= 6 else 0,
+        }
     
     # --- Per-Key Curve Commands ---
     

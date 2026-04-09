@@ -62,6 +62,11 @@ typedef enum {
   CMD_SET_KEY_GAMEPAD_MAP = 0x4C, // Set per-key gamepad mapping
   CMD_GET_GAMEPAD_WITH_KB = 0x4D, // Get gamepad+keyboard mode
   CMD_SET_GAMEPAD_WITH_KB = 0x4E, // Set gamepad+keyboard mode
+  CMD_GET_CALIBRATION_MAX = 0x4F, // Get per-key max ADC calibration values
+  CMD_SET_CALIBRATION_MAX = 0x50, // Set per-key max ADC calibration values
+  CMD_GUIDED_CALIBRATION_START = 0x51,
+  CMD_GUIDED_CALIBRATION_STATUS = 0x52,
+  CMD_GUIDED_CALIBRATION_ABORT = 0x53,
 
   // LED Matrix commands (0x60 - 0x7F)
   CMD_GET_LED_ENABLED = 0x60,
@@ -89,6 +94,8 @@ typedef enum {
   CMD_SET_LED_DIAGNOSTIC = 0x76,   // Set LED diagnostic mode
   CMD_GET_LED_EFFECT_PARAMS = 0x77, // Get persisted params for one effect
   CMD_SET_LED_EFFECT_PARAMS = 0x78, // Set persisted params for one effect
+  CMD_SET_LED_VOLUME_OVERLAY = 0x79, // Host-driven volume overlay
+  CMD_CLEAR_LED_VOLUME_OVERLAY = 0x7A, // Clear host-driven volume overlay
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
@@ -240,6 +247,15 @@ typedef struct __attribute__((packed)) {
   int16_t key_zero_values[HID_CALIBRATION_VALUES_PER_CHUNK];
 } hid_packet_calibration_t;
 
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t start_index;
+  uint8_t value_count;
+  int16_t lut_zero_value; // echoed for convenience / context
+  int16_t key_max_values[HID_CALIBRATION_VALUES_PER_CHUNK];
+} hid_packet_calibration_max_t;
+
 /**
  * @brief Auto-calibrate request packet
  */
@@ -249,6 +265,18 @@ typedef struct __attribute__((packed)) {
   uint8_t key_index; // Key to calibrate (0-NUM_KEYS-1), or 0xFF for all
   uint8_t reserved[61];
 } hid_packet_auto_calibrate_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t active;
+  uint8_t phase;
+  uint8_t current_key;
+  uint8_t progress_percent;
+  uint16_t sample_count;
+  uint16_t phase_elapsed_ms;
+  uint8_t reserved[54];
+} hid_packet_guided_calibration_status_t;
 
 /**
  * @brief ADC values response (debug)

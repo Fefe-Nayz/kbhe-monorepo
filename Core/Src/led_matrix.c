@@ -53,6 +53,21 @@ static bool effect_render_context = false;
 static uint8_t key_wave_energy[NUM_KEYS] = {0};
 static uint8_t key_wave_radius[NUM_KEYS] = {0};
 
+// Temporary volume overlay shown on the function row.
+static bool volume_overlay_active = false;
+static uint8_t volume_overlay_level = 0u;
+static uint32_t volume_overlay_expire_ms = 0u;
+static bool host_volume_level_valid = false;
+static uint8_t host_volume_level = 0u;
+static uint32_t host_volume_level_refresh_ms = 0u;
+
+static const uint8_t volume_overlay_keys[] = {
+    0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u, 11u, 12u
+};
+#define VOLUME_OVERLAY_KEY_COUNT                                                \
+  (sizeof(volume_overlay_keys) / sizeof(volume_overlay_keys[0]))
+#define HOST_VOLUME_LEVEL_STALE_MS 1250u
+
 // Logical key order follows the physical keyboard layout (K1..K82).
 // WS2812 chain order on the PCB is serpentine, so translate before pushing to
 // the driver.
@@ -107,10 +122,6 @@ static const uint16_t led_pos_y[NUM_KEYS] = {
 #define LED_LAYOUT_MAX_Y 1048u
 #define LED_LAYOUT_CENTER_X (LED_LAYOUT_MAX_X / 2u)
 #define LED_LAYOUT_CENTER_Y (LED_LAYOUT_MAX_Y / 2u)
-
-// Trigger travel normalization range used by triggerGetDistance01mm():
-// 4.00 mm => 400 units (0.01 mm).
-#define KEY_TRAVEL_MAX_01MM 400u
 
 static void effect_rainbow(void);
 static void effect_breathing(void);
@@ -182,6 +193,54 @@ static inline uint16_t led_layout_distance(uint8_t a, uint8_t b) {
   return major + (minor / 2u);
 }
 
+static inline bool volume_overlay_is_expired(uint32_t now_ms) {
+  return volume_overlay_active &&
+         ((int32_t)(now_ms - volume_overlay_expire_ms) >= 0);
+}
+
+static void apply_volume_overlay_to_ws2812(uint32_t now_ms) {
+  if (!volume_overlay_active) {
+    return;
+  }
+
+  if (current_effect == LED_EFFECT_THIRD_PARTY) {
+    return;
+  }
+
+  if (volume_overlay_is_expired(now_ms)) {
+    volume_overlay_active = false;
+    return;
+  }
+
+  uint32_t filled =
+      ((uint32_t)volume_overlay_level * (uint32_t)VOLUME_OVERLAY_KEY_COUNT +
+       254u) /
+      255u;
+  uint8_t base_r = 40u;
+  uint8_t base_g = 210u;
+  uint8_t base_b = 64u;
+
+  for (uint8_t i = 0; i < (uint8_t)VOLUME_OVERLAY_KEY_COUNT; i++) {
+    uint8_t logical_index = volume_overlay_keys[i];
+    uint8_t physical_index = LOGICAL_LED_INDEX_TO_PHYSICAL_LED_INDEX[logical_index];
+    uint8_t scale = 0u;
+
+    if (i < filled) {
+      scale = 255u;
+    } else if (i == filled) {
+      uint32_t remainder =
+          ((uint32_t)volume_overlay_level * (uint32_t)VOLUME_OVERLAY_KEY_COUNT) %
+          255u;
+      scale = (uint8_t)remainder;
+    }
+
+    setLedValues(&led_ws2812_handle, physical_index,
+                 apply_brightness(base_r, scale),
+                 apply_brightness(base_g, scale),
+                 apply_brightness(base_b, scale));
+  }
+}
+
 /**
  * @brief Push one runtime pixel to WS2812 buffer
  */
@@ -211,9 +270,12 @@ static void update_ws2812(void) {
     return;
 
   // Apply brightness and copy to WS2812 buffer
+  uint32_t now_ms = HAL_GetTick();
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     push_runtime_pixel_to_ws2812(i);
   }
+
+  apply_volume_overlay_to_ws2812(now_ms);
 
   ws2812_show(&led_ws2812_handle);
 }
@@ -621,6 +683,61 @@ void led_matrix_key_event(uint8_t key_index, bool pressed) {
   }
 }
 
+void led_matrix_set_volume_overlay(uint8_t level) {
+  volume_overlay_active = true;
+  volume_overlay_level = level;
+  volume_overlay_expire_ms = HAL_GetTick() + 1200u;
+
+  if (initialized && display_enabled) {
+    update_ws2812();
+  }
+}
+
+void led_matrix_clear_volume_overlay(void) {
+  volume_overlay_active = false;
+
+  if (initialized && display_enabled) {
+    update_ws2812();
+  }
+}
+
+void led_matrix_set_host_volume_level(uint8_t level) {
+  host_volume_level = level;
+  host_volume_level_valid = true;
+  host_volume_level_refresh_ms = HAL_GetTick();
+}
+
+void led_matrix_clear_host_volume_level(void) {
+  host_volume_level_valid = false;
+}
+
+void led_matrix_show_host_volume_overlay(void) {
+  uint32_t now_ms = HAL_GetTick();
+
+  if (!host_volume_level_valid) {
+    return;
+  }
+
+  if ((uint32_t)(now_ms - host_volume_level_refresh_ms) > HOST_VOLUME_LEVEL_STALE_MS) {
+    host_volume_level_valid = false;
+    return;
+  }
+
+  led_matrix_set_volume_overlay(host_volume_level);
+}
+
+void led_matrix_set_live_frame(const uint8_t *data) {
+  if (data == NULL) {
+    return;
+  }
+
+  memcpy(pixels_runtime, data, LED_MATRIX_DATA_SIZE);
+
+  if (initialized && display_enabled) {
+    update_ws2812();
+  }
+}
+
 /**
  * @brief Rainbow Wave effect - diagonal rainbow cycling
  */
@@ -983,18 +1100,7 @@ static void effect_distance_sensor(void) {
   }
 
   for (uint8_t key = 0; key < NUM_KEYS; key++) {
-    int16_t distance_value = analog_read_distance_value(key);
-    uint16_t distance_01mm = 0u;
-
-    if (distance_value > 0) {
-      distance_01mm = (uint16_t)distance_value;
-    }
-
-    if (distance_01mm > KEY_TRAVEL_MAX_01MM) {
-      distance_01mm = KEY_TRAVEL_MAX_01MM;
-    }
-
-    uint8_t level = (uint8_t)((distance_01mm * 255u) / KEY_TRAVEL_MAX_01MM);
+    uint8_t level = analog_read_normalized_value(key);
 
     // Hue ramps from cyan/blue to red as distance increases.
     uint8_t hue = reverse
@@ -1103,6 +1209,11 @@ static void effect_reactive(void) {
 void led_matrix_effect_tick(uint32_t tick) {
   if (!initialized || !display_enabled) {
     return;
+  }
+
+  if (volume_overlay_is_expired(tick)) {
+    volume_overlay_active = false;
+    update_ws2812();
   }
 
   // Calculate time deltas

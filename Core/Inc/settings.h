@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x000A         // Extended LED effect params + DMA cleanup
+#define SETTINGS_VERSION 0x000B         // Guided zero/max calibration + normalized travel
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -145,6 +145,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   int16_t lut_zero_value;     // LUT reference zero value (default ~2118)
   int16_t key_zero_values[NUM_KEYS]; // Per-key zero values
+  int16_t key_max_values[NUM_KEYS];  // Per-key fully pressed raw ADC values
 } settings_calibration_t;
 
 /**
@@ -493,6 +494,12 @@ uint8_t settings_get_led_effect_speed(void);
 bool settings_set_led_effect_speed(uint8_t speed);
 
 /**
+ * @brief Get LED FPS limit
+ * @return Current FPS limit (0 = unlimited)
+ */
+uint8_t settings_get_led_fps_limit(void);
+
+/**
  * @brief Get LED effect color
  * @param r Pointer to store red value
  * @param g Pointer to store green value
@@ -613,6 +620,14 @@ bool settings_set_calibration(const settings_calibration_t *calibration);
  * @return true if successful
  */
 bool settings_set_key_calibration(uint8_t key_index, int16_t zero_value);
+
+/**
+ * @brief Set max calibration for a single key
+ * @param key_index Key index
+ * @param max_value Raw ADC value captured at maximum press
+ * @return true if successful
+ */
+bool settings_set_key_calibration_max(uint8_t key_index, int16_t max_value);
 
 //--------------------------------------------------------------------+
 // Per-Key Curve Settings API

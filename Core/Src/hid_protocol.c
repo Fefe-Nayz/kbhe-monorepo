@@ -462,6 +462,77 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
   }
 }
 
+static void cmd_get_calibration_max(const uint8_t *in, uint8_t *out) {
+  const hid_packet_calibration_max_t *req =
+      (const hid_packet_calibration_max_t *)in;
+  hid_packet_calibration_max_t *resp = (hid_packet_calibration_max_t *)out;
+
+  resp->command_id = CMD_GET_CALIBRATION_MAX;
+  resp->start_index = req->start_index;
+  resp->value_count = 0;
+
+  if (req->start_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  const settings_calibration_t *cal = settings_get_calibration();
+  uint8_t count = (uint8_t)(NUM_KEYS - req->start_index);
+  if (count > HID_CALIBRATION_VALUES_PER_CHUNK) {
+    count = HID_CALIBRATION_VALUES_PER_CHUNK;
+  }
+
+  resp->status = HID_RESP_OK;
+  resp->value_count = count;
+  resp->lut_zero_value = cal->lut_zero_value;
+  for (uint8_t i = 0; i < count; i++) {
+    resp->key_max_values[i] = cal->key_max_values[req->start_index + i];
+  }
+}
+
+static void cmd_set_calibration_max(const uint8_t *in, uint8_t *out) {
+  const hid_packet_calibration_max_t *req =
+      (const hid_packet_calibration_max_t *)in;
+  hid_packet_calibration_max_t *resp = (hid_packet_calibration_max_t *)out;
+
+  resp->command_id = CMD_SET_CALIBRATION_MAX;
+
+  if (req->start_index >= NUM_KEYS || req->value_count == 0 ||
+      req->value_count > HID_CALIBRATION_VALUES_PER_CHUNK ||
+      (uint16_t)req->start_index + req->value_count > NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    resp->start_index = req->start_index;
+    resp->value_count = 0;
+    return;
+  }
+
+  const settings_calibration_t *current = settings_get_calibration();
+  settings_calibration_t cal = *current;
+  for (uint8_t i = 0; i < req->value_count; i++) {
+    cal.key_max_values[req->start_index + i] = req->key_max_values[i];
+  }
+
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    if (!is_valid_adc_calibration_value(cal.key_max_values[i])) {
+      resp->status = HID_RESP_INVALID_PARAM;
+      return;
+    }
+  }
+
+  bool success = settings_set_calibration(&cal);
+  if (success) {
+    refresh_runtime_calibration();
+  }
+
+  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->start_index = req->start_index;
+  resp->value_count = req->value_count;
+  resp->lut_zero_value = cal.lut_zero_value;
+  for (uint8_t i = 0; i < req->value_count; i++) {
+    resp->key_max_values[i] = cal.key_max_values[req->start_index + i];
+  }
+}
+
 static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
   const hid_packet_auto_calibrate_t *req =
       (const hid_packet_auto_calibrate_t *)in;
@@ -507,6 +578,61 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
   for (uint8_t i = 0; i < resp->value_count; i++) {
     resp->key_zero_values[i] = cal->key_zero_values[i];
   }
+}
+
+static void cmd_guided_calibration_start(const uint8_t *in, uint8_t *out) {
+  hid_packet_guided_calibration_status_t *resp =
+      (hid_packet_guided_calibration_status_t *)out;
+  calibration_guided_status_t status = {0};
+  (void)in;
+
+  resp->command_id = CMD_GUIDED_CALIBRATION_START;
+  resp->status = calibration_guided_start() ? HID_RESP_OK : HID_RESP_ERROR;
+  calibration_guided_get_status(&status);
+  resp->active = status.active;
+  resp->phase = status.phase;
+  resp->current_key = status.current_key;
+  resp->progress_percent = status.progress_percent;
+  resp->sample_count = status.sample_count;
+  resp->phase_elapsed_ms = status.phase_elapsed_ms;
+  memset(resp->reserved, 0, sizeof(resp->reserved));
+}
+
+static void cmd_guided_calibration_status(const uint8_t *in, uint8_t *out) {
+  hid_packet_guided_calibration_status_t *resp =
+      (hid_packet_guided_calibration_status_t *)out;
+  calibration_guided_status_t status = {0};
+  (void)in;
+
+  resp->command_id = CMD_GUIDED_CALIBRATION_STATUS;
+  resp->status = HID_RESP_OK;
+  calibration_guided_get_status(&status);
+  resp->active = status.active;
+  resp->phase = status.phase;
+  resp->current_key = status.current_key;
+  resp->progress_percent = status.progress_percent;
+  resp->sample_count = status.sample_count;
+  resp->phase_elapsed_ms = status.phase_elapsed_ms;
+  memset(resp->reserved, 0, sizeof(resp->reserved));
+}
+
+static void cmd_guided_calibration_abort(const uint8_t *in, uint8_t *out) {
+  hid_packet_guided_calibration_status_t *resp =
+      (hid_packet_guided_calibration_status_t *)out;
+  calibration_guided_status_t status = {0};
+  (void)in;
+
+  calibration_guided_abort();
+  resp->command_id = CMD_GUIDED_CALIBRATION_ABORT;
+  resp->status = HID_RESP_OK;
+  calibration_guided_get_status(&status);
+  resp->active = status.active;
+  resp->phase = status.phase;
+  resp->current_key = status.current_key;
+  resp->progress_percent = status.progress_percent;
+  resp->sample_count = status.sample_count;
+  resp->phase_elapsed_ms = status.phase_elapsed_ms;
+  memset(resp->reserved, 0, sizeof(resp->reserved));
 }
 
 //--------------------------------------------------------------------+
@@ -979,6 +1105,26 @@ static void cmd_set_led_diagnostic(const uint8_t *in, uint8_t *out) {
   resp->payload[0] = led_matrix_get_diagnostic_mode();
 }
 
+static void cmd_set_led_volume_overlay(const uint8_t *in, uint8_t *out) {
+  const hid_packet_t *req = (const hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+
+  resp->command_id = CMD_SET_LED_VOLUME_OVERLAY;
+  led_matrix_set_host_volume_level(req->payload[0]);
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = req->payload[0];
+}
+
+static void cmd_clear_led_volume_overlay(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_CLEAR_LED_VOLUME_OVERLAY;
+  led_matrix_clear_host_volume_level();
+  led_matrix_clear_volume_overlay();
+  resp->status_or_len = HID_RESP_OK;
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Filter Commands
 //--------------------------------------------------------------------+
@@ -1182,15 +1328,7 @@ static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
   for (uint8_t i = 0; i < count; i++) {
     uint8_t key = (uint8_t)(req->start_index + i);
     resp->keys[i].state = trigger_get_key_state(key) == PRESSED ? 1 : 0;
-
-    int16_t um = analog_read_distance_value(key);
-    if (um < 0) {
-      um = 0;
-    }
-    if (um > 4000) {
-      um = 4000;
-    }
-    resp->keys[i].distance_norm = (uint8_t)((um * 255) / 4000);
+    resp->keys[i].distance_norm = analog_read_normalized_value(key);
     resp->keys[i].distance_01mm = triggerGetDistance01mm(key);
   }
 }
@@ -1427,6 +1565,26 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_set_gamepad_with_kb(in_packet, out_packet);
     break;
 
+  case CMD_GET_CALIBRATION_MAX:
+    cmd_get_calibration_max(in_packet, out_packet);
+    break;
+
+  case CMD_SET_CALIBRATION_MAX:
+    cmd_set_calibration_max(in_packet, out_packet);
+    break;
+
+  case CMD_GUIDED_CALIBRATION_START:
+    cmd_guided_calibration_start(in_packet, out_packet);
+    break;
+
+  case CMD_GUIDED_CALIBRATION_STATUS:
+    cmd_guided_calibration_status(in_packet, out_packet);
+    break;
+
+  case CMD_GUIDED_CALIBRATION_ABORT:
+    cmd_guided_calibration_abort(in_packet, out_packet);
+    break;
+
   // LED Matrix commands
   case CMD_GET_LED_ENABLED:
     cmd_get_led_enabled(in_packet, out_packet);
@@ -1522,6 +1680,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_LED_EFFECT_PARAMS:
     cmd_set_led_effect_params(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_VOLUME_OVERLAY:
+    cmd_set_led_volume_overlay(in_packet, out_packet);
+    break;
+
+  case CMD_CLEAR_LED_VOLUME_OVERLAY:
+    cmd_clear_led_volume_overlay(in_packet, out_packet);
     break;
 
   // Filter commands

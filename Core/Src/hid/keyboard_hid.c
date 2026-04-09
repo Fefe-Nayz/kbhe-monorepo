@@ -5,6 +5,7 @@
  */
 
 #include "hid/keyboard_hid.h"
+#include "hid/consumer_hid.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "hid/raw_hid.h"
@@ -181,6 +182,9 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
     raw_hid_on_receive(buffer, bufsize);
     break;
 
+  case HID_ITF_CONSUMER:
+    break;
+
   default:
     // Other instances if needed
     break;
@@ -203,6 +207,10 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
 
   case HID_ITF_RAW_HID:
     raw_hid_on_report_complete();
+    break;
+
+  case HID_ITF_CONSUMER:
+    consumer_hid_on_report_complete();
     break;
 
   default:

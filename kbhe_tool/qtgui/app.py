@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 
 from .common import (
     HAS_GUI,
@@ -35,6 +36,7 @@ from .pages import (
 from .session import AppSession
 from .theme import apply_app_style, current_theme_mode
 from .widgets import StatusPill, make_primary_button, make_secondary_button
+from ..windows_volume import get_default_render_volume_level
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +76,11 @@ class KBHEQtMainWindow(QMainWindow):
         self._theme_btns: dict[str, QPushButton] = {}
         self.live_timer = QTimer(self)
         self.live_timer.timeout.connect(self._on_live_tick)
+        self.volume_timer = QTimer(self)
+        self.volume_timer.setInterval(150)
+        self.volume_timer.timeout.connect(self._on_volume_tick)
+        self._last_host_volume_level: int | None = None
+        self._last_host_volume_push_monotonic = 0.0
 
         self.setWindowTitle("KBHE Configurator")
         self.resize(1440, 900)
@@ -85,6 +92,7 @@ class KBHEQtMainWindow(QMainWindow):
         self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         self.session.refresh_snapshot()
         self.show_page("overview")
+        self.volume_timer.start()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -284,6 +292,9 @@ class KBHEQtMainWindow(QMainWindow):
         self.connection_dot.setProperty("connected", "true" if connected else "false")
         self.connection_dot.style().unpolish(self.connection_dot)
         self.connection_dot.style().polish(self.connection_dot)
+        if not connected:
+            self._last_host_volume_level = None
+            self._last_host_volume_push_monotonic = 0.0
 
     def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
         if enabled:
@@ -305,6 +316,29 @@ class KBHEQtMainWindow(QMainWindow):
                     page.on_live_tick()
                 except Exception:
                     pass
+
+    def _on_volume_tick(self) -> None:
+        if not self.session.connected:
+            return
+
+        level = get_default_render_volume_level()
+        if level is None:
+            return
+
+        now = time.monotonic()
+        should_push = (
+            self._last_host_volume_level is None
+            or self._last_host_volume_level != level
+            or (now - self._last_host_volume_push_monotonic) >= 0.75
+        )
+
+        if should_push:
+            try:
+                if self.session.device.led_set_volume_overlay(level):
+                    self._last_host_volume_level = level
+                    self._last_host_volume_push_monotonic = now
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
     # Navigation
@@ -425,6 +459,12 @@ class KBHEQtMainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self.live_timer.stop()
+        self.volume_timer.stop()
+        if self.session.connected:
+            try:
+                self.session.device.led_clear_volume_overlay()
+            except Exception:
+                pass
         if self.active_page_id and self.active_page_id in self.pages:
             page = self.pages[self.active_page_id]
             if hasattr(page, "on_page_deactivated"):

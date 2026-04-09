@@ -18,6 +18,8 @@ static uint16_t calibrated_values[NUM_KEYS];
 
 static uint16_t distance_values[NUM_KEYS];
 
+static uint8_t normalized_values[NUM_KEYS];
+
 static uint8_t current_mux_channel = 0;
 
 static bool is_scan_complete = false;
@@ -86,6 +88,7 @@ void analog_init(AnalogConfig_t* config) {
         filtered_values[i] = 0;
         calibrated_values[i] = 0;
         distance_values[i] = 0;
+        normalized_values[i] = 0;
     }
 
     analog_task_monitor.raw_us = 0;
@@ -143,6 +146,8 @@ void analog_task() {
         filtered_values[key] = filtered_value;
         calibrated_values[key] = calibrated_value;
         distance_values[key] = distance_value;
+        normalized_values[key] =
+            calibration_get_normalized_distance(key, (int16_t)distance_value);
         store_cycles += (DWT->CYCCNT - step_start_cycles);
 
         uint32_t key_cycles = DWT->CYCCNT - key_start_cycles;
@@ -227,6 +232,14 @@ int16_t analog_read_distance_value(uint8_t key) {
 
     // Return the distance value
     return distance_values[key];
+}
+
+uint8_t analog_read_normalized_value(uint8_t key) {
+    if (key >= NUM_KEYS) {
+        return 0u;
+    }
+
+    return normalized_values[key];
 }
 
 /*

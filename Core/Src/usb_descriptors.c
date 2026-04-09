@@ -105,6 +105,10 @@ static uint8_t const desc_gamepad_report[] = {
     HID_REPORT_SIZE(8), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
     HID_COLLECTION_END};
 
+// Consumer control interface: media keys / volume
+static uint8_t const desc_consumer_report[] = {
+    TUD_HID_REPORT_DESC_CONSUMER()};
+
 //--------------------------------------------------------------------+
 // Configuration Descriptor
 //--------------------------------------------------------------------+
@@ -115,6 +119,7 @@ enum {
   ITF_NUM_RAW_HID,
   ITF_NUM_GAMEPAD,
   ITF_NUM_NKRO,
+  ITF_NUM_CONSUMER,
   ITF_NUM_TOTAL
 };
 
@@ -129,6 +134,8 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
     return desc_gamepad_report;
   case ITF_NUM_NKRO:
     return desc_nkro_report;
+  case ITF_NUM_CONSUMER:
+    return desc_consumer_report;
   default:
     return NULL;
   }
@@ -142,7 +149,7 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
  */
 #define CONFIG_TOTAL_LEN                                                       \
   (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN + TUD_HID_INOUT_DESC_LEN +           \
-   TUD_HID_DESC_LEN + TUD_HID_DESC_LEN)
+   TUD_HID_DESC_LEN + TUD_HID_DESC_LEN + TUD_HID_DESC_LEN)
 
 static uint8_t const desc_configuration[] = {
     // Config number, interface count, string index, total length, attribute,
@@ -171,6 +178,11 @@ static uint8_t const desc_configuration[] = {
     // NKRO uses a 17-byte report: 1 modifier + 16 bitmap bytes (128 keys)
     TUD_HID_DESCRIPTOR(ITF_NUM_NKRO, STRID_NKRO, HID_ITF_PROTOCOL_KEYBOARD,
                        sizeof(desc_nkro_report), EPNUM_NKRO, HID_EP_SIZE,
+                       HID_POLL_INTERVAL_8KHZ),
+
+    // Interface 4: Consumer Control HID (volume / media keys)
+    TUD_HID_DESCRIPTOR(ITF_NUM_CONSUMER, STRID_CONSUMER, HID_ITF_PROTOCOL_NONE,
+                       sizeof(desc_consumer_report), EPNUM_CONSUMER, HID_EP_SIZE,
                        HID_POLL_INTERVAL_8KHZ)};
 
 //--------------------------------------------------------------------+
@@ -230,7 +242,8 @@ static char const *string_desc_arr[] = {
     NULL,                       // 3: Serial (Géré dynamiquement)
     "Raw HID",                  // 4: Interface Raw HID
     "HE Gamepad",               // 5: Interface Gamepad (Hall Effect)
-    "NKRO Keyboard"             // 6: Interface NKRO Keyboard
+    "NKRO Keyboard",            // 6: Interface NKRO Keyboard
+    "Consumer Control"           // 7: Consumer Control interface
 };
 
 static uint16_t _desc_str[32 + 1];

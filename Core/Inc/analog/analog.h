@@ -40,6 +40,8 @@ uint16_t analog_read_calibrated_value(uint8_t key);
 
 int16_t analog_read_distance_value(uint8_t key);
 
+uint8_t analog_read_normalized_value(uint8_t key);
+
 uint16_t* analog_get_adc_buffer_ptr(void);
 
 void analog_get_task_monitor(analog_task_monitor_t* monitor);
