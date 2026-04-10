@@ -16,6 +16,7 @@
 
 static int16_t zero_offset[NUM_KEYS];
 static uint16_t max_distance_um[NUM_KEYS];
+static uint32_t normalized_gain_q16[NUM_KEYS];
 static uint8_t guided_led_frame[LED_MATRIX_DATA_SIZE];
 
 typedef struct {
@@ -65,6 +66,7 @@ static void calibration_recompute_key_max_distance(uint8_t key, uint16_t max_raw
         distance_um = 1u;
     }
     max_distance_um[key] = distance_um;
+    normalized_gain_q16[key] = ((uint32_t)255u << 16) / distance_um;
 }
 
 static void calibration_restore_runtime_led_state(void) {
@@ -124,12 +126,11 @@ static void calibration_finish_session(bool success) {
 }
 
 void calibration_init(void) {
+    uint16_t default_max_raw = calibration_default_max_raw();
+
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
         zero_offset[i] = 0;
-        max_distance_um[i] = (uint16_t)getDistanceFromVoltage(calibration_default_max_raw());
-        if (max_distance_um[i] == 0u) {
-            max_distance_um[i] = 1u;
-        }
+        calibration_recompute_key_max_distance(i, default_max_raw);
     }
 
     memset(&guided_state, 0, sizeof(guided_state));
@@ -192,7 +193,8 @@ uint8_t calibration_get_normalized_distance(uint8_t key, int16_t distance_um) {
     if (distance >= max_distance) {
         return 255u;
     }
-    return (uint8_t)((distance * 255u) / max_distance);
+
+    return (uint8_t)((((uint64_t)distance * normalized_gain_q16[key]) + 0x8000u) >> 16);
 }
 
 bool calibration_guided_start(void) {

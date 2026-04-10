@@ -10,6 +10,10 @@ from .protocol import (
     GAMEPAD_AXES,
     GAMEPAD_BUTTONS,
     GAMEPAD_DIRECTIONS,
+    GAMEPAD_CURVE_MAX_DISTANCE_MM,
+    GAMEPAD_CURVE_POINT_COUNT,
+    GAMEPAD_KEYBOARD_ROUTING,
+    KEY_BEHAVIORS,
     KEY_COUNT,
     KEY_SETTINGS_PER_CHUNK,
     KEY_STATES_PER_CHUNK,
@@ -133,6 +137,102 @@ class KBHEDevice:
         except Exception:
             return 0
         return value if value in (0, 1) else 0
+
+    @staticmethod
+    def _sanitize_key_behavior_mode(value):
+        try:
+            value = int(value)
+        except Exception:
+            return int(KEY_BEHAVIORS["Normal"])
+        return value if value in KEY_BEHAVIORS.values() else int(KEY_BEHAVIORS["Normal"])
+
+    @staticmethod
+    def _default_dynamic_zones(primary_keycode=0x14):
+        return [
+            {"end_mm_tenths": 40, "end_mm": 4.0, "hid_keycode": int(primary_keycode)},
+            {"end_mm_tenths": 40, "end_mm": 4.0, "hid_keycode": 0},
+            {"end_mm_tenths": 40, "end_mm": 4.0, "hid_keycode": 0},
+            {"end_mm_tenths": 40, "end_mm": 4.0, "hid_keycode": 0},
+        ]
+
+    @classmethod
+    def _sanitize_dynamic_zones(cls, zones, primary_keycode=0x14):
+        defaults = cls._default_dynamic_zones(primary_keycode)
+        sanitized = []
+        previous_end = 0
+
+        for index in range(4):
+            source = zones[index] if isinstance(zones, (list, tuple)) and index < len(zones) else defaults[index]
+            if isinstance(source, dict):
+                if "end_mm_tenths" in source:
+                    end_mm_tenths = int(source.get("end_mm_tenths", defaults[index]["end_mm_tenths"]))
+                else:
+                    end_mm_tenths = int(round(float(source.get("end_mm", defaults[index]["end_mm"])) * 10.0))
+                hid_keycode = int(source.get("hid_keycode", defaults[index]["hid_keycode"]))
+            else:
+                end_mm_tenths = defaults[index]["end_mm_tenths"]
+                hid_keycode = defaults[index]["hid_keycode"]
+
+            end_mm_tenths = max(previous_end or 1, min(40, end_mm_tenths))
+            previous_end = end_mm_tenths
+            sanitized.append(
+                {
+                    "end_mm_tenths": end_mm_tenths,
+                    "end_mm": end_mm_tenths / 10.0,
+                    "hid_keycode": hid_keycode,
+                }
+            )
+
+        if all(int(zone["hid_keycode"]) == 0 for zone in sanitized):
+            sanitized[0]["hid_keycode"] = int(primary_keycode)
+
+        return sanitized
+
+    @staticmethod
+    def _default_gamepad_curve_points():
+        return [
+            {"x_01mm": 0, "x_mm": 0.00, "y": 0},
+            {"x_01mm": 133, "x_mm": 1.33, "y": 85},
+            {"x_01mm": 266, "x_mm": 2.66, "y": 170},
+            {"x_01mm": 400, "x_mm": 4.00, "y": 255},
+        ]
+
+    @staticmethod
+    def _sanitize_gamepad_routing(value):
+        try:
+            value = int(value)
+        except Exception:
+            return int(GAMEPAD_KEYBOARD_ROUTING["All Keys"])
+        return (
+            value
+            if value in GAMEPAD_KEYBOARD_ROUTING.values()
+            else int(GAMEPAD_KEYBOARD_ROUTING["All Keys"])
+        )
+
+    @classmethod
+    def _sanitize_gamepad_curve_points(cls, points):
+        defaults = cls._default_gamepad_curve_points()
+        sanitized = []
+        previous_x = 0
+
+        for index in range(GAMEPAD_CURVE_POINT_COUNT):
+            source = points[index] if isinstance(points, (list, tuple)) and index < len(points) else defaults[index]
+            if isinstance(source, dict):
+                if "x_01mm" in source:
+                    x_01mm = int(source.get("x_01mm", defaults[index]["x_01mm"]))
+                else:
+                    x_01mm = int(round(float(source.get("x_mm", defaults[index]["x_mm"])) * 100.0))
+                y = int(source.get("y", defaults[index]["y"]))
+            else:
+                x_01mm = defaults[index]["x_01mm"]
+                y = defaults[index]["y"]
+
+            x_01mm = max(previous_x, min(int(GAMEPAD_CURVE_MAX_DISTANCE_MM * 100), x_01mm))
+            y = max(0, min(255, y))
+            previous_x = x_01mm
+            sanitized.append({"x_01mm": x_01mm, "x_mm": x_01mm / 100.0, "y": y})
+
+        return sanitized
     
     def get_firmware_version(self):
         """Get firmware version."""
@@ -336,9 +436,27 @@ class KBHEDevice:
             )
             rapid_idx = 12 if has_socd_resolution else 11
             disable_idx = 13 if has_socd_resolution else 12
+            continuous_idx = 14 if len(resp) > 14 else None
+            behavior_idx = 15 if len(resp) > 15 else None
+            hold_idx = 16 if len(resp) > 16 else None
+            zone_count_idx = 17 if len(resp) > 17 else None
+            secondary_idx = 18 if len(resp) > 19 else None
+            primary_keycode = self._unpack_u16(resp, 3)
+            dynamic_zones = self._default_dynamic_zones(primary_keycode)
+            if len(resp) >= 32:
+                dynamic_zones = self._sanitize_dynamic_zones(
+                    [
+                        {
+                            "end_mm_tenths": int(resp[20 + i * 3]),
+                            "hid_keycode": self._unpack_u16(resp, 21 + i * 3),
+                        }
+                        for i in range(4)
+                    ],
+                    primary_keycode=primary_keycode,
+                )
             return {
                 'key_index': resp[2],
-                'hid_keycode': self._unpack_u16(resp, 3),
+                'hid_keycode': primary_keycode,
                 'actuation_point_mm': resp[5] / 10.0,  # 0.1mm to mm
                 'release_point_mm': resp[6] / 10.0,
                 'rapid_trigger_activation': resp[7] / 10.0,  # 0.1mm
@@ -347,7 +465,13 @@ class KBHEDevice:
                 'socd_pair': resp[10] if resp[10] != 255 else None,
                 'socd_resolution': socd_resolution,
                 'rapid_trigger_enabled': bool(resp[rapid_idx]),
-                'disable_kb_on_gamepad': bool(resp[disable_idx])
+                'disable_kb_on_gamepad': bool(resp[disable_idx]),
+                'continuous_rapid_trigger': bool(resp[continuous_idx]) if continuous_idx is not None else False,
+                'behavior_mode': self._sanitize_key_behavior_mode(resp[behavior_idx]) if behavior_idx is not None else int(KEY_BEHAVIORS["Normal"]),
+                'hold_threshold_ms': (int(resp[hold_idx]) * 10) if hold_idx is not None else 200,
+                'dynamic_zone_count': max(1, min(4, int(resp[zone_count_idx]) if zone_count_idx is not None else 1)),
+                'secondary_hid_keycode': self._unpack_u16(resp, secondary_idx) if secondary_idx is not None else 0,
+                'dynamic_zones': dynamic_zones,
             }
         return None
     
@@ -364,17 +488,28 @@ class KBHEDevice:
             'rapid_trigger_release': rapid_trigger_mm,
             'socd_pair': socd_pair if socd_pair is not None else 255,
             'socd_resolution': self._sanitize_socd_resolution(socd_resolution),
-            'disable_kb_on_gamepad': False
+            'disable_kb_on_gamepad': False,
+            'continuous_rapid_trigger': False,
+            'behavior_mode': int(KEY_BEHAVIORS["Normal"]),
+            'hold_threshold_ms': 200,
+            'secondary_hid_keycode': 0,
+            'dynamic_zone_count': 1,
+            'dynamic_zones': self._default_dynamic_zones(hid_keycode),
         }
         return self.set_key_settings_extended(key_index, settings)
     
     def set_key_settings_extended(self, key_index, settings):
         """Set settings for a specific key (extended format)."""
+        hid_keycode = int(settings.get('hid_keycode', 0x14))
+        dynamic_zones = self._sanitize_dynamic_zones(
+            settings.get('dynamic_zones'),
+            primary_keycode=hid_keycode,
+        )
         data = [
             0,  # placeholder for status
             key_index,
-            settings.get('hid_keycode', 0x14) & 0xFF,
-            (settings.get('hid_keycode', 0x14) >> 8) & 0xFF,
+            hid_keycode & 0xFF,
+            (hid_keycode >> 8) & 0xFF,
             int(settings.get('actuation_point_mm', 2.0) * 10),  # mm to 0.1mm
             int(settings.get('release_point_mm', 1.8) * 10),
             int(settings.get('rapid_trigger_activation', 0.5) * 10),  # mm to 0.1mm
@@ -383,8 +518,18 @@ class KBHEDevice:
             settings.get('socd_pair', 255),
             self._sanitize_socd_resolution(settings.get('socd_resolution', 0)),
             1 if settings.get('rapid_trigger_enabled', False) else 0,
-            1 if settings.get('disable_kb_on_gamepad', False) else 0
+            1 if settings.get('disable_kb_on_gamepad', False) else 0,
+            1 if settings.get('continuous_rapid_trigger', False) else 0,
+            self._sanitize_key_behavior_mode(settings.get('behavior_mode', 0)),
+            max(1, min(255, int(round(settings.get('hold_threshold_ms', 200) / 10.0)))),
+            max(1, min(4, int(settings.get('dynamic_zone_count', 1)))),
+            int(settings.get('secondary_hid_keycode', 0)) & 0xFF,
+            (int(settings.get('secondary_hid_keycode', 0)) >> 8) & 0xFF,
         ]
+        for zone in dynamic_zones:
+            data.append(int(zone['end_mm_tenths']) & 0xFF)
+            data.append(int(zone['hid_keycode']) & 0xFF)
+            data.append((int(zone['hid_keycode']) >> 8) & 0xFF)
         resp = self.send_command(Command.SET_KEY_SETTINGS, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
@@ -418,6 +563,12 @@ class KBHEDevice:
                     'socd_resolution': self._sanitize_socd_resolution((flags >> 2) & 0x03),
                     'rapid_trigger_enabled': bool(flags & 0x01),
                     'disable_kb_on_gamepad': bool(flags & 0x02),
+                    'continuous_rapid_trigger': False,
+                    'behavior_mode': int(KEY_BEHAVIORS["Normal"]),
+                    'hold_threshold_ms': 200,
+                    'secondary_hid_keycode': 0,
+                    'dynamic_zone_count': 1,
+                    'dynamic_zones': self._default_dynamic_zones(hid_keycode),
                 })
 
             next_index += key_count
@@ -429,24 +580,63 @@ class KBHEDevice:
     def get_gamepad_settings(self):
         """Get gamepad settings."""
         resp = self.send_command(Command.GET_GAMEPAD_SETTINGS)
-        if resp and len(resp) >= 6 and resp[1] == Status.OK:
+        if resp and len(resp) >= 18 and resp[1] == Status.OK:
+            routing = self._sanitize_gamepad_routing(resp[3])
+            points = []
+            offset = 6
+            for _ in range(GAMEPAD_CURVE_POINT_COUNT):
+                x_01mm = self._unpack_u16(resp, offset)
+                y = int(resp[offset + 2])
+                points.append({"x_01mm": x_01mm, "x_mm": x_01mm / 100.0, "y": y})
+                offset += 3
+            deadzone = max(int(resp[2]), int(points[0]["y"]) if points else 0)
             return {
-                'deadzone': resp[2],
-                'curve_type': resp[3],  # 0=linear, 1=smooth, 2=aggressive
+                'radial_deadzone': deadzone,
+                'deadzone': deadzone,
+                'keyboard_routing': routing,
+                'keep_keyboard_output': routing != int(GAMEPAD_KEYBOARD_ROUTING["Disabled"]),
+                'mapped_keys_replace_keyboard': routing == int(GAMEPAD_KEYBOARD_ROUTING["Unmapped Only"]),
                 'square_mode': bool(resp[4]),
-                'snappy_mode': bool(resp[5])
+                'reactive_stick': bool(resp[5]),
+                'snappy_mode': bool(resp[5]),
+                'curve_points': self._sanitize_gamepad_curve_points(points),
             }
         return None
-    
-    def set_gamepad_settings(self, deadzone, curve_type, square_mode, snappy_mode):
-        """Set gamepad settings."""
+
+    def set_gamepad_settings(self, settings_or_deadzone, curve_type=None, square_mode=None, snappy_mode=None):
+        """Set gamepad settings. Accepts either a settings dict or the legacy positional format."""
+        if isinstance(settings_or_deadzone, dict):
+            settings = dict(settings_or_deadzone)
+        else:
+            existing = self.get_gamepad_settings() or {}
+            settings = {
+                "radial_deadzone": int(settings_or_deadzone),
+                "keyboard_routing": int(existing.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])),
+                "square_mode": bool(square_mode),
+                "reactive_stick": bool(snappy_mode),
+                "curve_points": existing.get("curve_points") or self._default_gamepad_curve_points(),
+            }
+
+        routing = self._sanitize_gamepad_routing(
+            settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])
+        )
+        points = self._sanitize_gamepad_curve_points(settings.get("curve_points"))
+        deadzone = max(0, min(255, int(settings.get("radial_deadzone", settings.get("deadzone", 0)))))
+        if points:
+            deadzone = max(deadzone, int(points[0]["y"]))
+
         data = [
-            0,  # placeholder for status
+            0,
             deadzone,
-            curve_type,
-            1 if square_mode else 0,
-            1 if snappy_mode else 0
+            routing,
+            1 if settings.get("square_mode", False) else 0,
+            1 if settings.get("reactive_stick", settings.get("snappy_mode", False)) else 0,
         ]
+        for point in points:
+            data.append(point["x_01mm"] & 0xFF)
+            data.append((point["x_01mm"] >> 8) & 0xFF)
+            data.append(point["y"] & 0xFF)
+
         resp = self.send_command(Command.SET_GAMEPAD_SETTINGS, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
 

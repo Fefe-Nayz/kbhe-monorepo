@@ -14,9 +14,20 @@ def _default_key_settings(index: int) -> dict:
         "rapid_trigger_activation": 0.5,
         "rapid_trigger_press": 0.2 + ((index % 3) * 0.05),
         "rapid_trigger_release": 0.2 + ((index % 4) * 0.04),
+        "continuous_rapid_trigger": bool(index % 5 == 0),
         "socd_pair": (index + 1) % KEY_COUNT if index % 11 == 0 else None,
         "socd_resolution": 1 if index % 22 == 0 else 0,
         "disable_kb_on_gamepad": bool(index % 7 == 0),
+        "behavior_mode": 1 if index % 9 == 0 else 0,
+        "hold_threshold_ms": 220,
+        "secondary_hid_keycode": 0x2C if index % 9 == 0 else 0,
+        "dynamic_zone_count": 2,
+        "dynamic_zones": [
+            {"end_mm_tenths": 12, "end_mm": 1.2, "hid_keycode": 0x1E},
+            {"end_mm_tenths": 24, "end_mm": 2.4, "hid_keycode": 0x1F},
+            {"end_mm_tenths": 32, "end_mm": 3.2, "hid_keycode": 0},
+            {"end_mm_tenths": 40, "end_mm": 4.0, "hid_keycode": 0},
+        ],
     }
 
 
@@ -25,7 +36,7 @@ class DemoDevice:
         self.connected = True
         self._firmware_version = "2.4-demo"
         self._options = {
-            "keyboard_enabled": False,
+            "keyboard_enabled": True,
             "gamepad_enabled": True,
             "raw_hid_echo": False,
         }
@@ -53,10 +64,16 @@ class DemoDevice:
         ]
         self._gamepad_with_keyboard = True
         self._gamepad_settings = {
-            "deadzone": 18,
-            "curve_type": 1,
+            "radial_deadzone": 18,
+            "keyboard_routing": 1,
             "square_mode": True,
-            "snappy_mode": False,
+            "reactive_stick": False,
+            "curve_points": [
+                {"x_01mm": 0, "x_mm": 0.0, "y": 0},
+                {"x_01mm": 90, "x_mm": 0.9, "y": 32},
+                {"x_01mm": 250, "x_mm": 2.5, "y": 196},
+                {"x_01mm": 400, "x_mm": 4.0, "y": 255},
+            ],
         }
         self._filter_enabled = True
         self._filter_params = {
@@ -214,22 +231,38 @@ class DemoDevice:
         return True
 
     def get_gamepad_with_keyboard(self):
-        return bool(self._gamepad_with_keyboard)
+        return bool(self._gamepad_settings.get("keyboard_routing", 1) != 0)
 
     def set_gamepad_with_keyboard(self, enabled):
-        self._gamepad_with_keyboard = bool(enabled)
+        self._gamepad_settings["keyboard_routing"] = 1 if enabled else 0
         return True
 
     def get_gamepad_settings(self):
-        return dict(self._gamepad_settings)
+        settings = deepcopy(self._gamepad_settings)
+        settings.setdefault("deadzone", int(settings.get("radial_deadzone", 0)))
+        settings.setdefault("snappy_mode", bool(settings.get("reactive_stick", False)))
+        settings.setdefault("curve_type", 0)
+        return settings
 
-    def set_gamepad_settings(self, deadzone, curve_type, square_mode, snappy_mode):
-        self._gamepad_settings = {
-            "deadzone": int(deadzone),
-            "curve_type": int(curve_type),
-            "square_mode": bool(square_mode),
-            "snappy_mode": bool(snappy_mode),
-        }
+    def set_gamepad_settings(self, settings_or_deadzone, curve_type=None, square_mode=None, snappy_mode=None):
+        if isinstance(settings_or_deadzone, dict):
+            settings = deepcopy(settings_or_deadzone)
+        else:
+            settings = deepcopy(self._gamepad_settings)
+            settings["radial_deadzone"] = int(settings_or_deadzone)
+            settings["square_mode"] = bool(square_mode)
+            settings["reactive_stick"] = bool(snappy_mode)
+        curve_points = list(settings.get("curve_points") or self._gamepad_settings.get("curve_points") or [])
+        curve_floor = int(curve_points[0].get("y", 0)) if curve_points else 0
+        settings["radial_deadzone"] = max(
+            int(settings.get("radial_deadzone", settings.get("deadzone", 0))),
+            curve_floor,
+        )
+        settings["deadzone"] = int(settings.get("radial_deadzone", settings.get("deadzone", 0)))
+        settings["snappy_mode"] = bool(settings.get("reactive_stick", settings.get("snappy_mode", False)))
+        settings.setdefault("curve_type", 0)
+        self._gamepad_settings = settings
+        self._gamepad_with_keyboard = bool(self._gamepad_settings.get("keyboard_routing", 1) != 0)
         return True
 
     def get_filter_enabled(self):

@@ -64,10 +64,10 @@ class AppSettingsPage(QWidget):
     def _build_live_card(self) -> SectionCard:
         card = SectionCard(
             "Global Live Updates",
-            "One shared live toggle and interval for auto-refresh and all live preview pages.",
+            "One shared live toggle and interval for auto-refresh, live previews, and firmware performance diagnostics.",
         )
 
-        self.live_toggle = QCheckBox("Enable global live polling")
+        self.live_toggle = QCheckBox("Enable global live polling and perf diagnostics")
         self.live_toggle.toggled.connect(self._on_live_toggled)
         card.body_layout.addWidget(self.live_toggle)
 
@@ -87,7 +87,7 @@ class AppSettingsPage(QWidget):
         card.body_layout.addLayout(row)
 
         note = QLabel(
-            "Applies to periodic status refresh and live previews (travel, graph, debug, gamepad, curve tracking)."
+            "Applies to periodic status refresh and live previews. It also re-enables the firmware perf diagnostics session while pages are polling."
         )
         note.setObjectName("Muted")
         note.setWordWrap(True)

@@ -9,7 +9,7 @@ class KeyboardPageMixin:
         _, body = create_page_frame(
             parent,
             "Keyboard",
-            "Per-key actuation, rapid trigger, SOCD pairing and HID keycodes. This screen follows the shared selected key from the app shell.",
+            "Per-key actuation, rapid trigger, SOCD pairing and output actions. This screen follows the shared selected key from the app shell.",
         )
 
         if not hasattr(self, "selected_key_var"):
@@ -56,11 +56,11 @@ class KeyboardPageMixin:
 
         keycode_card = create_card(
             body,
-            "HID Keycode",
-            "Choose the keyboard keycode this switch emits when keyboard output is enabled.",
+            "Output Action",
+            "Choose the action this switch emits when non-gamepad output is enabled: keyboard, media, browser, brightness, or mouse.",
         )
         keycode_row = create_section_row(keycode_card)
-        ttk.Label(keycode_row, text="Keycode:", width=20).pack(side=tk.LEFT)
+        ttk.Label(keycode_row, text="Action:", width=20).pack(side=tk.LEFT)
         self.key_hid_keycode_var = tk.StringVar(value="Q")
         keycode_combo = ttk.Combobox(
             keycode_row,

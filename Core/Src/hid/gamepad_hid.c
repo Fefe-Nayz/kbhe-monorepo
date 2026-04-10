@@ -1,149 +1,293 @@
-/*
- * gamepad_hid.c
- * Implémentation du gamepad HID pour touches Hall Effect
- * Chaque touche est mappée sur un axe (X, Y, Z, Rx, Ry, Rz)
- */
-
 #include "hid/gamepad_hid.h"
+
 #include "settings.h"
+#include "trigger/trigger.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
-#include <math.h>
 #include <string.h>
 
-//--------------------------------------------------------------------+
-// Variables internes
-//--------------------------------------------------------------------+
+#define GAMEPAD_AXIS_RANGE 255u
+#define GAMEPAD_BUTTON_BIT_COUNT 32u
 
-// Current gamepad report
 static gamepad_report_t gamepad_report = {0};
-
-// Previous report for change detection
 static gamepad_report_t prev_gamepad_report = {0};
-
-// Flag for report change detection
+static settings_gamepad_t cached_gamepad = SETTINGS_DEFAULT_GAMEPAD;
+static settings_gamepad_mapping_t cached_mappings[NUM_KEYS];
 static volatile bool gamepad_report_changed = false;
-
-// Gamepad enabled flag (default: enabled)
 static bool gamepad_enabled = true;
 
-// Raw axis values before processing (for snappy mode)
-static float raw_axis_values[GAMEPAD_NUM_AXES] = {0};
-
-//--------------------------------------------------------------------+
-// Internal: Analog curve processing
-//--------------------------------------------------------------------+
-
-/**
- * Apply deadzone to a value
- * @param value Input value (0.0 - 1.0)
- * @param deadzone Deadzone threshold (0.0 - 1.0)
- * @return Processed value with deadzone applied
- */
-static float apply_deadzone(float value, float deadzone) {
-  if (value < deadzone) {
-    return 0.0f;
-  }
-  // Rescale remaining range to 0-1
-  return (value - deadzone) / (1.0f - deadzone);
+static inline uint8_t gamepad_max_u8(uint8_t a, uint8_t b) {
+  return (a > b) ? a : b;
 }
 
-/**
- * Apply analog curve
- * @param value Input value (0.0 - 1.0)
- * @param curve_type 0=linear, 1=smooth, 2=aggressive
- * @return Processed value
- */
-static float apply_curve(float value, uint8_t curve_type) {
-  switch (curve_type) {
-  case 1: // Smooth (quadratic ease-in-out)
-    return value * value;
-  case 2: // Aggressive (cubic)
-    return value * value * value;
-  default: // Linear
-    return value;
+static inline int16_t gamepad_clamp_axis_i16(int32_t value) {
+  if (value > (int32_t)GAMEPAD_AXIS_RANGE) {
+    return (int16_t)GAMEPAD_AXIS_RANGE;
+  }
+  if (value < -(int32_t)GAMEPAD_AXIS_RANGE) {
+    return -(int16_t)GAMEPAD_AXIS_RANGE;
+  }
+  return (int16_t)value;
+}
+
+static uint8_t gamepad_effective_radial_deadzone(
+    const settings_gamepad_t *gamepad) {
+  uint8_t curve_floor = 0u;
+
+  if (gamepad == NULL) {
+    return 0u;
+  }
+
+  curve_floor = gamepad->curve[0].y;
+  return (gamepad->radial_deadzone > curve_floor) ? gamepad->radial_deadzone
+                                                  : curve_floor;
+}
+
+static uint16_t gamepad_isqrt_u32(uint32_t value) {
+  uint32_t op = value;
+  uint32_t res = 0u;
+  uint32_t one = 1uL << 30;
+
+  while (one > op) {
+    one >>= 2;
+  }
+
+  while (one != 0u) {
+    if (op >= res + one) {
+      op -= res + one;
+      res = (res >> 1) + one;
+    } else {
+      res >>= 1;
+    }
+    one >>= 2;
+  }
+
+  return (uint16_t)res;
+}
+
+static int8_t gamepad_to_signed_axis(int16_t value) {
+  int32_t clamped = gamepad_clamp_axis_i16(value);
+  int32_t magnitude = clamped >= 0 ? clamped : -clamped;
+  int32_t scaled = (magnitude * 127 + (GAMEPAD_AXIS_RANGE / 2)) /
+                   (int32_t)GAMEPAD_AXIS_RANGE;
+
+  if (scaled > 127) {
+    scaled = 127;
+  }
+
+  return clamped >= 0 ? (int8_t)scaled : (int8_t)(-scaled);
+}
+
+static gamepad_report_t gamepad_neutral_report(void) {
+  gamepad_report_t neutral = {0};
+  neutral.buttons = 0u;
+  neutral.lx = 0;
+  neutral.ly = 0;
+  neutral.rx = 0;
+  neutral.ry = 0;
+  neutral.lt = 0u;
+  neutral.rt = 0u;
+  return neutral;
+}
+
+static void gamepad_store_report(const gamepad_report_t *report) {
+  if (report == NULL) {
+    return;
+  }
+
+  if (memcmp(&gamepad_report, report, sizeof(gamepad_report_t)) != 0) {
+    memcpy(&gamepad_report, report, sizeof(gamepad_report_t));
+    gamepad_report_changed = true;
   }
 }
 
-//--------------------------------------------------------------------+
-// Public API Implementation
-//--------------------------------------------------------------------+
+static void gamepad_compose_axis_pair(uint8_t positive, uint8_t negative,
+                                      bool reactive_stick, int16_t *out_value) {
+  uint8_t pos = positive;
+  uint8_t neg = negative;
+
+  if (out_value == NULL) {
+    return;
+  }
+
+  if (reactive_stick && pos > 0u && neg > 0u) {
+    if (pos >= neg) {
+      neg = 0u;
+    } else {
+      pos = 0u;
+    }
+  }
+
+  *out_value = (int16_t)pos - (int16_t)neg;
+}
+
+static void gamepad_apply_stick_shape(int16_t *x, int16_t *y,
+                                      uint8_t radial_deadzone,
+                                      bool square_mode) {
+  int32_t x_val = 0;
+  int32_t y_val = 0;
+  uint32_t mag_sq = 0u;
+  uint16_t magnitude = 0u;
+
+  if (x == NULL || y == NULL) {
+    return;
+  }
+
+  x_val = *x;
+  y_val = *y;
+
+  if (!square_mode) {
+    mag_sq = (uint32_t)(x_val * x_val + y_val * y_val);
+    if (mag_sq > (uint32_t)(GAMEPAD_AXIS_RANGE * GAMEPAD_AXIS_RANGE)) {
+      magnitude = gamepad_isqrt_u32(mag_sq);
+      if (magnitude > 0u) {
+        x_val = (x_val * (int32_t)GAMEPAD_AXIS_RANGE) / (int32_t)magnitude;
+        y_val = (y_val * (int32_t)GAMEPAD_AXIS_RANGE) / (int32_t)magnitude;
+      }
+    }
+  }
+
+  mag_sq = (uint32_t)(x_val * x_val + y_val * y_val);
+  if (mag_sq == 0u) {
+    *x = 0;
+    *y = 0;
+    return;
+  }
+
+  magnitude = gamepad_isqrt_u32(mag_sq);
+  if (radial_deadzone >= GAMEPAD_AXIS_RANGE) {
+    *x = 0;
+    *y = 0;
+    return;
+  }
+
+  if (magnitude <= radial_deadzone) {
+    *x = 0;
+    *y = 0;
+    return;
+  }
+
+  if (radial_deadzone > 0u && magnitude > 0u) {
+    int32_t scaled_magnitude =
+        ((int32_t)(magnitude - radial_deadzone) * (int32_t)GAMEPAD_AXIS_RANGE +
+         (int32_t)((GAMEPAD_AXIS_RANGE - radial_deadzone) / 2u)) /
+        (int32_t)(GAMEPAD_AXIS_RANGE - radial_deadzone);
+
+    if (scaled_magnitude > (int32_t)GAMEPAD_AXIS_RANGE) {
+      scaled_magnitude = (int32_t)GAMEPAD_AXIS_RANGE;
+    }
+
+    x_val = (x_val * scaled_magnitude) / (int32_t)magnitude;
+    y_val = (y_val * scaled_magnitude) / (int32_t)magnitude;
+  }
+
+  *x = gamepad_clamp_axis_i16(x_val);
+  *y = gamepad_clamp_axis_i16(y_val);
+}
 
 void gamepad_hid_init(void) {
-  // Initialize all axes to center (released position)
-  memset(&gamepad_report, 0, sizeof(gamepad_report));
-  memset(&prev_gamepad_report, 0, sizeof(prev_gamepad_report));
-  memset(raw_axis_values, 0, sizeof(raw_axis_values));
+  memset(cached_mappings, 0, sizeof(cached_mappings));
+  cached_gamepad = (settings_gamepad_t)SETTINGS_DEFAULT_GAMEPAD;
+  gamepad_report = gamepad_neutral_report();
+  prev_gamepad_report = gamepad_neutral_report();
   gamepad_report_changed = false;
   gamepad_enabled = true;
 }
 
 bool gamepad_hid_is_ready(void) { return tud_hid_n_ready(HID_ITF_GAMEPAD); }
 
-void gamepad_hid_set_axis(uint8_t axis_index, uint8_t value) {
-  if (axis_index >= GAMEPAD_NUM_AXES)
-    return;
+void gamepad_hid_reload_settings(void) {
+  const settings_t *settings = settings_get();
 
-  if (gamepad_report.axes[axis_index] != value) {
-    gamepad_report.axes[axis_index] = value;
-    gamepad_report_changed = true;
+  if (settings == NULL) {
+    cached_gamepad = (settings_gamepad_t)SETTINGS_DEFAULT_GAMEPAD;
+    memset(cached_mappings, 0, sizeof(cached_mappings));
+    return;
+  }
+
+  memcpy(&cached_gamepad, &settings->gamepad, sizeof(cached_gamepad));
+  for (uint8_t key = 0; key < NUM_KEYS; key++) {
+    cached_mappings[key] = settings->keys[key].gamepad_map;
   }
 }
 
-void gamepad_hid_set_axis_from_distance(uint8_t axis_index, float distance) {
-  if (axis_index >= GAMEPAD_NUM_AXES)
+void gamepad_hid_refresh_state(void) {
+  gamepad_report_t next_report = gamepad_neutral_report();
+  uint8_t positive[GAMEPAD_AXIS_TRIGGER_R + 1u] = {0};
+  uint8_t negative[GAMEPAD_AXIS_TRIGGER_R + 1u] = {0};
+  uint8_t radial_deadzone = gamepad_effective_radial_deadzone(&cached_gamepad);
+  int16_t left_x = 0;
+  int16_t left_y = 0;
+  int16_t right_x = 0;
+  int16_t right_y = 0;
+
+  if (!gamepad_enabled) {
+    gamepad_store_report(&next_report);
     return;
+  }
 
-  // Clamp distance to 0.0 - 1.0
-  if (distance < 0.0f)
-    distance = 0.0f;
-  if (distance > 1.0f)
-    distance = 1.0f;
+  for (uint8_t key = 0; key < NUM_KEYS; key++) {
+    const settings_gamepad_mapping_t *mapping = &cached_mappings[key];
+    uint16_t distance_01mm = 0u;
+    uint8_t analog_value = 0u;
 
-  // Store raw value for snappy mode processing
-  raw_axis_values[axis_index] = distance;
+    if (mapping->button > GAMEPAD_BUTTON_NONE &&
+        mapping->button <= GAMEPAD_BUTTON_HOME &&
+        trigger_get_key_state(key) == PRESSED) {
+      uint8_t bit_index = (uint8_t)(mapping->button - 1u);
+      if (bit_index < GAMEPAD_BUTTON_BIT_COUNT) {
+        next_report.buttons |= (uint32_t)1u << bit_index;
+      }
+    }
 
-  // Get gamepad settings
-  const settings_t *s = settings_get();
-  float deadzone = s ? (s->gamepad.deadzone / 255.0f) : 0.0f;
-  uint8_t curve_type = s ? s->gamepad.curve_type : 0;
-  bool snappy_mode = s ? s->gamepad.snappy_mode : false;
-  bool square_mode = s ? s->gamepad.square_mode : false;
+    if (mapping->axis <= GAMEPAD_AXIS_NONE ||
+        mapping->axis > GAMEPAD_AXIS_TRIGGER_R) {
+      continue;
+    }
 
-  // Apply deadzone
-  float processed = apply_deadzone(distance, deadzone);
+    distance_01mm = trigger_get_distance_01mm(key);
+    analog_value = settings_gamepad_apply_curve(distance_01mm);
 
-  // Apply analog curve
-  processed = apply_curve(processed, curve_type);
-
-  // Snappy mode: use max of opposing axes (for axes 3↔5 which are A↔D)
-  if (snappy_mode) {
-    // Keys 3 and 5 are A and D (opposing)
-    if (axis_index == 3 && raw_axis_values[5] > processed) {
-      processed = 0.0f; // D is stronger, suppress A
-    } else if (axis_index == 5 && raw_axis_values[3] > processed) {
-      processed = 0.0f; // A is stronger, suppress D
+    if (mapping->direction == (uint8_t)GAMEPAD_DIR_NEGATIVE) {
+      negative[mapping->axis] =
+          gamepad_max_u8(negative[mapping->axis], analog_value);
+    } else {
+      positive[mapping->axis] =
+          gamepad_max_u8(positive[mapping->axis], analog_value);
     }
   }
 
-  // Square mode: remove circular boundary limitation
-  // This is typically applied to X/Y pairs but we just max out the range
-  if (square_mode) {
-    // Already 0-1 linear, square mode means no circular normalization needed
-    // For now just ensure full range is available
-  }
+  gamepad_compose_axis_pair(positive[GAMEPAD_AXIS_LEFT_X],
+                            negative[GAMEPAD_AXIS_LEFT_X],
+                            cached_gamepad.reactive_stick != 0u, &left_x);
+  gamepad_compose_axis_pair(positive[GAMEPAD_AXIS_LEFT_Y],
+                            negative[GAMEPAD_AXIS_LEFT_Y],
+                            cached_gamepad.reactive_stick != 0u, &left_y);
+  gamepad_compose_axis_pair(positive[GAMEPAD_AXIS_RIGHT_X],
+                            negative[GAMEPAD_AXIS_RIGHT_X],
+                            cached_gamepad.reactive_stick != 0u, &right_x);
+  gamepad_compose_axis_pair(positive[GAMEPAD_AXIS_RIGHT_Y],
+                            negative[GAMEPAD_AXIS_RIGHT_Y],
+                            cached_gamepad.reactive_stick != 0u, &right_y);
 
-  // Convert to 0-255 range
-  uint8_t value = (uint8_t)(processed * 255.0f);
+  gamepad_apply_stick_shape(&left_x, &left_y, radial_deadzone,
+                            cached_gamepad.square_mode != 0u);
+  gamepad_apply_stick_shape(&right_x, &right_y, radial_deadzone,
+                            cached_gamepad.square_mode != 0u);
 
-  gamepad_hid_set_axis(axis_index, value);
+  next_report.lx = gamepad_to_signed_axis(left_x);
+  next_report.ly = gamepad_to_signed_axis(left_y);
+  next_report.rx = gamepad_to_signed_axis(right_x);
+  next_report.ry = gamepad_to_signed_axis(right_y);
+  next_report.lt = gamepad_max_u8(positive[GAMEPAD_AXIS_TRIGGER_L],
+                                  negative[GAMEPAD_AXIS_TRIGGER_L]);
+  next_report.rt = gamepad_max_u8(positive[GAMEPAD_AXIS_TRIGGER_R],
+                                  negative[GAMEPAD_AXIS_TRIGGER_R]);
+
+  gamepad_store_report(&next_report);
 }
 
 bool gamepad_hid_send_report_if_changed(void) {
-  if (!gamepad_enabled) {
-    return false;
-  }
-
   if (!gamepad_report_changed) {
     return false;
   }
@@ -152,14 +296,12 @@ bool gamepad_hid_send_report_if_changed(void) {
     return false;
   }
 
-  // Check if report actually changed from last sent
   if (memcmp(&gamepad_report, &prev_gamepad_report, sizeof(gamepad_report)) ==
       0) {
     gamepad_report_changed = false;
     return false;
   }
 
-  // Send report (report_id = 0, no report ID in descriptor)
   if (tud_hid_n_report(HID_ITF_GAMEPAD, 0, &gamepad_report,
                        sizeof(gamepad_report))) {
     memcpy(&prev_gamepad_report, &gamepad_report, sizeof(gamepad_report));
@@ -172,6 +314,14 @@ bool gamepad_hid_send_report_if_changed(void) {
 
 void gamepad_hid_task(void) { gamepad_hid_send_report_if_changed(); }
 
-void gamepad_hid_set_enabled(bool enabled) { gamepad_enabled = enabled; }
+void gamepad_hid_set_enabled(bool enabled) {
+  if (gamepad_enabled != enabled) {
+    gamepad_report_t neutral = gamepad_neutral_report();
+    gamepad_enabled = enabled;
+    gamepad_store_report(&neutral);
+  } else {
+    gamepad_enabled = enabled;
+  }
+}
 
 bool gamepad_hid_is_enabled(void) { return gamepad_enabled; }

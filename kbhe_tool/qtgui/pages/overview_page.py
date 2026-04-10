@@ -131,7 +131,7 @@ class OverviewPage(QWidget):
         action_specs = [
             ("Tune Keys", "keyboard", "Actuation, release, remap, rapid trigger"),
             ("Calibrate", "calibration", "Zero points and analog curve editing"),
-            ("Gamepad", "gamepad", "Deadzone, response curve, key mapping"),
+        ("Gamepad", "gamepad", "Routing, response curve, stick preview, key mapping"),
             ("Lighting", "lighting", "Matrix painting and brightness"),
             ("Effects", "effects", "Live animation mode and timing"),
             ("Firmware", "firmware", "Flash app image and inspect updater logs"),

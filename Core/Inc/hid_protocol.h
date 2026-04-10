@@ -197,7 +197,16 @@ typedef struct __attribute__((packed)) {
   uint8_t socd_resolution;          // settings_socd_resolution_t
   uint8_t rapid_trigger_enabled; // RT enable flag
   uint8_t disable_kb_on_gamepad; // Disable keyboard when gamepad active
-  uint8_t reserved[50];
+  uint8_t continuous_rapid_trigger; // Continue RT until full release
+  uint8_t behavior_mode;            // key_behavior_mode_t
+  uint8_t hold_threshold_10ms;      // Tap-hold / toggle threshold
+  uint8_t dynamic_zone_count;       // 1..4 for dynamic mapping
+  uint16_t secondary_hid_keycode;   // Hold / alternate action
+  struct __attribute__((packed)) {
+    uint8_t end_mm_tenths;
+    uint16_t hid_keycode;
+  } dynamic_zones[SETTINGS_DYNAMIC_ZONE_COUNT];
+  uint8_t reserved[34];
 } hid_packet_key_settings_t;
 
 /**
@@ -232,11 +241,15 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t deadzone;    // 0-255
-  uint8_t curve_type;  // 0=linear, 1=smooth, 2=aggressive
-  uint8_t square_mode; // 0 or 1
-  uint8_t snappy_mode; // 0 or 1
-  uint8_t reserved[58];
+  uint8_t radial_deadzone;
+  uint8_t keyboard_routing;
+  uint8_t square_mode;
+  uint8_t reactive_stick;
+  struct __attribute__((packed)) {
+    uint16_t x_01mm;
+    uint8_t y;
+  } curve[GAMEPAD_CURVE_POINT_COUNT];
+  uint8_t reserved[46];
 } hid_packet_gamepad_settings_t;
 
 typedef struct __attribute__((packed)) {

@@ -52,7 +52,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 // CLASS CONFIGURATION - HID uniquement
 //--------------------------------------------------------------------+
-#define CFG_TUD_HID 5 // Keyboard + Raw HID + Gamepad + NKRO Keyboard + Consumer
+#define CFG_TUD_HID 6 // Keyboard + Raw HID + Gamepad + NKRO + Consumer + Mouse
 #define CFG_TUD_CDC 0
 #define CFG_TUD_MSC 0
 #define CFG_TUD_MIDI 0

@@ -78,36 +78,47 @@ static uint8_t const desc_raw_hid_report[] = {
     TUD_HID_REPORT_DESC_GENERIC_INOUT(64)};
 
 //--------------------------------------------------------------------+
-// HID Report Descriptor - Gamepad with 6 axes (for 6 Hall Effect keys)
-// Each axis represents key travel distance (0-255)
+// HID Report Descriptor - Gamepad v1
+// 32 buttons + 4 centered stick axes + 2 analog triggers
 //--------------------------------------------------------------------+
 static uint8_t const desc_gamepad_report[] = {
     HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),
     HID_USAGE(HID_USAGE_DESKTOP_GAMEPAD),
     HID_COLLECTION(HID_COLLECTION_APPLICATION),
-    // 6 axes for the 6 keys (X, Y, Z, Rx, Ry, Rz)
+    HID_USAGE_PAGE(HID_USAGE_PAGE_BUTTON),
+    HID_USAGE_MIN(1),
+    HID_USAGE_MAX(32),
+    HID_LOGICAL_MIN(0),
+    HID_LOGICAL_MAX(1),
+    HID_REPORT_COUNT(32),
+    HID_REPORT_SIZE(1),
+    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+
     HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),
-
-    // X axis - Key 0
     HID_USAGE(HID_USAGE_DESKTOP_X),
-    // Y axis - Key 1
     HID_USAGE(HID_USAGE_DESKTOP_Y),
-    // Z axis - Key 2
-    HID_USAGE(HID_USAGE_DESKTOP_Z),
-    // Rx axis - Key 3
     HID_USAGE(HID_USAGE_DESKTOP_RX),
-    // Ry axis - Key 4
     HID_USAGE(HID_USAGE_DESKTOP_RY),
-    // Rz axis - Key 5
-    HID_USAGE(HID_USAGE_DESKTOP_RZ),
+    HID_LOGICAL_MIN_N(-127, 1),
+    HID_LOGICAL_MAX(127),
+    HID_REPORT_COUNT(4),
+    HID_REPORT_SIZE(8),
+    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
 
-    HID_LOGICAL_MIN(0), HID_LOGICAL_MAX_N(255, 2), HID_REPORT_COUNT(6),
-    HID_REPORT_SIZE(8), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+    HID_USAGE(HID_USAGE_DESKTOP_Z),
+    HID_USAGE(HID_USAGE_DESKTOP_RZ),
+    HID_LOGICAL_MIN(0),
+    HID_LOGICAL_MAX_N(255, 2),
+    HID_REPORT_COUNT(2),
+    HID_REPORT_SIZE(8),
+    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
     HID_COLLECTION_END};
 
 // Consumer control interface: media keys / volume
 static uint8_t const desc_consumer_report[] = {
     TUD_HID_REPORT_DESC_CONSUMER()};
+
+static uint8_t const desc_mouse_report[] = {TUD_HID_REPORT_DESC_MOUSE()};
 
 //--------------------------------------------------------------------+
 // Configuration Descriptor
@@ -120,6 +131,7 @@ enum {
   ITF_NUM_GAMEPAD,
   ITF_NUM_NKRO,
   ITF_NUM_CONSUMER,
+  ITF_NUM_MOUSE,
   ITF_NUM_TOTAL
 };
 
@@ -136,6 +148,8 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
     return desc_nkro_report;
   case ITF_NUM_CONSUMER:
     return desc_consumer_report;
+  case ITF_NUM_MOUSE:
+    return desc_mouse_report;
   default:
     return NULL;
   }
@@ -149,7 +163,8 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
  */
 #define CONFIG_TOTAL_LEN                                                       \
   (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN + TUD_HID_INOUT_DESC_LEN +           \
-   TUD_HID_DESC_LEN + TUD_HID_DESC_LEN + TUD_HID_DESC_LEN)
+   TUD_HID_DESC_LEN + TUD_HID_DESC_LEN + TUD_HID_DESC_LEN +                    \
+   TUD_HID_DESC_LEN)
 
 static uint8_t const desc_configuration[] = {
     // Config number, interface count, string index, total length, attribute,
@@ -183,6 +198,11 @@ static uint8_t const desc_configuration[] = {
     // Interface 4: Consumer Control HID (volume / media keys)
     TUD_HID_DESCRIPTOR(ITF_NUM_CONSUMER, STRID_CONSUMER, HID_ITF_PROTOCOL_NONE,
                        sizeof(desc_consumer_report), EPNUM_CONSUMER, HID_EP_SIZE,
+                       HID_POLL_INTERVAL_8KHZ),
+
+    // Interface 5: Mouse HID (buttons + wheel)
+    TUD_HID_DESCRIPTOR(ITF_NUM_MOUSE, STRID_MOUSE, HID_ITF_PROTOCOL_MOUSE,
+                       sizeof(desc_mouse_report), EPNUM_MOUSE, HID_EP_SIZE,
                        HID_POLL_INTERVAL_8KHZ)};
 
 //--------------------------------------------------------------------+
@@ -243,7 +263,8 @@ static char const *string_desc_arr[] = {
     "Raw HID",                  // 4: Interface Raw HID
     "HE Gamepad",               // 5: Interface Gamepad (Hall Effect)
     "NKRO Keyboard",            // 6: Interface NKRO Keyboard
-    "Consumer Control"           // 7: Consumer Control interface
+    "Consumer Control",         // 7: Consumer Control interface
+    "Mouse"                     // 8: Mouse interface
 };
 
 static uint16_t _desc_str[32 + 1];

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from kbhe_tool.protocol import (
     HID_KEYCODES,
     HID_KEYCODE_NAMES,
+    KEY_BEHAVIORS,
     KEY_COUNT,
     SOCD_RESOLUTIONS,
 )
@@ -44,10 +45,11 @@ class _SliderRow(QWidget):
     """Compact slider with label and live mm readout."""
 
     def __init__(self, label: str, minimum: float, maximum: float, default: float,
-                 decimals: int, scale: int, parent=None):
+                 decimals: int, scale: int, parent=None, suffix: str = " mm"):
         super().__init__(parent)
         self._scale = scale
         self._decimals = decimals
+        self._suffix = suffix
 
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
@@ -72,7 +74,9 @@ class _SliderRow(QWidget):
         self._refresh_label(self.slider.value())
 
     def _refresh_label(self, raw: int) -> None:
-        self.value_label.setText(f"{raw / self._scale:.{self._decimals}f} mm")
+        self.value_label.setText(
+            f"{raw / self._scale:.{self._decimals}f}{self._suffix}"
+        )
 
     def get_value(self) -> float:
         return self.slider.value() / self._scale
@@ -159,6 +163,7 @@ class KeyboardPage(QWidget):
         self._build_actuation_card(left)
         self._build_socd_card(left)
         self._build_rapid_card(right)
+        self._build_behavior_card(right)
 
         left.addStretch(1)
         right.addStretch(1)
@@ -193,13 +198,16 @@ class KeyboardPage(QWidget):
         return card
 
     def _build_keycode_card(self, parent: QVBoxLayout) -> None:
-        card = SectionCard("HID Output", "Keycode this switch sends when keyboard mode is active.")
+        card = SectionCard(
+            "Output Action",
+            "Choose the action this switch sends when non-gamepad output is active: keyboard, media, browser, brightness, or mouse.",
+        )
         parent.addWidget(card)
         bl = card.body_layout
 
         row = QHBoxLayout()
         row.setSpacing(10)
-        lbl = QLabel("Keycode")
+        lbl = QLabel("Action")
         lbl.setObjectName("Muted")
         lbl.setFixedWidth(165)
         row.addWidget(lbl)
@@ -214,6 +222,13 @@ class KeyboardPage(QWidget):
         self.disable_kb_check.stateChanged.connect(self._on_changed)
         self._controls.append(self.disable_kb_check)
         bl.addWidget(self.disable_kb_check)
+
+    def _create_action_combo(self) -> QComboBox:
+        combo = QComboBox()
+        combo.addItems(list(HID_KEYCODES.keys()))
+        combo.currentIndexChanged.connect(self._on_changed)
+        self._controls.append(combo)
+        return combo
 
     def _build_actuation_card(self, parent: QVBoxLayout) -> None:
         card = SectionCard("Fixed Actuation", "Used when rapid trigger is disabled.")
@@ -283,6 +298,11 @@ class KeyboardPage(QWidget):
         self._controls.append(self.rapid_check)
         bl.addWidget(self.rapid_check)
 
+        self.continuous_rt_check = QCheckBox("Continuous rapid trigger until full release")
+        self.continuous_rt_check.stateChanged.connect(self._on_changed)
+        self._controls.append(self.continuous_rt_check)
+        bl.addWidget(self.continuous_rt_check)
+
         self.rapid_body = QWidget()
         rapid_bl = QVBoxLayout(self.rapid_body)
         rapid_bl.setContentsMargins(0, 4, 0, 0)
@@ -318,6 +338,128 @@ class KeyboardPage(QWidget):
         bl.addWidget(hint)
 
         self._update_rapid_visibility()
+
+    def _build_behavior_card(self, parent: QVBoxLayout) -> None:
+        card = SectionCard(
+            "Advanced Behavior",
+            "Switch between normal output, tap-hold, toggle, or 1-4 dynamic travel zones.",
+        )
+        parent.addWidget(card)
+        bl = card.body_layout
+
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(10)
+        mode_lbl = QLabel("Behavior")
+        mode_lbl.setObjectName("Muted")
+        mode_lbl.setFixedWidth(165)
+        mode_row.addWidget(mode_lbl)
+        self.behavior_combo = QComboBox()
+        for label, value in KEY_BEHAVIORS.items():
+            self.behavior_combo.addItem(label, value)
+        self.behavior_combo.currentIndexChanged.connect(self._on_behavior_changed)
+        self._controls.append(self.behavior_combo)
+        mode_row.addWidget(self.behavior_combo, 1)
+        bl.addLayout(mode_row)
+
+        self.tap_hold_body = QWidget()
+        tap_bl = QVBoxLayout(self.tap_hold_body)
+        tap_bl.setContentsMargins(0, 0, 0, 0)
+        tap_bl.setSpacing(8)
+        tap_action_row = QHBoxLayout()
+        tap_action_row.setSpacing(10)
+        tap_action_lbl = QLabel("Hold action")
+        tap_action_lbl.setObjectName("Muted")
+        tap_action_lbl.setFixedWidth(165)
+        tap_action_row.addWidget(tap_action_lbl)
+        self.tap_hold_secondary_combo = self._create_action_combo()
+        tap_action_row.addWidget(self.tap_hold_secondary_combo, 1)
+        tap_bl.addLayout(tap_action_row)
+        self.tap_hold_threshold_row = _SliderRow(
+            "Hold threshold", 50, 1000, 200, decimals=0, scale=1, suffix=" ms"
+        )
+        self.tap_hold_threshold_row.slider.valueChanged.connect(self._on_changed)
+        self._controls.append(self.tap_hold_threshold_row.slider)
+        tap_bl.addWidget(self.tap_hold_threshold_row)
+        bl.addWidget(self.tap_hold_body)
+
+        self.toggle_body = QWidget()
+        toggle_bl = QVBoxLayout(self.toggle_body)
+        toggle_bl.setContentsMargins(0, 0, 0, 0)
+        toggle_bl.setSpacing(8)
+        self.toggle_threshold_row = _SliderRow(
+            "Hold threshold", 50, 1000, 200, decimals=0, scale=1, suffix=" ms"
+        )
+        self.toggle_threshold_row.slider.valueChanged.connect(self._on_changed)
+        self._controls.append(self.toggle_threshold_row.slider)
+        toggle_bl.addWidget(self.toggle_threshold_row)
+        toggle_hint = QLabel(
+            "Quick tap toggles the primary action. Holding falls back to a momentary press."
+        )
+        toggle_hint.setObjectName("Muted")
+        toggle_hint.setWordWrap(True)
+        toggle_bl.addWidget(toggle_hint)
+        bl.addWidget(self.toggle_body)
+
+        self.dynamic_body = QWidget()
+        dynamic_bl = QVBoxLayout(self.dynamic_body)
+        dynamic_bl.setContentsMargins(0, 0, 0, 0)
+        dynamic_bl.setSpacing(8)
+
+        count_row = QHBoxLayout()
+        count_row.setSpacing(10)
+        count_lbl = QLabel("Zone count")
+        count_lbl.setObjectName("Muted")
+        count_lbl.setFixedWidth(165)
+        count_row.addWidget(count_lbl)
+        self.dynamic_zone_count_combo = QComboBox()
+        for count in range(1, 5):
+            self.dynamic_zone_count_combo.addItem(str(count), count)
+        self.dynamic_zone_count_combo.currentIndexChanged.connect(self._on_behavior_changed)
+        self._controls.append(self.dynamic_zone_count_combo)
+        count_row.addWidget(self.dynamic_zone_count_combo, 1)
+        dynamic_bl.addLayout(count_row)
+
+        self.dynamic_zone_rows = []
+        for zone_index in range(4):
+            zone_widget = QWidget()
+            zone_layout = QVBoxLayout(zone_widget)
+            zone_layout.setContentsMargins(0, 0, 0, 0)
+            zone_layout.setSpacing(6)
+
+            zone_header = QLabel(f"Zone {zone_index + 1}")
+            zone_header.setObjectName("Muted")
+            zone_layout.addWidget(zone_header)
+
+            zone_slider = _SliderRow(
+                "Travel end", 0.1, 4.0, float(zone_index + 1), decimals=1, scale=10
+            )
+            zone_slider.slider.valueChanged.connect(self._on_changed)
+            self._controls.append(zone_slider.slider)
+            zone_layout.addWidget(zone_slider)
+
+            zone_action_row = QHBoxLayout()
+            zone_action_row.setSpacing(10)
+            zone_action_lbl = QLabel("Action")
+            zone_action_lbl.setObjectName("Muted")
+            zone_action_lbl.setFixedWidth(165)
+            zone_action_row.addWidget(zone_action_lbl)
+            zone_combo = self._create_action_combo()
+            zone_action_row.addWidget(zone_combo, 1)
+            zone_layout.addLayout(zone_action_row)
+
+            dynamic_bl.addWidget(zone_widget)
+            self.dynamic_zone_rows.append((zone_widget, zone_slider, zone_combo))
+
+        bl.addWidget(self.dynamic_body)
+
+        hint = QLabel(
+            "Tap-hold uses the primary action on tap and the secondary action on hold. Dynamic mapping swaps the active action by travel zone."
+        )
+        hint.setObjectName("Muted")
+        hint.setWordWrap(True)
+        bl.addWidget(hint)
+
+        self._update_behavior_visibility()
 
     def _build_gamepad_card(self, parent: QVBoxLayout) -> None:
         # (Gamepad output disable is already in keycode card — this card is kept
@@ -369,6 +511,27 @@ class KeyboardPage(QWidget):
         self._update_socd_hint()
         self._on_changed()
 
+    def _on_behavior_changed(self, *_) -> None:
+        self._update_behavior_visibility()
+        self._on_changed()
+
+    def _update_behavior_visibility(self) -> None:
+        behavior = (
+            int(self.behavior_combo.currentData())
+            if hasattr(self, "behavior_combo") and self.behavior_combo.currentIndex() >= 0
+            else int(KEY_BEHAVIORS["Normal"])
+        )
+        zone_count = (
+            int(self.dynamic_zone_count_combo.currentData())
+            if hasattr(self, "dynamic_zone_count_combo") and self.dynamic_zone_count_combo.currentIndex() >= 0
+            else 1
+        )
+        self.tap_hold_body.setVisible(behavior == KEY_BEHAVIORS["Tap-Hold"])
+        self.toggle_body.setVisible(behavior == KEY_BEHAVIORS["Toggle"])
+        self.dynamic_body.setVisible(behavior == KEY_BEHAVIORS["Dynamic Mapping"])
+        for index, (widget, _slider, _combo) in enumerate(getattr(self, "dynamic_zone_rows", []), start=1):
+            widget.setVisible(index <= zone_count)
+
     # ------------------------------------------------------------------
     # Session wiring
     # ------------------------------------------------------------------
@@ -412,6 +575,16 @@ class KeyboardPage(QWidget):
             if self.socd_resolution_combo.currentIndex() >= 0
             else 0
         )
+        behavior_mode = (
+            int(self.behavior_combo.currentData())
+            if self.behavior_combo.currentIndex() >= 0
+            else int(KEY_BEHAVIORS["Normal"])
+        )
+        dynamic_zone_count = (
+            int(self.dynamic_zone_count_combo.currentData())
+            if self.dynamic_zone_count_combo.currentIndex() >= 0
+            else 1
+        )
 
         rt_press = self.rt_press_row.get_value()
         rt_release = (
@@ -419,6 +592,14 @@ class KeyboardPage(QWidget):
             if self.separate_check.isChecked()
             else rt_press
         )
+        dynamic_zones = []
+        for _widget, slider, combo in self.dynamic_zone_rows:
+            dynamic_zones.append(
+                {
+                    "end_mm_tenths": int(round(slider.get_value() * 10.0)),
+                    "hid_keycode": HID_KEYCODES.get(combo.currentText(), HID_KEYCODES["NO"]),
+                }
+            )
         return {
             "hid_keycode":            HID_KEYCODES.get(self.keycode_combo.currentText(), HID_KEYCODES["Q"]),
             "actuation_point_mm":     self.fixed_actuation_row.get_value(),
@@ -427,9 +608,21 @@ class KeyboardPage(QWidget):
             "rapid_trigger_activation": self.rt_activation_row.get_value(),
             "rapid_trigger_press":    rt_press,
             "rapid_trigger_release":  rt_release,
+            "continuous_rapid_trigger": self.continuous_rt_check.isChecked(),
             "socd_pair":              socd,
             "socd_resolution":        socd_resolution,
             "disable_kb_on_gamepad":  self.disable_kb_check.isChecked(),
+            "behavior_mode":          behavior_mode,
+            "hold_threshold_ms":      (
+                self.tap_hold_threshold_row.get_value()
+                if behavior_mode == KEY_BEHAVIORS["Tap-Hold"]
+                else self.toggle_threshold_row.get_value()
+            ),
+            "secondary_hid_keycode":  HID_KEYCODES.get(
+                self.tap_hold_secondary_combo.currentText(), HID_KEYCODES["NO"]
+            ),
+            "dynamic_zone_count":     dynamic_zone_count,
+            "dynamic_zones":          dynamic_zones,
         }
 
     def _sync_from_settings(self, s: dict) -> None:
@@ -446,6 +639,7 @@ class KeyboardPage(QWidget):
             self.rt_activation_row.set_value(_safe_float(s.get("rapid_trigger_activation", 0.5)))
             self.rt_press_row.set_value(_safe_float(s.get("rapid_trigger_press", 0.3)))
             self.rt_release_row.set_value(_safe_float(s.get("rapid_trigger_release", 0.3)))
+            self.continuous_rt_check.setChecked(bool(s.get("continuous_rapid_trigger", False)))
 
             rt_press   = _safe_float(s.get("rapid_trigger_press", 0.3))
             rt_release = _safe_float(s.get("rapid_trigger_release", 0.3))
@@ -461,8 +655,30 @@ class KeyboardPage(QWidget):
             )
 
             self.disable_kb_check.setChecked(bool(s.get("disable_kb_on_gamepad", False)))
+            behavior_mode = int(s.get("behavior_mode", KEY_BEHAVIORS["Normal"]))
+            self.behavior_combo.setCurrentIndex(max(0, self.behavior_combo.findData(behavior_mode)))
+            self.tap_hold_threshold_row.set_value(_safe_float(s.get("hold_threshold_ms", 200)))
+            self.toggle_threshold_row.set_value(_safe_float(s.get("hold_threshold_ms", 200)))
+            secondary_name = HID_KEYCODE_NAMES.get(
+                int(s.get("secondary_hid_keycode", HID_KEYCODES["NO"])),
+                "NO",
+            )
+            self.tap_hold_secondary_combo.setCurrentIndex(
+                max(0, self.tap_hold_secondary_combo.findText(secondary_name))
+            )
+            dynamic_zone_count = int(s.get("dynamic_zone_count", 1))
+            self.dynamic_zone_count_combo.setCurrentIndex(
+                max(0, self.dynamic_zone_count_combo.findData(dynamic_zone_count))
+            )
+            dynamic_zones = s.get("dynamic_zones") or []
+            for index, (_widget, slider, combo) in enumerate(self.dynamic_zone_rows):
+                zone = dynamic_zones[index] if index < len(dynamic_zones) else {}
+                slider.set_value(_safe_float(zone.get("end_mm", (index + 1) * 1.0)))
+                zone_name = HID_KEYCODE_NAMES.get(int(zone.get("hid_keycode", HID_KEYCODES["NO"])), "NO")
+                combo.setCurrentIndex(max(0, combo.findText(zone_name)))
             self._update_rapid_visibility()
             self._update_socd_hint()
+            self._update_behavior_visibility()
             self._update_layout_summary(s)
         finally:
             self._loading = False
@@ -488,10 +704,18 @@ class KeyboardPage(QWidget):
         actuation = _safe_float(settings.get("actuation_point_mm", 0.0))
         rt_enabled = bool(settings.get("rapid_trigger_enabled", False))
         rt_press = _safe_float(settings.get("rapid_trigger_press", 0.0))
+        behavior_mode = int(settings.get("behavior_mode", KEY_BEHAVIORS["Normal"]))
         self.summary_keycode_chip.set_text_and_level(key_name, "info")
         self.summary_actuation_chip.set_text_and_level(f"{actuation:.2f} mm", "neutral")
         if rt_enabled:
-            self.summary_rt_chip.set_text_and_level(f"RT {rt_press:.2f} mm", "ok")
+            suffix = " C" if bool(settings.get("continuous_rapid_trigger", False)) else ""
+            self.summary_rt_chip.set_text_and_level(f"RT {rt_press:.2f} mm{suffix}", "ok")
+        elif behavior_mode == KEY_BEHAVIORS["Tap-Hold"]:
+            self.summary_rt_chip.set_text_and_level("Tap-Hold", "info")
+        elif behavior_mode == KEY_BEHAVIORS["Toggle"]:
+            self.summary_rt_chip.set_text_and_level("Toggle", "info")
+        elif behavior_mode == KEY_BEHAVIORS["Dynamic Mapping"]:
+            self.summary_rt_chip.set_text_and_level("Dynamic", "info")
         else:
             self.summary_rt_chip.set_text_and_level("RT Off", "neutral")
 

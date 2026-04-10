@@ -3,8 +3,12 @@
 #include "analog/filter.h"
 #include "analog/lut.h"
 #include "analog/calibration.h"
+#include "diagnostics.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+
+#define ANALOG_PROFILE_DECIMATION 32u
 
 static AnalogConfig_t analog_config;
 
@@ -25,17 +29,20 @@ static uint8_t current_mux_channel = 0;
 static bool is_scan_complete = false;
 
 static analog_task_monitor_t analog_task_monitor;
+static uint8_t analog_profile_counter = 0u;
 
 static inline bool analog_is_valid_physical_index(uint8_t index) {
     return index < NUM_ANALOG_INPUTS;
 }
 
 static inline uint32_t analog_cycles_to_us(uint32_t cycles) {
-    if (SystemCoreClock == 0U) {
+    uint32_t cycles_per_us = SystemCoreClock / 1000000U;
+
+    if (cycles_per_us == 0U) {
         return 0U;
     }
 
-    return (uint32_t)(((uint64_t)cycles * 1000000ULL) / (uint64_t)SystemCoreClock);
+    return (cycles + (cycles_per_us / 2U)) / cycles_per_us;
 }
 
 /*
@@ -105,6 +112,8 @@ void analog_init(AnalogConfig_t* config) {
 
 void analog_task() {
     const uint8_t* key_to_phys = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX;
+    bool diagnostics_active = diagnostics_is_perf_active();
+    bool collect_profile = diagnostics_active && (analog_profile_counter == 0u);
     uint32_t raw_cycles = 0;
     uint32_t filter_cycles = 0;
     uint32_t calibration_cycles = 0;
@@ -116,39 +125,75 @@ void analog_task() {
     uint8_t key_max_index = 0;
     uint16_t nonzero_keys = 0;
 
-    for (uint8_t key = 0; key < NUM_KEYS; key++) {
-        uint32_t key_start_cycles = DWT->CYCCNT;
-        uint8_t physical_key_index = key_to_phys[key];
+    if (diagnostics_active) {
+        analog_profile_counter++;
+        if (analog_profile_counter >= ANALOG_PROFILE_DECIMATION) {
+            analog_profile_counter = 0u;
+        }
+    } else {
+        analog_profile_counter = 0u;
+        memset(&analog_task_monitor, 0, sizeof(analog_task_monitor));
+    }
 
-        uint32_t step_start_cycles = DWT->CYCCNT;
-        uint16_t raw_value = analog_is_valid_physical_index(physical_key_index)
-                                 ? raw_values[physical_key_index]
-                                 : 0;
-        raw_cycles += (DWT->CYCCNT - step_start_cycles);
+    for (uint8_t key = 0; key < NUM_KEYS; key++) {
+        uint32_t key_start_cycles = 0u;
+        uint8_t physical_key_index = key_to_phys[key];
+        uint16_t raw_value = 0u;
+        uint16_t filtered_value = 0u;
+        uint16_t calibrated_value = 0u;
+        uint16_t distance_value = 0u;
+
+        if (collect_profile) {
+            uint32_t step_start_cycles = DWT->CYCCNT;
+            key_start_cycles = step_start_cycles;
+            raw_value = analog_is_valid_physical_index(physical_key_index)
+                            ? raw_values[physical_key_index]
+                            : 0u;
+            raw_cycles += (DWT->CYCCNT - step_start_cycles);
+        } else {
+            raw_value = analog_is_valid_physical_index(physical_key_index)
+                            ? raw_values[physical_key_index]
+                            : 0u;
+        }
 
         if (raw_value != 0) {
             nonzero_keys++;
         }
 
-        step_start_cycles = DWT->CYCCNT;
-        uint16_t filtered_value = filter_compute_next_filtered_value(key, raw_value);
-        filter_cycles += (DWT->CYCCNT - step_start_cycles);
+        if (collect_profile) {
+            uint32_t step_start_cycles = DWT->CYCCNT;
+            filtered_value = filter_compute_next_filtered_value(key, raw_value);
+            filter_cycles += (DWT->CYCCNT - step_start_cycles);
 
-        step_start_cycles = DWT->CYCCNT;
-        uint16_t calibrated_value = calibration_get_calibrated_value(key, filtered_value);
-        calibration_cycles += (DWT->CYCCNT - step_start_cycles);
+            step_start_cycles = DWT->CYCCNT;
+            calibrated_value = calibration_get_calibrated_value(key, filtered_value);
+            calibration_cycles += (DWT->CYCCNT - step_start_cycles);
 
-        step_start_cycles = DWT->CYCCNT;
-        uint16_t distance_value = getDistanceFromVoltage(calibrated_value);
-        lut_cycles += (DWT->CYCCNT - step_start_cycles);
+            step_start_cycles = DWT->CYCCNT;
+            distance_value = getDistanceFromVoltage(calibrated_value);
+            lut_cycles += (DWT->CYCCNT - step_start_cycles);
 
-        step_start_cycles = DWT->CYCCNT;
-        filtered_values[key] = filtered_value;
-        calibrated_values[key] = calibrated_value;
-        distance_values[key] = distance_value;
-        normalized_values[key] =
-            calibration_get_normalized_distance(key, (int16_t)distance_value);
-        store_cycles += (DWT->CYCCNT - step_start_cycles);
+            step_start_cycles = DWT->CYCCNT;
+            filtered_values[key] = filtered_value;
+            calibrated_values[key] = calibrated_value;
+            distance_values[key] = distance_value;
+            normalized_values[key] =
+                calibration_get_normalized_distance(key, (int16_t)distance_value);
+            store_cycles += (DWT->CYCCNT - step_start_cycles);
+        } else {
+            filtered_value = filter_compute_next_filtered_value(key, raw_value);
+            calibrated_value = calibration_get_calibrated_value(key, filtered_value);
+            distance_value = getDistanceFromVoltage(calibrated_value);
+            filtered_values[key] = filtered_value;
+            calibrated_values[key] = calibrated_value;
+            distance_values[key] = distance_value;
+            normalized_values[key] =
+                calibration_get_normalized_distance(key, (int16_t)distance_value);
+        }
+
+        if (!collect_profile) {
+            continue;
+        }
 
         uint32_t key_cycles = DWT->CYCCNT - key_start_cycles;
         key_sum_cycles += key_cycles;
@@ -163,16 +208,20 @@ void analog_task() {
         }
     }
 
-    analog_task_monitor.raw_us = (uint16_t)analog_cycles_to_us(raw_cycles);
-    analog_task_monitor.filter_us = (uint16_t)analog_cycles_to_us(filter_cycles);
-    analog_task_monitor.calibration_us = (uint16_t)analog_cycles_to_us(calibration_cycles);
-    analog_task_monitor.lut_us = (uint16_t)analog_cycles_to_us(lut_cycles);
-    analog_task_monitor.store_us = (uint16_t)analog_cycles_to_us(store_cycles);
-    analog_task_monitor.key_min_us = (uint16_t)analog_cycles_to_us(key_min_cycles == UINT32_MAX ? 0 : key_min_cycles);
-    analog_task_monitor.key_max_us = (uint16_t)analog_cycles_to_us(key_max_cycles);
-    analog_task_monitor.key_avg_us = (uint16_t)analog_cycles_to_us(key_sum_cycles / NUM_KEYS);
     analog_task_monitor.nonzero_keys = nonzero_keys;
-    analog_task_monitor.key_max_index = key_max_index;
+
+    if (collect_profile) {
+        analog_task_monitor.raw_us = (uint16_t)analog_cycles_to_us(raw_cycles);
+        analog_task_monitor.filter_us = (uint16_t)analog_cycles_to_us(filter_cycles);
+        analog_task_monitor.calibration_us = (uint16_t)analog_cycles_to_us(calibration_cycles);
+        analog_task_monitor.lut_us = (uint16_t)analog_cycles_to_us(lut_cycles);
+        analog_task_monitor.store_us = (uint16_t)analog_cycles_to_us(store_cycles);
+        analog_task_monitor.key_min_us =
+            (uint16_t)analog_cycles_to_us(key_min_cycles == UINT32_MAX ? 0u : key_min_cycles);
+        analog_task_monitor.key_max_us = (uint16_t)analog_cycles_to_us(key_max_cycles);
+        analog_task_monitor.key_avg_us = (uint16_t)analog_cycles_to_us(key_sum_cycles / NUM_KEYS);
+        analog_task_monitor.key_max_index = key_max_index;
+    }
 
     if (!filter_is_initialized()) {
         filter_set_initialized(true);
@@ -252,11 +301,9 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
         return;
     }
 
-    // Store ADC buffer values into raw values
-    for (uint8_t i = 0; i < NUM_MUX; i++) {
-        uint8_t physical_index = i + (current_mux_channel * NUM_MUX);
-        raw_values[physical_index] = adc_buffer[i];
-    }
+    memcpy(&raw_values[(uint16_t)current_mux_channel * NUM_MUX],
+           adc_buffer,
+           (size_t)NUM_MUX * sizeof(adc_buffer[0]));
 
     // Increment MUX channel
     current_mux_channel++;

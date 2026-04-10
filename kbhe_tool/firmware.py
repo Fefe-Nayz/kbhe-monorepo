@@ -1,4 +1,5 @@
 import pathlib
+import re
 import struct
 import time
 import zlib
@@ -13,6 +14,10 @@ _UPDATER_APP_SLOT_SIZE = 0x00050000
 _UPDATER_TRAILER_RESERVED_SIZE = 0x00000100
 _UPDATER_APP_MAX_IMAGE_SIZE = _UPDATER_APP_SLOT_SIZE - _UPDATER_TRAILER_RESERVED_SIZE
 
+_KBHE_FW_VERSION_RECORD_MAGIC = 0x4B465756
+_KBHE_FW_VERSION_RECORD_MAGIC_BYTES = struct.pack("<I", _KBHE_FW_VERSION_RECORD_MAGIC)
+_KBHE_FW_VERSION_RECORD_STRUCT = struct.Struct("<IHH")
+
 _DEBUG_GET_FW_PREFIX = b"\x80\xb4\x00\xaf"
 _DEBUG_GET_FW_SUFFIX = b"\x18\x46\xbd\x46\x5d\xf8\x04\x7b\x70\x47"
 _RELEASE_NEXT_FN_PREFIXES = (
@@ -21,6 +26,20 @@ _RELEASE_NEXT_FN_PREFIXES = (
     b"\x00\x00\x80\xb4\x00\xaf",
     b"\x80\xb4\x00\xaf",
 )
+
+
+def _read_repo_firmware_version() -> int | None:
+    repo_root = pathlib.Path(__file__).resolve().parent.parent
+    settings_path = repo_root / "Core" / "Src" / "settings.c"
+    if not settings_path.exists():
+        return None
+
+    text = settings_path.read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"#define\s+FIRMWARE_VERSION\s+(0x[0-9A-Fa-f]+|\d+)", text)
+    if not match:
+        return None
+
+    return int(match.group(1), 0)
 
 
 def format_firmware_version(version: int) -> str:
@@ -128,6 +147,42 @@ def _try_read_fw_version_from_image_trailer_bytes(data: bytes) -> tuple[int, str
     return fw_version, f"binary trailer @ 0x{trailer_offset:08X}"
 
 
+def _try_read_fw_version_from_metadata_bytes(data: bytes) -> tuple[int, str] | None:
+    candidates: list[tuple[int, int]] = []
+    search_pos = 0
+
+    while True:
+        record_offset = data.find(_KBHE_FW_VERSION_RECORD_MAGIC_BYTES, search_pos)
+        if record_offset < 0:
+            break
+        search_pos = record_offset + 1
+
+        record_end = record_offset + _KBHE_FW_VERSION_RECORD_STRUCT.size
+        if record_end > len(data):
+            continue
+
+        magic, version, version_xor = _KBHE_FW_VERSION_RECORD_STRUCT.unpack(
+            data[record_offset:record_end]
+        )
+        if magic != _KBHE_FW_VERSION_RECORD_MAGIC:
+            continue
+        if (version ^ version_xor) != 0xFFFF:
+            continue
+
+        candidates.append((record_offset, int(version)))
+
+    if not candidates:
+        return None
+
+    versions = {version for _offset, version in candidates}
+    if len(versions) > 1:
+        formatted = ", ".join(f"0x{v:04X}" for v in sorted(versions))
+        raise RuntimeError(f"ambiguous firmware version metadata in binary: {formatted}")
+
+    record_offset, version = candidates[0]
+    return version, f"binary metadata @ 0x{record_offset:08X}"
+
+
 def _try_read_fw_version_from_code_signature(data: bytes) -> tuple[int, str] | None:
     strong_candidates: list[tuple[int, str, int]] = []
 
@@ -213,13 +268,31 @@ def resolve_firmware_version(firmware_path: str | pathlib.Path, explicit_version
     if trailer is not None:
         return trailer
 
-    code_signature = _try_read_fw_version_from_code_signature(data)
-    if code_signature is not None:
-        return code_signature
+    metadata = _try_read_fw_version_from_metadata_bytes(data)
+    if metadata is not None:
+        return metadata
+
+    code_signature_error: RuntimeError | None = None
+
+    try:
+        code_signature = _try_read_fw_version_from_code_signature(data)
+    except RuntimeError as exc:
+        code_signature_error = exc
+    else:
+        if code_signature is not None:
+            return code_signature
+
+    repo_version = _read_repo_firmware_version()
+    if repo_version is not None:
+        suffix = "after ambiguous binary signature" if code_signature_error is not None else "repo source fallback"
+        return repo_version, f"Core/Src/settings.c ({suffix})"
+
+    if code_signature_error is not None:
+        raise code_signature_error
 
     raise RuntimeError(
         "could not detect firmware version from binary: no valid updater trailer "
-        "or settings_get_firmware_version code signature found"
+        "metadata, or settings_get_firmware_version code signature found"
     )
 
 def perform_firmware_update(device, firmware_path, firmware_version=None,

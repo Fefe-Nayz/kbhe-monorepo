@@ -67,13 +67,11 @@ void Error_Handler(void);
 #define ENCODER_WAVE_1_GPIO_Port GPIOB
 #define ENCODER_WAVE_2_Pin GPIO_PIN_4
 #define ENCODER_WAVE_2_GPIO_Port GPIOB
-#define M3_Pin GPIO_PIN_11
-#define M3_GPIO_Port GPIOC
-#define M2_Pin GPIO_PIN_12
-#define M2_GPIO_Port GPIOC
-#define M1_Pin GPIO_PIN_0
+#define M2_Pin GPIO_PIN_6
+#define M2_GPIO_Port GPIOD
+#define M1_Pin GPIO_PIN_5
 #define M1_GPIO_Port GPIOD
-#define M0_Pin GPIO_PIN_1
+#define M0_Pin GPIO_PIN_4
 #define M0_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */

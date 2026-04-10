@@ -6,6 +6,7 @@
 
 #include "hid/keyboard_hid.h"
 #include "hid/consumer_hid.h"
+#include "hid/mouse_hid.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "hid/raw_hid.h"
@@ -29,6 +30,10 @@ static volatile bool report_changed = false;
 
 // Flag pour indiquer qu'un rapport est prêt à être envoyé
 static volatile bool report_pending = false;
+
+static inline bool keyboard_hid_is_modifier(uint8_t keycode) {
+  return (keycode >= HID_KEY_CONTROL_LEFT) && (keycode <= HID_KEY_GUI_RIGHT);
+}
 
 //--------------------------------------------------------------------+
 // API Publique - Fonctions d'envoi de rapport clavier
@@ -78,6 +83,15 @@ void keyboard_hid_key_press(uint8_t keycode) {
   if (keycode == 0)
     return;
 
+  if (keyboard_hid_is_modifier(keycode)) {
+    uint8_t modifier_mask = (uint8_t)(1u << (keycode - HID_KEY_CONTROL_LEFT));
+    if ((keyboard_report.modifier & modifier_mask) == 0u) {
+      keyboard_report.modifier |= modifier_mask;
+      report_changed = true;
+    }
+    return;
+  }
+
   // Check if key is already pressed
   for (uint8_t i = 0; i < num_pressed_keys; i++) {
     if (pressed_keys[i] == keycode) {
@@ -95,6 +109,15 @@ void keyboard_hid_key_press(uint8_t keycode) {
 void keyboard_hid_key_release(uint8_t keycode) {
   if (keycode == 0)
     return;
+
+  if (keyboard_hid_is_modifier(keycode)) {
+    uint8_t modifier_mask = (uint8_t)(1u << (keycode - HID_KEY_CONTROL_LEFT));
+    if ((keyboard_report.modifier & modifier_mask) != 0u) {
+      keyboard_report.modifier &= (uint8_t)(~modifier_mask);
+      report_changed = true;
+    }
+    return;
+  }
 
   // Find and remove key
   for (uint8_t i = 0; i < num_pressed_keys; i++) {
@@ -126,7 +149,7 @@ bool keyboard_hid_send_report_if_changed(void) {
     keycodes[i] = pressed_keys[i];
   }
 
-  if (keyboard_hid_send_report(0, keycodes)) {
+  if (keyboard_hid_send_report(keyboard_report.modifier, keycodes)) {
     report_changed = false;
     return true;
   }
@@ -150,11 +173,10 @@ void keyboard_hid_task(void) {
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
                                hid_report_type_t report_type, uint8_t *buffer,
                                uint16_t reqlen) {
-  (void)instance;
   (void)report_id;
   (void)reqlen;
 
-  if (report_type == HID_REPORT_TYPE_INPUT) {
+  if ((instance == HID_ITF_KEYBOARD) && (report_type == HID_REPORT_TYPE_INPUT)) {
     // Retourner le rapport clavier courant
     memcpy(buffer, &keyboard_report, sizeof(keyboard_report));
     return sizeof(keyboard_report);
@@ -219,6 +241,10 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
 
   case HID_ITF_CONSUMER:
     consumer_hid_on_report_complete();
+    break;
+
+  case HID_ITF_MOUSE:
+    mouse_hid_on_report_complete();
     break;
 
   default:

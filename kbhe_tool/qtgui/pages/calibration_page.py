@@ -78,6 +78,9 @@ class CalibrationPage(QWidget):
         self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         self.reload()
 
+    def _has_curve_ui(self) -> bool:
+        return hasattr(self, "curve_key_badge")
+
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -86,7 +89,7 @@ class CalibrationPage(QWidget):
         scaffold = PageScaffold(
             "Calibration",
             "Calibre le zero au repos et la course max par touche. "
-            "Le mode guide utilise les LEDs pour piloter toute la procedure.",
+            "La forme de reponse analogique gamepad est maintenant geree depuis la page Gamepad.",
         )
         root.addWidget(scaffold, 1)
 
@@ -97,8 +100,6 @@ class CalibrationPage(QWidget):
         top_row.addWidget(self._build_manual_card(), 2)
         top_row.addWidget(self._build_guided_card(), 1)
         scaffold.content_layout.addLayout(top_row)
-
-        scaffold.add_card(self._build_curve_card())
 
         self.status_chip = StatusChip("Calibration page ready.", "neutral")
         scaffold.content_layout.addWidget(self.status_chip)
@@ -389,7 +390,8 @@ class CalibrationPage(QWidget):
     def _set_key_labels(self) -> None:
         text = key_display_name(self._current_key)
         self.layout_focus_chip.setText(text)
-        self.curve_key_badge.setText(text)
+        if self._has_curve_ui():
+            self.curve_key_badge.setText(text)
         self.focused_key_zero_label.setText(f"{text} zero")
         self.focused_key_max_label.setText(f"{text} max")
         self.guided_target_chip.setText(text)
@@ -420,6 +422,8 @@ class CalibrationPage(QWidget):
         return x, y
 
     def _on_spin_changed(self) -> None:
+        if not self._has_curve_ui():
+            return
         self._update_curve_preview()
         vals = (
             self.p1x_spin.value(),
@@ -438,6 +442,8 @@ class CalibrationPage(QWidget):
         self.preset_combo.blockSignals(False)
 
     def _on_preset_selected(self, index: int) -> None:
+        if not self._has_curve_ui():
+            return
         data = self.preset_combo.itemData(index)
         if data is None:
             return
@@ -448,6 +454,8 @@ class CalibrationPage(QWidget):
         self._update_curve_preview()
 
     def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
+        if not hasattr(self, "position_rate_label") or not hasattr(self, "position_series"):
+            return
         if enabled:
             self.position_rate_label.set_text_and_level(f"ON @ {int(interval_ms)} ms", "info")
             self.position_series.setVisible(True)
@@ -458,6 +466,8 @@ class CalibrationPage(QWidget):
             self.position_series.clear()
 
     def _update_position_dot(self) -> None:
+        if not hasattr(self, "position_series"):
+            return
         try:
             key_states = self.device.get_key_states() or {}
             travel_values = key_states.get("distances") or [0] * KEY_COUNT
@@ -484,6 +494,8 @@ class CalibrationPage(QWidget):
         self.position_series.append(travel, by)
 
     def _update_curve_preview(self) -> None:
+        if not hasattr(self, "curve_series"):
+            return
         self.curve_series.clear()
         p0 = (0, 0)
         p1 = (_clamp(self.p1x_spin.value(), 0, 255), _clamp(self.p1y_spin.value(), 0, 255))
@@ -588,7 +600,6 @@ class CalibrationPage(QWidget):
 
     def reload(self) -> None:
         self.load_calibration()
-        self.load_key_curve(self._current_key)
         self._poll_guided_status()
 
     def load_calibration(self) -> None:
@@ -706,6 +717,14 @@ class CalibrationPage(QWidget):
         self.key_max_spin.setValue(int(self._key_max_values[self._current_key]))
         self._loading = False
 
+        if not self._has_curve_ui():
+            self._refresh_layout_overview()
+            self._update_status(
+                "Analog curve editing moved to the Gamepad page.",
+                "info",
+            )
+            return
+
         try:
             curve = self.device.get_key_curve(self._current_key)
             if not curve:
@@ -735,6 +754,12 @@ class CalibrationPage(QWidget):
         self._update_status(f"Loaded curve for {key_display_name(self._current_key)}.", "success")
 
     def apply_analog_curve(self) -> None:
+        if not self._has_curve_ui():
+            self._update_status(
+                "Analog curve editing moved to the Gamepad page.",
+                "warning",
+            )
+            return
         try:
             ok = self.device.set_key_curve(
                 self._current_key,
@@ -752,16 +777,23 @@ class CalibrationPage(QWidget):
         self._update_status(f"Applied curve to {key_display_name(self._current_key)}.", "success")
 
     def on_selected_key_changed(self, key_index: int) -> None:
-        self.load_key_curve(key_index)
+        self._current_key = _clamp(key_index, 0, KEY_COUNT - 1)
+        self._set_key_labels()
+        self._loading = True
+        self.key_zero_spin.setValue(int(self._key_zero_values[self._current_key]))
+        self.key_max_spin.setValue(int(self._key_max_values[self._current_key]))
+        self._loading = False
         self._refresh_layout_overview()
 
     def on_live_tick(self) -> None:
-        if self.session.live_enabled:
+        if self.session.live_enabled and hasattr(self, "position_series"):
             self._update_position_dot()
         if self._guided_active or self.isVisible():
             self._poll_guided_status()
 
     def apply_theme(self) -> None:
+        if not hasattr(self, "curve_series"):
+            return
         c = current_colors()
         self.curve_series.setPen(QPen(QColor(c["accent"]), 2))
         if hasattr(self, "position_series"):
@@ -778,7 +810,7 @@ class CalibrationPage(QWidget):
 
     def on_page_activated(self) -> None:
         self.reload()
-        if self.session.live_enabled:
+        if self.session.live_enabled and hasattr(self, "position_series"):
             self._update_position_dot()
         self._poll_guided_status()
 

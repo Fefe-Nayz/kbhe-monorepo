@@ -8,6 +8,7 @@
 #include "analog/filter.h"
 #include "analog/lut.h"
 #include "flash_storage.h"
+#include "layout/keycodes.h"
 #include "layout/layout.h"
 #include "led_matrix.h"
 #include "trigger/socd.h"
@@ -19,7 +20,23 @@
 // Firmware Version
 //--------------------------------------------------------------------+
 #define FIRMWARE_VERSION 0x0105 // v1.5.0
-#define SETTINGS_VERSION_PREVIOUS 0x000B
+#define KBHE_FW_VERSION_RECORD_MAGIC 0x4B465756u
+#define SETTINGS_VERSION_PREVIOUS 0x000D
+#define SETTINGS_VERSION_V12 0x000C
+#define SETTINGS_VERSION_V11 0x000B
+
+typedef struct __attribute__((packed)) {
+  uint32_t magic;
+  uint16_t version;
+  uint16_t version_xor;
+} kbhe_fw_version_record_t;
+
+__attribute__((used, section(".kbhe_fw_version")))
+static const kbhe_fw_version_record_t g_kbhe_fw_version_record = {
+    .magic = KBHE_FW_VERSION_RECORD_MAGIC,
+    .version = FIRMWARE_VERSION,
+    .version_xor = (uint16_t)(FIRMWARE_VERSION ^ 0xFFFFu),
+};
 
 //--------------------------------------------------------------------+
 // Internal Variables
@@ -34,6 +51,8 @@ static bool settings_dirty = false;
 static uint8_t led_effect_restore_mode = LED_EFFECT_STATIC_MATRIX;
 static bool led_effect_restore_valid = false;
 
+static settings_key_t settings_default_key(uint8_t key_index);
+
 typedef struct __attribute__((packed)) {
   uint8_t rotation_action;
   uint8_t button_action;
@@ -43,6 +62,59 @@ typedef struct __attribute__((packed)) {
   uint8_t rgb_effect_mode;
   uint8_t rgb_step;
 } settings_legacy_rotary_encoder_t;
+
+typedef struct __attribute__((packed)) {
+  uint16_t hid_keycode;
+  uint8_t actuation_point_mm;
+  uint8_t release_point_mm;
+  uint8_t rapid_trigger_activation;
+  uint8_t rapid_trigger_press;
+  uint8_t rapid_trigger_release;
+  uint8_t socd_pair;
+  uint8_t rapid_trigger_enabled : 1;
+  uint8_t disable_kb_on_gamepad : 1;
+  uint8_t curve_enabled : 1;
+  uint8_t reserved_bits : 5;
+  settings_curve_t curve;
+  settings_gamepad_mapping_t gamepad_map;
+} settings_key_v13_t;
+
+typedef struct __attribute__((packed)) {
+  uint32_t magic_start;
+  uint16_t version;
+  uint16_t reserved;
+
+  settings_options_t options;
+  uint8_t padding1[3];
+
+  settings_key_v13_t keys[NUM_KEYS];
+
+  settings_gamepad_t gamepad;
+  settings_calibration_t calibration;
+  settings_led_t led;
+  uint8_t led_effect_mode;
+  uint8_t led_effect_speed;
+  uint8_t led_effect_color_r;
+  uint8_t led_effect_color_g;
+  uint8_t led_effect_color_b;
+  uint8_t led_fps_limit;
+  uint8_t led_effect_params[LED_EFFECT_MAX][LED_EFFECT_PARAM_COUNT];
+  settings_rotary_encoder_t rotary;
+  uint8_t filter_enabled;
+  uint8_t filter_noise_band;
+  uint8_t filter_alpha_min;
+  uint8_t filter_alpha_max;
+  uint32_t magic_end;
+  uint32_t crc32;
+} settings_v13_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t deadzone;
+  uint8_t curve_type;
+  uint8_t square_mode;
+  uint8_t snappy_mode;
+  uint8_t reserved[4];
+} settings_gamepad_v12_t;
 
 typedef struct __attribute__((packed)) {
   // Header
@@ -55,10 +127,53 @@ typedef struct __attribute__((packed)) {
   uint8_t padding1[3];
 
   // Per-key settings
-  settings_key_t keys[NUM_KEYS];
+  settings_key_v13_t keys[NUM_KEYS];
 
   // Gamepad settings
-  settings_gamepad_t gamepad;
+  settings_gamepad_v12_t gamepad;
+
+  // Calibration settings
+  settings_calibration_t calibration;
+
+  // LED matrix data
+  settings_led_t led;
+
+  // LED effect settings
+  uint8_t led_effect_mode;
+  uint8_t led_effect_speed;
+  uint8_t led_effect_color_r;
+  uint8_t led_effect_color_g;
+  uint8_t led_effect_color_b;
+  uint8_t led_fps_limit;
+  uint8_t led_effect_params[LED_EFFECT_MAX][LED_EFFECT_PARAM_COUNT];
+  settings_rotary_encoder_t rotary;
+
+  // ADC EMA Filter settings
+  uint8_t filter_enabled;
+  uint8_t filter_noise_band;
+  uint8_t filter_alpha_min;
+  uint8_t filter_alpha_max;
+
+  // Footer
+  uint32_t magic_end;
+  uint32_t crc32;
+} settings_v12_t;
+
+typedef struct __attribute__((packed)) {
+  // Header
+  uint32_t magic_start;
+  uint16_t version;
+  uint16_t reserved;
+
+  // Global options
+  settings_options_t options;
+  uint8_t padding1[3];
+
+  // Per-key settings
+  settings_key_v13_t keys[NUM_KEYS];
+
+  // Gamepad settings
+  settings_gamepad_v12_t gamepad;
 
   // Calibration settings
   settings_calibration_t calibration;
@@ -103,6 +218,206 @@ static void settings_default_rotary_encoder(settings_rotary_encoder_t *rotary) {
   rotary->progress_color_r = 40u;
   rotary->progress_color_g = 210u;
   rotary->progress_color_b = 64u;
+}
+
+static void settings_default_gamepad(settings_gamepad_t *gamepad) {
+  settings_gamepad_t defaults = SETTINGS_DEFAULT_GAMEPAD;
+
+  if (gamepad == NULL) {
+    return;
+  }
+
+  memcpy(gamepad, &defaults, sizeof(defaults));
+}
+
+static void settings_gamepad_sanitize_mapping(settings_gamepad_mapping_t *mapping) {
+  if (mapping == NULL) {
+    return;
+  }
+
+  if (mapping->axis > GAMEPAD_AXIS_TRIGGER_R) {
+    mapping->axis = GAMEPAD_AXIS_NONE;
+  }
+
+  if (mapping->direction > GAMEPAD_DIR_NEGATIVE) {
+    mapping->direction = GAMEPAD_DIR_POSITIVE;
+  }
+
+  if (mapping->button > GAMEPAD_BUTTON_HOME) {
+    mapping->button = GAMEPAD_BUTTON_NONE;
+  }
+
+  mapping->reserved = 0u;
+}
+
+static void settings_default_key_advanced(settings_key_advanced_t *advanced,
+                                          uint16_t primary_hid_keycode) {
+  if (advanced == NULL) {
+    return;
+  }
+
+  memset(advanced, 0, sizeof(*advanced));
+  advanced->behavior_mode = (uint8_t)KEY_BEHAVIOR_NORMAL;
+  advanced->hold_threshold_10ms = 20u;
+  advanced->dynamic_zone_count = 1u;
+  advanced->secondary_hid_keycode = KC_NO;
+  advanced->dynamic_zones[0].end_mm_tenths = 40u;
+  advanced->dynamic_zones[0].hid_keycode = primary_hid_keycode;
+  for (uint8_t i = 1u; i < SETTINGS_DYNAMIC_ZONE_COUNT; i++) {
+    advanced->dynamic_zones[i].end_mm_tenths = 40u;
+    advanced->dynamic_zones[i].hid_keycode = KC_NO;
+  }
+}
+
+static void settings_copy_key_from_v13(settings_key_t *dst,
+                                       const settings_key_v13_t *src,
+                                       uint8_t key_index) {
+  settings_key_t defaults = settings_default_key(key_index);
+
+  if (dst == NULL) {
+    return;
+  }
+
+  *dst = defaults;
+  if (src == NULL) {
+    return;
+  }
+
+  dst->hid_keycode = src->hid_keycode;
+  dst->actuation_point_mm = src->actuation_point_mm;
+  dst->release_point_mm = src->release_point_mm;
+  dst->rapid_trigger_activation = src->rapid_trigger_activation;
+  dst->rapid_trigger_press = src->rapid_trigger_press;
+  dst->rapid_trigger_release = src->rapid_trigger_release;
+  dst->socd_pair = src->socd_pair;
+  dst->rapid_trigger_enabled = src->rapid_trigger_enabled;
+  dst->disable_kb_on_gamepad = src->disable_kb_on_gamepad;
+  dst->curve_enabled = src->curve_enabled;
+  dst->reserved_bits = src->reserved_bits;
+  dst->curve = src->curve;
+  dst->gamepad_map = src->gamepad_map;
+  settings_default_key_advanced(&dst->advanced, dst->hid_keycode);
+}
+
+static void settings_sanitize_key_advanced(uint16_t primary_hid_keycode,
+                                           settings_key_t *key) {
+  settings_key_advanced_t defaults = {0};
+  uint8_t previous_end = 0u;
+  bool has_any_dynamic_action = false;
+
+  if (key == NULL) {
+    return;
+  }
+
+  settings_default_key_advanced(&defaults, primary_hid_keycode);
+
+  if (key->advanced.behavior_mode >= (uint8_t)KEY_BEHAVIOR_MAX) {
+    key->advanced.behavior_mode = defaults.behavior_mode;
+  }
+
+  if (key->advanced.hold_threshold_10ms == 0u) {
+    key->advanced.hold_threshold_10ms = defaults.hold_threshold_10ms;
+  }
+
+  if (key->advanced.dynamic_zone_count == 0u ||
+      key->advanced.dynamic_zone_count > SETTINGS_DYNAMIC_ZONE_COUNT) {
+    key->advanced.dynamic_zone_count = defaults.dynamic_zone_count;
+  }
+
+  key->advanced.reserved = 0u;
+
+  for (uint8_t i = 0u; i < SETTINGS_DYNAMIC_ZONE_COUNT; i++) {
+    if (key->advanced.dynamic_zones[i].end_mm_tenths == 0u) {
+      key->advanced.dynamic_zones[i].end_mm_tenths =
+          defaults.dynamic_zones[i].end_mm_tenths;
+    } else if (key->advanced.dynamic_zones[i].end_mm_tenths > 40u) {
+      key->advanced.dynamic_zones[i].end_mm_tenths = 40u;
+    }
+
+    if (key->advanced.dynamic_zones[i].end_mm_tenths < previous_end) {
+      key->advanced.dynamic_zones[i].end_mm_tenths = previous_end;
+    }
+
+    previous_end = key->advanced.dynamic_zones[i].end_mm_tenths;
+    if (key->advanced.dynamic_zones[i].hid_keycode != KC_NO) {
+      has_any_dynamic_action = true;
+    }
+  }
+
+  if (!has_any_dynamic_action) {
+    key->advanced.dynamic_zones[0].hid_keycode = primary_hid_keycode;
+  } else if (key->advanced.dynamic_zones[0].hid_keycode == KC_NO) {
+    key->advanced.dynamic_zones[0].hid_keycode = primary_hid_keycode;
+  }
+}
+
+static void settings_gamepad_sanitize(settings_gamepad_t *gamepad) {
+  settings_gamepad_t defaults;
+  uint16_t previous_x = 0u;
+  bool has_any_span = false;
+
+  if (gamepad == NULL) {
+    return;
+  }
+
+  settings_default_gamepad(&defaults);
+
+  if (gamepad->keyboard_routing >= (uint8_t)GAMEPAD_KEYBOARD_ROUTING_MAX) {
+    gamepad->keyboard_routing = defaults.keyboard_routing;
+  }
+
+  gamepad->square_mode = gamepad->square_mode ? 1u : 0u;
+  gamepad->reactive_stick = gamepad->reactive_stick ? 1u : 0u;
+
+  for (uint8_t i = 0; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
+    if (gamepad->curve[i].x_01mm > GAMEPAD_CURVE_MAX_DISTANCE_01MM) {
+      gamepad->curve[i].x_01mm = GAMEPAD_CURVE_MAX_DISTANCE_01MM;
+    }
+
+    if (i > 0u && gamepad->curve[i].x_01mm < previous_x) {
+      gamepad->curve[i].x_01mm = previous_x;
+    }
+
+    if (gamepad->curve[i].x_01mm != previous_x || i == 0u) {
+      has_any_span = true;
+    }
+
+    previous_x = gamepad->curve[i].x_01mm;
+  }
+
+  if (!has_any_span) {
+    memcpy(gamepad->curve, defaults.curve, sizeof(defaults.curve));
+  }
+}
+
+static void settings_gamepad_apply_keyboard_routing_option(void) {
+  current_settings.options.gamepad_with_keyboard =
+      current_settings.gamepad.keyboard_routing !=
+              (uint8_t)GAMEPAD_KEYBOARD_ROUTING_DISABLED
+          ? 1u
+          : 0u;
+}
+
+static void settings_gamepad_from_v12(settings_gamepad_t *gamepad,
+                                      const settings_gamepad_v12_t *legacy,
+                                      bool legacy_gamepad_with_keyboard) {
+  if (gamepad == NULL) {
+    return;
+  }
+
+  settings_default_gamepad(gamepad);
+  if (legacy == NULL) {
+    return;
+  }
+
+  gamepad->radial_deadzone = legacy->deadzone;
+  gamepad->keyboard_routing =
+      legacy_gamepad_with_keyboard
+          ? (uint8_t)GAMEPAD_KEYBOARD_ROUTING_ALL_KEYS
+          : (uint8_t)GAMEPAD_KEYBOARD_ROUTING_DISABLED;
+  gamepad->square_mode = legacy->square_mode ? 1u : 0u;
+  gamepad->reactive_stick = legacy->snappy_mode ? 1u : 0u;
+  settings_gamepad_sanitize(gamepad);
 }
 
 static void settings_rotary_encoder_from_legacy(
@@ -310,6 +625,10 @@ static uint32_t crc32_compute(const void *data, uint32_t len) {
 
 _Static_assert(sizeof(settings_t) <= FLASH_STORAGE_SIZE,
                "settings_t must fit in the flash storage sector");
+_Static_assert(sizeof(settings_v13_t) <= FLASH_STORAGE_SIZE,
+               "settings_v13_t must fit in the flash storage sector");
+_Static_assert(sizeof(settings_v12_t) <= FLASH_STORAGE_SIZE,
+               "settings_v12_t must fit in the flash storage sector");
 _Static_assert(sizeof(settings_v11_t) <= FLASH_STORAGE_SIZE,
                "settings_v11_t must fit in the flash storage sector");
 
@@ -329,6 +648,8 @@ static settings_key_t settings_default_key(uint8_t key_index) {
       .curve = SETTINGS_DEFAULT_CURVE,
       .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP,
   };
+  settings_default_key_advanced(&key.advanced, key.hid_keycode);
+  settings_gamepad_sanitize_mapping(&key.gamepad_map);
   return key;
 }
 
@@ -345,6 +666,8 @@ static void settings_sanitize_key_config(uint8_t key_index, settings_key_t *key)
 
   resolution = settings_key_get_socd_resolution(key);
   settings_key_set_socd_resolution(key, resolution);
+  settings_gamepad_sanitize_mapping(&key->gamepad_map);
+  settings_sanitize_key_advanced(key->hid_keycode, key);
 }
 
 static void settings_set_defaults(void) {
@@ -367,8 +690,8 @@ static void settings_set_defaults(void) {
   }
 
   // Default gamepad settings
-  settings_gamepad_t default_gamepad = SETTINGS_DEFAULT_GAMEPAD;
-  current_settings.gamepad = default_gamepad;
+  settings_default_gamepad(&current_settings.gamepad);
+  settings_gamepad_apply_keyboard_routing_option();
 
   // Default calibration settings
   current_settings.calibration.lut_zero_value = LUT_ZERO_VALUE;
@@ -430,7 +753,7 @@ static bool settings_validate_current(const settings_t *s) {
   return true;
 }
 
-static bool settings_validate_v11(const settings_v11_t *s) {
+static bool settings_validate_v13(const settings_v13_t *s) {
   if (s->magic_start != SETTINGS_MAGIC_START) {
     return false;
   }
@@ -438,6 +761,44 @@ static bool settings_validate_v11(const settings_v11_t *s) {
     return false;
   }
   if (s->version != SETTINGS_VERSION_PREVIOUS) {
+    return false;
+  }
+
+  if (s->crc32 !=
+      crc32_compute(s, sizeof(settings_v13_t) - sizeof(uint32_t))) {
+    return false;
+  }
+
+  return true;
+}
+
+static bool settings_validate_v12(const settings_v12_t *s) {
+  if (s->magic_start != SETTINGS_MAGIC_START) {
+    return false;
+  }
+  if (s->magic_end != SETTINGS_MAGIC_END) {
+    return false;
+  }
+  if (s->version != SETTINGS_VERSION_V12) {
+    return false;
+  }
+
+  if (s->crc32 !=
+      crc32_compute(s, sizeof(settings_v12_t) - sizeof(uint32_t))) {
+    return false;
+  }
+
+  return true;
+}
+
+static bool settings_validate_v11(const settings_v11_t *s) {
+  if (s->magic_start != SETTINGS_MAGIC_START) {
+    return false;
+  }
+  if (s->magic_end != SETTINGS_MAGIC_END) {
+    return false;
+  }
+  if (s->version != SETTINGS_VERSION_V11) {
     return false;
   }
 
@@ -459,8 +820,11 @@ static void settings_migrate_v11(const settings_v11_t *legacy) {
   current_settings.options = legacy->options;
   memcpy(current_settings.padding1, legacy->padding1,
          sizeof(current_settings.padding1));
-  memcpy(current_settings.keys, legacy->keys, sizeof(current_settings.keys));
-  current_settings.gamepad = legacy->gamepad;
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    settings_copy_key_from_v13(&current_settings.keys[i], &legacy->keys[i], i);
+  }
+  settings_gamepad_from_v12(&current_settings.gamepad, &legacy->gamepad,
+                            legacy->options.gamepad_with_keyboard != 0);
   current_settings.calibration = legacy->calibration;
   current_settings.led = legacy->led;
   current_settings.led_effect_mode = legacy->led_effect_mode;
@@ -480,17 +844,95 @@ static void settings_migrate_v11(const settings_v11_t *legacy) {
   memcpy(((uint8_t *)&legacy_rotary) + 4u, legacy->led.reserved, 3u);
   settings_rotary_encoder_from_legacy(&current_settings.rotary, &legacy_rotary);
   settings_rotary_encoder_sanitize(&current_settings.rotary);
+  settings_gamepad_apply_keyboard_routing_option();
   settings_reset_led_effect_restore_state();
-
-  memset(current_settings.gamepad.reserved, 0,
-         sizeof(current_settings.gamepad.reserved));
   memset(current_settings.led.reserved, 0, sizeof(current_settings.led.reserved));
+  current_settings.magic_end = SETTINGS_MAGIC_END;
+  current_settings.crc32 = 0u;
+}
+
+static void settings_migrate_v13(const settings_v13_t *legacy) {
+  memset(&current_settings, 0, sizeof(current_settings));
+  current_settings.magic_start = SETTINGS_MAGIC_START;
+  current_settings.version = SETTINGS_VERSION;
+  current_settings.reserved = legacy->reserved;
+  current_settings.options = legacy->options;
+  memcpy(current_settings.padding1, legacy->padding1,
+         sizeof(current_settings.padding1));
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    settings_copy_key_from_v13(&current_settings.keys[i], &legacy->keys[i], i);
+  }
+  current_settings.gamepad = legacy->gamepad;
+  current_settings.calibration = legacy->calibration;
+  current_settings.led = legacy->led;
+  current_settings.led_effect_mode = legacy->led_effect_mode;
+  current_settings.led_effect_speed = legacy->led_effect_speed;
+  current_settings.led_effect_color_r = legacy->led_effect_color_r;
+  current_settings.led_effect_color_g = legacy->led_effect_color_g;
+  current_settings.led_effect_color_b = legacy->led_effect_color_b;
+  current_settings.led_fps_limit = legacy->led_fps_limit;
+  memcpy(current_settings.led_effect_params, legacy->led_effect_params,
+         sizeof(current_settings.led_effect_params));
+  current_settings.rotary = legacy->rotary;
+  current_settings.filter_enabled = legacy->filter_enabled;
+  current_settings.filter_noise_band = legacy->filter_noise_band;
+  current_settings.filter_alpha_min = legacy->filter_alpha_min;
+  current_settings.filter_alpha_max = legacy->filter_alpha_max;
+
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    settings_sanitize_key_config(i, &current_settings.keys[i]);
+  }
+  settings_gamepad_sanitize(&current_settings.gamepad);
+  settings_gamepad_apply_keyboard_routing_option();
+  settings_rotary_encoder_sanitize(&current_settings.rotary);
+  settings_reset_led_effect_restore_state();
+  current_settings.magic_end = SETTINGS_MAGIC_END;
+  current_settings.crc32 = 0u;
+}
+
+static void settings_migrate_v12(const settings_v12_t *legacy) {
+  memset(&current_settings, 0, sizeof(current_settings));
+  current_settings.magic_start = SETTINGS_MAGIC_START;
+  current_settings.version = SETTINGS_VERSION;
+  current_settings.reserved = legacy->reserved;
+  current_settings.options = legacy->options;
+  memcpy(current_settings.padding1, legacy->padding1,
+         sizeof(current_settings.padding1));
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    settings_copy_key_from_v13(&current_settings.keys[i], &legacy->keys[i], i);
+  }
+  settings_gamepad_from_v12(&current_settings.gamepad, &legacy->gamepad,
+                            legacy->options.gamepad_with_keyboard != 0);
+  current_settings.calibration = legacy->calibration;
+  current_settings.led = legacy->led;
+  current_settings.led_effect_mode = legacy->led_effect_mode;
+  current_settings.led_effect_speed = legacy->led_effect_speed;
+  current_settings.led_effect_color_r = legacy->led_effect_color_r;
+  current_settings.led_effect_color_g = legacy->led_effect_color_g;
+  current_settings.led_effect_color_b = legacy->led_effect_color_b;
+  current_settings.led_fps_limit = legacy->led_fps_limit;
+  memcpy(current_settings.led_effect_params, legacy->led_effect_params,
+         sizeof(current_settings.led_effect_params));
+  current_settings.rotary = legacy->rotary;
+  current_settings.filter_enabled = legacy->filter_enabled;
+  current_settings.filter_noise_band = legacy->filter_noise_band;
+  current_settings.filter_alpha_min = legacy->filter_alpha_min;
+  current_settings.filter_alpha_max = legacy->filter_alpha_max;
+
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    settings_sanitize_key_config(i, &current_settings.keys[i]);
+  }
+  settings_gamepad_apply_keyboard_routing_option();
+  settings_rotary_encoder_sanitize(&current_settings.rotary);
+  settings_reset_led_effect_restore_state();
   current_settings.magic_end = SETTINGS_MAGIC_END;
   current_settings.crc32 = 0u;
 }
 
 static bool settings_load_from_flash(bool *migrated) {
   settings_t temp;
+  settings_v13_t legacy_v13;
+  settings_v12_t legacy_v12;
   settings_v11_t legacy;
 
   if (migrated != NULL) {
@@ -505,6 +947,37 @@ static bool settings_load_from_flash(bool *migrated) {
   // Validate
   if (settings_validate_current(&temp)) {
     memcpy(&current_settings, &temp, sizeof(settings_t));
+    for (uint8_t i = 0; i < NUM_KEYS; i++) {
+      settings_sanitize_key_config(i, &current_settings.keys[i]);
+    }
+    settings_gamepad_sanitize(&current_settings.gamepad);
+    settings_gamepad_apply_keyboard_routing_option();
+    settings_rotary_encoder_sanitize(&current_settings.rotary);
+    settings_reset_led_effect_restore_state();
+    return true;
+  }
+
+  if (!flash_storage_read(0, &legacy_v13, sizeof(settings_v13_t))) {
+    return false;
+  }
+
+  if (settings_validate_v13(&legacy_v13)) {
+    settings_migrate_v13(&legacy_v13);
+    if (migrated != NULL) {
+      *migrated = true;
+    }
+    return true;
+  }
+
+  if (!flash_storage_read(0, &legacy_v12, sizeof(settings_v12_t))) {
+    return false;
+  }
+
+  if (settings_validate_v12(&legacy_v12)) {
+    settings_migrate_v12(&legacy_v12);
+    if (migrated != NULL) {
+      *migrated = true;
+    }
     return true;
   }
 
@@ -549,6 +1022,7 @@ void settings_init(void) {
 
   // Apply loaded settings to modules
   gamepad_hid_set_enabled(current_settings.options.gamepad_enabled);
+  gamepad_hid_reload_settings();
 
   // Apply LED settings (LED matrix must be initialized first in main.c)
   led_matrix_set_brightness(current_settings.led.brightness);
@@ -596,6 +1070,7 @@ bool settings_set_keyboard_enabled(bool enabled) {
 bool settings_set_gamepad_enabled(bool enabled) {
   current_settings.options.gamepad_enabled = enabled ? 1 : 0;
   gamepad_hid_set_enabled(enabled);
+  gamepad_hid_reload_settings();
   return settings_save();
 }
 
@@ -611,7 +1086,9 @@ bool settings_set_nkro_enabled(bool enabled) {
 
 bool settings_set_options(settings_options_t options) {
   current_settings.options = options;
+  settings_gamepad_apply_keyboard_routing_option();
   gamepad_hid_set_enabled(options.gamepad_enabled);
+  gamepad_hid_reload_settings();
   return settings_save();
 }
 
@@ -622,6 +1099,7 @@ settings_options_t settings_get_options(void) {
 bool settings_reset(void) {
   settings_set_defaults();
   gamepad_hid_set_enabled(current_settings.options.gamepad_enabled);
+  gamepad_hid_reload_settings();
   led_matrix_set_brightness(current_settings.led.brightness);
   led_matrix_set_raw_data(current_settings.led.pixels);
   led_matrix_set_enabled(current_settings.options.led_enabled);
@@ -871,6 +1349,7 @@ bool settings_set_key(uint8_t key_index, const settings_key_t *key) {
   settings_sanitize_key_config(key_index, &current_settings.keys[key_index]);
   trigger_apply_key_settings(key_index, &current_settings.keys[key_index]);
   socd_load_settings();
+  gamepad_hid_reload_settings();
   return true; // Don't auto-save
 }
 
@@ -883,10 +1362,14 @@ const settings_gamepad_t *settings_get_gamepad(void) {
 }
 
 bool settings_set_gamepad(const settings_gamepad_t *gamepad) {
-  if (gamepad == NULL)
+  if (gamepad == NULL) {
     return false;
+  }
 
   memcpy(&current_settings.gamepad, gamepad, sizeof(settings_gamepad_t));
+  settings_gamepad_sanitize(&current_settings.gamepad);
+  settings_gamepad_apply_keyboard_routing_option();
+  gamepad_hid_reload_settings();
   return true; // Don't auto-save
 }
 
@@ -1026,6 +1509,47 @@ uint8_t settings_apply_curve(uint8_t key_index, uint8_t input) {
   return bezier_cubic(input, 0, curve->p1.y, curve->p2.y, 255);
 }
 
+uint8_t settings_gamepad_apply_curve(uint16_t distance_01mm) {
+  const settings_gamepad_t *gamepad = &current_settings.gamepad;
+  const settings_gamepad_curve_point_t *curve = gamepad->curve;
+
+  if (distance_01mm <= curve[0].x_01mm) {
+    return curve[0].y;
+  }
+
+  for (uint8_t i = 1; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
+    uint16_t x0 = curve[i - 1u].x_01mm;
+    uint16_t x1 = curve[i].x_01mm;
+    uint8_t y0 = curve[i - 1u].y;
+    uint8_t y1 = curve[i].y;
+
+    if (distance_01mm <= x1) {
+      if (x1 <= x0) {
+        return y1;
+      }
+
+      uint32_t delta_x = (uint32_t)(x1 - x0);
+      uint32_t delta_input = (uint32_t)(distance_01mm - x0);
+      int32_t delta_y = (int32_t)y1 - (int32_t)y0;
+      int32_t interpolated =
+          (int32_t)y0 +
+          (int32_t)(((int64_t)delta_y * (int64_t)delta_input +
+                     (int64_t)(delta_x / 2u)) /
+                    (int64_t)delta_x);
+
+      if (interpolated < 0) {
+        return 0u;
+      }
+      if (interpolated > 255) {
+        return 255u;
+      }
+      return (uint8_t)interpolated;
+    }
+  }
+
+  return curve[GAMEPAD_CURVE_POINT_COUNT - 1u].y;
+}
+
 //--------------------------------------------------------------------+
 // Per-Key Gamepad Mapping API
 //--------------------------------------------------------------------+
@@ -1044,14 +1568,33 @@ bool settings_set_key_gamepad_mapping(
 
   memcpy(&current_settings.keys[key_index].gamepad_map, mapping,
          sizeof(settings_gamepad_mapping_t));
+  settings_gamepad_sanitize_mapping(&current_settings.keys[key_index].gamepad_map);
+  gamepad_hid_reload_settings();
   return true;
 }
 
 bool settings_is_gamepad_with_keyboard(void) {
-  return current_settings.options.gamepad_with_keyboard;
+  return current_settings.gamepad.keyboard_routing !=
+         (uint8_t)GAMEPAD_KEYBOARD_ROUTING_DISABLED;
 }
 
 bool settings_set_gamepad_with_keyboard(bool enabled) {
-  current_settings.options.gamepad_with_keyboard = enabled ? 1 : 0;
+  current_settings.gamepad.keyboard_routing =
+      enabled ? (uint8_t)GAMEPAD_KEYBOARD_ROUTING_ALL_KEYS
+              : (uint8_t)GAMEPAD_KEYBOARD_ROUTING_DISABLED;
+  settings_gamepad_apply_keyboard_routing_option();
+  gamepad_hid_reload_settings();
   return true;
+}
+
+bool settings_is_key_mapped_to_gamepad(uint8_t key_index) {
+  const settings_gamepad_mapping_t *mapping = NULL;
+
+  if (key_index >= NUM_KEYS) {
+    return false;
+  }
+
+  mapping = &current_settings.keys[key_index].gamepad_map;
+  return mapping->axis != (uint8_t)GAMEPAD_AXIS_NONE ||
+         mapping->button != (uint8_t)GAMEPAD_BUTTON_NONE;
 }

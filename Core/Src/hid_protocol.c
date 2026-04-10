@@ -6,6 +6,7 @@
 #include "hid_protocol.h"
 #include "adc_capture.h"
 #include "analog/analog.h"
+#include "diagnostics.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "main.h"
@@ -242,6 +243,14 @@ static void cmd_get_key_settings(const uint8_t *in, uint8_t *out) {
   resp->socd_resolution = (uint8_t)settings_key_get_socd_resolution(key);
   resp->rapid_trigger_enabled = key->rapid_trigger_enabled;
   resp->disable_kb_on_gamepad = key->disable_kb_on_gamepad;
+  resp->continuous_rapid_trigger =
+      settings_key_is_continuous_rapid_trigger_enabled(key) ? 1u : 0u;
+  resp->behavior_mode = key->advanced.behavior_mode;
+  resp->hold_threshold_10ms = key->advanced.hold_threshold_10ms;
+  resp->dynamic_zone_count = key->advanced.dynamic_zone_count;
+  resp->secondary_hid_keycode = key->advanced.secondary_hid_keycode;
+  memcpy(resp->dynamic_zones, key->advanced.dynamic_zones,
+         sizeof(resp->dynamic_zones));
 }
 
 static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
@@ -255,7 +264,9 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
     return;
   }
   if (!hid_is_valid_socd_pair(req->key_index, req->socd_pair) ||
-      req->socd_resolution >= (uint8_t)SETTINGS_SOCD_RESOLUTION_MAX) {
+      req->socd_resolution >= (uint8_t)SETTINGS_SOCD_RESOLUTION_MAX ||
+      req->behavior_mode >= (uint8_t)KEY_BEHAVIOR_MAX ||
+      req->dynamic_zone_count > SETTINGS_DYNAMIC_ZONE_COUNT) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
@@ -278,6 +289,14 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
       &key, (settings_socd_resolution_t)req->socd_resolution);
   key.rapid_trigger_enabled = req->rapid_trigger_enabled ? 1 : 0;
   key.disable_kb_on_gamepad = req->disable_kb_on_gamepad ? 1 : 0;
+  settings_key_set_continuous_rapid_trigger(
+      &key, req->continuous_rapid_trigger != 0u);
+  key.advanced.behavior_mode = req->behavior_mode;
+  key.advanced.hold_threshold_10ms = req->hold_threshold_10ms;
+  key.advanced.dynamic_zone_count = req->dynamic_zone_count;
+  key.advanced.secondary_hid_keycode = req->secondary_hid_keycode;
+  memcpy(key.advanced.dynamic_zones, req->dynamic_zones,
+         sizeof(key.advanced.dynamic_zones));
 
   bool success = settings_set_key(req->key_index, &key);
 
@@ -293,6 +312,14 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   resp->socd_resolution = (uint8_t)settings_key_get_socd_resolution(&key);
   resp->rapid_trigger_enabled = key.rapid_trigger_enabled;
   resp->disable_kb_on_gamepad = key.disable_kb_on_gamepad;
+  resp->continuous_rapid_trigger =
+      settings_key_is_continuous_rapid_trigger_enabled(&key) ? 1u : 0u;
+  resp->behavior_mode = key.advanced.behavior_mode;
+  resp->hold_threshold_10ms = key.advanced.hold_threshold_10ms;
+  resp->dynamic_zone_count = key.advanced.dynamic_zone_count;
+  resp->secondary_hid_keycode = key.advanced.secondary_hid_keycode;
+  memcpy(resp->dynamic_zones, key.advanced.dynamic_zones,
+         sizeof(resp->dynamic_zones));
 }
 
 static void cmd_get_all_key_settings(const uint8_t *in, uint8_t *out) {
@@ -383,41 +410,60 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
 
 static void cmd_get_gamepad_settings(const uint8_t *in, uint8_t *out) {
   hid_packet_gamepad_settings_t *resp = (hid_packet_gamepad_settings_t *)out;
+  const settings_t *s = settings_get();
 
   resp->command_id = CMD_GET_GAMEPAD_SETTINGS;
   resp->status = HID_RESP_OK;
-
-  const settings_t *s = settings_get();
-  resp->deadzone = s->gamepad.deadzone;
-  resp->curve_type = s->gamepad.curve_type;
+  resp->radial_deadzone = s->gamepad.radial_deadzone;
+  resp->keyboard_routing = s->gamepad.keyboard_routing;
   resp->square_mode = s->gamepad.square_mode;
-  resp->snappy_mode = s->gamepad.snappy_mode;
+  resp->reactive_stick = s->gamepad.reactive_stick;
+  for (uint8_t i = 0; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
+    resp->curve[i].x_01mm = s->gamepad.curve[i].x_01mm;
+    resp->curve[i].y = s->gamepad.curve[i].y;
+  }
 }
 
 static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
   const hid_packet_gamepad_settings_t *req =
       (const hid_packet_gamepad_settings_t *)in;
   hid_packet_gamepad_settings_t *resp = (hid_packet_gamepad_settings_t *)out;
+  settings_gamepad_t gamepad;
+  bool invalid = req->keyboard_routing >= (uint8_t)GAMEPAD_KEYBOARD_ROUTING_MAX;
 
   resp->command_id = CMD_SET_GAMEPAD_SETTINGS;
 
-  settings_gamepad_t gamepad;
-  gamepad.deadzone = req->deadzone;
-  gamepad.curve_type = req->curve_type;
+  gamepad.radial_deadzone = req->radial_deadzone;
+  gamepad.keyboard_routing = req->keyboard_routing;
   gamepad.square_mode = req->square_mode ? 1 : 0;
-  gamepad.snappy_mode = req->snappy_mode ? 1 : 0;
-  gamepad.reserved[0] = 0;
-  gamepad.reserved[1] = 0;
-  gamepad.reserved[2] = 0;
-  gamepad.reserved[3] = 0;
+  gamepad.reactive_stick = req->reactive_stick ? 1 : 0;
+  for (uint8_t i = 0; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
+    gamepad.curve[i].x_01mm = req->curve[i].x_01mm;
+    gamepad.curve[i].y = req->curve[i].y;
+    if (gamepad.curve[i].x_01mm > GAMEPAD_CURVE_MAX_DISTANCE_01MM) {
+      invalid = true;
+    }
+    if (i > 0u && gamepad.curve[i].x_01mm < gamepad.curve[i - 1u].x_01mm) {
+      invalid = true;
+    }
+  }
+
+  if (invalid) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
 
   bool success = settings_set_gamepad(&gamepad);
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
-  resp->deadzone = gamepad.deadzone;
-  resp->curve_type = gamepad.curve_type;
+  resp->radial_deadzone = gamepad.radial_deadzone;
+  resp->keyboard_routing = gamepad.keyboard_routing;
   resp->square_mode = gamepad.square_mode;
-  resp->snappy_mode = gamepad.snappy_mode;
+  resp->reactive_stick = gamepad.reactive_stick;
+  for (uint8_t i = 0; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
+    resp->curve[i].x_01mm = gamepad.curve[i].x_01mm;
+    resp->curve[i].y = gamepad.curve[i].y;
+  }
 }
 
 static void cmd_get_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
@@ -878,7 +924,13 @@ static void cmd_set_gamepad_with_kb(const uint8_t *in, uint8_t *out) {
   const hid_packet_bool_t *req = (const hid_packet_bool_t *)in;
   hid_packet_bool_t *resp = (hid_packet_bool_t *)out;
 
-  settings_set_gamepad_with_keyboard(req->value != 0);
+  if (req->value != 0) {
+    if (!settings_is_gamepad_with_keyboard()) {
+      settings_set_gamepad_with_keyboard(true);
+    }
+  } else {
+    settings_set_gamepad_with_keyboard(false);
+  }
 
   resp->command_id = CMD_SET_GAMEPAD_WITH_KB;
   resp->status = HID_RESP_OK;
@@ -1308,6 +1360,7 @@ static void cmd_set_filter_params(const uint8_t *in, uint8_t *out) {
 static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
   hid_resp_adc_values_t *resp = (hid_resp_adc_values_t *)out;
   (void)in;
+  diagnostics_live_ping();
   resp->command_id = CMD_GET_ADC_VALUES;
   resp->status = HID_RESP_OK;
 
@@ -1351,6 +1404,7 @@ static void cmd_get_adc_values(const uint8_t *in, uint8_t *out) {
 static void cmd_get_raw_adc_chunk(const uint8_t *in, uint8_t *out) {
   const hid_req_raw_adc_chunk_t *req = (const hid_req_raw_adc_chunk_t *)in;
   hid_resp_adc_chunk_t *resp = (hid_resp_adc_chunk_t *)out;
+  diagnostics_live_ping();
 
   resp->command_id = CMD_GET_RAW_ADC_CHUNK;
   resp->status = HID_RESP_OK;
@@ -1378,6 +1432,7 @@ static void cmd_get_raw_adc_chunk(const uint8_t *in, uint8_t *out) {
 static void cmd_get_filtered_adc_chunk(const uint8_t *in, uint8_t *out) {
   const hid_req_raw_adc_chunk_t *req = (const hid_req_raw_adc_chunk_t *)in;
   hid_resp_adc_chunk_t *resp = (hid_resp_adc_chunk_t *)out;
+  diagnostics_live_ping();
 
   resp->command_id = CMD_GET_FILTERED_ADC_CHUNK;
   resp->status = HID_RESP_OK;
@@ -1406,6 +1461,7 @@ static void cmd_get_filtered_adc_chunk(const uint8_t *in, uint8_t *out) {
 static void cmd_get_calibrated_adc_chunk(const uint8_t *in, uint8_t *out) {
   const hid_req_raw_adc_chunk_t *req = (const hid_req_raw_adc_chunk_t *)in;
   hid_resp_adc_chunk_t *resp = (hid_resp_adc_chunk_t *)out;
+  diagnostics_live_ping();
 
   resp->command_id = CMD_GET_CALIBRATED_ADC_CHUNK;
   resp->status = HID_RESP_OK;
@@ -1440,6 +1496,7 @@ uint16_t triggerGetDistance01mm(int keyIndex) {
 static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
   const hid_resp_key_states_t *req = (const hid_resp_key_states_t *)in;
   hid_resp_key_states_t *resp = (hid_resp_key_states_t *)out;
+  diagnostics_live_ping();
   resp->command_id = CMD_GET_KEY_STATES;
   resp->start_index = req->start_index;
   resp->key_count = 0;
@@ -1467,6 +1524,7 @@ static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
 
 static void cmd_get_lock_states(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
+  diagnostics_live_ping();
   resp->command_id = CMD_GET_LOCK_STATES;
   resp->status_or_len = HID_RESP_OK;
 
@@ -1488,6 +1546,7 @@ static void cmd_adc_capture_start(const uint8_t *in, uint8_t *out) {
   const hid_req_adc_capture_start_t *req =
       (const hid_req_adc_capture_start_t *)in;
   hid_resp_adc_capture_status_t *resp = (hid_resp_adc_capture_status_t *)out;
+  diagnostics_live_ping();
 
   resp->command_id = CMD_ADC_CAPTURE_START;
 
@@ -1513,6 +1572,7 @@ static void cmd_adc_capture_start(const uint8_t *in, uint8_t *out) {
 static void cmd_adc_capture_status(const uint8_t *in, uint8_t *out) {
   (void)in;
   hid_resp_adc_capture_status_t *resp = (hid_resp_adc_capture_status_t *)out;
+  diagnostics_live_ping();
 
   resp->command_id = CMD_ADC_CAPTURE_STATUS;
   resp->status = HID_RESP_OK;
@@ -1526,6 +1586,7 @@ static void cmd_adc_capture_status(const uint8_t *in, uint8_t *out) {
 static void cmd_adc_capture_read(const uint8_t *in, uint8_t *out) {
   const hid_req_adc_capture_read_t *req = (const hid_req_adc_capture_read_t *)in;
   hid_resp_adc_capture_read_t *resp = (hid_resp_adc_capture_read_t *)out;
+  diagnostics_live_ping();
 
   uint16_t raw_samples[ADC_CAPTURE_MAX_READ_SAMPLES] = {0};
   uint16_t filtered_samples[ADC_CAPTURE_MAX_READ_SAMPLES] = {0};

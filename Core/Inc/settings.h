@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x000C         // Rotary encoder block + progress bar styling
+#define SETTINGS_VERSION 0x000E         // Advanced per-key behaviors
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -33,6 +33,9 @@ extern "C" {
 // Analog Curve Constants
 //--------------------------------------------------------------------+
 #define ANALOG_CURVE_POINTS 4 // 4-point bezier curve (P0, P1, P2, P3)
+#define GAMEPAD_CURVE_POINT_COUNT 4u
+#define GAMEPAD_CURVE_MAX_DISTANCE_01MM 400u // 4.00 mm
+#define SETTINGS_DYNAMIC_ZONE_COUNT 4u
 
 //--------------------------------------------------------------------+
 // Gamepad Mapping Constants
@@ -51,6 +54,13 @@ typedef enum {
   GAMEPAD_DIR_POSITIVE = 0, // Press increases axis value
   GAMEPAD_DIR_NEGATIVE = 1  // Press decreases axis value
 } gamepad_direction_t;
+
+typedef enum {
+  GAMEPAD_KEYBOARD_ROUTING_DISABLED = 0,
+  GAMEPAD_KEYBOARD_ROUTING_ALL_KEYS = 1,
+  GAMEPAD_KEYBOARD_ROUTING_UNMAPPED_ONLY = 2,
+  GAMEPAD_KEYBOARD_ROUTING_MAX
+} gamepad_keyboard_routing_t;
 
 typedef enum {
   GAMEPAD_BUTTON_NONE = 0,
@@ -166,6 +176,33 @@ typedef struct __attribute__((packed)) {
   uint8_t reserved;  // Padding
 } settings_gamepad_mapping_t;
 
+typedef struct __attribute__((packed)) {
+  uint16_t x_01mm; // Distance in 0.01 mm (0..400 for 0..4.00 mm)
+  uint8_t y;       // Analog output value (0..255)
+} settings_gamepad_curve_point_t;
+
+typedef enum {
+  KEY_BEHAVIOR_NORMAL = 0,
+  KEY_BEHAVIOR_TAP_HOLD = 1,
+  KEY_BEHAVIOR_TOGGLE = 2,
+  KEY_BEHAVIOR_DYNAMIC = 3,
+  KEY_BEHAVIOR_MAX
+} key_behavior_mode_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t end_mm_tenths; // Inclusive upper bound of the zone in 0.1 mm
+  uint16_t hid_keycode;  // Action sent while the key travel is in this zone
+} settings_dynamic_zone_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t behavior_mode;            // key_behavior_mode_t
+  uint8_t hold_threshold_10ms;      // Tap-hold / toggle hold threshold
+  uint8_t dynamic_zone_count;       // 1..4 when dynamic mapping is enabled
+  uint8_t reserved;
+  uint16_t secondary_hid_keycode;   // Hold / alternate action
+  settings_dynamic_zone_t dynamic_zones[SETTINGS_DYNAMIC_ZONE_COUNT];
+} settings_key_advanced_t;
+
 typedef enum {
   SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS = 0,
   SETTINGS_SOCD_RESOLUTION_MOST_PRESSED_WINS = 1,
@@ -174,6 +211,7 @@ typedef enum {
 
 #define SETTINGS_SOCD_PAIR_NONE 0xFFu
 #define SETTINGS_KEY_SOCD_RESOLUTION_MASK 0x03u
+#define SETTINGS_KEY_CONTINUOUS_RAPID_TRIGGER_MASK 0x04u
 
 /**
  * @brief Key-specific settings
@@ -194,6 +232,7 @@ typedef struct __attribute__((packed)) {
   uint8_t reserved_bits : 5;     // Reserved bits
   settings_curve_t curve;        // Per-key analog curve (4 bytes)
   settings_gamepad_mapping_t gamepad_map; // Per-key gamepad mapping (4 bytes)
+  settings_key_advanced_t advanced;     // Advanced per-key behaviors
 } settings_key_t;
 
 static inline settings_socd_resolution_t
@@ -227,6 +266,29 @@ static inline void settings_key_set_socd_resolution(
                 (sanitized & SETTINGS_KEY_SOCD_RESOLUTION_MASK));
 }
 
+static inline bool
+settings_key_is_continuous_rapid_trigger_enabled(const settings_key_t *key) {
+  if (key == 0) {
+    return false;
+  }
+
+  return (key->reserved_bits & SETTINGS_KEY_CONTINUOUS_RAPID_TRIGGER_MASK) != 0u;
+}
+
+static inline void settings_key_set_continuous_rapid_trigger(
+    settings_key_t *key, bool enabled) {
+  if (key == 0) {
+    return;
+  }
+
+  if (enabled) {
+    key->reserved_bits |= SETTINGS_KEY_CONTINUOUS_RAPID_TRIGGER_MASK;
+  } else {
+    key->reserved_bits =
+        (uint8_t)(key->reserved_bits & (uint8_t)(~SETTINGS_KEY_CONTINUOUS_RAPID_TRIGGER_MASK));
+  }
+}
+
 /**
  * @brief Calibration settings for ADC offset correction
  */
@@ -240,11 +302,11 @@ typedef struct __attribute__((packed)) {
  * @brief Gamepad settings
  */
 typedef struct __attribute__((packed)) {
-  uint8_t deadzone;    // Analog deadzone (0-255)
-  uint8_t curve_type;  // Analog curve (0=linear, 1=smooth, 2=aggressive)
-  uint8_t square_mode; // Use square joystick mapping
-  uint8_t snappy_mode; // Faster return to neutral
-  uint8_t reserved[4];
+  uint8_t radial_deadzone;   // Radial deadzone for composed stick pairs (0-255)
+  uint8_t keyboard_routing;  // gamepad_keyboard_routing_t
+  uint8_t square_mode;       // Preserve full diagonal output
+  uint8_t reactive_stick;    // Strongest opposing direction wins
+  settings_gamepad_curve_point_t curve[GAMEPAD_CURVE_POINT_COUNT];
 } settings_gamepad_t;
 
 /**
@@ -410,7 +472,11 @@ typedef struct __attribute__((packed)) {
    .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 
 #define SETTINGS_DEFAULT_GAMEPAD                                               \
-  {.deadzone = 10, .curve_type = 0, .square_mode = 0, .snappy_mode = 0}
+  {.radial_deadzone = 10,                                                      \
+   .keyboard_routing = GAMEPAD_KEYBOARD_ROUTING_ALL_KEYS,                      \
+   .square_mode = 0,                                                           \
+   .reactive_stick = 0,                                                        \
+   .curve = {{0u, 0u}, {133u, 85u}, {266u, 170u}, {GAMEPAD_CURVE_MAX_DISTANCE_01MM, 255u}}}
 
 // Default calibration values (from offset.c)
 #define SETTINGS_DEFAULT_CALIBRATION                                           \
@@ -691,6 +757,20 @@ const settings_gamepad_t *settings_get_gamepad(void);
  * @return true if successful
  */
 bool settings_set_gamepad(const settings_gamepad_t *gamepad);
+
+/**
+ * @brief Apply the global gamepad analog curve to a distance value.
+ * @param distance_01mm Distance in 0.01 mm
+ * @return Curved output in the 0..255 range
+ */
+uint8_t settings_gamepad_apply_curve(uint16_t distance_01mm);
+
+/**
+ * @brief Check whether a key has any active gamepad mapping.
+ * @param key_index Key index
+ * @return true if the key contributes to a gamepad axis or button
+ */
+bool settings_is_key_mapped_to_gamepad(uint8_t key_index);
 
 //--------------------------------------------------------------------+
 // Rotary Encoder Settings API

@@ -26,6 +26,7 @@
 #include "analog/analog.h"
 #include "analog/filter.h"
 #include "analog/calibration.h"
+#include "diagnostics.h"
 
 #include "settings.h"
 
@@ -44,8 +45,10 @@
 #include "updater_app.h"
 #include "hid/gamepad_hid.h"
 #include "usb_descriptors.h"
+#include "hid/consumer_hid.h"
 #include "hid/keyboard_hid.h"
 #include "hid/keyboard_nkro_hid.h"
+#include "hid/mouse_hid.h"
 #include "rotary_encoder.h"
 #include "ws2812.h" // Include WS2812 header
 #include <stdbool.h>
@@ -62,6 +65,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define KBHE_TIMING_PROFILE_DECIMATION 32u
 
 /* USER CODE END PD */
 
@@ -163,6 +167,7 @@ uint32_t task_keyboard_nkro_us = 0;
 uint32_t task_gamepad_us = 0;
 uint32_t task_led_us = 0;
 uint32_t task_total_us = 0;
+static uint8_t timing_profile_counter = 0u;
 
 //--------------------------------------------------------------------+
 // Filter Management Functions
@@ -274,18 +279,44 @@ static void DWT_CycleCounter_Init(void) {
 }
 
 static uint32_t cycles_to_us(uint32_t cycles) {
-  if (SystemCoreClock == 0U) {
+  uint32_t cycles_per_us = SystemCoreClock / 1000000U;
+
+  if (cycles_per_us == 0U) {
     return 0U;
   }
-  // Calcul en 64 bits pour éviter l'overflow lors de la multiplication
-  return (uint32_t)(((uint64_t)cycles * 1000000ULL) /
-                    (uint64_t)SystemCoreClock);
+
+  return (cycles + (cycles_per_us / 2U)) / cycles_per_us;
 }
 
 static void TIM4_StartOneShot_TRGO(void) {
   TIM4->SR = ~TIM_SR_UIF;
   TIM4->CNT = 0;
   TIM4->CR1 |= TIM_CR1_CEN;
+}
+
+static bool should_profile_timing_scan(void) {
+  if (!diagnostics_is_perf_active()) {
+    adc_full_cycle_us = 0u;
+    task_analog_us = 0u;
+    task_trigger_us = 0u;
+    task_socd_us = 0u;
+    task_keyboard_us = 0u;
+    task_keyboard_nkro_us = 0u;
+    task_gamepad_us = 0u;
+    task_led_us = 0u;
+    task_total_us = 0u;
+    timing_profile_counter = 0u;
+    return false;
+  }
+
+  bool collect_profile = (timing_profile_counter == 0u);
+
+  timing_profile_counter++;
+  if (timing_profile_counter >= KBHE_TIMING_PROFILE_DECIMATION) {
+    timing_profile_counter = 0u;
+  }
+
+  return collect_profile;
 }
 
 // /**
@@ -466,6 +497,9 @@ int main(void) {
   tusb_init(USB_RHPORT_HS, &rhport_init);
 
   raw_hid_init();
+  consumer_hid_init();
+  mouse_hid_init();
+  diagnostics_init();
 
   // triggerInit();
 
@@ -498,55 +532,63 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
   while (1) {
     bool processed_scan = false;
+    bool profile_timing = false;
     uint32_t task_start_cycles = 0;
 
     tud_task(); // TinyUSB device task
     raw_hid_task();
+    consumer_hid_task();
+    mouse_hid_task();
     updater_app_task();
 
     // If a full ADC scan is complete, process keys and restart
     if (analog_is_scan_complete()) {
-      // Measure time since last scan start (full cycle time)
       uint32_t now = DWT->CYCCNT;
-      adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
+      profile_timing = should_profile_timing_scan();
+      if (profile_timing) {
+        adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
+        task_start_cycles = now;
+      }
       adc_full_cycle_start_cycles = now;
-
-      task_start_cycles = DWT->CYCCNT;
       processed_scan = true;
 
-      uint32_t step_start_cycles = DWT->CYCCNT;
-      analog_task();
-      task_analog_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+      if (profile_timing) {
+        uint32_t step_start_cycles = DWT->CYCCNT;
+        analog_task();
+        task_analog_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
-      calibration_guided_on_scan(HAL_GetTick());
-      
-      step_start_cycles = DWT->CYCCNT;
-      trigger_task();
-      task_trigger_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+        calibration_guided_on_scan(HAL_GetTick());
 
-      step_start_cycles = DWT->CYCCNT;
-      socd_task();
-      task_socd_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+        step_start_cycles = DWT->CYCCNT;
+        trigger_task();
+        task_trigger_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
-      // // adc_capture_process_scan(adc_values, NUM_KEYS, HAL_GetTick());
+        step_start_cycles = DWT->CYCCNT;
+        socd_task();
+        task_socd_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
-      // // Process all 6 keys with trigger logic
-      // for (int key = 0; key < 6; key++) {
-      //   uint16_t value = analog_read_filtered_value(key);
-      //   handleTrigger(key, value);
-      // }
+        step_start_cycles = DWT->CYCCNT;
+        keyboard_hid_task();
+        task_keyboard_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
-      step_start_cycles = DWT->CYCCNT;
-      keyboard_hid_task();
-      task_keyboard_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+        step_start_cycles = DWT->CYCCNT;
+        keyboard_nkro_hid_task();
+        task_keyboard_nkro_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
-      step_start_cycles = DWT->CYCCNT;
-      keyboard_nkro_hid_task();
-      task_keyboard_nkro_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
-
-      step_start_cycles = DWT->CYCCNT;
-      gamepad_hid_task();
-      task_gamepad_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+        step_start_cycles = DWT->CYCCNT;
+        gamepad_hid_refresh_state();
+        gamepad_hid_task();
+        task_gamepad_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+      } else {
+        analog_task();
+        calibration_guided_on_scan(HAL_GetTick());
+        trigger_task();
+        socd_task();
+        keyboard_hid_task();
+        keyboard_nkro_hid_task();
+        gamepad_hid_refresh_state();
+        gamepad_hid_task();
+      }
 
       analog_set_scan_complete(false);
       TIM4_StartOneShot_TRGO();
@@ -555,15 +597,20 @@ int main(void) {
     // LED/UI timing should not depend on ADC scan state. The scan completes so
     // quickly on the 82-key board that gating animation updates behind the
     // "no scan complete" branch effectively starves LED effects.
-    uint32_t led_start_cycles = DWT->CYCCNT;
     uint32_t now_ms = HAL_GetTick();
+    uint32_t led_start_cycles = 0u;
+    if (profile_timing) {
+      led_start_cycles = DWT->CYCCNT;
+    }
     calibration_guided_tick(now_ms);
     rotary_encoder_task(now_ms);
     led_matrix_effect_tick(now_ms);
     led_indicator_tick(now_ms);
-    task_led_us = cycles_to_us(DWT->CYCCNT - led_start_cycles);
+    if (profile_timing) {
+      task_led_us = cycles_to_us(DWT->CYCCNT - led_start_cycles);
+    }
 
-    if (processed_scan) {
+    if (processed_scan && profile_timing) {
       task_total_us = cycles_to_us(DWT->CYCCNT - task_start_cycles);
     }
     /* USER CODE END WHILE */
@@ -954,10 +1001,8 @@ static void MX_GPIO_Init(void) {
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  // HAL_GPIO_WritePin(GPIOC, M3_Pin | M2_Pin, GPIO_PIN_RESET);
-
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6 | GPIO_PIN_5 | GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(M0_GPIO_Port, M0_Pin | M1_Pin | M2_Pin, GPIO_PIN_RESET);
 
   // /*Configure GPIO pins : M3_Pin M2_Pin */
   // GPIO_InitStruct.Pin = M3_Pin | M2_Pin;
@@ -966,12 +1011,12 @@ static void MX_GPIO_Init(void) {
   // GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   // HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : M1_Pin M0_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_5 | GPIO_PIN_4;
+  /*Configure GPIO pins : M2_Pin M1_Pin M0_Pin */
+  GPIO_InitStruct.Pin = M0_Pin | M1_Pin | M2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  HAL_GPIO_Init(M0_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : ENCODER_SW_Pin ENCODER_WAVE_1_Pin ENCODER_WAVE_2_Pin */
   GPIO_InitStruct.Pin = ENCODER_SW_Pin | ENCODER_WAVE_1_Pin | ENCODER_WAVE_2_Pin;

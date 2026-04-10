@@ -38,6 +38,8 @@
 #define EPNUM_NKRO 0x84 // EP4 IN
 // Endpoint for Consumer Control IN
 #define EPNUM_CONSUMER 0x85 // EP5 IN
+// Endpoint for Mouse IN
+#define EPNUM_MOUSE 0x86 // EP6 IN
 
 // Endpoint size for High Speed HID
 // High Speed permet jusqu'à 1024 bytes, mais 64 suffit pour un clavier
@@ -75,6 +77,7 @@ enum {
   STRID_GAMEPAD,
   STRID_NKRO,
   STRID_CONSUMER,
+  STRID_MOUSE,
 };
 
 //--------------------------------------------------------------------+
@@ -86,6 +89,7 @@ enum {
   HID_ITF_GAMEPAD = 2,
   HID_ITF_NKRO = 3,
   HID_ITF_CONSUMER = 4,
+  HID_ITF_MOUSE = 5,
 };
 
 //--------------------------------------------------------------------+
