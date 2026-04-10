@@ -30,8 +30,8 @@ export default function Performance() {
           </div>
         </div>
 
-        <div className="flex flex-row border-t border-gray-300 my-6">
-          <div className="w-[50%] p-8">
+        <div className="flex flex-row items-center border-t border-gray-300 my-6">
+          <div className="w-[50%] p-8 border border-gray-300 rounded-sm">
             <h2 className="text-2xl font-bold mb-4">Key Settings</h2>
             <KeySettingsMapper array={[0.5, 1, 1.5, 2]} />
           </div>
