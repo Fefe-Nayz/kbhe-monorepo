@@ -3,6 +3,7 @@ import { labelRegistry } from "@/ui/labels/labelRegistry"
 
 import Key from "./keyboard-components/key"
 import KeyEnter from "./keyboard-components/keyEnter"
+import RotaryEncoder from "./keyboard-components/rotary-encoder"
 
 import { useScreenScale } from "@/hooks/mywindow"
 import { useEffect } from "react"
@@ -54,6 +55,7 @@ export default function BaseKeyboard({ mode = "single", onButtonClick }: BaseKey
   }, [mode])
   return (
     <div className="flex flex-col gap-2 p-4 bg-white rounded-lg border border-gray-200 w-fit h-auto">
+
       {keyboard75Layout.map((row, rowIndex) => (
         <div key={rowIndex} className="flex gap-1">
           {row.map((keyData) => (
@@ -82,6 +84,11 @@ export default function BaseKeyboard({ mode = "single", onButtonClick }: BaseKey
               )}
             </div>
           ))}
+          {rowIndex === 0 && 
+          <div className="flex items-center justify-center px-2 pl-16">
+              <RotaryEncoder  />
+          </div>
+}
         </div>
       ))}
     </div>
