@@ -12,10 +12,11 @@ export default function KeySettingsMapper({ array }: KeySettingsMapperProps) {
 
     return (
         <div className="space-y-4">
-            <div>
+            <div >
 
                 <label className="text-sm font-medium">Actuation point : <span>{actuation}</span></label>
                 <Slider 
+                className="border border-gray-300 rounded-sm h-5 w-5"
                 defaultValue={[50]}
                 value={[actuation]} 
                 min={0} 
