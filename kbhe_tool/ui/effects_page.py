@@ -309,6 +309,15 @@ class EffectsPageMixin:
         except Exception as exc:
             errors.append(f"fps: {exc}")
 
+        try:
+            effect_color = self.device.get_led_effect_color()
+            if effect_color is not None and len(effect_color) >= 3:
+                self.effect_color = [int(effect_color[0]), int(effect_color[1]), int(effect_color[2])]
+                if hasattr(self, "effect_color_preview"):
+                    self.effect_color_preview.config(bg=self._rgb_to_hex(self.effect_color))
+        except Exception as exc:
+            errors.append(f"effect color: {exc}")
+
         if errors:
             self._set_effect_status("⚠️ Error loading effect settings: " + "; ".join(errors))
         else:

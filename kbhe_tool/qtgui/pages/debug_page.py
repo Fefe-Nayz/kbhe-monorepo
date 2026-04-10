@@ -698,6 +698,7 @@ class DebugPage(QWidget):
             options = self.device.get_options() or {}
             nkro = self.device.get_nkro_enabled()
             gamepad = self.device.get_gamepad_settings() or {}
+            mcu_metrics = getattr(self.device, "get_mcu_metrics", lambda: {})() or {}
             filter_enabled = self.device.get_filter_enabled()
             filter_params = self.device.get_filter_params() or {}
             led_effect = self.device.get_led_effect()
@@ -708,6 +709,16 @@ class DebugPage(QWidget):
                 f"Gamepad Enabled: {bool(options.get('gamepad_enabled'))}",
                 f"Raw HID Echo: {bool(options.get('raw_hid_echo'))}",
                 f"NKRO Enabled: {bool(nkro)}",
+                "",
+                "MCU:",
+                f"  Temperature: {mcu_metrics.get('temperature_c', '--')} C"
+                if mcu_metrics.get("temperature_valid")
+                else "  Temperature: Unavailable",
+                f"  Core Clock: {mcu_metrics.get('core_clock_hz', 0) / 1_000_000:.0f} MHz"
+                if mcu_metrics.get("core_clock_hz")
+                else "  Core Clock: --",
+                f"  Scan Rate: {mcu_metrics.get('scan_rate_hz', '--')} Hz",
+                f"  Load: {mcu_metrics.get('load_percent', '--')}%",
                 "",
                 "Gamepad:",
                 f"  Curve Start Deadzone: {gamepad.get('deadzone', gamepad.get('radial_deadzone', '--'))}",

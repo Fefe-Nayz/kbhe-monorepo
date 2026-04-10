@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -24,6 +26,9 @@ class OverviewPage(QWidget):
         self.session = session
         self.device = session.device
         self.controller = controller
+        self._page_active = False
+        self._mcu_metrics_cache: dict = {}
+        self._next_mcu_refresh_monotonic = 0.0
         self._build_ui()
         self.on_selected_key_changed(getattr(self.session, "selected_key", 0))
         try:
@@ -59,6 +64,7 @@ class OverviewPage(QWidget):
         top_row.setSpacing(14)
         top_row.addWidget(self._build_device_card(), 1)
         top_row.addWidget(self._build_modes_card(), 1)
+        top_row.addWidget(self._build_mcu_card(), 1)
         scaffold.content_layout.addLayout(top_row)
 
         bottom_row = QHBoxLayout()
@@ -157,6 +163,42 @@ class OverviewPage(QWidget):
 
         return card
 
+    def _build_mcu_card(self) -> SectionCard:
+        card = SectionCard(
+            "MCU Metrics",
+            "Internal STM32 telemetry: temperature, clock, scan cadence, and estimated workload.",
+        )
+
+        self.mcu_temp_value = QLabel("--")
+        self.mcu_temp_value.setObjectName("CardTitle")
+        self.mcu_temp_value.setStyleSheet("font-size: 22pt; font-weight: 700;")
+        card.body_layout.addWidget(self.mcu_temp_value)
+
+        self.mcu_temp_hint = QLabel("Internal MCU temperature")
+        self.mcu_temp_hint.setObjectName("Muted")
+        card.body_layout.addWidget(self.mcu_temp_hint)
+
+        self.mcu_clock_value = QLabel("--")
+        self.mcu_clock_value.setObjectName("CardTitle")
+        self.mcu_clock_value.setStyleSheet("font-size: 18pt; font-weight: 700; margin-top: 8px;")
+        card.body_layout.addWidget(self.mcu_clock_value)
+
+        self.mcu_clock_hint = QLabel("Core clock")
+        self.mcu_clock_hint.setObjectName("Muted")
+        card.body_layout.addWidget(self.mcu_clock_hint)
+
+        self.mcu_load_value = QLabel("--")
+        self.mcu_load_value.setObjectName("CardTitle")
+        self.mcu_load_value.setStyleSheet("font-size: 18pt; font-weight: 700; margin-top: 8px;")
+        card.body_layout.addWidget(self.mcu_load_value)
+
+        self.mcu_load_hint = QLabel("Scan workload")
+        self.mcu_load_hint.setObjectName("Muted")
+        self.mcu_load_hint.setWordWrap(True)
+        card.body_layout.addWidget(self.mcu_load_hint)
+
+        return card
+
     def _build_actions_card(self) -> SectionCard:
         card = SectionCard(
             "Quick Access",
@@ -203,6 +245,21 @@ class OverviewPage(QWidget):
         except Exception:
             return None
 
+    def _safe_mcu_metrics(self) -> dict:
+        try:
+            return getattr(self.device, "get_mcu_metrics", lambda: {})() or {}
+        except Exception:
+            return {}
+
+    def _maybe_refresh_mcu_metrics(self, force: bool = False) -> None:
+        if not self._page_active or not bool(getattr(self.session, "connected", False)):
+            return
+        now = time.monotonic()
+        if not force and now < self._next_mcu_refresh_monotonic:
+            return
+        self._next_mcu_refresh_monotonic = now + 1.0
+        self._mcu_metrics_cache = self._safe_mcu_metrics()
+
     def reload(self, *_args) -> None:
         snapshot = self.session.snapshot or {}
         options = snapshot.get("options") or {}
@@ -217,6 +274,8 @@ class OverviewPage(QWidget):
         gamepad_settings = self._safe_gamepad_settings() if connected else {}
         gamepad_api = gamepad_settings.get("api_mode")
         led_effect = self._safe_led_effect() if connected else None
+        self._maybe_refresh_mcu_metrics()
+        mcu_metrics = self._mcu_metrics_cache if connected else {}
 
         self.connection_chip.set_text_and_level(
             "Connected" if connected else "Disconnected",
@@ -249,10 +308,49 @@ class OverviewPage(QWidget):
             else "--"
         )
 
+        temperature_c = mcu_metrics.get("temperature_c")
+        if isinstance(temperature_c, (int, float)):
+            self.mcu_temp_value.setText(f"{int(temperature_c)} °C")
+            vref_mv = mcu_metrics.get("vref_mv")
+            if isinstance(vref_mv, int) and vref_mv > 0:
+                self.mcu_temp_hint.setText(f"Internal MCU temperature · Vref {vref_mv} mV")
+            else:
+                self.mcu_temp_hint.setText("Internal MCU temperature")
+        else:
+            self.mcu_temp_value.setText("Unavailable")
+            self.mcu_temp_hint.setText(
+                "Internal temperature sensor not available yet or current sample failed."
+            )
+
+        core_clock_hz = mcu_metrics.get("core_clock_hz")
+        if isinstance(core_clock_hz, int) and core_clock_hz > 0:
+            self.mcu_clock_value.setText(f"{core_clock_hz / 1_000_000.0:.0f} MHz")
+            self.mcu_clock_hint.setText("SystemCoreClock")
+        else:
+            self.mcu_clock_value.setText("--")
+            self.mcu_clock_hint.setText("Core clock")
+
+        load_percent = mcu_metrics.get("load_percent")
+        scan_rate_hz = mcu_metrics.get("scan_rate_hz")
+        work_us = mcu_metrics.get("work_us")
+        if isinstance(load_percent, (int, float)):
+            self.mcu_load_value.setText(f"{float(load_percent):.1f}%")
+            hint_bits = []
+            if isinstance(scan_rate_hz, int) and scan_rate_hz > 0:
+                hint_bits.append(f"{scan_rate_hz} Hz")
+            if isinstance(work_us, int) and work_us > 0:
+                hint_bits.append(f"{work_us} us work")
+            self.mcu_load_hint.setText(" · ".join(hint_bits) if hint_bits else "Scan workload")
+        else:
+            self.mcu_load_value.setText("--")
+            self.mcu_load_hint.setText("Scan workload")
+
     def on_selected_key_changed(self, key_index: int) -> None:
         self.focus_key_value.setText(key_display_name(int(key_index)))
 
     def on_page_activated(self) -> None:
+        self._page_active = True
+        self._maybe_refresh_mcu_metrics(force=True)
         try:
             self.session.refresh_snapshot()
         except Exception:
@@ -260,4 +358,9 @@ class OverviewPage(QWidget):
         self.reload()
 
     def on_page_deactivated(self) -> None:
-        pass
+        self._page_active = False
+
+    def on_live_tick(self) -> None:
+        if not self._page_active:
+            return
+        self._maybe_refresh_mcu_metrics()

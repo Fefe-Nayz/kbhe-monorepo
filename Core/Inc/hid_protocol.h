@@ -104,6 +104,7 @@ typedef enum {
   CMD_SET_LED_VOLUME_OVERLAY = 0x79, // Host-driven volume overlay
   CMD_CLEAR_LED_VOLUME_OVERLAY = 0x7A, // Clear host-driven volume overlay
   CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x7B, // Restore effect active before third-party live override
+  CMD_GET_LED_EFFECT_COLOR = 0x7C, // Get persisted effect color
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
@@ -121,6 +122,7 @@ typedef enum {
   CMD_GET_RAW_ADC_CHUNK = 0xE6,
   CMD_GET_FILTERED_ADC_CHUNK = 0xE7,
   CMD_GET_CALIBRATED_ADC_CHUNK = 0xE8,
+  CMD_GET_MCU_METRICS = 0xE9,
 
   // Echo command for testing (0xFE)
   CMD_ECHO = 0xFE,
@@ -363,6 +365,20 @@ typedef struct __attribute__((packed)) {
   uint16_t analog_key_avg_us;
   uint16_t analog_nonzero_keys;
 } hid_resp_adc_values_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  int16_t temperature_c;
+  uint16_t vref_mv;
+  uint32_t core_clock_hz;
+  uint16_t scan_cycle_us;
+  uint16_t scan_rate_hz;
+  uint16_t work_us;
+  uint16_t load_permille;
+  uint8_t temp_valid;
+  uint8_t reserved[45];
+} hid_resp_mcu_metrics_t;
 
 /**
  * @brief Key states response (debug)

@@ -372,12 +372,16 @@ static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
 
   switch ((rotary_action_t)rotary.rotation_action) {
   case ROTARY_ACTION_VOLUME:
-    for (uint8_t i = 0; i < rotary_step_size(&rotary); i++) {
-      if (direction > 0) {
-        (void)consumer_hid_volume_up();
-      } else {
-        (void)consumer_hid_volume_down();
+    {
+      uint8_t steps = rotary_step_size(&rotary);
+      for (uint8_t i = 0; i < steps; i++) {
+        if (direction > 0) {
+          (void)consumer_hid_volume_up();
+        } else {
+          (void)consumer_hid_volume_down();
+        }
       }
+      led_matrix_nudge_host_volume_overlay(direction, steps);
     }
     break;
   case ROTARY_ACTION_LED_BRIGHTNESS:

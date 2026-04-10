@@ -1019,6 +1019,13 @@ class KBHEDevice:
         resp = self.send_command(Command.SET_LED_EFFECT_COLOR, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
 
+    def get_led_effect_color(self):
+        """Get persisted LED effect color."""
+        resp = self.send_command(Command.GET_LED_EFFECT_COLOR)
+        if resp and len(resp) >= 5 and resp[1] == Status.OK:
+            return [int(resp[2]), int(resp[3]), int(resp[4])]
+        return None
+
     def get_led_effect_params(self, effect_mode):
         """Get persisted tuning params for one LED effect."""
         data = [0, int(effect_mode) & 0xFF]
@@ -1205,6 +1212,33 @@ class KBHEDevice:
                 'adc_payload_format': 'legacy'
             }
         return None
+
+    def get_mcu_metrics(self):
+        """Get MCU-side telemetry such as internal temperature, clock, and scan load."""
+        resp = self.send_command(Command.GET_MCU_METRICS, timeout_ms=120)
+        if not resp or len(resp) < 19 or resp[1] != Status.OK:
+            return None
+
+        temperature_raw = struct.unpack_from("<h", bytes(resp), 2)[0]
+        vref_mv = self._unpack_u16(resp, 4)
+        core_clock_hz = struct.unpack_from("<I", bytes(resp), 6)[0]
+        scan_cycle_us = self._unpack_u16(resp, 10)
+        scan_rate_hz = self._unpack_u16(resp, 12)
+        work_us = self._unpack_u16(resp, 14)
+        load_permille = self._unpack_u16(resp, 16)
+        temp_valid = bool(resp[18])
+
+        return {
+            "temperature_c": int(temperature_raw) if temp_valid else None,
+            "temperature_valid": temp_valid,
+            "vref_mv": int(vref_mv),
+            "core_clock_hz": int(core_clock_hz),
+            "scan_cycle_us": int(scan_cycle_us),
+            "scan_rate_hz": int(scan_rate_hz),
+            "work_us": int(work_us),
+            "load_percent": float(load_permille) / 10.0,
+            "load_permille": int(load_permille),
+        }
 
     def get_raw_adc_chunk(self, start_index: int):
         """Fetch one raw ADC chunk from the firmware."""

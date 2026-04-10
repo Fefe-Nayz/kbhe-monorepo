@@ -617,13 +617,13 @@ static void layout_handle_internal_press(uint16_t keycode) {
     layout_cycle_led_color();
     break;
   case CUSTOM_GAMEPAD_ENABLE:
-    gamepad_hid_set_enabled(true);
+    (void)settings_set_gamepad_enabled_live(true);
     break;
   case CUSTOM_GAMEPAD_DISABLE:
-    gamepad_hid_set_enabled(false);
+    (void)settings_set_gamepad_enabled_live(false);
     break;
   case CUSTOM_GAMEPAD_TOGGLE:
-    gamepad_hid_set_enabled(!gamepad_hid_is_enabled());
+    (void)settings_set_gamepad_enabled_live(!settings_is_gamepad_enabled());
     break;
   default:
     break;

@@ -51,6 +51,7 @@
 #include "hid/keyboard_nkro_hid.h"
 #include "hid/mouse_hid.h"
 #include "rotary_encoder.h"
+#include "stm32f7xx_ll_adc.h"
 #include "ws2812.h" // Include WS2812 header
 #include <stdbool.h>
 #include <stdint.h>
@@ -168,7 +169,14 @@ uint32_t task_keyboard_nkro_us = 0;
 uint32_t task_gamepad_us = 0;
 uint32_t task_led_us = 0;
 uint32_t task_total_us = 0;
+uint32_t mcu_scan_cycle_us_live = 0;
+uint32_t mcu_work_us_live = 0;
+uint16_t mcu_load_permille_live = 0;
+int16_t mcu_temperature_c_live = 0;
+uint16_t mcu_vref_mv_live = 0;
+uint8_t mcu_temperature_valid_live = 0;
 static uint8_t timing_profile_counter = 0u;
+static uint32_t mcu_metrics_next_sample_ms = 0u;
 
 //--------------------------------------------------------------------+
 // Filter Management Functions
@@ -287,6 +295,97 @@ static uint32_t cycles_to_us(uint32_t cycles) {
   }
 
   return (cycles + (cycles_per_us / 2U)) / cycles_per_us;
+}
+
+static uint32_t smooth_u32(uint32_t previous, uint32_t sample) {
+  if (previous == 0u) {
+    return sample;
+  }
+  return (uint32_t)(((uint64_t)previous * 7u + sample + 4u) / 8u);
+}
+
+static void mcu_refresh_runtime_metrics(uint32_t scan_cycle_us,
+                                        uint32_t work_us) {
+  mcu_scan_cycle_us_live = smooth_u32(mcu_scan_cycle_us_live, scan_cycle_us);
+  mcu_work_us_live = smooth_u32(mcu_work_us_live, work_us);
+
+  if (mcu_scan_cycle_us_live == 0u) {
+    mcu_load_permille_live = 0u;
+    return;
+  }
+
+  uint32_t permille =
+      ((uint32_t)mcu_work_us_live * 1000u + (mcu_scan_cycle_us_live / 2u)) /
+      mcu_scan_cycle_us_live;
+  if (permille > 1000u) {
+    permille = 1000u;
+  }
+  mcu_load_permille_live = (uint16_t)permille;
+}
+
+static void mcu_init_injected_sensors(void) {
+  ADC_InjectionConfTypeDef sInjectedConfig = {0};
+
+  sInjectedConfig.InjectedOffset = 0u;
+  sInjectedConfig.InjectedNbrOfConversion = 2u;
+  sInjectedConfig.InjectedDiscontinuousConvMode = DISABLE;
+  sInjectedConfig.AutoInjectedConv = DISABLE;
+  sInjectedConfig.ExternalTrigInjecConv = ADC_INJECTED_SOFTWARE_START;
+  sInjectedConfig.ExternalTrigInjecConvEdge =
+      ADC_EXTERNALTRIGINJECCONVEDGE_NONE;
+  sInjectedConfig.InjectedSamplingTime = ADC_SAMPLETIME_480CYCLES;
+
+  sInjectedConfig.InjectedChannel = ADC_CHANNEL_VREFINT;
+  sInjectedConfig.InjectedRank = ADC_INJECTED_RANK_1;
+  if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sInjectedConfig) != HAL_OK) {
+    mcu_temperature_valid_live = 0u;
+    return;
+  }
+
+  sInjectedConfig.InjectedChannel = ADC_CHANNEL_TEMPSENSOR;
+  sInjectedConfig.InjectedRank = ADC_INJECTED_RANK_2;
+  if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sInjectedConfig) != HAL_OK) {
+    mcu_temperature_valid_live = 0u;
+  }
+}
+
+static void mcu_sample_internal_sensors(uint32_t now_ms) {
+  if (!diagnostics_is_perf_active()) {
+    return;
+  }
+  if (now_ms < mcu_metrics_next_sample_ms) {
+    return;
+  }
+  mcu_metrics_next_sample_ms = now_ms + 1000u;
+
+  if (HAL_ADCEx_InjectedStart(&hadc1) != HAL_OK) {
+    mcu_temperature_valid_live = 0u;
+    return;
+  }
+
+  if (HAL_ADCEx_InjectedPollForConversion(&hadc1, 4u) != HAL_OK) {
+    (void)HAL_ADCEx_InjectedStop(&hadc1);
+    mcu_temperature_valid_live = 0u;
+    return;
+  }
+
+  uint32_t vref_raw = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
+  uint32_t temp_raw = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_2);
+  (void)HAL_ADCEx_InjectedStop(&hadc1);
+
+  if (vref_raw == 0u || temp_raw == 0u) {
+    mcu_temperature_valid_live = 0u;
+    return;
+  }
+
+  uint32_t vref_mv =
+      __LL_ADC_CALC_VREFANALOG_VOLTAGE(vref_raw, LL_ADC_RESOLUTION_12B);
+  int32_t temperature_c =
+      __LL_ADC_CALC_TEMPERATURE(vref_mv, temp_raw, LL_ADC_RESOLUTION_12B);
+
+  mcu_vref_mv_live = (uint16_t)vref_mv;
+  mcu_temperature_c_live = (int16_t)temperature_c;
+  mcu_temperature_valid_live = 1u;
 }
 
 static void TIM4_StartOneShot_TRGO(void) {
@@ -513,6 +612,7 @@ int main(void) {
   mouse_hid_init();
   xinput_usb_init();
   diagnostics_init();
+  mcu_init_injected_sensors();
 
   // triggerInit();
 
@@ -536,6 +636,8 @@ int main(void) {
     bool processed_scan = false;
     bool profile_timing = false;
     uint32_t task_start_cycles = 0;
+    uint32_t live_task_start_cycles = 0;
+    uint32_t live_scan_cycle_us = 0;
 
     tud_task(); // TinyUSB device task
     raw_hid_task();
@@ -546,9 +648,11 @@ int main(void) {
     // If a full ADC scan is complete, process keys and restart
     if (analog_is_scan_complete()) {
       uint32_t now = DWT->CYCCNT;
+      live_scan_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
       profile_timing = should_profile_timing_scan();
+      live_task_start_cycles = now;
       if (profile_timing) {
-        adc_full_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
+        adc_full_cycle_us = live_scan_cycle_us;
         task_start_cycles = now;
       }
       adc_full_cycle_start_cycles = now;
@@ -602,6 +706,7 @@ int main(void) {
     // quickly on the 82-key board that gating animation updates behind the
     // "no scan complete" branch effectively starves LED effects.
     uint32_t now_ms = HAL_GetTick();
+    mcu_sample_internal_sensors(now_ms);
     uint32_t led_start_cycles = 0u;
     if (profile_timing) {
       led_start_cycles = DWT->CYCCNT;
@@ -616,6 +721,10 @@ int main(void) {
 
     if (processed_scan && profile_timing) {
       task_total_us = cycles_to_us(DWT->CYCCNT - task_start_cycles);
+    }
+    if (processed_scan && diagnostics_is_perf_active()) {
+      uint32_t live_work_us = cycles_to_us(DWT->CYCCNT - live_task_start_cycles);
+      mcu_refresh_runtime_metrics(live_scan_cycle_us, live_work_us);
     }
     /* USER CODE END WHILE */
 

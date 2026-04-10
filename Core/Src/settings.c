@@ -1260,7 +1260,14 @@ bool settings_is_keyboard_enabled(void) {
 }
 
 bool settings_is_gamepad_enabled(void) {
-  return gamepad_hid_is_enabled();
+  return current_settings.options.gamepad_enabled != 0u;
+}
+
+bool settings_set_gamepad_enabled_live(bool enabled) {
+  current_settings.options.gamepad_enabled = enabled ? 1u : 0u;
+  gamepad_hid_set_enabled(enabled);
+  gamepad_hid_reload_settings();
+  return true;
 }
 
 bool settings_set_keyboard_enabled(bool enabled) {
@@ -1269,9 +1276,7 @@ bool settings_set_keyboard_enabled(bool enabled) {
 }
 
 bool settings_set_gamepad_enabled(bool enabled) {
-  current_settings.options.gamepad_enabled = enabled ? 1 : 0;
-  gamepad_hid_set_enabled(enabled);
-  gamepad_hid_reload_settings();
+  settings_set_gamepad_enabled_live(enabled);
   return settings_save();
 }
 
@@ -1451,6 +1456,12 @@ bool settings_set_led_effect_speed(uint8_t speed) {
 
 uint8_t settings_get_led_fps_limit(void) {
   return current_settings.led_fps_limit;
+}
+
+bool settings_set_led_fps_limit(uint8_t fps_limit) {
+  current_settings.led_fps_limit = fps_limit;
+  led_matrix_set_fps_limit(fps_limit);
+  return true; // Don't auto-save
 }
 
 void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b) {

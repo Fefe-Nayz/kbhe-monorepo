@@ -439,6 +439,9 @@ class EffectsPage(QWidget):
                 with QSignalBlocker(self.fps_slider):
                     self.fps_slider.setValue(int(fps))
                 self.fps_value.setText("Unlimited" if int(fps) == 0 else f"{int(fps)} FPS")
+            effect_color = self.device.get_led_effect_color()
+            if effect_color is not None and len(effect_color) >= 3:
+                self._set_effect_color(effect_color)
         finally:
             self._loading = False
         self._update_status("Effect settings loaded from device.", "success")

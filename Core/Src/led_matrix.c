@@ -74,6 +74,7 @@ static const uint8_t volume_overlay_keys[] = {
 #define VOLUME_OVERLAY_KEY_COUNT                                                \
   (sizeof(volume_overlay_keys) / sizeof(volume_overlay_keys[0]))
 #define HOST_VOLUME_LEVEL_STALE_MS 1250u
+#define HOST_VOLUME_STEP_ESTIMATE 5u
 
 // Logical key order follows the physical keyboard layout (K1..K82).
 // WS2812 chain order on the PCB is serpentine, so translate before pushing to
@@ -957,6 +958,48 @@ void led_matrix_show_host_volume_overlay(void) {
     return;
   }
 
+  led_matrix_set_progress_overlay(host_volume_level);
+}
+
+void led_matrix_nudge_host_volume_overlay(int8_t direction, uint8_t steps) {
+  uint32_t now_ms = HAL_GetTick();
+  uint8_t base_level = 0u;
+  int16_t signed_level = 0;
+  uint16_t delta = 0u;
+
+  if (steps == 0u || direction == 0) {
+    led_matrix_show_host_volume_overlay();
+    return;
+  }
+
+  if (host_volume_level_valid &&
+      (uint32_t)(now_ms - host_volume_level_refresh_ms) <=
+          HOST_VOLUME_LEVEL_STALE_MS) {
+    base_level = host_volume_level;
+  } else if (volume_overlay_active && !volume_overlay_is_expired(now_ms)) {
+    base_level = volume_overlay_level;
+  } else {
+    led_matrix_show_host_volume_overlay();
+    return;
+  }
+
+  delta = (uint16_t)steps * HOST_VOLUME_STEP_ESTIMATE;
+  signed_level = (int16_t)base_level;
+  if (direction > 0) {
+    signed_level += (int16_t)delta;
+  } else {
+    signed_level -= (int16_t)delta;
+  }
+
+  if (signed_level < 0) {
+    signed_level = 0;
+  } else if (signed_level > 255) {
+    signed_level = 255;
+  }
+
+  host_volume_level = (uint8_t)signed_level;
+  host_volume_level_valid = true;
+  host_volume_level_refresh_ms = now_ms;
   led_matrix_set_progress_overlay(host_volume_level);
 }
 

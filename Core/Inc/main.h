@@ -93,6 +93,12 @@ extern uint32_t task_keyboard_nkro_us;
 extern uint32_t task_gamepad_us;
 extern uint32_t task_led_us;
 extern uint32_t task_total_us;
+extern uint32_t mcu_scan_cycle_us_live;
+extern uint32_t mcu_work_us_live;
+extern uint16_t mcu_load_permille_live;
+extern int16_t mcu_temperature_c_live;
+extern uint16_t mcu_vref_mv_live;
+extern uint8_t mcu_temperature_valid_live;
 
 // ADC EMA Filter control functions
 // uint8_t get_filter_enabled(void);

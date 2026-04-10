@@ -1090,7 +1090,7 @@ static void cmd_get_led_pixel(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  const uint8_t *pixels = settings_get_led_pixels();
+  const uint8_t *pixels = led_matrix_get_raw_data();
   resp->status = HID_RESP_OK;
   resp->index = req->index;
   resp->r = pixels[req->index * 3 + 0];
@@ -1184,6 +1184,21 @@ static void cmd_get_led_all(const uint8_t *in, uint8_t *out) {
   resp->status = HID_RESP_OK;
   resp->chunk_size = size;
   memcpy(resp->data, &pixels[offset], size);
+}
+
+static void cmd_get_led_effect_color(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  uint8_t r = 0u;
+  uint8_t g = 0u;
+  uint8_t b = 0u;
+  (void)in;
+
+  settings_get_led_effect_color(&r, &g, &b);
+  resp->command_id = CMD_GET_LED_EFFECT_COLOR;
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = r;
+  resp->payload[1] = g;
+  resp->payload[2] = b;
 }
 
 static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
@@ -1348,7 +1363,7 @@ static void cmd_get_led_fps_limit(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_LED_FPS_LIMIT;
   resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = led_matrix_get_fps_limit();
+  resp->payload[0] = settings_get_led_fps_limit();
 }
 
 static void cmd_set_led_fps_limit(const uint8_t *in, uint8_t *out) {
@@ -1356,9 +1371,9 @@ static void cmd_set_led_fps_limit(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_LED_FPS_LIMIT;
 
-  led_matrix_set_fps_limit(req->payload[0]);
+  settings_set_led_fps_limit(req->payload[0]);
   resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = led_matrix_get_fps_limit();
+  resp->payload[0] = settings_get_led_fps_limit();
 }
 
 static void cmd_get_led_diagnostic(const uint8_t *in, uint8_t *out) {
@@ -1621,6 +1636,26 @@ static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
     resp->keys[i].distance_norm = analog_read_normalized_value(key);
     resp->keys[i].distance_01mm = triggerGetDistance01mm(key);
   }
+}
+
+static void cmd_get_mcu_metrics(const uint8_t *in, uint8_t *out) {
+  hid_resp_mcu_metrics_t *resp = (hid_resp_mcu_metrics_t *)out;
+  (void)in;
+  diagnostics_live_ping();
+
+  resp->command_id = CMD_GET_MCU_METRICS;
+  resp->status = HID_RESP_OK;
+  resp->temperature_c = mcu_temperature_c_live;
+  resp->vref_mv = mcu_vref_mv_live;
+  resp->core_clock_hz = SystemCoreClock;
+  resp->scan_cycle_us = (uint16_t)mcu_scan_cycle_us_live;
+  resp->scan_rate_hz = mcu_scan_cycle_us_live > 0u
+                           ? (uint16_t)(1000000u / mcu_scan_cycle_us_live)
+                           : 0u;
+  resp->work_us = (uint16_t)mcu_work_us_live;
+  resp->load_permille = mcu_load_permille_live;
+  resp->temp_valid = mcu_temperature_valid_live ? 1u : 0u;
+  memset(resp->reserved, 0, sizeof(resp->reserved));
 }
 
 static void cmd_get_lock_states(const uint8_t *in, uint8_t *out) {
@@ -2016,6 +2051,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_restore_led_effect_before_third_party(in_packet, out_packet);
     break;
 
+  case CMD_GET_LED_EFFECT_COLOR:
+    cmd_get_led_effect_color(in_packet, out_packet);
+    break;
+
   // Filter commands
   case CMD_GET_FILTER_ENABLED:
     cmd_get_filter_enabled(in_packet, out_packet);
@@ -2068,6 +2107,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_GET_CALIBRATED_ADC_CHUNK:
     cmd_get_calibrated_adc_chunk(in_packet, out_packet);
+    break;
+
+  case CMD_GET_MCU_METRICS:
+    cmd_get_mcu_metrics(in_packet, out_packet);
     break;
 
   // Echo for testing

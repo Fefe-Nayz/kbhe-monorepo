@@ -320,6 +320,14 @@ void led_matrix_clear_host_volume_level(void);
 void led_matrix_show_host_volume_overlay(void);
 
 /**
+ * @brief Predictively nudge the cached host volume level for immediate rotary
+ *        overlay feedback until the next real host refresh arrives.
+ * @param direction Positive for volume up, negative for volume down.
+ * @param steps Number of consumer volume steps emitted for this rotary detent.
+ */
+void led_matrix_nudge_host_volume_overlay(int8_t direction, uint8_t steps);
+
+/**
  * @brief Replace the live runtime frame in one shot.
  * Useful for third-party/live rendering paths that must avoid
  * intermediate per-pixel WS2812 updates.

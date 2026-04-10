@@ -142,6 +142,19 @@ class DemoDevice:
     def get_options(self):
         return dict(self._options)
 
+    def get_mcu_metrics(self):
+        return {
+            "temperature_c": 41,
+            "temperature_valid": True,
+            "vref_mv": 3290,
+            "core_clock_hz": 216_000_000,
+            "scan_cycle_us": 125,
+            "scan_rate_hz": 8000,
+            "work_us": 78,
+            "load_percent": 62.4,
+            "load_permille": 624,
+        }
+
     def set_keyboard_enabled(self, enabled):
         self._options["keyboard_enabled"] = bool(enabled)
         return True
@@ -355,6 +368,9 @@ class DemoDevice:
     def set_led_effect_color(self, r, g, b):
         self._led_effect_color = [int(r), int(g), int(b)]
         return True
+
+    def get_led_effect_color(self):
+        return list(self._led_effect_color)
 
     def get_led_effect_params(self, effect_mode):
         return list(self._led_effect_params.get(int(effect_mode), [160, 96, 160, 255, 0, 0]))

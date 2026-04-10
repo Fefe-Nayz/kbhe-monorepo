@@ -536,6 +536,14 @@ bool settings_set_keyboard_enabled(bool enabled);
 bool settings_set_gamepad_enabled(bool enabled);
 
 /**
+ * @brief Enable/disable gamepad HID output without saving to flash.
+ * Updates the in-RAM settings state so subsequent reads stay coherent.
+ * @param enabled true to enable, false to disable
+ * @return true if successful
+ */
+bool settings_set_gamepad_enabled_live(bool enabled);
+
+/**
  * @brief Check if NKRO mode is enabled
  */
 bool settings_is_nkro_enabled(void);
@@ -680,6 +688,13 @@ bool settings_set_led_effect_speed(uint8_t speed);
  * @return Current FPS limit (0 = unlimited)
  */
 uint8_t settings_get_led_fps_limit(void);
+
+/**
+ * @brief Set LED FPS limit
+ * @param fps_limit FPS limit (0 = unlimited)
+ * @return true if successful
+ */
+bool settings_set_led_fps_limit(uint8_t fps_limit);
 
 /**
  * @brief Get LED effect color
