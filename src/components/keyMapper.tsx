@@ -138,8 +138,8 @@ export default function KeyMapper( { onButtonClick } : KeyMapperProps) {
   const [searchTerm, setSearchTerm] = useState("");
   return (
 
-    <main className="relative flex flex-wrap gap-1 p-4 slate-50 border border-gray-200 w-full h-auto">
-      <div className="slate-50 flex justify-end w-full mb-2">
+    <main className="relative flex flex-wrap gap-1 p-4 bg-slate-50 border border-gray-200 w-full h-auto rounded-md">
+      <div className="bg-state-100 flex justify-end w-full mb-2">
         <Input
           placeholder="Search for a component here..."
           value={searchTerm}
@@ -152,9 +152,15 @@ export default function KeyMapper( { onButtonClick } : KeyMapperProps) {
 
 
         {Object.entries(groupedKeys).filter(([type, keys]) => funcFilter(type, searchTerm, keys)).map(([type, keys]) => (
-          <Accordion defaultValue={["Basic"]} className="w-full mt-4">
+          <Accordion defaultValue={["Basic"]} className="bg-neutral-50 w-full mt-4">
             <AccordionItem value={type} disabled = {searchTerm !== "" ? true : false}>
-              <AccordionTrigger >{type}</AccordionTrigger>
+              <AccordionTrigger className="border-state-50 bg-slate-50 transition-colors px-6">
+                <div className="flex justify-center ">
+                </div>
+                <span className="text-sm font-bold tracking-wide text-slate-800 uppercase">
+                 {type}
+                </span> 
+              </AccordionTrigger>
               <AccordionContent>
                 {keys.filter(key => key.id.toLowerCase().includes(searchTerm.toLowerCase())).map((keyData) => (
                   <div className="inline-block m-0.5" key={keyData.id}>
