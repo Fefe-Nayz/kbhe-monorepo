@@ -9,6 +9,7 @@
 #include "diagnostics.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
+#include "layout/keycodes.h"
 #include "main.h"
 #include "settings.h"
 #include "trigger/trigger.h"
@@ -604,6 +605,47 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   resp->progress_color_r = rotary.progress_color_r;
   resp->progress_color_g = rotary.progress_color_g;
   resp->progress_color_b = rotary.progress_color_b;
+}
+
+static void cmd_get_layer_keycode(const uint8_t *in, uint8_t *out) {
+  const hid_packet_layer_keycode_t *req = (const hid_packet_layer_keycode_t *)in;
+  hid_packet_layer_keycode_t *resp = (hid_packet_layer_keycode_t *)out;
+
+  resp->command_id = CMD_GET_LAYER_KEYCODE;
+  resp->layer_index = req->layer_index;
+  resp->key_index = req->key_index;
+
+  if (req->layer_index >= SETTINGS_LAYER_COUNT || req->key_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    resp->hid_keycode = KC_NO;
+    return;
+  }
+
+  resp->status = HID_RESP_OK;
+  resp->hid_keycode =
+      settings_get_layer_keycode(req->layer_index, req->key_index);
+}
+
+static void cmd_set_layer_keycode(const uint8_t *in, uint8_t *out) {
+  const hid_packet_layer_keycode_t *req = (const hid_packet_layer_keycode_t *)in;
+  hid_packet_layer_keycode_t *resp = (hid_packet_layer_keycode_t *)out;
+  bool success = false;
+
+  resp->command_id = CMD_SET_LAYER_KEYCODE;
+  resp->layer_index = req->layer_index;
+  resp->key_index = req->key_index;
+
+  if (req->layer_index >= SETTINGS_LAYER_COUNT || req->key_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    resp->hid_keycode = KC_NO;
+    return;
+  }
+
+  success = settings_set_layer_keycode(req->layer_index, req->key_index,
+                                       req->hid_keycode);
+  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->hid_keycode =
+      settings_get_layer_keycode(req->layer_index, req->key_index);
 }
 
 //--------------------------------------------------------------------+
@@ -1855,6 +1897,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_ROTARY_ENCODER_SETTINGS:
     cmd_set_rotary_encoder_settings(in_packet, out_packet);
+    break;
+
+  case CMD_GET_LAYER_KEYCODE:
+    cmd_get_layer_keycode(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LAYER_KEYCODE:
+    cmd_set_layer_keycode(in_packet, out_packet);
     break;
 
   // LED Matrix commands

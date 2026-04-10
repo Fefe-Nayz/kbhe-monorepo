@@ -72,6 +72,8 @@ typedef enum {
   CMD_GUIDED_CALIBRATION_ABORT = 0x53,
   CMD_GET_ROTARY_ENCODER_SETTINGS = 0x54,
   CMD_SET_ROTARY_ENCODER_SETTINGS = 0x55,
+  CMD_GET_LAYER_KEYCODE = 0x56,
+  CMD_SET_LAYER_KEYCODE = 0x57,
 
   // LED Matrix commands (0x60 - 0x7F)
   CMD_GET_LED_ENABLED = 0x60,
@@ -280,6 +282,15 @@ typedef struct __attribute__((packed)) {
   uint8_t progress_color_b;
   uint8_t reserved[50];
 } hid_packet_rotary_encoder_settings_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t layer_index;
+  uint8_t key_index;
+  uint16_t hid_keycode;
+  uint8_t reserved[58];
+} hid_packet_layer_keycode_t;
 
 /**
  * @brief Calibration settings packet

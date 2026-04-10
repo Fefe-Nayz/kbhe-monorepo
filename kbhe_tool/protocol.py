@@ -22,6 +22,7 @@ FILTER_DEFAULT_ALPHA_MIN_DENOM = 32
 FILTER_DEFAULT_ALPHA_MAX_DENOM = 4
 GAMEPAD_CURVE_POINT_COUNT = 4
 GAMEPAD_CURVE_MAX_DISTANCE_MM = 4.0
+LAYER_COUNT = 4
 ADVANCED_TICK_RATE_MIN = 1
 ADVANCED_TICK_RATE_MAX = 100
 ADVANCED_TICK_RATE_DEFAULT = 1
@@ -68,6 +69,8 @@ class Command(IntEnum):
     GUIDED_CALIBRATION_ABORT = 0x53
     GET_ROTARY_ENCODER_SETTINGS = 0x54
     SET_ROTARY_ENCODER_SETTINGS = 0x55
+    GET_LAYER_KEYCODE = 0x56
+    SET_LAYER_KEYCODE = 0x57
 
     GET_LED_ENABLED = 0x60
     SET_LED_ENABLED = 0x61
@@ -265,9 +268,17 @@ SOCD_RESOLUTIONS = {
 }
 SOCD_RESOLUTION_NAMES = {value: key for key, value in SOCD_RESOLUTIONS.items()}
 
+LAYER_NAMES = {
+    0: "Base",
+    1: "Fn",
+    2: "Layer 2",
+    3: "Layer 3",
+}
+
 
 HID_KEYCODES = {
     'NO': 0x0000,
+    'TRANSPARENT': 0x0001,
     'A': 0x04, 'B': 0x05, 'C': 0x06, 'D': 0x07, 'E': 0x08, 'F': 0x09,
     'G': 0x0A, 'H': 0x0B, 'I': 0x0C, 'J': 0x0D, 'K': 0x0E, 'L': 0x0F,
     'M': 0x10, 'N': 0x11, 'O': 0x12, 'P': 0x13, 'Q': 0x14, 'R': 0x15,
@@ -306,6 +317,21 @@ HID_KEYCODES = {
     'WWW_STOP': 0x00B8, 'WWW_REFRESH': 0x00B9, 'WWW_FAVORITES': 0x00BA,
     'MEDIA_FAST_FORWARD': 0x00BB, 'MEDIA_REWIND': 0x00BC,
     'BRIGHTNESS_UP': 0x00BD, 'BRIGHTNESS_DOWN': 0x00BE, 'CONTROL_PANEL': 0x00BF,
+    'FN / MO Layer 1': 0xF000, 'MO Layer 2': 0xF001, 'MO Layer 3': 0xF002,
+    'TG Layer 1': 0xF010, 'TG Layer 2': 0xF011, 'TG Layer 3': 0xF012,
+    'Set Base Layer': 0xF018, 'Set Fn Layer': 0xF019,
+    'Set Layer 2': 0xF01A, 'Set Layer 3': 0xF01B, 'Clear Layer Toggles': 0xF01C,
+    'LED Toggle': 0xF200, 'LED Brightness Down': 0xF201, 'LED Brightness Up': 0xF202,
+    'LED Effect Prev': 0xF203, 'LED Effect Next': 0xF204,
+    'LED Speed Down': 0xF205, 'LED Speed Up': 0xF206, 'LED Color Next': 0xF207,
+    'Gamepad Enable': 0xF300, 'Gamepad Disable': 0xF301, 'Gamepad Toggle': 0xF302,
+    'GP A': 0xF320, 'GP B': 0xF321, 'GP X': 0xF322, 'GP Y': 0xF323,
+    'GP LB': 0xF324, 'GP RB': 0xF325, 'GP LT Trigger': 0xF326, 'GP RT Trigger': 0xF327,
+    'GP Back': 0xF328, 'GP Start': 0xF329, 'GP L3': 0xF32A, 'GP R3': 0xF32B,
+    'GP DPad Up': 0xF32C, 'GP DPad Down': 0xF32D,
+    'GP DPad Left': 0xF32E, 'GP DPad Right': 0xF32F, 'GP Home': 0xF330,
+    'GP LS Right': 0xF340, 'GP LS Left': 0xF341, 'GP LS Down': 0xF342, 'GP LS Up': 0xF343,
+    'GP RS Right': 0xF344, 'GP RS Left': 0xF345, 'GP RS Down': 0xF346, 'GP RS Up': 0xF347,
     'MOUSE_LEFT': 0xF100, 'MOUSE_RIGHT': 0xF101, 'MOUSE_MIDDLE': 0xF102,
     'MOUSE_BACK': 0xF103, 'MOUSE_FORWARD': 0xF104,
     'MOUSE_WHEEL_UP': 0xF105, 'MOUSE_WHEEL_DOWN': 0xF106,
@@ -314,6 +340,7 @@ HID_KEYCODES = {
 }
 
 HID_KEYCODE_NAMES = {value: key for key, value in HID_KEYCODES.items()}
+HID_KEYCODE_NAMES[0xF000] = "FN / MO Layer 1"
 
 
 class Status(IntEnum):

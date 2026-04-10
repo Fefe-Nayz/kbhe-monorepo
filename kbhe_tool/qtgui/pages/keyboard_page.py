@@ -21,6 +21,7 @@ from kbhe_tool.protocol import (
     HID_KEYCODE_NAMES,
     KEY_BEHAVIORS,
     KEY_COUNT,
+    LAYER_NAMES,
     SOCD_RESOLUTIONS,
 )
 from kbhe_tool.key_layout import key_display_name
@@ -103,6 +104,7 @@ class KeyboardPage(QWidget):
 
         self._build_ui()
         self._connect_session()
+        self._update_layer_ui()
         self.reload()
 
     # ------------------------------------------------------------------
@@ -203,10 +205,24 @@ class KeyboardPage(QWidget):
     def _build_keycode_card(self, parent: QVBoxLayout) -> None:
         card = SectionCard(
             "Output Action",
-            "Choose the action this switch sends when non-gamepad output is active: keyboard, media, browser, brightness, or mouse.",
+            "Choose the action this switch sends. Base layer keeps the analog behavior config; overlay layers only replace the outgoing action.",
         )
         parent.addWidget(card)
         bl = card.body_layout
+
+        layer_row = QHBoxLayout()
+        layer_row.setSpacing(10)
+        layer_lbl = QLabel("Layer")
+        layer_lbl.setObjectName("Muted")
+        layer_lbl.setFixedWidth(165)
+        layer_row.addWidget(layer_lbl)
+        self.layer_combo = QComboBox()
+        for value, label in LAYER_NAMES.items():
+            self.layer_combo.addItem(label, value)
+        self.layer_combo.currentIndexChanged.connect(self._on_layer_changed)
+        self._controls.append(self.layer_combo)
+        layer_row.addWidget(self.layer_combo, 1)
+        bl.addLayout(layer_row)
 
         row = QHBoxLayout()
         row.setSpacing(10)
@@ -225,6 +241,11 @@ class KeyboardPage(QWidget):
         self.disable_kb_check.stateChanged.connect(self._on_changed)
         self._controls.append(self.disable_kb_check)
         bl.addWidget(self.disable_kb_check)
+
+        self.layer_mode_hint = QLabel()
+        self.layer_mode_hint.setObjectName("Muted")
+        self.layer_mode_hint.setWordWrap(True)
+        bl.addWidget(self.layer_mode_hint)
 
     def _create_action_combo(self) -> QComboBox:
         combo = QComboBox()
@@ -532,6 +553,12 @@ class KeyboardPage(QWidget):
         self._update_behavior_visibility()
         self._on_changed()
 
+    def _on_layer_changed(self, *_) -> None:
+        self._update_layer_ui()
+        if self._loading:
+            return
+        self.load_selected_key_settings()
+
     def _update_behavior_visibility(self) -> None:
         behavior = (
             int(self.behavior_combo.currentData())
@@ -564,8 +591,51 @@ class KeyboardPage(QWidget):
     def _selected_key(self) -> int:
         return _clamp(int(getattr(self.session, "selected_key", 0)), 0, KEY_COUNT - 1)
 
+    def _current_layer(self) -> int:
+        if not hasattr(self, "layer_combo") or self.layer_combo.currentIndex() < 0:
+            return 0
+        return int(self.layer_combo.currentData())
+
     def _device(self):
         return getattr(self.session, "device", None)
+
+    def _set_base_only_enabled(self, enabled: bool) -> None:
+        base_controls = [
+            self.disable_kb_check,
+            self.fixed_actuation_row.slider,
+            self.fixed_release_row.slider,
+            self.socd_combo,
+            self.socd_resolution_combo,
+            self.rapid_check,
+            self.continuous_rt_check,
+            self.rt_activation_row.slider,
+            self.rt_press_row.slider,
+            self.separate_check,
+            self.rt_release_row.slider,
+            self.tick_rate_row.slider,
+            self.behavior_combo,
+            self.tap_hold_secondary_combo,
+            self.tap_hold_threshold_row.slider,
+            self.toggle_threshold_row.slider,
+            self.dynamic_zone_count_combo,
+        ]
+        for widget in base_controls:
+            widget.setEnabled(enabled)
+        for _widget, slider, combo in self.dynamic_zone_rows:
+            slider.slider.setEnabled(enabled)
+            combo.setEnabled(enabled)
+
+    def _update_layer_ui(self) -> None:
+        base_layer = self._current_layer() == 0
+        self._set_base_only_enabled(base_layer)
+        if base_layer:
+            self.layer_mode_hint.setText(
+                "Base layer stores the analog trigger, rapid trigger, SOCD, and advanced behavior settings."
+            )
+        else:
+            self.layer_mode_hint.setText(
+                "Overlay layers only replace the outgoing action. Use TRANSPARENT to fall through to a lower layer."
+            )
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         for w in self._controls:
@@ -696,6 +766,7 @@ class KeyboardPage(QWidget):
             self._update_rapid_visibility()
             self._update_socd_hint()
             self._update_behavior_visibility()
+            self._update_layer_ui()
             self._update_layout_summary(s)
         finally:
             self._loading = False
@@ -717,13 +788,22 @@ class KeyboardPage(QWidget):
     def _update_layout_summary(self, settings: dict | None = None) -> None:
         if settings is None:
             settings = self._build_payload()
+        current_layer = self._current_layer()
+        layer_label = LAYER_NAMES.get(current_layer, f"Layer {current_layer}")
         key_name = HID_KEYCODE_NAMES.get(int(settings.get("hid_keycode", HID_KEYCODES["Q"])), "Q")
         actuation = _safe_float(settings.get("actuation_point_mm", 0.0))
         rt_enabled = bool(settings.get("rapid_trigger_enabled", False))
         rt_press = _safe_float(settings.get("rapid_trigger_press", 0.0))
         behavior_mode = int(settings.get("behavior_mode", KEY_BEHAVIORS["Normal"]))
         self.summary_keycode_chip.set_text_and_level(key_name, "info")
-        self.summary_actuation_chip.set_text_and_level(f"{actuation:.2f} mm", "neutral")
+        if current_layer == 0:
+            self.summary_actuation_chip.set_text_and_level(
+                f"{layer_label} • {actuation:.2f} mm", "neutral"
+            )
+        else:
+            self.summary_actuation_chip.set_text_and_level(layer_label, "neutral")
+            self.summary_rt_chip.set_text_and_level("Overlay only", "info")
+            return
         if rt_enabled:
             suffix = " C" if bool(settings.get("continuous_rapid_trigger", False)) else ""
             self.summary_rt_chip.set_text_and_level(f"RT {rt_press:.2f} mm{suffix}", "ok")
@@ -752,6 +832,7 @@ class KeyboardPage(QWidget):
 
     def load_selected_key_settings(self, key_idx: int | None = None) -> None:
         idx = _clamp(int(key_idx if key_idx is not None else self._selected_key()), 0, KEY_COUNT - 1)
+        layer = self._current_layer()
         self._set_key_badge(idx)
         device = self._device()
         if not device:
@@ -762,11 +843,24 @@ class KeyboardPage(QWidget):
             if not settings:
                 self._set_status(f"No settings returned for {key_display_name(idx)}.", "warn")
                 return
+            if layer != 0:
+                layer_entry = device.get_layer_keycode(layer, idx)
+                if not layer_entry:
+                    self._set_status(
+                        f"No layer keycode returned for {key_display_name(idx)} on {LAYER_NAMES.get(layer, layer)}.",
+                        "warn",
+                    )
+                    return
+                settings = dict(settings)
+                settings["hid_keycode"] = int(layer_entry.get("hid_keycode", HID_KEYCODES["TRANSPARENT"]))
             tick_rate = device.get_advanced_tick_rate()
             self._sync_from_settings(settings)
             if tick_rate is not None:
                 self.tick_rate_row.set_value(float(tick_rate))
-            self._set_status(f"Loaded {key_display_name(idx)}.", "ok")
+            self._set_status(
+                f"Loaded {key_display_name(idx)} on {LAYER_NAMES.get(layer, f'Layer {layer}')}.",
+                "ok",
+            )
         except Exception as exc:
             self._set_status(f"Load error: {exc}", "bad")
 
@@ -782,18 +876,36 @@ class KeyboardPage(QWidget):
             self._set_status("No device connected.", "warn")
             return
         idx = self._selected_key()
+        layer = self._current_layer()
         try:
-            ok = device.set_key_settings_extended(idx, self._build_payload())
-            tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
-            if ok and tick_ok:
-                self._set_status(f"Applied {key_display_name(idx)} live.", "ok")
-            elif ok:
-                self._set_status(
-                    f"Applied {key_display_name(idx)} live, but tick rate update failed.",
-                    "warn",
-                )
+            if layer == 0:
+                ok = device.set_key_settings_extended(idx, self._build_payload())
+                tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
+                if ok and tick_ok:
+                    self._set_status(f"Applied {key_display_name(idx)} live.", "ok")
+                elif ok:
+                    self._set_status(
+                        f"Applied {key_display_name(idx)} live, but tick rate update failed.",
+                        "warn",
+                    )
+                else:
+                    self._set_status(f"Apply failed for {key_display_name(idx)}.", "bad")
             else:
-                self._set_status(f"Apply failed for {key_display_name(idx)}.", "bad")
+                ok = device.set_layer_keycode(
+                    layer,
+                    idx,
+                    HID_KEYCODES.get(self.keycode_combo.currentText(), HID_KEYCODES["TRANSPARENT"]),
+                )
+                if ok:
+                    self._set_status(
+                        f"Applied {LAYER_NAMES.get(layer, f'Layer {layer}')} for {key_display_name(idx)}.",
+                        "ok",
+                    )
+                else:
+                    self._set_status(
+                        f"Layer apply failed for {key_display_name(idx)}.",
+                        "bad",
+                    )
         except Exception as exc:
             self._set_status(f"Apply error: {exc}", "bad")
 
@@ -805,19 +917,37 @@ class KeyboardPage(QWidget):
         if not device:
             self._set_status("No device connected.", "warn")
             return
+        layer = self._current_layer()
         try:
-            payload  = self._build_payload()
-            failures = [
-                i + 1 for i in range(KEY_COUNT)
-                if not device.set_key_settings_extended(i, payload)
-            ]
-            tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
-            if failures:
-                self._set_status(f"Applied with failures on Key(s) {failures}.", "warn")
-            elif not tick_ok:
-                self._set_status("Applied key settings, but tick rate update failed.", "warn")
+            if layer == 0:
+                payload = self._build_payload()
+                failures = [
+                    i + 1 for i in range(KEY_COUNT)
+                    if not device.set_key_settings_extended(i, payload)
+                ]
+                tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
+                if failures:
+                    self._set_status(f"Applied with failures on Key(s) {failures}.", "warn")
+                elif not tick_ok:
+                    self._set_status("Applied key settings, but tick rate update failed.", "warn")
+                else:
+                    self._set_status(f"Applied to all {KEY_COUNT} keys live.", "ok")
             else:
-                self._set_status(f"Applied to all {KEY_COUNT} keys live.", "ok")
+                keycode = HID_KEYCODES.get(self.keycode_combo.currentText(), HID_KEYCODES["TRANSPARENT"])
+                failures = [
+                    i + 1 for i in range(KEY_COUNT)
+                    if not device.set_layer_keycode(layer, i, keycode)
+                ]
+                if failures:
+                    self._set_status(
+                        f"Applied {LAYER_NAMES.get(layer, f'Layer {layer}')} with failures on Key(s) {failures}.",
+                        "warn",
+                    )
+                else:
+                    self._set_status(
+                        f"Applied {LAYER_NAMES.get(layer, f'Layer {layer}')} to all {KEY_COUNT} keys live.",
+                        "ok",
+                    )
         except Exception as exc:
             self._set_status(f"Apply-all error: {exc}", "bad")
 

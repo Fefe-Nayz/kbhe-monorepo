@@ -27,6 +27,11 @@ void gamepad_hid_task(void);
 const gamepad_report_t *gamepad_hid_get_report(void);
 void gamepad_hid_set_enabled(bool enabled);
 bool gamepad_hid_is_enabled(void);
+void gamepad_hid_custom_button_press(uint8_t button);
+void gamepad_hid_custom_button_release(uint8_t button);
+void gamepad_hid_custom_axis_press(uint8_t axis, uint8_t direction);
+void gamepad_hid_custom_axis_release(uint8_t axis, uint8_t direction);
+void gamepad_hid_custom_clear(void);
 
 #ifdef __cplusplus
 }

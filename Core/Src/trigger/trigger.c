@@ -145,6 +145,17 @@ static void trigger_release_active_action(uint8_t key) {
     }
 }
 
+static uint16_t trigger_resolve_primary_action_keycode(uint8_t key,
+                                                       const key_trigger_settings_t *settings) {
+    uint16_t keycode = layout_get_active_keycode(key);
+
+    if (keycode == KC_TRANSPARENT) {
+        return settings->primary_keycode;
+    }
+
+    return keycode;
+}
+
 static void trigger_tap_action(uint8_t key, uint16_t keycode) {
     if (keycode == KC_NO) {
         return;
@@ -205,7 +216,8 @@ static void trigger_behavior_on_press(uint8_t key, int16_t current_distance,
 
     case KEY_BEHAVIOR_NORMAL:
     default:
-        runtime->active_keycode = settings->primary_keycode;
+        runtime->active_keycode =
+            trigger_resolve_primary_action_keycode(key, settings);
         if (runtime->active_keycode != KC_NO) {
             layout_press_action_for_key(key, runtime->active_keycode);
         }
@@ -237,7 +249,8 @@ static void trigger_behavior_on_update(uint8_t key, int16_t current_distance,
             elapsed_ms >= settings->hold_threshold_ms) {
             runtime->toggle_pending = false;
             runtime->toggle_hold_active = true;
-            runtime->active_keycode = settings->primary_keycode;
+            runtime->active_keycode =
+                trigger_resolve_primary_action_keycode(key, settings);
             if (runtime->active_keycode != KC_NO) {
                 layout_press_action_for_key(key, runtime->active_keycode);
             }
@@ -277,7 +290,8 @@ static void trigger_behavior_on_release(uint8_t key) {
         if (runtime->tap_hold_secondary_active) {
             trigger_release_active_action(key);
         } else if (runtime->tap_hold_pending) {
-            trigger_tap_action(key, settings->primary_keycode);
+            trigger_tap_action(key,
+                               trigger_resolve_primary_action_keycode(key, settings));
         }
         runtime->tap_hold_pending = false;
         runtime->tap_hold_secondary_active = false;
@@ -287,14 +301,16 @@ static void trigger_behavior_on_release(uint8_t key) {
         if (runtime->toggle_hold_active) {
             trigger_release_active_action(key);
         } else if (runtime->toggle_pending) {
+            uint16_t primary_keycode =
+                trigger_resolve_primary_action_keycode(key, settings);
             if (runtime->toggle_latched) {
-                layout_release_action_for_key(key, settings->primary_keycode);
+                layout_release_action_for_key(key, primary_keycode);
                 runtime->toggle_latched = false;
                 runtime->active_keycode = KC_NO;
             } else {
-                layout_press_action_for_key(key, settings->primary_keycode);
+                layout_press_action_for_key(key, primary_keycode);
                 runtime->toggle_latched = true;
-                runtime->active_keycode = settings->primary_keycode;
+                runtime->active_keycode = primary_keycode;
             }
         }
         runtime->toggle_pending = false;

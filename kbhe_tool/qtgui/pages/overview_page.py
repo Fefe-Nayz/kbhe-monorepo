@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -10,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from kbhe_tool.key_layout import key_display_name
+from kbhe_tool.protocol import GAMEPAD_API_MODE_NAMES, LED_EFFECT_NAMES
 from ..widgets import (
     PageScaffold,
     SectionCard,
@@ -34,11 +34,15 @@ class OverviewPage(QWidget):
             self.session.snapshotChanged.connect(self.reload)
         except Exception:
             pass
+        try:
+            self.session.connectionChanged.connect(self.reload)
+        except Exception:
+            pass
+        try:
+            self.session.liveSettingsChanged.connect(lambda *_args: self.reload())
+        except Exception:
+            pass
         self.reload()
-
-    # ------------------------------------------------------------------
-    # UI construction
-    # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
@@ -46,222 +50,204 @@ class OverviewPage(QWidget):
         root.setSpacing(0)
 
         scaffold = PageScaffold(
-            "Overview",
-            "Current device status at a glance. Jump into any configuration screen from here.",
+            "Dashboard",
+            "Short device snapshot and direct jumps to the pages you actually use.",
         )
         root.addWidget(scaffold, 1)
 
-        # ── Status tiles (2×2) ────────────────────────────────────────
-        tiles_grid = QGridLayout()
-        tiles_grid.setHorizontalSpacing(14)
-        tiles_grid.setVerticalSpacing(14)
+        top_row = QHBoxLayout()
+        top_row.setSpacing(14)
+        top_row.addWidget(self._build_device_card(), 1)
+        top_row.addWidget(self._build_modes_card(), 1)
+        scaffold.content_layout.addLayout(top_row)
 
-        self.connection_tile = self._make_tile("Connection", "●")
-        self.firmware_tile = self._make_tile("Firmware", "⬡")
-        self.interfaces_tile = self._make_tile("Interfaces", "⌨")
-        self.lighting_tile = self._make_tile("Lighting", "◈")
-
-        tiles_grid.addWidget(self.connection_tile["frame"], 0, 0)
-        tiles_grid.addWidget(self.firmware_tile["frame"], 0, 1)
-        tiles_grid.addWidget(self.interfaces_tile["frame"], 1, 0)
-        tiles_grid.addWidget(self.lighting_tile["frame"], 1, 1)
-        scaffold.content_layout.addLayout(tiles_grid)
-
-        # ── Middle row: quick actions + focused key ───────────────────
-        middle_row = QHBoxLayout()
-        middle_row.setSpacing(14)
-        scaffold.content_layout.addLayout(middle_row)
-
-        middle_row.addWidget(self._build_actions_card(), 2)
-        middle_row.addWidget(self._build_focus_card(), 1)
-
-        # ── Bottom row: persistence + workflow ────────────────────────
         bottom_row = QHBoxLayout()
         bottom_row.setSpacing(14)
+        bottom_row.addWidget(self._build_focus_card(), 1)
+        bottom_row.addWidget(self._build_actions_card(), 1)
         scaffold.content_layout.addLayout(bottom_row)
-
-        bottom_row.addWidget(self._build_persistence_card(), 1)
-        bottom_row.addWidget(self._build_workflow_card(), 1)
 
         scaffold.add_stretch()
 
-    def _make_tile(self, title: str, icon: str = "") -> dict:
-        """A prominent status tile styled like a SectionCard."""
-        frame = QFrame()
-        frame.setObjectName("SectionCard")
+    def _build_device_card(self) -> SectionCard:
+        card = SectionCard(
+            "Device State",
+            "Connection, firmware, and live polling without the filler text.",
+        )
 
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(8)
-
-        # Header: label + status chip
         header = QHBoxLayout()
         header.setSpacing(8)
-        lbl = QLabel(f"{icon}  {title.upper()}" if icon else title.upper())
-        lbl.setObjectName("SidebarGroupLabel")
-        header.addWidget(lbl, 1)
-        chip = StatusChip("—", "neutral")
-        header.addWidget(chip)
-        layout.addLayout(header)
+        self.connection_chip = StatusChip("Disconnected", "bad")
+        self.live_chip = StatusChip("Live OFF", "neutral")
+        header.addWidget(self.connection_chip)
+        header.addWidget(self.live_chip)
+        header.addStretch(1)
+        card.body_layout.addLayout(header)
 
-        # Large value
-        value = QLabel("—")
-        value.setObjectName("CardTitle")
-        value.setStyleSheet("font-size: 17pt; font-weight: 700; margin-top: 2px;")
-        layout.addWidget(value)
+        self.firmware_value = QLabel("Firmware: --")
+        self.firmware_value.setObjectName("CardTitle")
+        self.firmware_value.setStyleSheet("font-size: 18pt; font-weight: 700;")
+        card.body_layout.addWidget(self.firmware_value)
 
-        # Detail line
-        detail = QLabel("")
-        detail.setObjectName("Muted")
-        detail.setWordWrap(True)
-        layout.addWidget(detail)
+        self.connection_detail = QLabel("--")
+        self.connection_detail.setObjectName("Muted")
+        self.connection_detail.setWordWrap(True)
+        card.body_layout.addWidget(self.connection_detail)
 
-        return {"frame": frame, "value": value, "detail": detail, "chip": chip}
+        return card
 
-    def _build_actions_card(self) -> SectionCard:
+    def _build_modes_card(self) -> SectionCard:
         card = SectionCard(
-            "Jump Into a Task",
-            "Structured like a configurator flow instead of a flat utility menu.",
+            "Current Modes",
+            "The active input and lighting modes that matter right now.",
         )
+
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
+        grid.setVerticalSpacing(8)
         card.body_layout.addLayout(grid)
 
-        action_specs = [
-            ("Tune Keys", "keyboard", "Actuation, release, remap, rapid trigger"),
-            ("Calibrate", "calibration", "Zero points and analog curve editing"),
-        ("Gamepad", "gamepad", "Routing, response curve, stick preview, key mapping"),
-            ("Lighting", "lighting", "Matrix painting and brightness"),
-            ("Effects", "effects", "Live animation mode and timing"),
-            ("Firmware", "firmware", "Flash app image and inspect updater logs"),
+        self.mode_values: dict[str, QLabel] = {}
+        rows = [
+            ("keyboard", "Keyboard"),
+            ("gamepad", "Gamepad"),
+            ("nkro", "NKRO"),
+            ("led", "LED"),
+            ("brightness", "Brightness"),
+            ("gamepad_api", "Gamepad API"),
+            ("led_effect", "LED Effect"),
         ]
-        for i, (title, page_id, subtitle) in enumerate(action_specs):
-            btn = make_secondary_button(
-                f"{title}\n{subtitle}",
-                lambda _=False, pid=page_id: self._open_page(pid),
-            )
-            btn.setMinimumHeight(64)
-            btn.setStyleSheet(btn.styleSheet() + " text-align: left; padding: 8px 14px;")
-            grid.addWidget(btn, i // 2, i % 2)
+        for row, (key, title) in enumerate(rows):
+            label = QLabel(title)
+            label.setObjectName("Muted")
+            value = QLabel("--")
+            value.setWordWrap(True)
+            grid.addWidget(label, row, 0)
+            grid.addWidget(value, row, 1)
+            self.mode_values[key] = value
 
         return card
 
     def _build_focus_card(self) -> SectionCard:
         card = SectionCard(
             "Focused Key",
-            "The selected key follows you across Keyboard, Calibration, and Gamepad.",
+            "Keep the selected key in view and jump straight to the page that edits it.",
         )
 
         self.focus_key_value = QLabel(key_display_name(0))
         self.focus_key_value.setObjectName("CardTitle")
-        self.focus_key_value.setStyleSheet("font-size: 28pt; font-weight: 700; padding: 8px 0;")
+        self.focus_key_value.setStyleSheet("font-size: 28pt; font-weight: 700; padding: 6px 0;")
         card.body_layout.addWidget(self.focus_key_value)
 
         hint = QLabel(
-            "Pick a key in the top bar, then jump straight to the screen where you want to edit it."
+            "The selected key is shared with Keyboard, Calibration, and Gamepad."
         )
         hint.setObjectName("Muted")
         hint.setWordWrap(True)
         card.body_layout.addWidget(hint)
 
-        card.body_layout.addSpacing(4)
-
         for title, page_id in [
-            ("Open Keyboard Tuning", "keyboard"),
+            ("Open Keyboard", "keyboard"),
             ("Open Calibration", "calibration"),
-            ("Open Gamepad Mapping", "gamepad"),
+            ("Open Gamepad", "gamepad"),
         ]:
             card.body_layout.addWidget(
                 make_secondary_button(title, lambda _=False, pid=page_id: self._open_page(pid))
             )
 
-        card.body_layout.addStretch(1)
         return card
 
-    def _build_persistence_card(self) -> SectionCard:
-        card = SectionCard("Persistence Model")
-        for text in [
-            "Saved immediately: Keyboard HID, Gamepad HID, NKRO.",
-            "Live until Save to Flash: LED enable, brightness, and the current 82-LED frame.",
-            "Other tuning screens edit live RAM-backed settings; persist them with Save to Flash once the behavior feels correct.",
-        ]:
-            lbl = QLabel(text)
-            lbl.setObjectName("Muted")
-            lbl.setWordWrap(True)
-            card.body_layout.addWidget(lbl)
-        card.body_layout.addStretch(1)
-        return card
+    def _build_actions_card(self) -> SectionCard:
+        card = SectionCard(
+            "Quick Access",
+            "Shortcuts to the pages that usually follow from the current state.",
+        )
 
-    def _build_workflow_card(self) -> SectionCard:
-        card = SectionCard("Recommended Workflow")
-        for step in [
-            "1. Tune the per-key behavior in Keyboard.",
-            "2. Adjust baselines or curves in Calibration if travel feels off.",
-            "3. Map analog/gamepad behavior only after the key behavior is stable.",
-            "4. Finalize lighting last, then Save to Flash.",
-        ]:
-            lbl = QLabel(step)
-            lbl.setObjectName("Muted")
-            lbl.setWordWrap(True)
-            card.body_layout.addWidget(lbl)
-        card.body_layout.addStretch(1)
-        return card
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(10)
+        card.body_layout.addLayout(grid)
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+        actions = [
+            ("Keyboard", "keyboard"),
+            ("Gamepad", "gamepad"),
+            ("Lighting", "lighting"),
+            ("Effects", "effects"),
+            ("Rotary", "rotary"),
+            ("Firmware", "firmware"),
+            ("Device", "device"),
+            ("Debug", "debug"),
+        ]
+        for index, (title, page_id) in enumerate(actions):
+            button = make_secondary_button(
+                title, lambda _=False, pid=page_id: self._open_page(pid)
+            )
+            button.setMinimumHeight(46)
+            grid.addWidget(button, index // 2, index % 2)
+
+        return card
 
     def _open_page(self, page_id: str) -> None:
         if self.controller is not None and hasattr(self.controller, "show_page"):
             self.controller.show_page(page_id)
 
-    def _set_tile(self, tile: dict, value: str, detail: str, level: str = "neutral") -> None:
-        tile["value"].setText(value)
-        tile["detail"].setText(detail)
-        tile["chip"].set_text_and_level(value, level)
+    def _safe_gamepad_settings(self) -> dict:
+        try:
+            return self.device.get_gamepad_settings() or {}
+        except Exception:
+            return {}
 
-    # ------------------------------------------------------------------
-    # Data
-    # ------------------------------------------------------------------
+    def _safe_led_effect(self):
+        try:
+            return self.device.get_led_effect()
+        except Exception:
+            return None
 
     def reload(self, *_args) -> None:
         snapshot = self.session.snapshot or {}
         options = snapshot.get("options") or {}
         connected = bool(getattr(self.session, "connected", True))
-        firmware = snapshot.get("firmware_version") or "Unknown"
+        firmware = snapshot.get("firmware_version")
         brightness = snapshot.get("brightness")
         led_enabled = snapshot.get("led_enabled")
         nkro_enabled = snapshot.get("nkro_enabled")
+        live_enabled = bool(getattr(self.session, "live_enabled", False))
+        live_interval_ms = int(getattr(self.session, "live_interval_ms", 100))
 
-        self._set_tile(
-            self.connection_tile,
+        gamepad_settings = self._safe_gamepad_settings() if connected else {}
+        gamepad_api = gamepad_settings.get("api_mode")
+        led_effect = self._safe_led_effect() if connected else None
+
+        self.connection_chip.set_text_and_level(
             "Connected" if connected else "Disconnected",
-            "Raw HID session is active." if connected else "Reconnect the keyboard before editing settings.",
             "ok" if connected else "bad",
         )
-        self._set_tile(
-            self.firmware_tile,
-            str(firmware),
-            "Application firmware reported by the device.",
-            "info" if firmware != "Unknown" else "neutral",
+        self.live_chip.set_text_and_level(
+            f"Live {live_interval_ms} ms" if live_enabled else "Live OFF",
+            "info" if live_enabled else "neutral",
         )
-        self._set_tile(
-            self.interfaces_tile,
-            f"KBD {'On' if options.get('keyboard_enabled') else 'Off'}  •  PAD {'On' if options.get('gamepad_enabled') else 'Off'}",
-            f"NKRO {'On' if nkro_enabled else 'Off'}",
-            "ok" if options.get("keyboard_enabled") else "neutral",
-        )
-        self._set_tile(
-            self.lighting_tile,
-            f"LED {'On' if led_enabled else 'Off'}",
-            f"Brightness {brightness if brightness is not None else '--'}",
-            "ok" if led_enabled else "neutral",
+        self.firmware_value.setText(f"Firmware: {firmware if firmware is not None else '--'}")
+        self.connection_detail.setText(
+            "Raw HID session is up and the app can query settings live."
+            if connected
+            else "Reconnect the keyboard before editing or polling live data."
         )
 
-    # ------------------------------------------------------------------
-    # Page lifecycle
-    # ------------------------------------------------------------------
+        self.mode_values["keyboard"].setText("On" if options.get("keyboard_enabled") else "Off")
+        self.mode_values["gamepad"].setText("On" if options.get("gamepad_enabled") else "Off")
+        self.mode_values["nkro"].setText("On" if nkro_enabled else "Off")
+        self.mode_values["led"].setText("On" if led_enabled else "Off")
+        self.mode_values["brightness"].setText(str(brightness) if brightness is not None else "--")
+        self.mode_values["gamepad_api"].setText(
+            GAMEPAD_API_MODE_NAMES.get(int(gamepad_api), "--")
+            if gamepad_api is not None
+            else "--"
+        )
+        self.mode_values["led_effect"].setText(
+            LED_EFFECT_NAMES.get(led_effect, str(led_effect))
+            if led_effect is not None
+            else "--"
+        )
 
     def on_selected_key_changed(self, key_index: int) -> None:
         self.focus_key_value.setText(key_display_name(int(key_index)))

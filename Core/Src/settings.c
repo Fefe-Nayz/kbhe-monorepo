@@ -19,9 +19,9 @@
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0105 // v1.5.0
+#define FIRMWARE_VERSION 0x0107 // v1.7.0
 #define KBHE_FW_VERSION_RECORD_MAGIC 0x4B465756u
-#define SETTINGS_VERSION_PREVIOUS 0x000F
+#define SETTINGS_VERSION_PREVIOUS 0x0010
 #define SETTINGS_VERSION_V13 0x000E
 #define SETTINGS_VERSION_V12 0x000C
 #define SETTINGS_VERSION_V11 0x000B
@@ -266,6 +266,25 @@ static void settings_default_gamepad(settings_gamepad_t *gamepad) {
   }
 
   memcpy(gamepad, &defaults, sizeof(defaults));
+}
+
+static void settings_default_layer_keycodes(void) {
+  for (uint8_t layer = 1u; layer < SETTINGS_LAYER_COUNT; layer++) {
+    for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+      current_settings.layer_keycodes[layer - 1u][key] =
+          layout_get_default_layer_keycode(layer, key);
+    }
+  }
+}
+
+static void settings_sanitize_layer_keycodes(void) {
+  for (uint8_t layer = 1u; layer < SETTINGS_LAYER_COUNT; layer++) {
+    for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+      if (current_settings.layer_keycodes[layer - 1u][key] == 0xFFFFu) {
+        current_settings.layer_keycodes[layer - 1u][key] = KC_TRANSPARENT;
+      }
+    }
+  }
 }
 
 static uint16_t settings_gamepad_deadzone_to_curve_x_01mm(uint8_t deadzone) {
@@ -784,6 +803,7 @@ static void settings_set_defaults(void) {
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
     current_settings.keys[i] = settings_default_key(i);
   }
+  settings_default_layer_keycodes();
 
   // Default gamepad settings
   settings_default_gamepad(&current_settings.gamepad);
@@ -939,6 +959,7 @@ static void settings_migrate_v11(const settings_v11_t *legacy) {
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
     settings_copy_key_from_v13(&current_settings.keys[i], &legacy->keys[i], i);
   }
+  settings_default_layer_keycodes();
   settings_gamepad_from_v12(&current_settings.gamepad, &legacy->gamepad,
                             legacy->options.gamepad_with_keyboard != 0);
   current_settings.calibration = legacy->calibration;
@@ -979,6 +1000,7 @@ static void settings_migrate_v13(const settings_v13_t *legacy) {
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
     settings_copy_key_from_v13(&current_settings.keys[i], &legacy->keys[i], i);
   }
+  settings_default_layer_keycodes();
   settings_gamepad_from_v13(&current_settings.gamepad, &legacy->gamepad);
   current_settings.calibration = legacy->calibration;
   current_settings.led = legacy->led;
@@ -1019,6 +1041,7 @@ static void settings_migrate_v14(const settings_v14_t *legacy) {
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
     current_settings.keys[i] = legacy->keys[i];
   }
+  settings_default_layer_keycodes();
   current_settings.gamepad = legacy->gamepad;
   current_settings.calibration = legacy->calibration;
   current_settings.led = legacy->led;
@@ -1061,6 +1084,7 @@ static void settings_migrate_v12(const settings_v12_t *legacy) {
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
     settings_copy_key_from_v13(&current_settings.keys[i], &legacy->keys[i], i);
   }
+  settings_default_layer_keycodes();
   settings_gamepad_from_v12(&current_settings.gamepad, &legacy->gamepad,
                             legacy->options.gamepad_with_keyboard != 0);
   current_settings.calibration = legacy->calibration;
@@ -1112,6 +1136,7 @@ static bool settings_load_from_flash(bool *migrated) {
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
       settings_sanitize_key_config(i, &current_settings.keys[i]);
     }
+    settings_sanitize_layer_keycodes();
     settings_gamepad_sanitize(&current_settings.gamepad);
     settings_gamepad_apply_keyboard_routing_option();
     settings_rotary_encoder_sanitize(&current_settings.rotary);
@@ -1235,7 +1260,7 @@ bool settings_is_keyboard_enabled(void) {
 }
 
 bool settings_is_gamepad_enabled(void) {
-  return current_settings.options.gamepad_enabled;
+  return gamepad_hid_is_enabled();
 }
 
 bool settings_set_keyboard_enabled(bool enabled) {
@@ -1538,6 +1563,41 @@ bool settings_set_key(uint8_t key_index, const settings_key_t *key) {
   socd_load_settings();
   gamepad_hid_reload_settings();
   return true; // Don't auto-save
+}
+
+uint16_t settings_get_layer_keycode(uint8_t layer_index, uint8_t key_index) {
+  if (key_index >= NUM_KEYS || layer_index >= SETTINGS_LAYER_COUNT) {
+    return KC_NO;
+  }
+
+  if (layer_index == 0u) {
+    return current_settings.keys[key_index].hid_keycode;
+  }
+
+  return current_settings.layer_keycodes[layer_index - 1u][key_index];
+}
+
+bool settings_set_layer_keycode(uint8_t layer_index, uint8_t key_index,
+                                uint16_t keycode) {
+  settings_key_t key = {0};
+
+  if (key_index >= NUM_KEYS || layer_index >= SETTINGS_LAYER_COUNT) {
+    return false;
+  }
+
+  if (layer_index == 0u) {
+    const settings_key_t *current_key = settings_get_key(key_index);
+    if (current_key == NULL) {
+      return false;
+    }
+
+    key = *current_key;
+    key.hid_keycode = keycode;
+    return settings_set_key(key_index, &key);
+  }
+
+  current_settings.layer_keycodes[layer_index - 1u][key_index] = keycode;
+  return true;
 }
 
 //--------------------------------------------------------------------+

@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x0010         // Advanced key tick rate
+#define SETTINGS_VERSION 0x0011         // Layer keymaps and firmware action keys
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -35,6 +35,7 @@ extern "C" {
 #define ANALOG_CURVE_POINTS 4 // 4-point bezier curve (P0, P1, P2, P3)
 #define GAMEPAD_CURVE_POINT_COUNT 4u
 #define GAMEPAD_CURVE_MAX_DISTANCE_01MM 400u // 4.00 mm
+#define SETTINGS_LAYER_COUNT 4u
 #define SETTINGS_DYNAMIC_ZONE_COUNT 4u
 #define SETTINGS_ADVANCED_TICK_RATE_MIN 1u
 #define SETTINGS_ADVANCED_TICK_RATE_MAX 100u
@@ -343,6 +344,7 @@ typedef struct __attribute__((packed)) {
 
   // Per-key settings
   settings_key_t keys[NUM_KEYS];
+  uint16_t layer_keycodes[SETTINGS_LAYER_COUNT - 1u][NUM_KEYS];
 
   // Gamepad settings
   settings_gamepad_t gamepad;
@@ -765,6 +767,28 @@ const settings_key_t *settings_get_key(uint8_t key_index);
  * @return true if successful
  */
 bool settings_set_key(uint8_t key_index, const settings_key_t *key);
+
+/**
+ * @brief Get the keycode assigned to one logical layer/key slot.
+ * Layer 0 is the base layer stored in settings_key_t.hid_keycode.
+ * Layers 1..N are additional overlay layers.
+ * @param layer_index Logical layer index
+ * @param key_index Key index
+ * @return Assigned keycode or KC_NO on invalid input
+ */
+uint16_t settings_get_layer_keycode(uint8_t layer_index, uint8_t key_index);
+
+/**
+ * @brief Set the keycode assigned to one logical layer/key slot.
+ * Layer 0 updates the base settings_key_t.hid_keycode.
+ * Layers 1..N update the persisted overlay keymaps.
+ * @param layer_index Logical layer index
+ * @param key_index Key index
+ * @param keycode HID/custom keycode to assign
+ * @return true if successful
+ */
+bool settings_set_layer_keycode(uint8_t layer_index, uint8_t key_index,
+                                uint16_t keycode);
 
 //--------------------------------------------------------------------+
 // Gamepad Settings API

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from .protocol import ADVANCED_TICK_RATE_DEFAULT, ADVANCED_TICK_RATE_MAX, ADVANCED_TICK_RATE_MIN, GAMEPAD_API_MODES, KEY_COUNT
+from .protocol import ADVANCED_TICK_RATE_DEFAULT, ADVANCED_TICK_RATE_MAX, ADVANCED_TICK_RATE_MIN, GAMEPAD_API_MODES, KEY_COUNT, LAYER_COUNT
 
 
 def _default_key_settings(index: int) -> dict:
@@ -43,6 +43,9 @@ class DemoDevice:
         self._nkro_enabled = True
         self._advanced_tick_rate = int(ADVANCED_TICK_RATE_DEFAULT)
         self._keys = [_default_key_settings(i) for i in range(KEY_COUNT)]
+        self._layer_keycodes = [
+            [int(self._keys[i]["hid_keycode"]) for i in range(KEY_COUNT)]
+        ] + [[0x0001 for _ in range(KEY_COUNT)] for _ in range(LAYER_COUNT - 1)]
         self._curves = [
             {
                 "key_index": i,
@@ -172,6 +175,31 @@ class DemoDevice:
 
     def set_key_settings_extended(self, index, settings):
         self._keys[int(index)] = {**self._keys[int(index)], **deepcopy(settings)}
+        self._layer_keycodes[0][int(index)] = int(self._keys[int(index)]["hid_keycode"])
+        return True
+
+    def get_layer_keycode(self, layer_index, key_index):
+        layer_index = max(0, min(int(LAYER_COUNT) - 1, int(layer_index)))
+        key_index = max(0, min(int(KEY_COUNT) - 1, int(key_index)))
+        if layer_index == 0:
+            hid_keycode = int(self._keys[key_index]["hid_keycode"])
+        else:
+            hid_keycode = int(self._layer_keycodes[layer_index][key_index])
+        return {
+            "layer_index": layer_index,
+            "key_index": key_index,
+            "hid_keycode": hid_keycode,
+        }
+
+    def set_layer_keycode(self, layer_index, key_index, hid_keycode):
+        layer_index = max(0, min(int(LAYER_COUNT) - 1, int(layer_index)))
+        key_index = max(0, min(int(KEY_COUNT) - 1, int(key_index)))
+        hid_keycode = int(hid_keycode) & 0xFFFF
+        if layer_index == 0:
+            self._keys[key_index]["hid_keycode"] = hid_keycode
+            self._layer_keycodes[0][key_index] = hid_keycode
+        else:
+            self._layer_keycodes[layer_index][key_index] = hid_keycode
         return True
 
     def get_calibration(self):

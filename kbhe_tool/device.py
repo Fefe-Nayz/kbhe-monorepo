@@ -17,6 +17,7 @@ from .protocol import (
     GAMEPAD_CURVE_MAX_DISTANCE_MM,
     GAMEPAD_CURVE_POINT_COUNT,
     GAMEPAD_KEYBOARD_ROUTING,
+    LAYER_COUNT,
     KEY_BEHAVIORS,
     KEY_COUNT,
     KEY_SETTINGS_PER_CHUNK,
@@ -542,6 +543,30 @@ class KBHEDevice:
                 'dynamic_zones': dynamic_zones,
             }
         return None
+
+    def get_layer_keycode(self, layer_index, key_index):
+        """Get the keycode assigned to one layer/key slot."""
+        layer_index = max(0, min(int(LAYER_COUNT) - 1, int(layer_index)))
+        key_index = max(0, min(int(KEY_COUNT) - 1, int(key_index)))
+        resp = self.send_command(
+            Command.GET_LAYER_KEYCODE, [0, layer_index, key_index], timeout_ms=150
+        )
+        if resp and len(resp) >= 6 and resp[1] == Status.OK:
+            return {
+                "layer_index": int(resp[2]),
+                "key_index": int(resp[3]),
+                "hid_keycode": self._unpack_u16(resp, 4),
+            }
+        return None
+
+    def set_layer_keycode(self, layer_index, key_index, hid_keycode):
+        """Set the keycode assigned to one layer/key slot."""
+        layer_index = max(0, min(int(LAYER_COUNT) - 1, int(layer_index)))
+        key_index = max(0, min(int(KEY_COUNT) - 1, int(key_index)))
+        hid_keycode = int(hid_keycode) & 0xFFFF
+        data = [0, layer_index, key_index, hid_keycode & 0xFF, (hid_keycode >> 8) & 0xFF]
+        resp = self.send_command(Command.SET_LAYER_KEYCODE, data, timeout_ms=150)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def set_key_settings(self, key_index, hid_keycode, actuation_mm, release_mm, rapid_trigger_mm, socd_pair=None, socd_resolution=0):
         """Set settings for a specific key (legacy format for backwards compatibility)."""

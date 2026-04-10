@@ -7,6 +7,7 @@
 
 #define GAMEPAD_AXIS_RANGE 255u
 #define GAMEPAD_BUTTON_BIT_COUNT 32u
+#define GAMEPAD_CUSTOM_DIGITAL_VALUE 255u
 
 enum {
   KBHE_GAMEPAD_BUTTON_NONE = GAMEPAD_BUTTON_NONE,
@@ -36,6 +37,8 @@ static settings_gamepad_t cached_gamepad = SETTINGS_DEFAULT_GAMEPAD;
 static settings_gamepad_mapping_t cached_mappings[NUM_KEYS];
 static volatile bool gamepad_report_changed = false;
 static bool gamepad_enabled = true;
+static uint8_t custom_button_counts[KBHE_GAMEPAD_BUTTON_HOME + 1u] = {0};
+static uint8_t custom_axis_counts[GAMEPAD_AXIS_TRIGGER_R + 1u][2] = {{0}};
 
 typedef struct __attribute__((packed)) {
   uint16_t lx;
@@ -51,6 +54,34 @@ static gamepad_hid_usb_report_t prev_gamepad_hid_report = {0};
 
 static inline uint8_t gamepad_max_u8(uint8_t a, uint8_t b) {
   return (a > b) ? a : b;
+}
+
+static inline bool gamepad_is_valid_button_id(uint8_t button) {
+  return button > KBHE_GAMEPAD_BUTTON_NONE && button <= KBHE_GAMEPAD_BUTTON_HOME;
+}
+
+static inline bool gamepad_is_valid_axis_id(uint8_t axis) {
+  return axis > (uint8_t)GAMEPAD_AXIS_NONE &&
+         axis <= (uint8_t)GAMEPAD_AXIS_TRIGGER_R;
+}
+
+static inline uint8_t gamepad_direction_to_index(uint8_t direction) {
+  return direction == (uint8_t)GAMEPAD_DIR_NEGATIVE ? 1u : 0u;
+}
+
+static uint32_t gamepad_get_custom_buttons_mask(void) {
+  uint32_t buttons = 0u;
+
+  for (uint8_t button = KBHE_GAMEPAD_BUTTON_A;
+       button <= KBHE_GAMEPAD_BUTTON_HOME; button++) {
+    if (custom_button_counts[button] == 0u) {
+      continue;
+    }
+
+    buttons |= (uint32_t)1u << (uint8_t)(button - 1u);
+  }
+
+  return buttons;
 }
 
 static inline int16_t gamepad_clamp_axis_i16(int32_t value) {
@@ -328,6 +359,7 @@ void gamepad_hid_init(void) {
   prev_gamepad_hid_report = gamepad_neutral_hid_report();
   gamepad_report_changed = false;
   gamepad_enabled = true;
+  gamepad_hid_custom_clear();
 }
 
 bool gamepad_hid_is_ready(void) { return tud_hid_n_ready(HID_ITF_GAMEPAD); }
@@ -389,6 +421,20 @@ void gamepad_hid_refresh_state(void) {
     } else {
       positive[mapping->axis] =
           gamepad_max_u8(positive[mapping->axis], analog_value);
+    }
+  }
+
+  next_report.buttons |= gamepad_get_custom_buttons_mask();
+
+  for (uint8_t axis = (uint8_t)GAMEPAD_AXIS_LEFT_X;
+       axis <= (uint8_t)GAMEPAD_AXIS_TRIGGER_R; axis++) {
+    if (custom_axis_counts[axis][0] > 0u) {
+      positive[axis] =
+          gamepad_max_u8(positive[axis], GAMEPAD_CUSTOM_DIGITAL_VALUE);
+    }
+    if (custom_axis_counts[axis][1] > 0u) {
+      negative[axis] =
+          gamepad_max_u8(negative[axis], GAMEPAD_CUSTOM_DIGITAL_VALUE);
     }
   }
 
@@ -467,3 +513,54 @@ void gamepad_hid_set_enabled(bool enabled) {
 }
 
 bool gamepad_hid_is_enabled(void) { return gamepad_enabled; }
+
+void gamepad_hid_custom_button_press(uint8_t button) {
+  if (!gamepad_is_valid_button_id(button)) {
+    return;
+  }
+
+  if (custom_button_counts[button] < 0xFFu) {
+    custom_button_counts[button]++;
+  }
+}
+
+void gamepad_hid_custom_button_release(uint8_t button) {
+  if (!gamepad_is_valid_button_id(button)) {
+    return;
+  }
+
+  if (custom_button_counts[button] > 0u) {
+    custom_button_counts[button]--;
+  }
+}
+
+void gamepad_hid_custom_axis_press(uint8_t axis, uint8_t direction) {
+  uint8_t direction_index = 0u;
+
+  if (!gamepad_is_valid_axis_id(axis)) {
+    return;
+  }
+
+  direction_index = gamepad_direction_to_index(direction);
+  if (custom_axis_counts[axis][direction_index] < 0xFFu) {
+    custom_axis_counts[axis][direction_index]++;
+  }
+}
+
+void gamepad_hid_custom_axis_release(uint8_t axis, uint8_t direction) {
+  uint8_t direction_index = 0u;
+
+  if (!gamepad_is_valid_axis_id(axis)) {
+    return;
+  }
+
+  direction_index = gamepad_direction_to_index(direction);
+  if (custom_axis_counts[axis][direction_index] > 0u) {
+    custom_axis_counts[axis][direction_index]--;
+  }
+}
+
+void gamepad_hid_custom_clear(void) {
+  memset(custom_button_counts, 0, sizeof(custom_button_counts));
+  memset(custom_axis_counts, 0, sizeof(custom_axis_counts));
+}
