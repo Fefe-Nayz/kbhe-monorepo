@@ -34,6 +34,7 @@ typedef enum {
   CMD_REBOOT = 0x01,
   CMD_ENTER_BOOTLOADER = 0x02,
   CMD_FACTORY_RESET = 0x03,
+  CMD_USB_REENUMERATE = 0x04,
 
   // Settings commands (0x20 - 0x3F)
   CMD_GET_OPTIONS = 0x20,
@@ -45,6 +46,8 @@ typedef enum {
   CMD_SAVE_SETTINGS = 0x26,
   CMD_GET_NKRO_ENABLED = 0x27,
   CMD_SET_NKRO_ENABLED = 0x28,
+  CMD_GET_ADVANCED_TICK_RATE = 0x29,
+  CMD_SET_ADVANCED_TICK_RATE = 0x2A,
 
   // Key settings commands (0x40 - 0x5F)
   CMD_GET_KEY_SETTINGS = 0x40,
@@ -178,6 +181,13 @@ typedef struct __attribute__((packed)) {
   uint8_t reserved[61];
 } hid_packet_bool_t;
 
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t tick_rate;
+  uint8_t reserved[61];
+} hid_packet_tick_rate_t;
+
 /**
  * @brief Key settings packet (for single key)
  * Updated for enhanced rapid trigger settings
@@ -245,11 +255,12 @@ typedef struct __attribute__((packed)) {
   uint8_t keyboard_routing;
   uint8_t square_mode;
   uint8_t reactive_stick;
+  uint8_t api_mode;
   struct __attribute__((packed)) {
     uint16_t x_01mm;
     uint8_t y;
   } curve[GAMEPAD_CURVE_POINT_COUNT];
-  uint8_t reserved[46];
+  uint8_t reserved[45];
 } hid_packet_gamepad_settings_t;
 
 typedef struct __attribute__((packed)) {

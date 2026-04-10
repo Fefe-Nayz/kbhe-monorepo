@@ -50,6 +50,25 @@ static inline uint8_t hid_socd_resolution_from_flags(uint8_t flags) {
   return hid_sanitize_socd_resolution((uint8_t)((flags >> 2) & 0x03u));
 }
 
+static inline uint8_t hid_gamepad_curve_x_01mm_to_deadzone(uint16_t x_01mm) {
+  uint32_t scaled = ((uint32_t)x_01mm * 255u +
+                     (GAMEPAD_CURVE_MAX_DISTANCE_01MM / 2u)) /
+                    GAMEPAD_CURVE_MAX_DISTANCE_01MM;
+  if (scaled > 255u) {
+    scaled = 255u;
+  }
+  return (uint8_t)scaled;
+}
+
+static inline uint16_t hid_gamepad_deadzone_to_curve_x_01mm(uint8_t deadzone) {
+  uint32_t scaled =
+      ((uint32_t)deadzone * GAMEPAD_CURVE_MAX_DISTANCE_01MM + 127u) / 255u;
+  if (scaled > GAMEPAD_CURVE_MAX_DISTANCE_01MM) {
+    scaled = GAMEPAD_CURVE_MAX_DISTANCE_01MM;
+  }
+  return (uint16_t)scaled;
+}
+
 static inline uint8_t hid_key_flags_from_settings(const settings_key_t *key) {
   uint8_t flags = 0;
   if (key->rapid_trigger_enabled) {
@@ -99,6 +118,16 @@ static void cmd_factory_reset(const uint8_t *in, uint8_t *out) {
   }
 
   resp->status_or_len = success ? HID_RESP_OK : HID_RESP_ERROR;
+}
+
+static void cmd_usb_reenumerate(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
+  resp->command_id = CMD_USB_REENUMERATE;
+  resp->status_or_len =
+      updater_app_schedule_action(UPDATER_APP_ACTION_USB_REENUMERATE)
+          ? HID_RESP_OK
+          : HID_RESP_ERROR;
 }
 
 static void cmd_reboot(const uint8_t *in, uint8_t *out) {
@@ -211,6 +240,25 @@ static void cmd_set_nkro_enabled(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_SET_NKRO_ENABLED;
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
   resp->value = settings_is_nkro_enabled() ? 1 : 0;
+}
+
+static void cmd_get_advanced_tick_rate(const uint8_t *in, uint8_t *out) {
+  hid_packet_tick_rate_t *resp = (hid_packet_tick_rate_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_GET_ADVANCED_TICK_RATE;
+  resp->status = HID_RESP_OK;
+  resp->tick_rate = settings_get_advanced_tick_rate();
+}
+
+static void cmd_set_advanced_tick_rate(const uint8_t *in, uint8_t *out) {
+  const hid_packet_tick_rate_t *req = (const hid_packet_tick_rate_t *)in;
+  hid_packet_tick_rate_t *resp = (hid_packet_tick_rate_t *)out;
+  bool success = settings_set_advanced_tick_rate(req->tick_rate);
+
+  resp->command_id = CMD_SET_ADVANCED_TICK_RATE;
+  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->tick_rate = settings_get_advanced_tick_rate();
 }
 
 //--------------------------------------------------------------------+
@@ -414,10 +462,12 @@ static void cmd_get_gamepad_settings(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_GET_GAMEPAD_SETTINGS;
   resp->status = HID_RESP_OK;
-  resp->radial_deadzone = s->gamepad.radial_deadzone;
+  resp->radial_deadzone =
+      hid_gamepad_curve_x_01mm_to_deadzone(s->gamepad.curve[0].x_01mm);
   resp->keyboard_routing = s->gamepad.keyboard_routing;
   resp->square_mode = s->gamepad.square_mode;
   resp->reactive_stick = s->gamepad.reactive_stick;
+  resp->api_mode = s->gamepad.api_mode;
   for (uint8_t i = 0; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
     resp->curve[i].x_01mm = s->gamepad.curve[i].x_01mm;
     resp->curve[i].y = s->gamepad.curve[i].y;
@@ -429,14 +479,16 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
       (const hid_packet_gamepad_settings_t *)in;
   hid_packet_gamepad_settings_t *resp = (hid_packet_gamepad_settings_t *)out;
   settings_gamepad_t gamepad;
-  bool invalid = req->keyboard_routing >= (uint8_t)GAMEPAD_KEYBOARD_ROUTING_MAX;
+  bool invalid = req->keyboard_routing >= (uint8_t)GAMEPAD_KEYBOARD_ROUTING_MAX ||
+                 req->api_mode >= (uint8_t)GAMEPAD_API_MAX;
 
   resp->command_id = CMD_SET_GAMEPAD_SETTINGS;
 
-  gamepad.radial_deadzone = req->radial_deadzone;
+  gamepad.radial_deadzone = 0u;
   gamepad.keyboard_routing = req->keyboard_routing;
   gamepad.square_mode = req->square_mode ? 1 : 0;
   gamepad.reactive_stick = req->reactive_stick ? 1 : 0;
+  gamepad.api_mode = req->api_mode;
   for (uint8_t i = 0; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
     gamepad.curve[i].x_01mm = req->curve[i].x_01mm;
     gamepad.curve[i].y = req->curve[i].y;
@@ -448,6 +500,11 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
     }
   }
 
+  if (gamepad.curve[0].x_01mm == 0u && req->radial_deadzone > 0u) {
+    gamepad.curve[0].x_01mm =
+        hid_gamepad_deadzone_to_curve_x_01mm(req->radial_deadzone);
+  }
+
   if (invalid) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
@@ -456,10 +513,12 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
   bool success = settings_set_gamepad(&gamepad);
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
-  resp->radial_deadzone = gamepad.radial_deadzone;
+  resp->radial_deadzone =
+      hid_gamepad_curve_x_01mm_to_deadzone(gamepad.curve[0].x_01mm);
   resp->keyboard_routing = gamepad.keyboard_routing;
   resp->square_mode = gamepad.square_mode;
   resp->reactive_stick = gamepad.reactive_stick;
+  resp->api_mode = gamepad.api_mode;
   for (uint8_t i = 0; i < GAMEPAD_CURVE_POINT_COUNT; i++) {
     resp->curve[i].x_01mm = gamepad.curve[i].x_01mm;
     resp->curve[i].y = gamepad.curve[i].y;
@@ -1660,6 +1719,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_factory_reset(in_packet, out_packet);
     break;
 
+  case CMD_USB_REENUMERATE:
+    cmd_usb_reenumerate(in_packet, out_packet);
+    break;
+
   // Settings commands
   case CMD_GET_OPTIONS:
     cmd_get_options(in_packet, out_packet);
@@ -1695,6 +1758,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_NKRO_ENABLED:
     cmd_set_nkro_enabled(in_packet, out_packet);
+    break;
+
+  case CMD_GET_ADVANCED_TICK_RATE:
+    cmd_get_advanced_tick_rate(in_packet, out_packet);
+    break;
+
+  case CMD_SET_ADVANCED_TICK_RATE:
+    cmd_set_advanced_tick_rate(in_packet, out_packet);
     break;
 
   // Key settings commands

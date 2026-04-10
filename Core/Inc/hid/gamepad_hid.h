@@ -24,6 +24,7 @@ void gamepad_hid_reload_settings(void);
 void gamepad_hid_refresh_state(void);
 bool gamepad_hid_send_report_if_changed(void);
 void gamepad_hid_task(void);
+const gamepad_report_t *gamepad_hid_get_report(void);
 void gamepad_hid_set_enabled(bool enabled);
 bool gamepad_hid_is_enabled(void);
 

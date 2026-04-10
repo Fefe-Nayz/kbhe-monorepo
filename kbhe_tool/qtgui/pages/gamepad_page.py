@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QSlider,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -22,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from kbhe_tool.key_layout import key_display_name
 from kbhe_tool.protocol import (
+    GAMEPAD_API_MODES,
     GAMEPAD_AXES,
     GAMEPAD_BUTTONS,
     GAMEPAD_CURVE_MAX_DISTANCE_MM,
@@ -101,16 +101,12 @@ def _curve_eval(points: list[dict[str, float | int]], distance_mm: float) -> int
     return int(curve[-1]["y"])
 
 
-def _curve_floor_output(points: list[dict[str, float | int]]) -> int:
+def _curve_start_deadzone(points: list[dict[str, float | int]]) -> int:
     curve = _sanitize_curve_points(points)
     if not curve:
         return 0
-    return int(_clamp(int(curve[0]["y"]), 0, 255))
-
-
-def _effective_radial_deadzone(radial_deadzone: int, points: list[dict[str, float | int]]) -> int:
-    raw = int(_clamp(radial_deadzone, 0, 255))
-    return max(raw, _curve_floor_output(points))
+    start_01mm = int(_clamp(int(curve[0]["x_01mm"]), 0, int(GAMEPAD_CURVE_MAX_DISTANCE_MM * 100.0)))
+    return int(round((start_01mm * 255.0) / (GAMEPAD_CURVE_MAX_DISTANCE_MM * 100.0)))
 
 
 def _compose_axis_value(positive: int, negative: int, reactive: bool) -> float:
@@ -124,7 +120,7 @@ def _compose_axis_value(positive: int, negative: int, reactive: bool) -> float:
     return float(pos - neg)
 
 
-def _shape_stick_pair(x: float, y: float, radial_deadzone: int, square_mode: bool) -> tuple[float, float]:
+def _shape_stick_pair(x: float, y: float, square_mode: bool) -> tuple[float, float]:
     if not square_mode:
         magnitude = math.hypot(x, y)
         if magnitude > 255.0 and magnitude > 0.0:
@@ -132,17 +128,8 @@ def _shape_stick_pair(x: float, y: float, radial_deadzone: int, square_mode: boo
             x *= scale
             y *= scale
 
-    magnitude = math.hypot(x, y)
-    deadzone = float(_clamp(radial_deadzone, 0, 255))
-    if magnitude <= 0.0 or deadzone >= 255.0 or magnitude <= deadzone:
+    if math.hypot(x, y) <= 0.0:
         return 0.0, 0.0
-
-    if deadzone > 0.0:
-        scaled = ((magnitude - deadzone) * 255.0) / (255.0 - deadzone)
-        if magnitude > 0.0:
-            factor = scaled / magnitude
-            x *= factor
-            y *= factor
 
     return float(_clamp(x, -255.0, 255.0)), float(_clamp(y, -255.0, 255.0))
 
@@ -200,7 +187,11 @@ class StickPreview(QWidget):
 
         painter.setPen(QColor(c["text_muted"]))
         painter.drawText(12, 20, "Live left-stick preview")
-        painter.drawText(12, self.height() - 12, f"X {self.x:+.2f}   Y {self.y:+.2f}")
+        painter.drawText(
+            12,
+            self.height() - 12,
+            f"X {self.x:+.2f}   Y {self.y:+.2f}   Curve start {self.deadzone_raw}/255",
+        )
 
 
 class GamepadCurveEditor(QWidget):
@@ -318,6 +309,7 @@ class GamepadPage(QWidget):
         self._page_active = False
         self._loading = False
         self._curve_points = _default_curve_points()
+        self._loaded_api_mode = int(GAMEPAD_API_MODES["HID (DirectInput)"])
         try:
             self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
         except Exception:
@@ -357,13 +349,13 @@ class GamepadPage(QWidget):
         scaffold.add_stretch()
 
         self._set_selected_key_label()
-        self._update_deadzone_label(self.deadzone_slider.value())
+        self._update_curve_deadzone_label()
         self._sync_curve_spinboxes()
 
     def _build_settings_card(self) -> SectionCard:
         card = SectionCard(
             "Global Response",
-            "Tune keyboard routing, the shared 4-point analog curve, and the radial stick deadzone floor applied after that curve.",
+            "Tune keyboard routing and the shared 4-point analog curve used by every mapped stick and trigger.",
         )
 
         focused_row = QHBoxLayout()
@@ -379,7 +371,7 @@ class GamepadPage(QWidget):
         tuning = SubCard()
 
         dz_row = QHBoxLayout()
-        dz_label = QLabel("Radial deadzone")
+        dz_label = QLabel("Curve start deadzone")
         dz_label.setObjectName("Muted")
         dz_row.addWidget(dz_label)
         dz_row.addStretch(1)
@@ -388,10 +380,17 @@ class GamepadPage(QWidget):
         dz_row.addWidget(self.deadzone_value_label)
         tuning.layout.addLayout(dz_row)
 
-        self.deadzone_slider = QSlider(Qt.Orientation.Horizontal)
-        self.deadzone_slider.setRange(0, 255)
-        self.deadzone_slider.valueChanged.connect(self._update_deadzone_label)
-        tuning.layout.addWidget(self.deadzone_slider)
+        api_row = QHBoxLayout()
+        api_row.setSpacing(8)
+        api_label = QLabel("Gamepad API")
+        api_label.setObjectName("Muted")
+        api_row.addWidget(api_label)
+        self.api_mode_combo = QComboBox()
+        for label, value in GAMEPAD_API_MODES.items():
+            self.api_mode_combo.addItem(label, value)
+        api_row.addWidget(self.api_mode_combo)
+        api_row.addStretch(1)
+        tuning.layout.addLayout(api_row)
 
         self.keep_keyboard_check = QCheckBox("Keep keyboard output in gamepad mode")
         self.replace_mapped_check = QCheckBox("Mapped keys replace keyboard output")
@@ -403,8 +402,9 @@ class GamepadPage(QWidget):
         tuning.layout.addWidget(self.reactive_check)
 
         hint = QLabel(
-            "The radial deadzone is clamped to the curve start output so both controls stay aligned. "
-            "If keyboard output is kept on, you can still suppress it only on mapped keys."
+            "The first curve point X position is the only start deadzone control now. "
+            "If keyboard output is kept on, you can still suppress it only on mapped keys. "
+            "Switching API restarts the USB gamepad interface automatically, though some games may still need to be reopened."
         )
         hint.setObjectName("Muted")
         hint.setWordWrap(True)
@@ -596,6 +596,32 @@ class GamepadPage(QWidget):
             self.focus_mapping_live_labels[key] = value
         right.addWidget(stats_card)
 
+        target_card = SubCard()
+        target_title = QLabel("Standard pad target layout")
+        target_title.setObjectName("Muted")
+        target_card.layout.addWidget(target_title)
+        target_grid = QGridLayout()
+        target_grid.setHorizontalSpacing(10)
+        target_grid.setVerticalSpacing(6)
+        target_rows = [
+            ("Face", "A  B  X  Y"),
+            ("D-pad", "Up  Down  Left  Right"),
+            ("Shoulders", "LB  RB"),
+            ("Triggers", "LT  RT"),
+            ("System", "Back/Minus  Start/Plus  Guide/Home"),
+            ("Stick press", "L3  R3"),
+            ("Stick axes", "Left Stick X/Y  Right Stick X/Y"),
+        ]
+        for row, (label_text, value_text) in enumerate(target_rows):
+            label = QLabel(label_text)
+            label.setObjectName("Muted")
+            value = QLabel(value_text)
+            value.setWordWrap(True)
+            target_grid.addWidget(label, row, 0)
+            target_grid.addWidget(value, row, 1)
+        target_card.layout.addLayout(target_grid)
+        right.addWidget(target_card)
+
         actions = QHBoxLayout()
         actions.setSpacing(8)
         actions.addWidget(make_secondary_button("Load Focused Mapping", self.load_focused_mapping))
@@ -666,30 +692,16 @@ class GamepadPage(QWidget):
         self.mapping_table.selectRow(self._current_key)
         self._sync_focused_mapping_from_table()
 
-    def _update_deadzone_label(self, value: int) -> None:
-        raw = int(_clamp(value, 0, 255))
-        effective = _effective_radial_deadzone(raw, self._curve_points)
-        curve_floor = _curve_floor_output(self._curve_points)
+    def _update_curve_deadzone_label(self) -> None:
+        effective = _curve_start_deadzone(self._curve_points)
         percent = effective * 100.0 / 255.0
-        if effective != raw:
-            self.deadzone_value_label.setText(
-                f"{effective}/255 effective (~{percent:.1f}%) • manual {raw}/255 • curve floor {curve_floor}/255"
-            )
-        else:
-            self.deadzone_value_label.setText(f"{effective}/255 (~{percent:.1f}%)")
+        self.deadzone_value_label.setText(f"{effective}/255 (~{percent:.1f}%)")
         self.preview_widget.set_state(
             self.preview_widget.x,
             self.preview_widget.y,
             self.square_check.isChecked(),
             effective,
         )
-
-    def _sync_deadzone_floor(self) -> None:
-        floor = _curve_floor_output(self._curve_points)
-        if self.deadzone_slider.value() < floor:
-            self.deadzone_slider.setValue(floor)
-            return
-        self._update_deadzone_label(self.deadzone_slider.value())
 
     def _sync_curve_spinboxes(self) -> None:
         self._curve_points = _sanitize_curve_points(self._curve_points)
@@ -709,7 +721,7 @@ class GamepadPage(QWidget):
             return
         self._curve_points = _sanitize_curve_points(points)
         self._sync_curve_spinboxes()
-        self._sync_deadzone_floor()
+        self._update_curve_deadzone_label()
 
     def _on_curve_spin_changed(self) -> None:
         if self._loading:
@@ -719,7 +731,7 @@ class GamepadPage(QWidget):
             points.append({"x_01mm": int(self.curve_x_spins[index].value()), "y": int(self.curve_y_spins[index].value())})
         self._curve_points = _sanitize_curve_points(points)
         self._sync_curve_spinboxes()
-        self._sync_deadzone_floor()
+        self._update_curve_deadzone_label()
 
     def _refresh_mapping_summary(self, row: int) -> None:
         axis_combo = self.mapping_table.cellWidget(row, 1)
@@ -809,12 +821,7 @@ class GamepadPage(QWidget):
             negative[GAMEPAD_AXES["Left Stick Y"]],
             self.reactive_check.isChecked(),
         )
-        x, y = _shape_stick_pair(
-            x,
-            y,
-            _effective_radial_deadzone(self.deadzone_slider.value(), self._curve_points),
-            self.square_check.isChecked(),
-        )
+        x, y = _shape_stick_pair(x, y, self.square_check.isChecked())
         return x / 255.0, y / 255.0
 
     def reload(self) -> None:
@@ -832,34 +839,47 @@ class GamepadPage(QWidget):
         self._loading = True
         self._curve_points = _sanitize_curve_points(settings.get("curve_points") or _default_curve_points())
         self._sync_curve_spinboxes()
-        self.deadzone_slider.setValue(
-            _effective_radial_deadzone(
-                int(settings.get("radial_deadzone", settings.get("deadzone", 0))),
-                self._curve_points,
-            )
-        )
         self._set_keyboard_routing_controls(int(settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])))
+        api_mode = int(settings.get("api_mode", GAMEPAD_API_MODES["HID (DirectInput)"]))
+        self.api_mode_combo.setCurrentIndex(max(0, self.api_mode_combo.findData(api_mode)))
+        self._loaded_api_mode = api_mode
         self.square_check.setChecked(bool(settings.get("square_mode", False)))
         self.reactive_check.setChecked(bool(settings.get("reactive_stick", settings.get("snappy_mode", False))))
         self._loading = False
-        self._update_deadzone_label(self.deadzone_slider.value())
+        self._update_curve_deadzone_label()
         self._update_status("Global gamepad settings loaded.", "success")
 
     def apply_gamepad_settings(self) -> None:
+        api_mode = int(self.api_mode_combo.currentData())
+        api_changed = api_mode != self._loaded_api_mode
         payload = {
-            "radial_deadzone": _effective_radial_deadzone(self.deadzone_slider.value(), self._curve_points),
+            "radial_deadzone": _curve_start_deadzone(self._curve_points),
             "keyboard_routing": self._current_keyboard_routing(),
             "square_mode": self.square_check.isChecked(),
             "reactive_stick": self.reactive_check.isChecked(),
+            "api_mode": api_mode,
             "curve_points": self._curve_points,
         }
         try:
             if not self.device.set_gamepad_settings(payload):
                 raise RuntimeError("device rejected one or more settings")
+            if api_changed:
+                if not self.device.save_settings():
+                    raise RuntimeError("device rejected save after API mode change")
+                if not self.device.usb_reenumerate(timeout_s=6.0):
+                    raise RuntimeError("USB gamepad re-enumeration failed")
         except Exception as exc:
             self._update_status(f"Failed to apply gamepad settings: {exc}", "error")
             return
-        self._update_status("Gamepad settings applied live.", "success")
+        self._loaded_api_mode = api_mode
+        if api_changed:
+            try:
+                self.session.refresh_snapshot()
+            except Exception:
+                pass
+            self._update_status("Gamepad API switched and the USB interface was restarted automatically.", "success")
+        else:
+            self._update_status("Gamepad settings applied live.", "success")
 
     def load_gamepad_mapping(self) -> None:
         missing = []
@@ -968,7 +988,7 @@ class GamepadPage(QWidget):
             preview_x,
             preview_y,
             self.square_check.isChecked(),
-            _effective_radial_deadzone(self.deadzone_slider.value(), self._curve_points),
+            _curve_start_deadzone(self._curve_points),
         )
 
         c = current_colors()

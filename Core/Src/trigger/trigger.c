@@ -22,6 +22,28 @@ static key_behavior_runtime_t key_behavior_states[NUM_KEYS];
 static key_state_e key_states[NUM_KEYS];
 static bool keyboard_blocked_for_calibration = false;
 
+#define TRIGGER_DEFERRED_QUEUE_SIZE 32u
+_Static_assert((TRIGGER_DEFERRED_QUEUE_SIZE &
+                (TRIGGER_DEFERRED_QUEUE_SIZE - 1u)) == 0u,
+               "TRIGGER_DEFERRED_QUEUE_SIZE must be a power of two");
+
+typedef enum {
+    TRIGGER_DEFERRED_ACTION_NONE = 0,
+    TRIGGER_DEFERRED_ACTION_PRESS,
+    TRIGGER_DEFERRED_ACTION_RELEASE,
+} trigger_deferred_action_type_t;
+
+typedef struct {
+    uint8_t type;
+    uint8_t key;
+    uint16_t keycode;
+    uint8_t ticks;
+} trigger_deferred_action_t;
+
+static trigger_deferred_action_t trigger_deferred_queue[TRIGGER_DEFERRED_QUEUE_SIZE];
+static uint8_t trigger_deferred_head = 0u;
+static uint8_t trigger_deferred_size = 0u;
+
 static inline bool is_below_actuation_point(int16_t distance, uint16_t actuation_point) {
     return distance >= actuation_point;
 }
@@ -31,13 +53,88 @@ static inline void reset_rapid_trigger_extremums(uint8_t key, int16_t current_di
     key_rapid_trigger_states[key].min_top_distance = current_distance;
 }
 
-static void trigger_release_pending_actions(void) {
-    for (uint8_t key = 0; key < NUM_KEYS; key++) {
-        if (key_behavior_states[key].pending_release_keycode != KC_NO) {
-            layout_release_action_for_key(key,
-                                          key_behavior_states[key].pending_release_keycode);
-            key_behavior_states[key].pending_release_keycode = KC_NO;
+static uint8_t trigger_deferred_ticks_from_setting(void) {
+    uint8_t tick_rate = settings_get_advanced_tick_rate();
+    if (tick_rate <= SETTINGS_ADVANCED_TICK_RATE_MIN) {
+        return 0u;
+    }
+
+    return (uint8_t)(tick_rate - 1u);
+}
+
+static void trigger_deferred_clear(void) {
+    trigger_deferred_head = 0u;
+    trigger_deferred_size = 0u;
+}
+
+static bool trigger_deferred_push(uint8_t type, uint8_t key, uint16_t keycode,
+                                  uint8_t ticks) {
+    uint8_t tail = 0u;
+
+    if (type == (uint8_t)TRIGGER_DEFERRED_ACTION_NONE || keycode == KC_NO) {
+        return true;
+    }
+
+    if (trigger_deferred_size >= TRIGGER_DEFERRED_QUEUE_SIZE) {
+        return false;
+    }
+
+    tail = (uint8_t)((trigger_deferred_head + trigger_deferred_size) &
+                     (TRIGGER_DEFERRED_QUEUE_SIZE - 1u));
+    trigger_deferred_queue[tail].type = type;
+    trigger_deferred_queue[tail].key = key;
+    trigger_deferred_queue[tail].keycode = keycode;
+    trigger_deferred_queue[tail].ticks = ticks;
+    trigger_deferred_size++;
+    return true;
+}
+
+static void trigger_deferred_cancel_key(uint8_t key) {
+    trigger_deferred_action_t compacted[TRIGGER_DEFERRED_QUEUE_SIZE] = {0};
+    uint8_t kept = 0u;
+
+    for (uint8_t i = 0; i < trigger_deferred_size; i++) {
+        uint8_t idx = (uint8_t)((trigger_deferred_head + i) &
+                                (TRIGGER_DEFERRED_QUEUE_SIZE - 1u));
+        if (trigger_deferred_queue[idx].key == key) {
+            continue;
         }
+        compacted[kept++] = trigger_deferred_queue[idx];
+    }
+
+    memcpy(trigger_deferred_queue, compacted, sizeof(trigger_deferred_queue));
+    trigger_deferred_head = 0u;
+    trigger_deferred_size = kept;
+}
+
+static void trigger_deferred_execute(const trigger_deferred_action_t *action) {
+    if (action == NULL || action->keycode == KC_NO) {
+        return;
+    }
+
+    if (action->type == (uint8_t)TRIGGER_DEFERRED_ACTION_PRESS) {
+        layout_press_action_for_key(action->key, action->keycode);
+    } else if (action->type == (uint8_t)TRIGGER_DEFERRED_ACTION_RELEASE) {
+        layout_release_action_for_key(action->key, action->keycode);
+    }
+}
+
+static void trigger_process_deferred_actions(void) {
+    while (trigger_deferred_size > 0u) {
+        trigger_deferred_action_t action =
+            trigger_deferred_queue[trigger_deferred_head];
+
+        if (action.ticks > 0u) {
+            trigger_deferred_queue[trigger_deferred_head].ticks--;
+            break;
+        }
+
+        trigger_deferred_head =
+            (uint8_t)((trigger_deferred_head + 1u) &
+                      (TRIGGER_DEFERRED_QUEUE_SIZE - 1u));
+        trigger_deferred_size--;
+
+        trigger_deferred_execute(&action);
     }
 }
 
@@ -54,7 +151,8 @@ static void trigger_tap_action(uint8_t key, uint16_t keycode) {
     }
 
     layout_press_action_for_key(key, keycode);
-    key_behavior_states[key].pending_release_keycode = keycode;
+    (void)trigger_deferred_push((uint8_t)TRIGGER_DEFERRED_ACTION_RELEASE, key,
+                                keycode, trigger_deferred_ticks_from_setting());
 }
 
 static uint8_t trigger_dynamic_zone_for_distance(
@@ -150,11 +248,15 @@ static void trigger_behavior_on_update(uint8_t key, int16_t current_distance,
         uint8_t zone =
             trigger_dynamic_zone_for_distance(settings, current_distance);
         if (zone != runtime->active_dynamic_zone) {
+            trigger_deferred_cancel_key(key);
             trigger_release_active_action(key);
             runtime->active_dynamic_zone = zone;
             runtime->active_keycode = settings->dynamic_zones[zone].hid_keycode;
             if (runtime->active_keycode != KC_NO) {
-                layout_press_action_for_key(key, runtime->active_keycode);
+                (void)trigger_deferred_push(
+                    (uint8_t)TRIGGER_DEFERRED_ACTION_PRESS, key,
+                    runtime->active_keycode,
+                    trigger_deferred_ticks_from_setting());
             }
         }
         break;
@@ -200,6 +302,7 @@ static void trigger_behavior_on_release(uint8_t key) {
         break;
 
     case KEY_BEHAVIOR_DYNAMIC:
+        trigger_deferred_cancel_key(key);
         trigger_release_active_action(key);
         runtime->active_dynamic_zone = 0u;
         break;
@@ -221,6 +324,7 @@ static void trigger_reset_runtime_state(bool release_keyboard_reports) {
 
     layout_reset_state();
     socd_load_settings();
+    trigger_deferred_clear();
 
     for (uint8_t key = 0; key < NUM_KEYS; key++) {
         int16_t current_distance = analog_read_distance_value(key);
@@ -230,7 +334,6 @@ static void trigger_reset_runtime_state(bool release_keyboard_reports) {
         key_rapid_trigger_states[key].continuous_armed = false;
         reset_rapid_trigger_extremums(key, current_distance);
         memset(&key_behavior_states[key], 0, sizeof(key_behavior_states[key]));
-        key_behavior_states[key].pending_release_keycode = KC_NO;
         key_behavior_states[key].active_keycode = KC_NO;
     }
 }
@@ -419,6 +522,8 @@ uint16_t trigger_get_distance_01mm(uint8_t key) {
 }
 
 void trigger_init() {
+    trigger_deferred_clear();
+
     for (int i = 0; i < NUM_KEYS; i++) {
         key_trigger_settings[i].primary_keycode = KC_NO;
         key_trigger_settings[i].actuation_point = DEFAULT_ACTUATION_POINT;
@@ -442,7 +547,6 @@ void trigger_init() {
         key_rapid_trigger_states[i].continuous_armed = false;
 
         memset(&key_behavior_states[i], 0, sizeof(key_behavior_states[i]));
-        key_behavior_states[i].pending_release_keycode = KC_NO;
         key_behavior_states[i].active_keycode = KC_NO;
 
         // Initialize key states
@@ -466,7 +570,7 @@ void trigger_task() {
         keyboard_blocked_for_calibration = false;
     }
 
-    trigger_release_pending_actions();
+    trigger_process_deferred_actions();
 
     for (uint8_t key = 0; key < NUM_KEYS; key++) {
         handle_trigger(key, now_ms);

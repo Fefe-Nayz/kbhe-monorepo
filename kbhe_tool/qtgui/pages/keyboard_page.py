@@ -14,6 +14,9 @@ from PySide6.QtWidgets import (
 )
 
 from kbhe_tool.protocol import (
+    ADVANCED_TICK_RATE_DEFAULT,
+    ADVANCED_TICK_RATE_MAX,
+    ADVANCED_TICK_RATE_MIN,
     HID_KEYCODES,
     HID_KEYCODE_NAMES,
     KEY_BEHAVIORS,
@@ -347,6 +350,19 @@ class KeyboardPage(QWidget):
         parent.addWidget(card)
         bl = card.body_layout
 
+        self.tick_rate_row = _SliderRow(
+            "Advanced tick rate",
+            ADVANCED_TICK_RATE_MIN,
+            ADVANCED_TICK_RATE_MAX,
+            ADVANCED_TICK_RATE_DEFAULT,
+            decimals=0,
+            scale=1,
+            suffix=" ticks",
+        )
+        self.tick_rate_row.slider.valueChanged.connect(self._on_changed)
+        self._controls.append(self.tick_rate_row.slider)
+        bl.addWidget(self.tick_rate_row)
+
         mode_row = QHBoxLayout()
         mode_row.setSpacing(10)
         mode_lbl = QLabel("Behavior")
@@ -453,7 +469,8 @@ class KeyboardPage(QWidget):
         bl.addWidget(self.dynamic_body)
 
         hint = QLabel(
-            "Tap-hold uses the primary action on tap and the secondary action on hold. Dynamic mapping swaps the active action by travel zone."
+            "Tap-hold uses the primary action on tap and the secondary action on hold. Dynamic mapping swaps the active action by travel zone. "
+            "Tick rate controls the delay between consecutive advanced actions (1 tick ~ one scan)."
         )
         hint.setObjectName("Muted")
         hint.setWordWrap(True)
@@ -745,7 +762,10 @@ class KeyboardPage(QWidget):
             if not settings:
                 self._set_status(f"No settings returned for {key_display_name(idx)}.", "warn")
                 return
+            tick_rate = device.get_advanced_tick_rate()
             self._sync_from_settings(settings)
+            if tick_rate is not None:
+                self.tick_rate_row.set_value(float(tick_rate))
             self._set_status(f"Loaded {key_display_name(idx)}.", "ok")
         except Exception as exc:
             self._set_status(f"Load error: {exc}", "bad")
@@ -764,8 +784,14 @@ class KeyboardPage(QWidget):
         idx = self._selected_key()
         try:
             ok = device.set_key_settings_extended(idx, self._build_payload())
-            if ok:
+            tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
+            if ok and tick_ok:
                 self._set_status(f"Applied {key_display_name(idx)} live.", "ok")
+            elif ok:
+                self._set_status(
+                    f"Applied {key_display_name(idx)} live, but tick rate update failed.",
+                    "warn",
+                )
             else:
                 self._set_status(f"Apply failed for {key_display_name(idx)}.", "bad")
         except Exception as exc:
@@ -785,8 +811,11 @@ class KeyboardPage(QWidget):
                 i + 1 for i in range(KEY_COUNT)
                 if not device.set_key_settings_extended(i, payload)
             ]
+            tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
             if failures:
                 self._set_status(f"Applied with failures on Key(s) {failures}.", "warn")
+            elif not tick_ok:
+                self._set_status("Applied key settings, but tick rate update failed.", "warn")
             else:
                 self._set_status(f"Applied to all {KEY_COUNT} keys live.", "ok")
         except Exception as exc:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from .protocol import KEY_COUNT
+from .protocol import ADVANCED_TICK_RATE_DEFAULT, ADVANCED_TICK_RATE_MAX, ADVANCED_TICK_RATE_MIN, GAMEPAD_API_MODES, KEY_COUNT
 
 
 def _default_key_settings(index: int) -> dict:
@@ -41,6 +41,7 @@ class DemoDevice:
             "raw_hid_echo": False,
         }
         self._nkro_enabled = True
+        self._advanced_tick_rate = int(ADVANCED_TICK_RATE_DEFAULT)
         self._keys = [_default_key_settings(i) for i in range(KEY_COUNT)]
         self._curves = [
             {
@@ -68,6 +69,7 @@ class DemoDevice:
             "keyboard_routing": 1,
             "square_mode": True,
             "reactive_stick": False,
+            "api_mode": int(GAMEPAD_API_MODES["HID (DirectInput)"]),
             "curve_points": [
                 {"x_01mm": 0, "x_mm": 0.0, "y": 0},
                 {"x_01mm": 90, "x_mm": 0.9, "y": 32},
@@ -150,6 +152,16 @@ class DemoDevice:
 
     def set_nkro_enabled(self, enabled):
         self._nkro_enabled = bool(enabled)
+        return True
+
+    def get_advanced_tick_rate(self):
+        return int(self._advanced_tick_rate)
+
+    def set_advanced_tick_rate(self, tick_rate):
+        self._advanced_tick_rate = max(
+            int(ADVANCED_TICK_RATE_MIN),
+            min(int(ADVANCED_TICK_RATE_MAX), int(tick_rate)),
+        )
         return True
 
     def get_key_settings(self, index):
@@ -239,9 +251,16 @@ class DemoDevice:
 
     def get_gamepad_settings(self):
         settings = deepcopy(self._gamepad_settings)
-        settings.setdefault("deadzone", int(settings.get("radial_deadzone", 0)))
+        curve_points = list(settings.get("curve_points") or [])
+        if curve_points:
+            start_01mm = int(curve_points[0].get("x_01mm", 0))
+            settings["deadzone"] = int(round((start_01mm * 255.0) / 400.0))
+            settings["radial_deadzone"] = settings["deadzone"]
+        else:
+            settings.setdefault("deadzone", int(settings.get("radial_deadzone", 0)))
         settings.setdefault("snappy_mode", bool(settings.get("reactive_stick", False)))
         settings.setdefault("curve_type", 0)
+        settings.setdefault("api_mode", int(GAMEPAD_API_MODES["HID (DirectInput)"]))
         return settings
 
     def set_gamepad_settings(self, settings_or_deadzone, curve_type=None, square_mode=None, snappy_mode=None):
@@ -249,18 +268,26 @@ class DemoDevice:
             settings = deepcopy(settings_or_deadzone)
         else:
             settings = deepcopy(self._gamepad_settings)
-            settings["radial_deadzone"] = int(settings_or_deadzone)
+            deadzone = max(0, min(255, int(settings_or_deadzone)))
+            curve_points = list(settings.get("curve_points") or [])
+            if curve_points:
+                curve_points[0]["x_01mm"] = int(round(deadzone * 400.0 / 255.0))
+                curve_points[0]["x_mm"] = curve_points[0]["x_01mm"] / 100.0
+                settings["curve_points"] = curve_points
+            settings["radial_deadzone"] = deadzone
             settings["square_mode"] = bool(square_mode)
             settings["reactive_stick"] = bool(snappy_mode)
         curve_points = list(settings.get("curve_points") or self._gamepad_settings.get("curve_points") or [])
-        curve_floor = int(curve_points[0].get("y", 0)) if curve_points else 0
-        settings["radial_deadzone"] = max(
-            int(settings.get("radial_deadzone", settings.get("deadzone", 0))),
-            curve_floor,
-        )
+        if curve_points:
+            settings["radial_deadzone"] = int(
+                round(max(0, min(400, int(curve_points[0].get("x_01mm", 0)))) * 255.0 / 400.0)
+            )
+        else:
+            settings["radial_deadzone"] = max(0, int(settings.get("radial_deadzone", settings.get("deadzone", 0))))
         settings["deadzone"] = int(settings.get("radial_deadzone", settings.get("deadzone", 0)))
         settings["snappy_mode"] = bool(settings.get("reactive_stick", settings.get("snappy_mode", False)))
         settings.setdefault("curve_type", 0)
+        settings["api_mode"] = int(settings.get("api_mode", GAMEPAD_API_MODES["HID (DirectInput)"]))
         self._gamepad_settings = settings
         self._gamepad_with_keyboard = bool(self._gamepad_settings.get("keyboard_routing", 1) != 0)
         return True

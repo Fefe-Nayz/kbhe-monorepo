@@ -125,6 +125,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/keyboard_hid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/keyboard_nkro_hid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/gamepad_hid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/xinput_usb.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/consumer_hid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/mouse_hid.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid/raw_hid.c

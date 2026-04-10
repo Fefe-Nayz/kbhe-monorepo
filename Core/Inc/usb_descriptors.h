@@ -20,7 +20,9 @@
 
 #define USB_RHPORT_HS 1u
 
-// USB Version - USB 2.0 pour High Speed
+// Baseline USB version. usb_descriptors.c overrides this dynamically:
+// - HID mode:    USB 2.0
+// - XInput mode: USB 2.1 + BOS/MS OS 2.0 descriptors
 #define USB_BCD 0x0200
 
 //--------------------------------------------------------------------+
@@ -40,6 +42,15 @@
 #define EPNUM_CONSUMER 0x85 // EP5 IN
 // Endpoint for Mouse IN
 #define EPNUM_MOUSE 0x86 // EP6 IN
+// Endpoint pair for XInput-compatible vendor interface
+#define EPNUM_XINPUT_OUT 0x07 // EP7 OUT
+#define EPNUM_XINPUT_IN 0x87  // EP7 IN
+
+// XInput-compatible interface constants
+#define XINPUT_SUBCLASS_DEFAULT 0x5D
+#define XINPUT_PROTOCOL_DEFAULT 0x01
+#define XINPUT_EP_SIZE 32
+#define XINPUT_DESC_LEN 39
 
 // Endpoint size for High Speed HID
 // High Speed permet jusqu'à 1024 bytes, mais 64 suffit pour un clavier
@@ -64,6 +75,7 @@
 #define RAW_HID_POLL_INTERVAL 4  // 1000µs = 1kHz
 #define GAMEPAD_POLL_INTERVAL                                                  \
   1 // 125µs = 8kHz (same as keyboard for fast response)
+#define XINPUT_POLL_INTERVAL 4 // 1000µs = 1kHz
 
 //--------------------------------------------------------------------+
 // String Descriptor Indices
@@ -78,6 +90,7 @@ enum {
   STRID_NKRO,
   STRID_CONSUMER,
   STRID_MOUSE,
+  STRID_XINPUT,
 };
 
 //--------------------------------------------------------------------+
@@ -86,10 +99,10 @@ enum {
 enum {
   HID_ITF_KEYBOARD = 0,
   HID_ITF_RAW_HID = 1,
-  HID_ITF_GAMEPAD = 2,
-  HID_ITF_NKRO = 3,
-  HID_ITF_CONSUMER = 4,
-  HID_ITF_MOUSE = 5,
+  HID_ITF_NKRO = 2,
+  HID_ITF_CONSUMER = 3,
+  HID_ITF_MOUSE = 4,
+  HID_ITF_GAMEPAD = 5,
 };
 
 //--------------------------------------------------------------------+

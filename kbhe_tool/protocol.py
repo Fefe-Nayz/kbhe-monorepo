@@ -22,6 +22,9 @@ FILTER_DEFAULT_ALPHA_MIN_DENOM = 32
 FILTER_DEFAULT_ALPHA_MAX_DENOM = 4
 GAMEPAD_CURVE_POINT_COUNT = 4
 GAMEPAD_CURVE_MAX_DISTANCE_MM = 4.0
+ADVANCED_TICK_RATE_MIN = 1
+ADVANCED_TICK_RATE_MAX = 100
+ADVANCED_TICK_RATE_DEFAULT = 1
 
 
 class Command(IntEnum):
@@ -29,6 +32,7 @@ class Command(IntEnum):
     REBOOT = 0x01
     ENTER_BOOTLOADER = 0x02
     FACTORY_RESET = 0x03
+    USB_REENUMERATE = 0x04
 
     GET_OPTIONS = 0x20
     SET_OPTIONS = 0x21
@@ -39,6 +43,8 @@ class Command(IntEnum):
     SAVE_SETTINGS = 0x26
     GET_NKRO_ENABLED = 0x27
     SET_NKRO_ENABLED = 0x28
+    GET_ADVANCED_TICK_RATE = 0x29
+    SET_ADVANCED_TICK_RATE = 0x2A
 
     GET_KEY_SETTINGS = 0x40
     SET_KEY_SETTINGS = 0x41
@@ -176,17 +182,17 @@ GAMEPAD_BUTTONS = {
     "Y": 4,
     "LB": 5,
     "RB": 6,
-    "LT": 7,
-    "RT": 8,
-    "Select": 9,
-    "Start": 10,
+    "LT (Full Trigger)": 7,
+    "RT (Full Trigger)": 8,
+    "Back / Minus": 9,
+    "Start / Plus": 10,
     "L3": 11,
     "R3": 12,
     "DPad Up": 13,
     "DPad Down": 14,
     "DPad Left": 15,
     "DPad Right": 16,
-    "Home": 17,
+    "Guide / Home": 17,
 }
 GAMEPAD_BUTTON_NAMES = {value: key for key, value in GAMEPAD_BUTTONS.items()}
 
@@ -198,6 +204,12 @@ GAMEPAD_KEYBOARD_ROUTING = {
 GAMEPAD_KEYBOARD_ROUTING_NAMES = {
     value: key for key, value in GAMEPAD_KEYBOARD_ROUTING.items()
 }
+
+GAMEPAD_API_MODES = {
+    "HID (DirectInput)": 0,
+    "XInput (Xbox Compatible)": 1,
+}
+GAMEPAD_API_MODE_NAMES = {value: key for key, value in GAMEPAD_API_MODES.items()}
 
 KEY_BEHAVIORS = {
     "Normal": 0,

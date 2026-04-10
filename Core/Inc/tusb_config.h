@@ -52,11 +52,12 @@ extern "C" {
 //--------------------------------------------------------------------+
 // CLASS CONFIGURATION - HID uniquement
 //--------------------------------------------------------------------+
-#define CFG_TUD_HID 6 // Keyboard + Raw HID + Gamepad + NKRO + Consumer + Mouse
+#define CFG_TUD_HID                                                            \
+	6 // Keyboard + Raw HID + Gamepad + NKRO + Consumer + Mouse
 #define CFG_TUD_CDC 0
 #define CFG_TUD_MSC 0
 #define CFG_TUD_MIDI 0
-#define CFG_TUD_VENDOR 0
+#define CFG_TUD_VENDOR 0 // XInput runs through usbd_app_driver_get_cb()
 
 // HID buffer size: doit contenir ID (optionnel) + données du rapport
 // Keyboard report = 8 bytes (modifier + reserved + 6 keycodes)

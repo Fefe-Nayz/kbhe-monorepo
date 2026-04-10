@@ -710,7 +710,7 @@ class DebugPage(QWidget):
                 f"NKRO Enabled: {bool(nkro)}",
                 "",
                 "Gamepad:",
-                f"  Radial Deadzone: {gamepad.get('radial_deadzone', '--')}",
+                f"  Curve Start Deadzone: {gamepad.get('deadzone', gamepad.get('radial_deadzone', '--'))}",
                 f"  Keyboard Routing: {gamepad.get('keyboard_routing', '--')}",
                 f"  Square Mode: {bool(gamepad.get('square_mode', False))}",
                 f"  Reactive Stick: {bool(gamepad.get('reactive_stick', False))}",

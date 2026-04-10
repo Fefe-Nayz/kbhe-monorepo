@@ -44,6 +44,7 @@
 #include "tusb.h"
 #include "updater_app.h"
 #include "hid/gamepad_hid.h"
+#include "hid/xinput_usb.h"
 #include "usb_descriptors.h"
 #include "hid/consumer_hid.h"
 #include "hid/keyboard_hid.h"
@@ -491,6 +492,17 @@ int main(void) {
     // LED init failed, but continue anyway
   }
 
+  // Initialize keyboard lock-state tracking (used to override the Caps Lock
+  // key LED inside the RGB matrix).
+  led_indicator_init();
+
+  /*
+   * Load/apply persisted settings after HAL, Flash and the LED driver are
+   * fully initialized, but before USB enumeration. This lets the USB
+   * descriptors reflect the saved gamepad API mode on the next enumeration.
+   */
+  settings_init();
+
   // Initialisation TinyUSB - RHPORT 1 = USB HS avec PHY intégré
   const tusb_rhport_init_t rhport_init = {.role = TUSB_ROLE_DEVICE,
                                           .speed = TUSB_SPEED_HIGH};
@@ -499,20 +511,10 @@ int main(void) {
   raw_hid_init();
   consumer_hid_init();
   mouse_hid_init();
+  xinput_usb_init();
   diagnostics_init();
 
   // triggerInit();
-
-  // Initialize keyboard lock-state tracking (used to override the Caps Lock
-  // key LED inside the RGB matrix).
-  led_indicator_init();
-
-  /*
-   * Load/apply persisted settings only after HAL, Flash and the LED driver are
-   * fully initialized. Calling this earlier causes LED defaults (effect,
-   * brightness) to be overwritten by led_matrix_init().
-   */
-  settings_init();
 
   rotary_encoder_init();
 
@@ -578,6 +580,7 @@ int main(void) {
         step_start_cycles = DWT->CYCCNT;
         gamepad_hid_refresh_state();
         gamepad_hid_task();
+        xinput_usb_task();
         task_gamepad_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
       } else {
         analog_task();
@@ -588,6 +591,7 @@ int main(void) {
         keyboard_nkro_hid_task();
         gamepad_hid_refresh_state();
         gamepad_hid_task();
+        xinput_usb_task();
       }
 
       analog_set_scan_complete(false);

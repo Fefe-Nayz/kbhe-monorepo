@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x000E         // Advanced per-key behaviors
+#define SETTINGS_VERSION 0x0010         // Advanced key tick rate
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -36,6 +36,9 @@ extern "C" {
 #define GAMEPAD_CURVE_POINT_COUNT 4u
 #define GAMEPAD_CURVE_MAX_DISTANCE_01MM 400u // 4.00 mm
 #define SETTINGS_DYNAMIC_ZONE_COUNT 4u
+#define SETTINGS_ADVANCED_TICK_RATE_MIN 1u
+#define SETTINGS_ADVANCED_TICK_RATE_MAX 100u
+#define SETTINGS_DEFAULT_ADVANCED_TICK_RATE 1u
 
 //--------------------------------------------------------------------+
 // Gamepad Mapping Constants
@@ -61,6 +64,12 @@ typedef enum {
   GAMEPAD_KEYBOARD_ROUTING_UNMAPPED_ONLY = 2,
   GAMEPAD_KEYBOARD_ROUTING_MAX
 } gamepad_keyboard_routing_t;
+
+typedef enum {
+  GAMEPAD_API_HID = 0,
+  GAMEPAD_API_XINPUT = 1,
+  GAMEPAD_API_MAX
+} gamepad_api_mode_t;
 
 typedef enum {
   GAMEPAD_BUTTON_NONE = 0,
@@ -302,10 +311,11 @@ typedef struct __attribute__((packed)) {
  * @brief Gamepad settings
  */
 typedef struct __attribute__((packed)) {
-  uint8_t radial_deadzone;   // Radial deadzone for composed stick pairs (0-255)
+  uint8_t radial_deadzone;   // Deprecated compatibility field, curve[0].x_01mm is authoritative
   uint8_t keyboard_routing;  // gamepad_keyboard_routing_t
   uint8_t square_mode;       // Preserve full diagonal output
   uint8_t reactive_stick;    // Strongest opposing direction wins
+  uint8_t api_mode;          // gamepad_api_mode_t
   settings_gamepad_curve_point_t curve[GAMEPAD_CURVE_POINT_COUNT];
 } settings_gamepad_t;
 
@@ -358,6 +368,7 @@ typedef struct __attribute__((packed)) {
   uint8_t filter_noise_band; // Noise band in ADC counts (default 30)
   uint8_t filter_alpha_min;  // Alpha min denominator (1/N, default 32)
   uint8_t filter_alpha_max;  // Alpha max denominator (1/N, default 4)
+  uint8_t advanced_tick_rate; // Delay in scan ticks between advanced actions
 
   // Footer
   uint32_t magic_end; // Magic number to validate end
@@ -472,10 +483,11 @@ typedef struct __attribute__((packed)) {
    .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 
 #define SETTINGS_DEFAULT_GAMEPAD                                               \
-  {.radial_deadzone = 10,                                                      \
+  {.radial_deadzone = 0,                                                       \
    .keyboard_routing = GAMEPAD_KEYBOARD_ROUTING_ALL_KEYS,                      \
    .square_mode = 0,                                                           \
    .reactive_stick = 0,                                                        \
+  .api_mode = GAMEPAD_API_HID,                                                \
    .curve = {{0u, 0u}, {133u, 85u}, {266u, 170u}, {GAMEPAD_CURVE_MAX_DISTANCE_01MM, 255u}}}
 
 // Default calibration values (from offset.c)
@@ -563,6 +575,19 @@ bool settings_save(void);
  * @return Firmware version number
  */
 uint16_t settings_get_firmware_version(void);
+
+/**
+ * @brief Get advanced action tick rate.
+ * @return Tick rate in scan ticks
+ */
+uint8_t settings_get_advanced_tick_rate(void);
+
+/**
+ * @brief Set advanced action tick rate.
+ * @param tick_rate Tick rate in scan ticks
+ * @return true if successful
+ */
+bool settings_set_advanced_tick_rate(uint8_t tick_rate);
 
 //--------------------------------------------------------------------+
 // LED Matrix Settings API
@@ -757,6 +782,19 @@ const settings_gamepad_t *settings_get_gamepad(void);
  * @return true if successful
  */
 bool settings_set_gamepad(const settings_gamepad_t *gamepad);
+
+/**
+ * @brief Get selected gamepad USB API mode.
+ * @return Current gamepad API mode
+ */
+gamepad_api_mode_t settings_get_gamepad_api_mode(void);
+
+/**
+ * @brief Set gamepad USB API mode.
+ * @param mode gamepad_api_mode_t
+ * @return true if successful
+ */
+bool settings_set_gamepad_api_mode(gamepad_api_mode_t mode);
 
 /**
  * @brief Apply the global gamepad analog curve to a distance value.

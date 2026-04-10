@@ -5,8 +5,12 @@ import time
 import hid
 
 from .protocol import (
+    ADVANCED_TICK_RATE_DEFAULT,
+    ADVANCED_TICK_RATE_MAX,
+    ADVANCED_TICK_RATE_MIN,
     CALIBRATION_VALUES_PER_CHUNK,
     Command,
+    GAMEPAD_API_MODES,
     GAMEPAD_AXES,
     GAMEPAD_BUTTONS,
     GAMEPAD_DIRECTIONS,
@@ -147,6 +151,14 @@ class KBHEDevice:
         return value if value in KEY_BEHAVIORS.values() else int(KEY_BEHAVIORS["Normal"])
 
     @staticmethod
+    def _sanitize_advanced_tick_rate(value):
+        try:
+            value = int(value)
+        except Exception:
+            return int(ADVANCED_TICK_RATE_DEFAULT)
+        return max(int(ADVANCED_TICK_RATE_MIN), min(int(ADVANCED_TICK_RATE_MAX), value))
+
+    @staticmethod
     def _default_dynamic_zones(primary_keycode=0x14):
         return [
             {"end_mm_tenths": 40, "end_mm": 4.0, "hid_keycode": int(primary_keycode)},
@@ -209,6 +221,18 @@ class KBHEDevice:
             else int(GAMEPAD_KEYBOARD_ROUTING["All Keys"])
         )
 
+    @staticmethod
+    def _sanitize_gamepad_api_mode(value):
+        try:
+            value = int(value)
+        except Exception:
+            return int(GAMEPAD_API_MODES["HID (DirectInput)"])
+        return (
+            value
+            if value in GAMEPAD_API_MODES.values()
+            else int(GAMEPAD_API_MODES["HID (DirectInput)"])
+        )
+
     @classmethod
     def _sanitize_gamepad_curve_points(cls, points):
         defaults = cls._default_gamepad_curve_points()
@@ -233,6 +257,13 @@ class KBHEDevice:
             sanitized.append({"x_01mm": x_01mm, "x_mm": x_01mm / 100.0, "y": y})
 
         return sanitized
+
+    @staticmethod
+    def _gamepad_curve_start_deadzone(points):
+        if not points:
+            return 0
+        start_01mm = max(0, min(int(GAMEPAD_CURVE_MAX_DISTANCE_MM * 100), int(points[0].get("x_01mm", 0))))
+        return int(round((start_01mm * 255.0) / (GAMEPAD_CURVE_MAX_DISTANCE_MM * 100.0)))
     
     def get_firmware_version(self):
         """Get firmware version."""
@@ -279,6 +310,20 @@ class KBHEDevice:
         data = [0, 1 if enabled else 0]  # 0 = placeholder for status byte
         resp = self.send_command(Command.SET_NKRO_ENABLED, data, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def get_advanced_tick_rate(self):
+        """Get advanced key tick rate (scan ticks between consecutive advanced actions)."""
+        resp = self.send_command(Command.GET_ADVANCED_TICK_RATE)
+        if resp and len(resp) >= 3 and resp[1] == Status.OK:
+            return self._sanitize_advanced_tick_rate(resp[2])
+        return None
+
+    def set_advanced_tick_rate(self, tick_rate):
+        """Set advanced key tick rate."""
+        value = self._sanitize_advanced_tick_rate(tick_rate)
+        data = [0, value]
+        resp = self.send_command(Command.SET_ADVANCED_TICK_RATE, data, timeout_ms=300)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def save_settings(self):
         """Save settings to flash. Uses longer timeout for flash erase operation."""
@@ -291,6 +336,29 @@ class KBHEDevice:
         # Factory reset also erases flash, needs longer timeout
         resp = self.send_command(Command.FACTORY_RESET, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def usb_reenumerate(self, timeout_s=6.0, logger=None):
+        """Request a USB-only re-enumeration and reconnect the Raw HID handle."""
+        resp = self.send_command(Command.USB_REENUMERATE, timeout_ms=500)
+        if not resp or len(resp) < 2 or resp[1] != Status.OK:
+            return False
+
+        self.disconnect()
+        time.sleep(0.35)
+
+        deadline = time.time() + max(1.0, float(timeout_s))
+        last_error = None
+        while time.time() < deadline:
+            try:
+                self.connect(logger=logger)
+                return True
+            except Exception as exc:
+                last_error = exc
+                time.sleep(0.25)
+
+        if logger is not None and last_error is not None:
+            logger(f"USB re-enumeration reconnect failed: {last_error}")
+        return False
     
     # --- LED Matrix Commands ---
     
@@ -582,14 +650,18 @@ class KBHEDevice:
         resp = self.send_command(Command.GET_GAMEPAD_SETTINGS)
         if resp and len(resp) >= 18 and resp[1] == Status.OK:
             routing = self._sanitize_gamepad_routing(resp[3])
-            points = []
+            api_mode = int(GAMEPAD_API_MODES["HID (DirectInput)"])
             offset = 6
+            if len(resp) >= 19:
+                api_mode = self._sanitize_gamepad_api_mode(resp[6])
+                offset = 7
+            points = []
             for _ in range(GAMEPAD_CURVE_POINT_COUNT):
                 x_01mm = self._unpack_u16(resp, offset)
                 y = int(resp[offset + 2])
                 points.append({"x_01mm": x_01mm, "x_mm": x_01mm / 100.0, "y": y})
                 offset += 3
-            deadzone = max(int(resp[2]), int(points[0]["y"]) if points else 0)
+            deadzone = self._gamepad_curve_start_deadzone(points)
             return {
                 'radial_deadzone': deadzone,
                 'deadzone': deadzone,
@@ -599,6 +671,7 @@ class KBHEDevice:
                 'square_mode': bool(resp[4]),
                 'reactive_stick': bool(resp[5]),
                 'snappy_mode': bool(resp[5]),
+                'api_mode': api_mode,
                 'curve_points': self._sanitize_gamepad_curve_points(points),
             }
         return None
@@ -609,21 +682,31 @@ class KBHEDevice:
             settings = dict(settings_or_deadzone)
         else:
             existing = self.get_gamepad_settings() or {}
+            points = self._sanitize_gamepad_curve_points(
+                existing.get("curve_points") or self._default_gamepad_curve_points()
+            )
+            if points:
+                points[0]["x_01mm"] = int(
+                    round(max(0, min(255, int(settings_or_deadzone))) * (GAMEPAD_CURVE_MAX_DISTANCE_MM * 100.0) / 255.0)
+                )
+                points[0]["x_mm"] = points[0]["x_01mm"] / 100.0
+                points = self._sanitize_gamepad_curve_points(points)
             settings = {
                 "radial_deadzone": int(settings_or_deadzone),
                 "keyboard_routing": int(existing.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])),
                 "square_mode": bool(square_mode),
                 "reactive_stick": bool(snappy_mode),
-                "curve_points": existing.get("curve_points") or self._default_gamepad_curve_points(),
+                "curve_points": points,
             }
 
         routing = self._sanitize_gamepad_routing(
             settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])
         )
+        api_mode = self._sanitize_gamepad_api_mode(
+            settings.get("api_mode", GAMEPAD_API_MODES["HID (DirectInput)"])
+        )
         points = self._sanitize_gamepad_curve_points(settings.get("curve_points"))
-        deadzone = max(0, min(255, int(settings.get("radial_deadzone", settings.get("deadzone", 0)))))
-        if points:
-            deadzone = max(deadzone, int(points[0]["y"]))
+        deadzone = self._gamepad_curve_start_deadzone(points)
 
         data = [
             0,
@@ -631,6 +714,7 @@ class KBHEDevice:
             routing,
             1 if settings.get("square_mode", False) else 0,
             1 if settings.get("reactive_stick", settings.get("snappy_mode", False)) else 0,
+            api_mode,
         ]
         for point in points:
             data.append(point["x_01mm"] & 0xFF)
