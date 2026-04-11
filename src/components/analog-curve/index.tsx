@@ -24,6 +24,9 @@ const PRESETS: Record<string, CurvePoint[]> = {
 
 interface AnalogCurveEditorProps {
   points: CurvePoint[];
+  /** Fires on every drag tick — use for live device preview (runtime-only SET). */
+  onLiveChange?: (points: CurvePoint[]) => void;
+  /** Fires once on pointer-up — the commit value. */
   onChange: (points: CurvePoint[]) => void;
   className?: string;
 }
@@ -35,7 +38,7 @@ function pointToDevice(p: CurvePoint): { distance: string; output: number } {
   };
 }
 
-export function AnalogCurveEditor({ points, onChange, className }: AnalogCurveEditorProps) {
+export function AnalogCurveEditor({ points, onLiveChange, onChange, className }: AnalogCurveEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const [localPoints, setLocalPoints] = useState<CurvePoint[]>(points);
@@ -63,10 +66,11 @@ export function AnalogCurveEditor({ points, onChange, className }: AnalogCurveEd
         const minX = dragging > 0 ? next[dragging - 1].x : 0;
         const maxX = dragging < next.length - 1 ? next[dragging + 1].x : VIEW_W;
         next[dragging] = { x: Math.max(minX, Math.min(maxX, x)), y };
+        onLiveChange?.(next);
         return next;
       });
     },
-    [dragging],
+    [dragging, onLiveChange],
   );
 
   const handlePointerUp = useCallback(() => {

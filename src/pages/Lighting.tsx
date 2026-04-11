@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useMemo } from "react";
+import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { selectItemsReverse } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import { LEDEffect, KEY_COUNT } from "@/lib/kbhe/protocol";
@@ -374,9 +376,11 @@ export default function Lighting() {
     onError: markError,
   });
 
-  const brightnessMut = useMutation({
-    mutationFn: async (v: number) => { markSaving(); await kbheDevice.ledSetBrightness(v); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.brightness() }); },
+  const brightnessMut = useOptimisticMutation<number, number, void>({
+    queryKey: queryKeys.led.brightness(),
+    mutationFn: async (v) => { markSaving(); await kbheDevice.ledSetBrightness(v); },
+    optimisticUpdate: (_cur, v) => v,
+    onSuccess: markSaved,
     onError: markError,
   });
 
@@ -386,27 +390,35 @@ export default function Lighting() {
     onError: markError,
   });
 
-  const speedMut = useMutation({
-    mutationFn: async (v: number) => { markSaving(); await kbheDevice.setLedEffectSpeed(v); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.effectSpeed() }); },
+  const speedMut = useOptimisticMutation<number, number, void>({
+    queryKey: queryKeys.led.effectSpeed(),
+    mutationFn: async (v) => { markSaving(); await kbheDevice.setLedEffectSpeed(v); },
+    optimisticUpdate: (_cur, v) => v,
+    onSuccess: markSaved,
     onError: markError,
   });
 
-  const colorMut = useMutation({
-    mutationFn: async (rgb: RGBColor) => { markSaving(); await kbheDevice.setLedEffectColor(rgb.r, rgb.g, rgb.b); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.effectColor() }); },
+  const colorMut = useOptimisticMutation<number[], RGBColor, void>({
+    queryKey: queryKeys.led.effectColor(),
+    mutationFn: async (rgb) => { markSaving(); await kbheDevice.setLedEffectColor(rgb.r, rgb.g, rgb.b); },
+    optimisticUpdate: (_cur, rgb) => [rgb.r, rgb.g, rgb.b],
+    onSuccess: markSaved,
     onError: markError,
   });
 
-  const fpsMut = useMutation({
-    mutationFn: async (v: number) => { markSaving(); await kbheDevice.setLedFpsLimit(v); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.fpsLimit() }); },
+  const fpsMut = useOptimisticMutation<number, number, void>({
+    queryKey: queryKeys.led.fpsLimit(),
+    mutationFn: async (v) => { markSaving(); await kbheDevice.setLedFpsLimit(v); },
+    optimisticUpdate: (_cur, v) => v,
+    onSuccess: markSaved,
     onError: markError,
   });
 
-  const paramsMut = useMutation({
-    mutationFn: async (params: number[]) => { markSaving(); await kbheDevice.setLedEffectParams(currentEffect, params); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.effectParams(currentEffect) }); },
+  const paramsMut = useOptimisticMutation<number[], number[], void>({
+    queryKey: queryKeys.led.effectParams(currentEffect),
+    mutationFn: async (params) => { markSaving(); await kbheDevice.setLedEffectParams(currentEffect, params); },
+    optimisticUpdate: (_cur, params) => params,
+    onSuccess: markSaved,
     onError: markError,
   });
 
@@ -458,6 +470,28 @@ export default function Lighting() {
     onError: markError,
   });
 
+
+  // ---- Live throttled calls (runtime-only, no flash — firmware auto-saves after 750ms) ----
+
+  const liveBrightness = useThrottledCall(async (v: number) => {
+    await kbheDevice.ledSetBrightness(v);
+  });
+
+  const liveSpeed = useThrottledCall(async (v: number) => {
+    await kbheDevice.setLedEffectSpeed(v);
+  });
+
+  const liveFps = useThrottledCall(async (v: number) => {
+    await kbheDevice.setLedFpsLimit(v);
+  });
+
+  const liveParams = useThrottledCall(async (params: number[]) => {
+    await kbheDevice.setLedEffectParams(currentEffect, params);
+  });
+
+  const liveColor = useThrottledCall(async (c: RGBColor) => {
+    await kbheDevice.setLedEffectColor(c.r, c.g, c.b);
+  });
 
   // ---- File I/O ----
 
@@ -527,7 +561,7 @@ export default function Lighting() {
               <div key={i} className="flex items-center justify-between">
                 <Label className="text-sm">{spec.label}</Label>
                 <div className="flex items-center gap-2">
-                  <ColorPicker color={effectColor} onChange={(c) => colorMut.mutate(c)} />
+                  <ColorPicker color={effectColor} onLiveChange={(c) => liveColor(c)} onChange={(c) => colorMut.mutate(c)} />
                 </div>
               </div>
             );
@@ -594,6 +628,11 @@ export default function Lighting() {
                 max={sMax}
                 step={1}
                 value={val}
+                onLiveChange={(v) => {
+                  const next = [...params];
+                  next[spec.index] = v;
+                  liveParams(next);
+                }}
                 onCommit={(v) => {
                   const next = [...params];
                   next[spec.index] = v;
@@ -646,6 +685,7 @@ export default function Lighting() {
                           <CommitSlider
                             min={0} max={255} step={1}
                             value={brightnessQ.data}
+                            onLiveChange={(v) => liveBrightness(v)}
                             onCommit={(v) => brightnessMut.mutate(v)}
                             disabled={!connected} className="flex-1"
                           />
@@ -707,6 +747,7 @@ export default function Lighting() {
                       <CommitSlider
                         min={1} max={255} step={1}
                         value={speedQ.data}
+                        onLiveChange={(v) => liveSpeed(v)}
                         onCommit={(v) => speedMut.mutate(v)}
                         disabled={!connected} className="flex-1"
                       />
@@ -720,7 +761,7 @@ export default function Lighting() {
                   ) : (
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
-                        <ColorPicker color={effectColor} onChange={(c) => colorMut.mutate(c)} />
+                        <ColorPicker color={effectColor} onLiveChange={(c) => liveColor(c)} onChange={(c) => colorMut.mutate(c)} />
                         <span className="text-xs font-mono text-muted-foreground">
                           {rgbToHex(effectColor.r, effectColor.g, effectColor.b)}
                         </span>
@@ -748,6 +789,7 @@ export default function Lighting() {
                       <CommitSlider
                         min={0} max={120} step={1}
                         value={fpsQ.data}
+                        onLiveChange={(v) => liveFps(v)}
                         onCommit={(v) => fpsMut.mutate(v)}
                         disabled={!connected} className="flex-1"
                       />
@@ -755,7 +797,7 @@ export default function Lighting() {
                   </div>
                 </SectionCard>
 
-                <SectionCard title="LED Diagnostic Mode" description="Stress-test modes for hardware verification">
+                {/* <SectionCard title="LED Diagnostic Mode" description="Stress-test modes for hardware verification">
                   {diagnosticQ.isLoading ? (
                     <Skeleton className="h-8 w-36" />
                   ) : (
@@ -773,7 +815,7 @@ export default function Lighting() {
                       ))}
                     </RadioGroup>
                   )}
-                </SectionCard>
+                </SectionCard> */}
               </div>
             </div>
           </TabsContent>

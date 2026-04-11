@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { useThrottledCall } from "@/hooks/use-throttled-call";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { DistanceSlider } from "@/components/distance-slider";
@@ -11,7 +12,7 @@ import { CommitSlider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
-import { kbheDevice } from "@/lib/kbhe/device";
+import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
 import { queryKeys } from "@/lib/query/keys";
 import {
   IconSelectAll,
@@ -19,17 +20,21 @@ import {
   IconRestore,
 } from "@tabler/icons-react";
 
+type FilterParams = { noise_band: number; alpha_min_denom: number; alpha_max_denom: number };
+
 export default function Performance() {
-  const selectedKeys  = useKeyboardStore((s) => s.selectedKeys);
-  const selectAll     = useKeyboardStore((s) => s.selectAll);
+  const selectedKeys   = useKeyboardStore((s) => s.selectedKeys);
+  const selectAll      = useKeyboardStore((s) => s.selectAll);
   const clearSelection = useKeyboardStore((s) => s.clearSelection);
-  const { status }    = useDeviceSession();
-  const connected     = status === "connected";
+  const { status }     = useDeviceSession();
+  const connected      = status === "connected";
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
   const focusedKeyId = selectedKeys[0] ?? null;
   const keyIndex = focusedKeyId?.startsWith("key-")
     ? parseInt(focusedKeyId.replace("key-", ""), 10) : null;
+
+  // ── Queries ──
 
   const keySettingsQ = useQuery({
     queryKey: queryKeys.keymap.keySettings(keyIndex ?? -1),
@@ -55,41 +60,67 @@ export default function Performance() {
     enabled: connected,
   });
 
-  type KeyPatch = Parameters<typeof kbheDevice.setKeySettingsExtended>[1];
-
-  const keyMutation = useOptimisticMutation({
-    queryKey: queryKeys.keymap.keySettings(keyIndex ?? -1),
-    mutationFn: async (patch: KeyPatch) => {
-      if (keyIndex == null) return;
-      markSaving();
-      await kbheDevice.setKeySettingsExtended(keyIndex, patch);
-    },
-    optimisticUpdate: (cur, patch) => (cur ? { ...cur, ...patch } : cur!),
-    onSuccess: () => markSaved(),
-  });
-  keyMutation.onError = markError as never;
-
-  const filterMutation = useOptimisticMutation({
-    queryKey: queryKeys.device.filterEnabled(),
-    mutationFn: (v: boolean) => kbheDevice.setFilterEnabled(v),
-    optimisticUpdate: (_cur, v) => v,
-  });
-
-  const filterParamsMutation = useOptimisticMutation({
-    queryKey: ["device", "filterParams"],
-    mutationFn: (params: { noise_band: number; alpha_min_denom: number; alpha_max_denom: number }) =>
-      kbheDevice.setFilterParams(params.noise_band, params.alpha_min_denom, params.alpha_max_denom),
-    optimisticUpdate: (_cur, params) => params,
-  });
-
-  const tickMutation = useOptimisticMutation({
-    queryKey: queryKeys.device.advancedTickRate(),
-    mutationFn: (v: number) => kbheDevice.setAdvancedTickRate(v),
-    optimisticUpdate: (_cur, v) => v,
-  });
-
   const settings = keySettingsQ.data;
   const noSelection = keyIndex == null;
+
+  // ── Live preview (throttled, runtime-only SET) ──
+  // The firmware auto-saves to flash 750 ms after the last change via settings_task().
+  // No need to call saveSettings() — just flood SET commands freely.
+
+  const liveKeyUpdate = useThrottledCall(async (patch: Partial<KeySettings>) => {
+    if (keyIndex == null || !settings) return;
+    await kbheDevice.setKeySettingsExtended(keyIndex, { ...settings, ...patch });
+  });
+
+  const liveFilterParams = useThrottledCall(async (params: FilterParams) => {
+    await kbheDevice.setFilterParams(params.noise_band, params.alpha_min_denom, params.alpha_max_denom);
+  });
+
+  const liveTickRate = useThrottledCall(async (v: number) => {
+    await kbheDevice.setAdvancedTickRate(v);
+  });
+
+  // ── Commit mutations (fire on pointer-up, update query cache) ──
+  // TData = query cache type, TVars = call args, TResult = device return type.
+  // Always send FULL settings to avoid firmware defaults overwriting unchanged fields.
+
+  const keyMutation = useOptimisticMutation<KeySettings | null, Partial<KeySettings>, void>({
+    queryKey: queryKeys.keymap.keySettings(keyIndex ?? -1),
+    mutationFn: async (full) => {
+      if (keyIndex == null) return;
+      markSaving();
+      await kbheDevice.setKeySettingsExtended(keyIndex, full);
+    },
+    optimisticUpdate: (cur, full) => cur ? { ...cur, ...full } : cur ?? null,
+    onSuccess: () => markSaved(),
+    onError: () => markError(),
+  });
+
+  const filterMutation = useOptimisticMutation<boolean, boolean, boolean>({
+    queryKey: queryKeys.device.filterEnabled(),
+    mutationFn: (v) => kbheDevice.setFilterEnabled(v),
+    optimisticUpdate: (_cur, v) => v,
+  });
+
+  const filterParamsMutation = useOptimisticMutation<FilterParams, FilterParams, boolean>({
+    queryKey: ["device", "filterParams"],
+    mutationFn: (p) => kbheDevice.setFilterParams(p.noise_band, p.alpha_min_denom, p.alpha_max_denom),
+    optimisticUpdate: (_cur, p) => p,
+  });
+
+  const tickMutation = useOptimisticMutation<number, number, boolean>({
+    queryKey: queryKeys.device.advancedTickRate(),
+    mutationFn: (v) => kbheDevice.setAdvancedTickRate(v),
+    optimisticUpdate: (_cur, v) => v,
+  });
+
+  // Merge a partial patch with the current full settings and commit.
+  function commitKey(patch: Partial<KeySettings>) {
+    if (!settings) return;
+    keyMutation.mutate({ ...settings, ...patch });
+  }
+
+  // ── UI ──
 
   const menubar = (
     <>
@@ -139,35 +170,64 @@ export default function Performance() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col gap-4">
-                <DistanceSlider label="Actuation Point" value={settings.actuation_point_mm}
-                  onChange={v => keyMutation.mutate({ actuation_point_mm: v })} disabled={!connected} />
-                <DistanceSlider label="Release Point" value={settings.release_point_mm}
-                  onChange={v => keyMutation.mutate({ release_point_mm: v })} disabled={!connected} />
+                <DistanceSlider
+                  label="Actuation Point"
+                  value={settings.actuation_point_mm}
+                  onLiveChange={v => liveKeyUpdate({ actuation_point_mm: v })}
+                  onChange={v => commitKey({ actuation_point_mm: v })}
+                  disabled={!connected}
+                />
+                <DistanceSlider
+                  label="Release Point"
+                  value={settings.release_point_mm}
+                  onLiveChange={v => liveKeyUpdate({ release_point_mm: v })}
+                  onChange={v => commitKey({ release_point_mm: v })}
+                  disabled={!connected}
+                />
                 {settings.rapid_trigger_enabled && (
                   <>
-                    <DistanceSlider label="RT Press Sensitivity" value={settings.rapid_trigger_press}
+                    <DistanceSlider
+                      label="RT Press Sensitivity"
+                      value={settings.rapid_trigger_press}
                       min={0.01} max={4.0} step={0.01}
-                      onChange={v => keyMutation.mutate({ rapid_trigger_press: v })} disabled={!connected} />
-                    <DistanceSlider label="RT Release Sensitivity" value={settings.rapid_trigger_release}
+                      onLiveChange={v => liveKeyUpdate({ rapid_trigger_press: v })}
+                      onChange={v => commitKey({ rapid_trigger_press: v })}
+                      disabled={!connected}
+                    />
+                    <DistanceSlider
+                      label="RT Release Sensitivity"
+                      value={settings.rapid_trigger_release}
                       min={0.01} max={4.0} step={0.01}
-                      onChange={v => keyMutation.mutate({ rapid_trigger_release: v })} disabled={!connected} />
+                      onLiveChange={v => liveKeyUpdate({ rapid_trigger_release: v })}
+                      onChange={v => commitKey({ rapid_trigger_release: v })}
+                      disabled={!connected}
+                    />
                   </>
                 )}
               </div>
               <div className="flex flex-col gap-4">
                 <FormRow label="Rapid Trigger" description="Dynamic actuation">
-                  <Switch checked={settings.rapid_trigger_enabled} disabled={!connected}
-                    onCheckedChange={v => keyMutation.mutate({ rapid_trigger_enabled: v })} />
+                  <Switch
+                    checked={settings.rapid_trigger_enabled}
+                    disabled={!connected}
+                    onCheckedChange={v => commitKey({ rapid_trigger_enabled: v })}
+                  />
                 </FormRow>
                 {settings.rapid_trigger_enabled && (
                   <FormRow label="Continuous RT" description="Track past bottom">
-                    <Switch checked={settings.continuous_rapid_trigger} disabled={!connected}
-                      onCheckedChange={v => keyMutation.mutate({ continuous_rapid_trigger: v })} />
+                    <Switch
+                      checked={settings.continuous_rapid_trigger}
+                      disabled={!connected}
+                      onCheckedChange={v => commitKey({ continuous_rapid_trigger: v })}
+                    />
                   </FormRow>
                 )}
                 <FormRow label="Disable KB on Gamepad">
-                  <Switch checked={settings.disable_kb_on_gamepad} disabled={!connected}
-                    onCheckedChange={v => keyMutation.mutate({ disable_kb_on_gamepad: v })} />
+                  <Switch
+                    checked={settings.disable_kb_on_gamepad}
+                    disabled={!connected}
+                    onCheckedChange={v => commitKey({ disable_kb_on_gamepad: v })}
+                  />
                 </FormRow>
               </div>
             </div>
@@ -178,28 +238,43 @@ export default function Performance() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-4">
               <FormRow label="Input Filter" description="ADC noise suppression">
-                <Switch checked={filterEnabledQ.data ?? false} disabled={!connected}
-                  onCheckedChange={v => filterMutation.mutate(v)} />
+                <Switch
+                  checked={filterEnabledQ.data ?? false}
+                  disabled={!connected}
+                  onCheckedChange={v => filterMutation.mutate(v)}
+                />
               </FormRow>
               {filterEnabledQ.data && filterParamsQ.data && (
                 <>
                   <div className="grid gap-2">
                     <span className="text-sm font-medium">Noise Band</span>
-                    <CommitSlider min={1} max={255} step={1} value={filterParamsQ.data.noise_band}
+                    <CommitSlider
+                      min={1} max={255} step={1}
+                      value={filterParamsQ.data.noise_band}
+                      onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, noise_band: v })}
                       onCommit={v => filterParamsMutation.mutate({ ...filterParamsQ.data!, noise_band: v })}
-                      disabled={!connected} />
+                      disabled={!connected}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <span className="text-sm font-medium">Alpha Min Denom</span>
-                    <CommitSlider min={1} max={255} step={1} value={filterParamsQ.data.alpha_min_denom}
+                    <CommitSlider
+                      min={1} max={255} step={1}
+                      value={filterParamsQ.data.alpha_min_denom}
+                      onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_min_denom: v })}
                       onCommit={v => filterParamsMutation.mutate({ ...filterParamsQ.data!, alpha_min_denom: v })}
-                      disabled={!connected} />
+                      disabled={!connected}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <span className="text-sm font-medium">Alpha Max Denom</span>
-                    <CommitSlider min={1} max={255} step={1} value={filterParamsQ.data.alpha_max_denom}
+                    <CommitSlider
+                      min={1} max={255} step={1}
+                      value={filterParamsQ.data.alpha_max_denom}
+                      onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_max_denom: v })}
                       onCommit={v => filterParamsMutation.mutate({ ...filterParamsQ.data!, alpha_max_denom: v })}
-                      disabled={!connected} />
+                      disabled={!connected}
+                    />
                   </div>
                 </>
               )}
@@ -207,9 +282,13 @@ export default function Performance() {
             <div className="flex flex-col gap-4">
               <div className="grid gap-2">
                 <span className="text-sm font-medium">Advanced Tick Rate</span>
-                <CommitSlider min={1} max={100} step={1} value={tickRateQ.data ?? 1}
+                <CommitSlider
+                  min={1} max={100} step={1}
+                  value={tickRateQ.data ?? 1}
+                  onLiveChange={v => liveTickRate(v)}
                   onCommit={v => tickMutation.mutate(v)}
-                  disabled={!connected} />
+                  disabled={!connected}
+                />
               </div>
             </div>
           </div>

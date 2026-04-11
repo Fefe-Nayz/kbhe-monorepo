@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
+import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
@@ -170,6 +171,12 @@ export default function Gamepad() {
   // ── Curve ──
 
   const curvePoints: CurvePoint[] = gs ? deviceCurveToEditor(gs.curve_points) : [];
+
+  // Live preview during drag: throttled runtime-only SET, no query cache update.
+  const liveCurveUpdate = useThrottledCall(async (pts: CurvePoint[]) => {
+    if (!gs) return;
+    await kbheDevice.setGamepadSettings({ ...gs, curve_points: editorCurveToDevice(pts) });
+  });
 
   const handleCurveChange = useCallback(
     (pts: CurvePoint[]) => {
@@ -446,6 +453,7 @@ export default function Gamepad() {
               ) : (
                 <AnalogCurveEditor
                   points={curvePoints}
+                  onLiveChange={liveCurveUpdate}
                   onChange={handleCurveChange}
                 />
               )}

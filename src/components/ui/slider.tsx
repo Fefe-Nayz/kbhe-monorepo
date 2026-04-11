@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from "react"
+import { useCallback, useState, useRef, useEffect } from "react"
 import { Slider as SliderPrimitive } from "@base-ui/react/slider"
 
 import { cn } from "@/lib/utils"
@@ -56,6 +56,10 @@ function Slider({
  *
  * While not dragging, `value` prop drives the display.
  * During drag, an internal draft overrides it for instant feedback.
+ *
+ * After pointer-up, draft is kept alive until the `value` prop catches up to
+ * the committed value (i.e. the parent's optimistic update has arrived).
+ * A 1.5 s fallback timeout clears it regardless, so draft never gets stuck.
  */
 function CommitSlider({
   value,
@@ -63,15 +67,32 @@ function CommitSlider({
   onLiveChange,
   className,
   ...props
-}: Omit<SliderPrimitive.Root.Props, "value" | "onValueChange"> & {
+}: Omit<SliderPrimitive.Root.Props, "value" | "onValueChange" | "className"> & {
   value: number
   onCommit: (value: number) => void
   onLiveChange?: (value: number) => void
+  className?: string
 }) {
   const [draft, setDraft] = useState<number | null>(null)
   const commitRef = useRef<number>(value)
+  // After pointer-up, holds the value we're waiting for the prop to match.
+  const waitingForRef = useRef<number | null>(null)
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const displayValue = draft ?? value
+
+  // Clear draft as soon as the value prop catches up to the committed value.
+  useEffect(() => {
+    if (waitingForRef.current === null) return
+    if (value === waitingForRef.current) {
+      setDraft(null)
+      waitingForRef.current = null
+      if (clearTimerRef.current) {
+        clearTimeout(clearTimerRef.current)
+        clearTimerRef.current = null
+      }
+    }
+  }, [value])
 
   const handleChange = useCallback(
     (v: number | readonly number[]) => {
@@ -87,17 +108,31 @@ function CommitSlider({
   const handlePointerDown = useCallback(() => {
     setDraft(value)
     commitRef.current = value
+    waitingForRef.current = null
+    if (clearTimerRef.current) {
+      clearTimeout(clearTimerRef.current)
+      clearTimerRef.current = null
+    }
   }, [value])
 
   const handlePointerUp = useCallback(() => {
     if (draft === null) return
     const final = commitRef.current
-    setDraft(null)
+    // Keep draft alive until value prop matches — no flash.
+    waitingForRef.current = final
+    // Fallback: always clear after 1.5 s (handles mutation errors / device rounding).
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
+    clearTimerRef.current = setTimeout(() => {
+      setDraft(null)
+      waitingForRef.current = null
+      clearTimerRef.current = null
+    }, 1500)
     onCommit(final)
   }, [draft, onCommit])
 
   return (
     <div
+      className={className}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
@@ -106,7 +141,6 @@ function CommitSlider({
       <Slider
         value={[displayValue]}
         onValueChange={handleChange}
-        className={className}
         {...props}
       />
     </div>

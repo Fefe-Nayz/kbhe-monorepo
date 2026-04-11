@@ -1,4 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { useThrottledCall } from "@/hooks/use-throttled-call";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { KeycodeAccordion } from "@/components/keycode-accordion";
@@ -20,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
-import { kbheDevice } from "@/lib/kbhe/device";
+import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
 import { KEY_BEHAVIORS, HID_KEYCODE_NAMES, SOCD_RESOLUTIONS, KEY_COUNT } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import { selectItems } from "@/lib/utils";
@@ -45,7 +47,6 @@ export default function AdvancedKeys() {
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
   const { status }      = useDeviceSession();
   const connected       = status === "connected";
-  const qc              = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
   const focusedKeyId = selectedKeys[0] ?? null;
@@ -64,25 +65,34 @@ export default function AdvancedKeys() {
     enabled: connected,
   });
 
-  const keyMutation = useMutation({
-    mutationFn: async (patch: Parameters<typeof kbheDevice.setKeySettingsExtended>[1]) => {
+  const keyMutation = useOptimisticMutation<KeySettings | null, Partial<KeySettings>>({
+    queryKey: queryKeys.keymap.keySettings(keyIndex ?? -1),
+    mutationFn: async (patch) => {
       if (keyIndex == null) return;
       markSaving();
       await kbheDevice.setKeySettingsExtended(keyIndex, patch);
     },
-    onSuccess: () => {
-      markSaved();
-      if (keyIndex != null) void qc.invalidateQueries({ queryKey: queryKeys.keymap.keySettings(keyIndex) });
-    },
+    optimisticUpdate: (cur, patch) => cur ? { ...cur, ...patch } : cur ?? null,
+    onSuccess: () => markSaved(),
     onError: markError,
   });
 
-  const tickMutation = useMutation({
-    mutationFn: (v: number) => kbheDevice.setAdvancedTickRate(v),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.device.advancedTickRate() }),
+  const tickMutation = useOptimisticMutation<number, number>({
+    queryKey: queryKeys.device.advancedTickRate(),
+    mutationFn: (v) => kbheDevice.setAdvancedTickRate(v),
+    optimisticUpdate: (_cur, v) => v,
   });
 
   const settings = keySettingsQ.data;
+
+  const liveKey = useThrottledCall(async (patch: Partial<KeySettings>) => {
+    if (keyIndex == null || !settings) return;
+    await kbheDevice.setKeySettingsExtended(keyIndex, { ...settings, ...patch });
+  });
+
+  const liveTick = useThrottledCall(async (v: number) => {
+    await kbheDevice.setAdvancedTickRate(v);
+  });
   const noSelection = keyIndex == null;
 
   const menubar = (

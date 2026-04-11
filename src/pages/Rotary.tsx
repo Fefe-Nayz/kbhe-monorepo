@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice, type RotaryEncoderSettings } from "@/lib/kbhe/device";
 import { isVolumeServiceRunning } from "@/lib/kbhe/volume-service";
@@ -119,6 +120,11 @@ export default function Rotary() {
     mutation.mutate({ ...rotaryQ.data, ...patch });
   };
 
+  const liveRotary = useThrottledCall(async (patch: Partial<RotaryPatch>) => {
+    if (!rotaryQ.data) return;
+    await kbheDevice.setRotaryEncoderSettings({ ...rotaryQ.data, ...patch });
+  });
+
   const s = rotaryQ.data;
 
   return (
@@ -172,6 +178,7 @@ export default function Rotary() {
                   <FormRow label="Sensitivity">
                     <div className="w-44">
                       <CommitSlider min={1} max={10} step={1} value={s.sensitivity}
+                        onLiveChange={(v) => liveRotary({ sensitivity: v })}
                         onCommit={(v) => write({ sensitivity: v })}
                         disabled={!connected} className="flex-1" />
                     </div>
@@ -179,6 +186,7 @@ export default function Rotary() {
                   <FormRow label="Step Size">
                     <div className="w-44">
                       <CommitSlider min={1} max={20} step={1} value={s.step_size}
+                        onLiveChange={(v) => liveRotary({ step_size: v })}
                         onCommit={(v) => write({ step_size: v })}
                         disabled={!connected} className="flex-1" />
                     </div>
@@ -267,9 +275,8 @@ export default function Rotary() {
                         g: s.progress_color?.[1] ?? 255,
                         b: s.progress_color?.[2] ?? 255,
                       }}
-                      onChange={(c) => write({
-                        progress_color: [c.r, c.g, c.b],
-                      })}
+                      onLiveChange={(c) => liveRotary({ progress_color: [c.r, c.g, c.b] })}
+                      onChange={(c) => write({ progress_color: [c.r, c.g, c.b] })}
                     />
                   </FormRow>
                 </div>
