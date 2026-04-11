@@ -39,6 +39,7 @@ export const queryKeys = {
     enabled: () => ["led", "enabled"] as const,
     brightness: () => ["led", "brightness"] as const,
     effect: () => ["led", "effect"] as const,
+    ledEnabled: () => ["device", "ledEnabled"] as const,
     effectSpeed: () => ["led", "effectSpeed"] as const,
     effectColor: () => ["led", "effectColor"] as const,
     effectParams: (mode: number) => ["led", "effectParams", mode] as const,

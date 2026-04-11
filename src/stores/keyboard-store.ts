@@ -21,6 +21,7 @@ export interface KeyboardState {
   setCurrentLayer: (layer: number) => void;
   toggleKeySelection: (keyId: string) => void;
   clearSelection: () => void;
+  selectAll: () => void;
   updateKeyConfig: (keyIds: string[], update: Partial<KeyConfig>) => void;
   updateLayout: (layout: KeyboardLayout) => void;
   resetLayout: (save?: boolean) => void;
@@ -61,6 +62,7 @@ export const useKeyboardStore = create<KeyboardState>()((set, get) => ({
   },
 
   clearSelection: () => set({ selectedKeys: [] }),
+  selectAll: () => set({ selectedKeys: Array.from({ length: 82 }, (_, i) => `key-${i}`) }),
 
   updateKeyConfig: (keyIds, update) => {
     const { layout } = get();

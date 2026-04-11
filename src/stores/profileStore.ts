@@ -23,6 +23,7 @@ interface ProfileStore {
   selectProfile: (name: string) => void
   save: (name: string) => void
   remove: (name: string) => void
+  rename: (oldName: string, newName: string) => void
   duplicate: (from: string, to: string) => void
   updateSelectedProfile: (data: KeyboardState) => void
 }
@@ -143,6 +144,29 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
   get().refresh()
 },
+
+  rename: (oldName, newName) => {
+    if (oldName === DEFAULT_PROFILE_NAME) return;
+    if (!newName.trim() || oldName === newName) return;
+    if (get().profiles.find((p) => p.name === newName)) return;
+
+    const raw = localStorage.getItem(STORAGE_PREFIX + oldName);
+    if (!raw) return;
+
+    localStorage.setItem(STORAGE_PREFIX + newName, raw);
+    localStorage.removeItem(STORAGE_PREFIX + oldName);
+
+    const active = localStorage.getItem(ACTIVE_PROFILE);
+    if (active === oldName) {
+      localStorage.setItem(ACTIVE_PROFILE, newName);
+    }
+
+    get().refresh();
+
+    if (get().selectedProfile?.name === oldName || active === oldName) {
+      get().selectProfile(newName);
+    }
+  },
 
   duplicate: (from, to) => {
 

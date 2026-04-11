@@ -24,8 +24,8 @@
 }
 
 .kle-root[data-kle-theme="modern"] {
-  --kle-key-color: var(--background, oklch(1 0 0));
-  --kle-legend-color: var(--foreground, oklch(0.145 0 0));
+  --kle-key-color: var(--card, oklch(1 0 0));
+  --kle-legend-color: var(--card-foreground, oklch(0.145 0 0));
   --kle-outer-stroke: var(--border, oklch(0.922 0 0));
   --kle-inner-stroke: color-mix(in oklch, var(--border, oklch(0.922 0 0)) 70%, white 30%);
   --kle-top-layer-offset: -1px;
@@ -230,9 +230,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  max-width: 42%;
-  white-space: pre-wrap;
-  text-wrap: balance;
+  max-width: 88%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-align: center;
   line-height: 1.05;
   font-family: Arial, Helvetica, sans-serif;
@@ -242,8 +243,8 @@
 }
 
 .kle-root[data-kle-theme="modern"] .kle-legend {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-weight: 600;
+  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -287,7 +288,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  max-width: 56%;
+  max-width: 92%;
 }
 
 .kle-legend--middle-right {

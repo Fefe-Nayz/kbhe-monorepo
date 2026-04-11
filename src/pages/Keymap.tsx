@@ -1,108 +1,145 @@
-import { useEffect, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
+import { useOSLayout } from "@/hooks/use-os-layout";
 import BaseKeyboard from "@/components/baseKeyboard";
-import KeyMapper from "@/components/keyMapper";
+import { KeyboardEditor } from "@/components/keyboard-editor";
+import { KeycodeAccordion } from "@/components/keycode-accordion";
+import { LayerSelect } from "@/components/layer-select";
+import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
+import { Button } from "@/components/ui/button";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
-import { HID_KEYCODES } from "@/lib/kbhe/protocol";
+import { HID_KEYCODE_NAMES, KEY_COUNT } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
-import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
-import { PageHeader } from "@/components/shared/PageLayout";
-import { cn } from "@/lib/utils";
+import { IconRestore } from "@tabler/icons-react";
+
+async function fetchAllLayerKeycodes(layer: number): Promise<Record<number, number>> {
+  const codes: Record<number, number> = {};
+  const BATCH = 8;
+  for (let start = 0; start < KEY_COUNT; start += BATCH) {
+    const end = Math.min(start + BATCH, KEY_COUNT);
+    const batch = Array.from({ length: end - start }, (_, i) =>
+      kbheDevice.getLayerKeycode(layer, start + i),
+    );
+    const results = await Promise.all(batch);
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r) codes[start + i] = r.hid_keycode;
+    }
+  }
+  return codes;
+}
 
 export default function Keymap() {
-  const selectedKeys      = useKeyboardStore((s) => s.selectedKeys);
-  const currentLayer      = useKeyboardStore((s) => s.currentLayer);
-  const updateKeyConfig   = useKeyboardStore((s) => s.updateKeyConfig);
-  const setSaveEnabled    = useKeyboardStore((s) => s.setSaveEnabled);
-  const { status }        = useDeviceSession();
-  const connected         = status === "connected";
-  const qc                = useQueryClient();
+  const selectedKeys    = useKeyboardStore((s) => s.selectedKeys);
+  const currentLayer    = useKeyboardStore((s) => s.currentLayer);
+  const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
+  const updateKeyConfig = useKeyboardStore((s) => s.updateKeyConfig);
+  const clearSelection  = useKeyboardStore((s) => s.clearSelection);
+  const { status }      = useDeviceSession();
+  const connected       = status === "connected";
+  const qc              = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
+  const resolveKeycodeLabel = useOSLayout();
 
-  useEffect(() => {
-    setSaveEnabled(true);
-    return () => setSaveEnabled(false);
-  }, [setSaveEnabled]);
-
-  // Mutation: write a keycode to the device for the current layer
-  const setKeycodeMutation = useMutation({
-    mutationFn: async ({ keyIndex, keycode }: { keyIndex: number; keycode: number }) => {
-      await kbheDevice.setLayerKeycode(currentLayer, keyIndex, keycode);
-    },
-    onMutate: markSaving,
-    onSuccess: () => {
-      markSaved();
-      void qc.invalidateQueries({ queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer) });
-    },
-    onError: markError,
+  const layerKeycodes = useQuery({
+    queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer),
+    queryFn: () => fetchAllLayerKeycodes(currentLayer),
+    enabled: connected,
+    staleTime: 30_000,
   });
 
-  const handleKeyAssign = useCallback(
-    (key: { id: string; label: string; value: string; width: number }) => {
+  const setKeycodeMutation = useOptimisticMutation({
+    queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer),
+    mutationFn: async ({ keyIndex, keycode }: { keyIndex: number; keycode: number }) => {
+      markSaving();
+      await kbheDevice.setLayerKeycode(currentLayer, keyIndex, keycode);
+    },
+    optimisticUpdate: (cur, { keyIndex, keycode }) => ({ ...cur, [keyIndex]: keycode }),
+    onSuccess: () => markSaved(),
+  });
+
+  const handleKeycodeSelect = useCallback(
+    (code: number, name: string) => {
       if (selectedKeys.length === 0) return;
 
-      // Update local profile state
-      updateKeyConfig(selectedKeys, { label: [key.label], value: key.value });
+      updateKeyConfig(selectedKeys, { label: [name], value: name });
 
-      // Write to device if connected
       if (connected) {
         for (const keyId of selectedKeys) {
           if (!keyId.startsWith("key-")) continue;
           const keyIndex = parseInt(keyId.replace("key-", ""), 10);
           if (!Number.isFinite(keyIndex)) continue;
-          const keycode = HID_KEYCODES[key.value] ?? HID_KEYCODES[key.label] ?? 0;
-          setKeycodeMutation.mutate({ keyIndex, keycode });
+          setKeycodeMutation.mutate({ keyIndex, keycode: code });
         }
       }
 
-      useKeyboardStore.getState().clearSelection();
+      clearSelection();
     },
-    [selectedKeys, updateKeyConfig, connected, currentLayer, setKeycodeMutation],
+    [selectedKeys, updateKeyConfig, connected, setKeycodeMutation, clearSelection],
+  );
+
+  const selectedCode = (() => {
+    if (selectedKeys.length !== 1) return undefined;
+    const keyId = selectedKeys[0];
+    if (!keyId.startsWith("key-")) return undefined;
+    const idx = parseInt(keyId.replace("key-", ""), 10);
+    return layerKeycodes.data?.[idx];
+  })();
+
+  const renderKeyOverlay = useCallback(
+    (keyId: string) => {
+      if (!layerKeycodes.data) return undefined;
+      if (!keyId.startsWith("key-")) return undefined;
+      const idx = parseInt(keyId.replace("key-", ""), 10);
+      const code = layerKeycodes.data[idx];
+      if (code === undefined) return undefined;
+      const fallback = HID_KEYCODE_NAMES[code] ?? `0x${code.toString(16)}`;
+      const label = resolveKeycodeLabel(code, fallback);
+      return (
+        <span className="text-[9px] leading-tight truncate">
+          {label}
+        </span>
+      );
+    },
+    [layerKeycodes.data, resolveKeycodeLabel],
+  );
+
+  const menubar = (
+    <>
+      <div className="flex items-center gap-2">
+        <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
+      </div>
+      <div className="flex items-center gap-2">
+        <AutosaveStatus state={saveState} />
+        <Button variant="destructive" size="sm" className="h-8 gap-1.5" disabled={!connected}>
+          <IconRestore className="size-4" />
+          Reset Layer
+        </Button>
+      </div>
+    </>
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header bar */}
-      <div className="shrink-0 border-b px-4 py-2 flex items-center justify-between gap-4">
-        <PageHeader
-          title="Keymap"
-          description={`Layer ${currentLayer} — click a key, then pick an action`}
+    <KeyboardEditor
+      keyboard={
+        <BaseKeyboard
+          mode="single"
+          onButtonClick={() => {}}
+          showLayerSelector={false}
+          showRotary={false}
+          renderKeyOverlay={connected ? renderKeyOverlay : undefined}
         />
-        <AutosaveStatus state={saveState} />
-      </div>
-
-      {/* Body: keyboard top, mapper below */}
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        {/* Keyboard preview — fixed height */}
-        <div className="shrink-0 border-b px-4 py-4 overflow-x-auto bg-muted/20">
-          <BaseKeyboard
-            mode="multi"
-            onButtonClick={() => {}}
-          />
-        </div>
-
-        {/* Key mapper — scrollable */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {selectedKeys.length > 0 ? (
-            <div className="flex flex-col gap-2 max-w-3xl mx-auto">
-              <div className="text-xs text-muted-foreground">
-                {selectedKeys.length} key{selectedKeys.length > 1 ? "s" : ""} selected
-                &mdash; pick an action below to assign
-              </div>
-              <KeyMapper onButtonClick={handleKeyAssign} />
-            </div>
-          ) : (
-            <div className={cn(
-              "flex flex-col items-center justify-center h-32",
-              "text-muted-foreground text-sm",
-            )}>
-              Select one or more keys on the keyboard above, then choose an action here.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      }
+      menubar={menubar}
+    >
+      <KeycodeAccordion
+        onSelect={handleKeycodeSelect}
+        selectedCode={selectedCode}
+        className="h-full"
+      />
+    </KeyboardEditor>
   );
 }

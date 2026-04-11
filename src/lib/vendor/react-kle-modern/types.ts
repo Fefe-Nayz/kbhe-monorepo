@@ -96,4 +96,6 @@ export interface KeyboardLayoutProps {
     label: string;
     index: number;
   }) => ReactNode;
+  /** Per-key CSS color override map (key id -> CSS color string). Used for RGB matrix / heatmaps. */
+  keyColorMap?: Record<string, string>;
 }

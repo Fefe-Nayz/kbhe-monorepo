@@ -1,33 +1,81 @@
 mod commands;
+mod volume;
+
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+    Manager, WindowEvent,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
-    .manage(commands::KbheTransportState::default())
-    .plugin(tauri_plugin_store::Builder::default().build())
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
-      Ok(())
-    })
-    .invoke_handler(tauri::generate_handler![
-      commands::kbhe_list_devices,
-      commands::kbhe_connect,
-      commands::kbhe_disconnect,
-      commands::kbhe_connection_state,
-      commands::kbhe_flush_input,
-      commands::kbhe_write_report,
-      commands::kbhe_read_report,
-      commands::kbhe_wait_for_device,
-      commands::kbhe_wait_for_disconnect
-    ])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    tauri::Builder::default()
+        .manage(commands::KbheTransportState::default())
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+
+            let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show, &quit])?;
+
+            let mut builder = TrayIconBuilder::new();
+            if let Some(icon) = app.default_window_icon().cloned() {
+                builder = builder.icon(icon);
+            }
+            builder
+                .tooltip("KBHE Configurator")
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                        if let Some(w) = tray.app_handle().get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::kbhe_list_devices,
+            commands::kbhe_connect,
+            commands::kbhe_disconnect,
+            commands::kbhe_connection_state,
+            commands::kbhe_flush_input,
+            commands::kbhe_write_report,
+            commands::kbhe_read_report,
+            commands::kbhe_wait_for_device,
+            commands::kbhe_wait_for_disconnect,
+            volume::kbhe_get_system_volume,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
-
-

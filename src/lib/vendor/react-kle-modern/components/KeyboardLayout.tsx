@@ -16,6 +16,7 @@ export function KeyboardLayout({
   theme = "kle",
   onKeyClick,
   renderLegend,
+  keyColorMap,
 }: KeyboardLayoutProps) {
   const parsed = useMemo(() => ensureParsedKeyboardLayout(layout), [layout]);
   const bounds = useMemo(() => getKeyboardBounds(parsed.keys), [parsed.keys]);
@@ -59,6 +60,8 @@ export function KeyboardLayout({
             onClick={onKeyClick}
             showLegendSlots={showLegendSlots}
             renderLegend={renderLegend}
+            overrideColor={keyColorMap?.[key.id]}
+            theme={theme}
           />
         ))}
       </div>

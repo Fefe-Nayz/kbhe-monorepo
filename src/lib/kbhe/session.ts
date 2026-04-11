@@ -10,6 +10,7 @@
 import { create } from "zustand";
 import { kbheDevice } from "./device";
 import type { KbheTransportDeviceInfo } from "./transport";
+import { startVolumeService, stopVolumeService } from "./volume-service";
 
 export type DeviceSessionStatus =
   | "disconnected"
@@ -32,18 +33,23 @@ export interface DeviceSessionState {
   setDeveloperMode: (enabled: boolean) => void;
 }
 
+const DEV_MODE_KEY = "kbhe-developer-mode";
+
 export const useDeviceSession = create<DeviceSessionState>()((set) => ({
   status: "disconnected",
   deviceInfo: null,
   firmwareVersion: null,
   error: null,
-  developerMode: false,
+  developerMode: localStorage.getItem(DEV_MODE_KEY) === "true",
 
   _setStatus: (status) => set({ status }),
   _setDeviceInfo: (deviceInfo) => set({ deviceInfo }),
   _setFirmwareVersion: (firmwareVersion) => set({ firmwareVersion }),
   _setError: (error) => set({ error }),
-  setDeveloperMode: (developerMode) => set({ developerMode }),
+  setDeveloperMode: (developerMode) => {
+    localStorage.setItem(DEV_MODE_KEY, String(developerMode));
+    set({ developerMode });
+  },
 }));
 
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -152,6 +158,7 @@ export const DeviceSessionManager = {
 
         _setStatus("connected");
         DeviceSessionManager.startPresencePolling(currentGeneration);
+        void DeviceSessionManager.syncVolumeService();
       } catch (error) {
         if (currentGeneration !== generation) {
           return;
@@ -173,6 +180,7 @@ export const DeviceSessionManager = {
     generation += 1;
     clearReconnectTimer();
     stopPresencePolling();
+    stopVolumeService();
 
     try {
       await kbheDevice.disconnect();
@@ -186,6 +194,19 @@ export const DeviceSessionManager = {
   async reconnect() {
     await DeviceSessionManager.disconnect();
     await DeviceSessionManager.connect();
+  },
+
+  async syncVolumeService() {
+    try {
+      const rotary = await kbheDevice.getRotaryEncoderSettings();
+      if (rotary && rotary.rotation_action === 0) {
+        startVolumeService();
+      } else {
+        stopVolumeService();
+      }
+    } catch {
+      stopVolumeService();
+    }
   },
 
   startPresencePolling(expectedGeneration: number) {
@@ -216,6 +237,7 @@ export const DeviceSessionManager = {
 
         if (!stillPresent) {
           stopPresencePolling();
+          stopVolumeService();
           resetDisconnectedState();
           scheduleReconnect(1500);
         }

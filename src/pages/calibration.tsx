@@ -1,260 +1,286 @@
-import { useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BaseKeyboard from "@/components/baseKeyboard";
+import { KeyboardEditor } from "@/components/keyboard-editor";
+import { KeyTester } from "@/components/key-tester";
+import { SectionCard } from "@/components/shared/SectionCard";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CommitSlider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
-import { queryKeys } from "@/lib/query/keys";
-import { SectionCard, FormRow } from "@/components/shared/SectionCard";
-import { PageHeader } from "@/components/shared/PageLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { KEY_COUNT } from "@/lib/kbhe/protocol";
+import { usePageVisible } from "@/hooks/use-page-visible";
 import {
   IconRefresh,
   IconPlayerPlay,
   IconPlayerStop,
-  IconAlertTriangle,
-  IconCheck,
 } from "@tabler/icons-react";
 
-// Check if shadcn Progress is available, fallback if not
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-      <div
-        className="h-full bg-primary transition-all"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-      />
-    </div>
-  );
+const MAX_TRAVEL_MM = 4.0;
+
+function heatmapColor(t: number): string {
+  const hue = 120 - Math.min(1, Math.max(0, t)) * 120;
+  return `hsl(${hue}, 80%, 45%)`;
 }
 
-function CalibrationStatusSection({ connected }: { connected: boolean }) {
-  const qc = useQueryClient();
+type GuidedState = "idle" | "running" | "success" | "error";
 
-  const calQ = useQuery({
-    queryKey: queryKeys.calibration.all(),
-    queryFn: () => kbheDevice.getCalibration(),
-    enabled: connected,
-  });
-
-  return (
-    <SectionCard
-      title="Calibration Status"
-      headerRight={
-        <Button
-          variant="outline" size="sm" className="h-7 gap-1.5"
-          disabled={!connected || calQ.isLoading}
-          onClick={() => void qc.invalidateQueries({ queryKey: queryKeys.calibration.all() })}
-        >
-          <IconRefresh className="size-3" />
-          Refresh
-        </Button>
-      }
-    >
-      {calQ.isLoading ? (
-        <div className="space-y-2">{[0,1].map(i=><Skeleton key={i} className="h-7 w-full"/>)}</div>
-      ) : !calQ.data ? (
-        <p className="text-sm text-muted-foreground">
-          {connected ? "Could not load calibration data." : "Connect device to view calibration."}
-        </p>
-      ) : (
-        <div className="flex flex-col divide-y">
-          <FormRow label="LUT Zero Value">
-            <Badge variant="outline" className="font-mono text-xs">
-              {calQ.data.lut_zero_value}
-            </Badge>
-          </FormRow>
-          <FormRow label="Key Zero Values" description="Min/max across all 82 keys">
-            <span className="text-xs text-muted-foreground font-mono">
-              {Math.min(...calQ.data.key_zero_values)} – {Math.max(...calQ.data.key_zero_values)}
-            </span>
-          </FormRow>
-          <FormRow label="Key Max Values" description="Min/max across all 82 keys">
-            <span className="text-xs text-muted-foreground font-mono">
-              {Math.min(...calQ.data.key_max_values)} – {Math.max(...calQ.data.key_max_values)}
-            </span>
-          </FormRow>
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-function GuidedCalibrationSection({ connected }: { connected: boolean }) {
-  const qc = useQueryClient();
-
-  const statusQ = useQuery({
-    queryKey: queryKeys.calibration.guidedStatus(),
-    queryFn: () => kbheDevice.guidedCalibrationStatus(),
-    enabled: connected,
-    refetchInterval: (query) => (query.state.data?.active ? 1000 : false),
-  });
-
-  const startMutation = useMutation({
-    mutationFn: () => kbheDevice.guidedCalibrationStart(),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.calibration.guidedStatus() }),
-  });
-
-  const abortMutation = useMutation({
-    mutationFn: () => kbheDevice.guidedCalibrationAbort(),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.calibration.guidedStatus() }),
-  });
-
-  const guided = statusQ.data;
-  const isActive = guided?.active ?? false;
-  const progress = guided?.progress_percent ?? 0;
-
-  const PHASE_LABELS: Record<number, string> = {
-    0: "Waiting to start",
-    1: "Release all keys",
-    2: "Press each key slowly",
-    3: "Finalizing…",
-    4: "Done",
-  };
-
-  return (
-    <SectionCard title="Guided Calibration" description="Step-by-step wizard to calibrate all keys">
-      {!connected ? (
-        <p className="text-sm text-muted-foreground">Connect device to use guided calibration.</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {isActive && (
-            <>
-              <div className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
-                <IconAlertTriangle className="size-4 mt-0.5 shrink-0 text-amber-500" />
-                <span>
-                  {PHASE_LABELS[guided?.phase ?? 0] ?? `Phase ${guided?.phase}`}
-                  {guided?.current_key != null && guided.current_key < 255 && (
-                    <span className="ml-2 text-muted-foreground">(Key {guided.current_key})</span>
-                  )}
-                </span>
-              </div>
-              <ProgressBar value={progress} />
-              <p className="text-xs text-muted-foreground text-right">{progress}%</p>
-            </>
-          )}
-          {!isActive && guided?.phase === 4 && (
-            <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
-              <IconCheck className="size-4 shrink-0" />
-              Calibration completed successfully.
-            </div>
-          )}
-          <div className="flex gap-2">
-            <Button
-              onClick={() => startMutation.mutate()}
-              disabled={isActive || startMutation.isPending}
-            >
-              <IconPlayerPlay className="size-4 mr-1" />
-              {isActive ? "Running…" : "Start Guided"}
-            </Button>
-            {isActive && (
-              <Button
-                variant="destructive"
-                onClick={() => abortMutation.mutate()}
-                disabled={abortMutation.isPending}
-              >
-                <IconPlayerStop className="size-4 mr-1" />
-                Abort
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-function ManualCalibrationSection({ connected }: { connected: boolean }) {
+export default function Calibration() {
   const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
-  const qc = useQueryClient();
+  const { status }   = useDeviceSession();
+  const connected    = status === "connected";
+  const visible      = usePageVisible();
+  const qc           = useQueryClient();
+
+  const [activeTab, setActiveTab] = useState("status");
+  const [guidedState, setGuidedState] = useState<GuidedState>("idle");
+  const [guidedProgress, setGuidedProgress] = useState(0);
 
   const focusedKeyId = selectedKeys[0] ?? null;
   const keyIndex = focusedKeyId?.startsWith("key-")
     ? parseInt(focusedKeyId.replace("key-", ""), 10) : null;
 
-  const autoCalMutation = useMutation({
-    mutationFn: (idx: number) => kbheDevice.autoCalibrate(idx),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.calibration.all() }),
+  const calibrationQ = useQuery({
+    queryKey: ["calibration", "all"],
+    queryFn: () => kbheDevice.getCalibration(),
+    enabled: connected,
+    staleTime: 30_000,
   });
 
-  return (
-    <SectionCard
-      title={keyIndex != null ? `Manual Calibration — Key ${keyIndex}` : "Manual Calibration"}
-      description={keyIndex == null ? "Select a key on the keyboard to calibrate it" : undefined}
-    >
-      {keyIndex == null ? (
-        <p className="text-sm text-muted-foreground py-2">Click a key above.</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <Button
-            variant="outline"
-            disabled={!connected || autoCalMutation.isPending}
-            onClick={() => autoCalMutation.mutate(keyIndex)}
-            className="w-fit"
-          >
-            {autoCalMutation.isPending ? "Calibrating…" : `Auto-calibrate Key ${keyIndex}`}
-          </Button>
-          {autoCalMutation.isSuccess && (
-            <p className="text-xs text-green-600">
-              <IconCheck className="inline size-3 mr-1" />
-              Key {keyIndex} calibrated.
-            </p>
-          )}
-        </div>
-      )}
-    </SectionCard>
+  const polling = connected && visible && activeTab === "status";
+
+  const keyStatesQ = useQuery({
+    queryKey: ["calibration", "keyStates"],
+    queryFn: () => kbheDevice.getKeyStates(),
+    enabled: polling,
+    refetchInterval: polling ? 150 : false,
+  });
+
+  const autoCalibrateMutation = useMutation({
+    mutationFn: (idx: number) => kbheDevice.autoCalibrate(idx),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["calibration"] }),
+  });
+
+  const guidedStart = useCallback(async () => {
+    if (!connected) return;
+    setGuidedState("running");
+    setGuidedProgress(0);
+    try {
+      await kbheDevice.guidedCalibrationStart();
+      const poll = async () => {
+        const st = await kbheDevice.guidedCalibrationStatus();
+        if (!st) return;
+        if (!st.active) {
+          setGuidedState("success");
+          setGuidedProgress(100);
+          void qc.invalidateQueries({ queryKey: ["calibration"] });
+        } else {
+          setGuidedProgress(st.progress_percent ?? 50);
+          setTimeout(() => void poll(), 200);
+        }
+      };
+      await poll();
+    } catch {
+      setGuidedState("error");
+    }
+  }, [connected, qc]);
+
+  const guidedAbort = useCallback(async () => {
+    try {
+      await kbheDevice.guidedCalibrationAbort();
+    } catch { /* ignore */ }
+    setGuidedState("idle");
+    setGuidedProgress(0);
+  }, []);
+
+  const distances = keyStatesQ.data?.distances_mm;
+
+  const keyColorMap = useMemo(() => {
+    if (!distances) return undefined;
+    const map: Record<string, string> = {};
+    for (let i = 0; i < KEY_COUNT; i++) {
+      const d = distances[i] ?? 0;
+      map[`key-${i}`] = heatmapColor(d / MAX_TRAVEL_MM);
+    }
+    return map;
+  }, [distances]);
+
+  const renderKeyOverlay = useCallback(
+    (keyId: string) => {
+      if (!distances) return undefined;
+      if (!keyId.startsWith("key-")) return undefined;
+      const idx = parseInt(keyId.replace("key-", ""), 10);
+      const distMm = distances[idx];
+      if (distMm === undefined) return undefined;
+      return (
+        <span className="text-[8px] font-mono text-white drop-shadow-[0_0_2px_rgba(0,0,0,.8)]">
+          {distMm.toFixed(1)}
+        </span>
+      );
+    },
+    [distances],
   );
-}
 
-export default function Calibration() {
-  const setSaveEnabled = useKeyboardStore((s) => s.setSaveEnabled);
-  const { status } = useDeviceSession();
-  const connected = status === "connected";
-
-  useEffect(() => { setSaveEnabled(true); return () => setSaveEnabled(false); }, [setSaveEnabled]);
+  const menubar = (
+    <>
+      <div className="flex items-center gap-2">
+        {polling && (
+          <Badge variant="secondary" className="gap-1 text-xs">
+            Live
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" className="h-8"
+          onClick={() => void qc.invalidateQueries({ queryKey: ["calibration"] })}>
+          <IconRefresh className="size-4" />
+          Reload
+        </Button>
+      </div>
+    </>
+  );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2">
-        <PageHeader title="Calibration" description="ADC zero/max calibration for all keys" />
-      </div>
-      <div className="flex-1 overflow-hidden min-h-0">
-        <Tabs defaultValue="status" className="flex flex-col h-full">
-          <div className="shrink-0 border-b px-4">
-            <TabsList className="h-9 mt-1">
-              <TabsTrigger value="status">Status</TabsTrigger>
-              <TabsTrigger value="manual">Manual</TabsTrigger>
-              <TabsTrigger value="guided">Guided</TabsTrigger>
-            </TabsList>
+    <KeyboardEditor
+      keyboard={
+        <BaseKeyboard
+          mode="single"
+          onButtonClick={() => {}}
+          showLayerSelector={false}
+          showRotary={false}
+          keyColorMap={keyColorMap}
+          renderKeyOverlay={connected ? renderKeyOverlay : undefined}
+        />
+      }
+      menubar={menubar}
+    >
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList>
+          <TabsTrigger value="status">Status</TabsTrigger>
+          <TabsTrigger value="manual">Manual</TabsTrigger>
+          <TabsTrigger value="guided">Guided</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="status" className="mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SectionCard title="Calibration Data">
+              {calibrationQ.isLoading ? (
+                <div className="space-y-2">{[0,1,2].map(i => <Skeleton key={i} className="h-6 w-full" />)}</div>
+              ) : calibrationQ.data ? (
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Keys calibrated</span>
+                    <span className="font-mono">{KEY_COUNT}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">LUT Reference</span>
+                    <span className="font-mono">{calibrationQ.data.lut_zero_value}</span>
+                  </div>
+                  {keyIndex != null && calibrationQ.data.key_zero_values[keyIndex] !== undefined && (
+                    <>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="text-muted-foreground">Key {keyIndex} Zero</span>
+                        <span className="font-mono">{calibrationQ.data.key_zero_values[keyIndex]}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Key {keyIndex} Max</span>
+                        <span className="font-mono">{calibrationQ.data.key_max_values[keyIndex]}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Connect device to view calibration.</p>
+              )}
+            </SectionCard>
+
+            <SectionCard title="Key Tester">
+              <KeyTester pressHeight="h-16" releaseHeight="h-20" />
+            </SectionCard>
           </div>
+        </TabsContent>
 
-          <TabsContent value="status" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-              <CalibrationStatusSection connected={connected} />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="manual" className="flex-1 overflow-hidden flex flex-col mt-0 min-h-0">
-            <div className="shrink-0 border-b px-4 py-4 overflow-x-auto bg-muted/20">
-              <BaseKeyboard mode="single" onButtonClick={() => {}} />
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-                <ManualCalibrationSection connected={connected} />
+        <TabsContent value="manual" className="mt-4">
+          <SectionCard title="Manual Calibration">
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-2">
+                <Button size="sm" disabled={!connected || keyIndex == null}
+                  onClick={() => keyIndex != null && autoCalibrateMutation.mutate(keyIndex)}>
+                  Auto Zero Key {keyIndex ?? "—"}
+                </Button>
+                <Button size="sm" variant="outline" disabled={!connected}
+                  onClick={() => autoCalibrateMutation.mutate(0xff)}>
+                  Auto Zero All
+                </Button>
               </div>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="guided" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-              <GuidedCalibrationSection connected={connected} />
+              {keyIndex != null && calibrationQ.data && (
+                <div className="flex flex-col gap-4 border-t pt-4">
+                  <div className="grid gap-2">
+                    <Label className="text-sm">Key {keyIndex} Zero</Label>
+                    <CommitSlider
+                      min={-32768} max={32767} step={1}
+                      value={calibrationQ.data.key_zero_values[keyIndex] ?? 0}
+                      onCommit={(v) => {
+                        if (!calibrationQ.data) return;
+                        const zeros = Array.from(calibrationQ.data.key_zero_values);
+                        zeros[keyIndex] = v;
+                        void kbheDevice.setCalibration(
+                          calibrationQ.data.lut_zero_value,
+                          zeros,
+                          calibrationQ.data.key_max_values,
+                        );
+                      }}
+                      disabled={!connected}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+          </SectionCard>
+        </TabsContent>
+
+        <TabsContent value="guided" className="mt-4">
+          <SectionCard title="Guided Calibration">
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Guided calibration will systematically calibrate all keys. Follow the on-screen instructions.
+                The keyboard LEDs will indicate which key to press.
+              </p>
+              <div className="flex gap-2">
+                {guidedState === "running" ? (
+                  <Button variant="destructive" size="sm" onClick={() => void guidedAbort()}>
+                    <IconPlayerStop className="size-4" />
+                    Abort
+                  </Button>
+                ) : (
+                  <Button size="sm" disabled={!connected} onClick={() => void guidedStart()}>
+                    <IconPlayerPlay className="size-4" />
+                    Start Guided Calibration
+                  </Button>
+                )}
+              </div>
+
+              {guidedState !== "idle" && (
+                <div className="flex flex-col gap-2">
+                  <Progress value={guidedProgress} className="h-2" />
+                  <span className="text-xs text-muted-foreground">
+                    {guidedState === "running" && `Calibrating... ${guidedProgress}%`}
+                    {guidedState === "success" && "Calibration complete!"}
+                    {guidedState === "error" && "Calibration failed."}
+                  </span>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+        </TabsContent>
+      </Tabs>
+    </KeyboardEditor>
   );
 }

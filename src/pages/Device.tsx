@@ -1,35 +1,38 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import { queryKeys } from "@/lib/query/keys";
-import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { PageHeader } from "@/components/shared/PageLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  IconRefresh,
+  IconPower,
+  IconDatabaseExport,
+  IconAlertTriangle,
+  IconRotateClockwise2,
+} from "@tabler/icons-react";
+import { useState } from "react";
 
 export default function Device() {
-  const { status, developerMode, setDeveloperMode } = useDeviceSession();
+  const { status, deviceInfo, firmwareVersion, setDeveloperMode, developerMode } = useDeviceSession();
   const connected = status === "connected";
   const qc = useQueryClient();
-  const { saveState, markSaving, markSaved, markError } = useAutosave();
-  const [rebootPending, setRebootPending] = useState(false);
-  const [resetPending, setResetPending] = useState(false);
 
-  const firmwareQ = useQuery({
-    queryKey: ["device", "firmware"],
-    queryFn: () => kbheDevice.getFirmwareVersion(),
-    enabled: connected,
-  });
+  const [resetOpen, setResetOpen] = useState(false);
+  const [bootloaderOpen, setBootloaderOpen] = useState(false);
 
   const optionsQ = useQuery({
     queryKey: queryKeys.device.options(),
@@ -37,287 +40,201 @@ export default function Device() {
     enabled: connected,
   });
 
-  const nkroQ = useQuery({
+  const nkroEnabledQ = useQuery({
     queryKey: queryKeys.device.nkroEnabled(),
     queryFn: () => kbheDevice.getNkroEnabled(),
     enabled: connected,
   });
 
-  const mcuQ = useQuery({
-    queryKey: queryKeys.device.mcuMetrics(),
-    queryFn: () => kbheDevice.getMcuMetrics(),
+  const ledEnabledQ = useQuery({
+    queryKey: queryKeys.led.enabled(),
+    queryFn: () => kbheDevice.ledGetEnabled(),
     enabled: connected,
-    refetchInterval: connected ? 2000 : false,
   });
 
-  const kbEnabledMut = useMutation({
-    mutationFn: async (v: boolean) => { markSaving(); await kbheDevice.setKeyboardEnabled(v); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.device.options() }); },
-    onError: markError,
+  const toggleMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
+      switch (key) {
+        case "keyboard": await kbheDevice.setKeyboardEnabled(value); break;
+        case "gamepad": await kbheDevice.setGamepadEnabled(value); break;
+        case "nkro": await kbheDevice.setNkroEnabled(value); break;
+        case "led": await kbheDevice.ledSetEnabled(value); break;
+      }
+    },
+    onSuccess: () => void qc.invalidateQueries(),
   });
 
-  const gpEnabledMut = useMutation({
-    mutationFn: async (v: boolean) => { markSaving(); await kbheDevice.setGamepadEnabled(v); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.device.options() }); },
-    onError: markError,
+  const saveMutation = useMutation({
+    mutationFn: () => kbheDevice.saveSettings(),
   });
 
-  const nkroMut = useMutation({
-    mutationFn: async (v: boolean) => { markSaving(); await kbheDevice.setNkroEnabled(v); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.device.nkroEnabled() }); },
-    onError: markError,
-  });
-
-  const saveMut = useMutation({
-    mutationFn: async () => { markSaving(); await kbheDevice.saveSettings(); },
-    onSuccess: markSaved,
-    onError: markError,
-  });
-
-  const rebootMut = useMutation({
+  const rebootMutation = useMutation({
     mutationFn: async () => {
-      setRebootPending(true);
       await kbheDevice.reboot();
+      await new Promise((r) => setTimeout(r, 2000));
+      await DeviceSessionManager.reconnect();
     },
-    onSuccess: () => { setRebootPending(false); void DeviceSessionManager.reconnect(); },
-    onError: () => setRebootPending(false),
   });
 
-  const bootloaderMut = useMutation({
-    mutationFn: () => kbheDevice.enterBootloader(),
-  });
-
-  const factoryResetMut = useMutation({
+  const factoryResetMutation = useMutation({
     mutationFn: async () => {
-      setResetPending(true);
       await kbheDevice.factoryReset();
+      await new Promise((r) => setTimeout(r, 3000));
+      await DeviceSessionManager.reconnect();
     },
-    onSuccess: () => { setResetPending(false); void qc.invalidateQueries(); },
-    onError: () => setResetPending(false),
   });
 
-  const opts = optionsQ.data;
+  const enterBootloaderMutation = useMutation({
+    mutationFn: async () => {
+      await kbheDevice.enterBootloader();
+      await new Promise((r) => setTimeout(r, 2000));
+      await DeviceSessionManager.reconnect();
+    },
+  });
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="shrink-0 border-b px-4 py-2 flex items-center justify-between gap-4">
-        <PageHeader title="Device" description="Firmware, options, and device management" />
-        <AutosaveStatus state={saveState} />
+        <PageHeader title="Device" description="Settings, options, and actions" />
       </div>
 
-      <div className="flex-1 overflow-hidden min-h-0">
-        <Tabs defaultValue="info" className="flex flex-col h-full">
-          <div className="shrink-0 border-b px-4">
-            <TabsList className="h-9 mt-1">
-              <TabsTrigger value="info">Info</TabsTrigger>
-              <TabsTrigger value="options">Options</TabsTrigger>
-              <TabsTrigger value="management">Management</TabsTrigger>
-            </TabsList>
-          </div>
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex flex-col gap-4 max-w-3xl mx-auto">
 
-          {/* Info tab */}
-          <TabsContent value="info" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-
-              <SectionCard title="Firmware">
-                <div className="flex flex-col divide-y">
-                  <FormRow label="Version">
-                    {firmwareQ.isLoading ? (
-                      <Skeleton className="h-5 w-32" />
-                    ) : (
-                      <Badge variant="secondary" className="font-mono text-xs">
-                        {firmwareQ.data ?? "—"}
-                      </Badge>
-                    )}
-                  </FormRow>
-                  <FormRow label="Connection Status">
-                    <Badge variant={connected ? "default" : "outline"}>
-                      {status}
-                    </Badge>
-                  </FormRow>
+          <SectionCard title="Connection">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Device:</span>
+                <span className="text-sm font-medium">{deviceInfo?.product ?? "Not connected"}</span>
+              </div>
+              {deviceInfo && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">VID:PID:</span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {deviceInfo.vid.toString(16).padStart(4, "0")}:{deviceInfo.pid.toString(16).padStart(4, "0")}
+                  </Badge>
                 </div>
-              </SectionCard>
-
-              <SectionCard title="MCU Metrics" description="Live device performance">
-                {mcuQ.isLoading ? (
-                  <div className="space-y-2">{[0,1,2,3].map(i => <Skeleton key={i} className="h-5 w-full" />)}</div>
-                ) : !mcuQ.data ? (
-                  <p className="text-sm text-muted-foreground">Connect device to view metrics.</p>
+              )}
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Firmware:</span>
+                {firmwareVersion ? (
+                  <Badge variant="secondary" className="font-mono">{firmwareVersion}</Badge>
                 ) : (
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Temperature</span>
-                      <span className="tabular-nums font-mono text-xs">
-                        {mcuQ.data.temperature_valid && mcuQ.data.temperature_c != null
-                          ? `${mcuQ.data.temperature_c.toFixed(1)} °C`
-                          : "—"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Vref</span>
-                      <span className="tabular-nums font-mono text-xs">{mcuQ.data.vref_mv} mV</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Core clock</span>
-                      <span className="tabular-nums font-mono text-xs">
-                        {(mcuQ.data.core_clock_hz / 1_000_000).toFixed(0)} MHz
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Scan rate</span>
-                      <span className="tabular-nums font-mono text-xs">
-                        {mcuQ.data.scan_rate_hz.toFixed(0)} Hz
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Scan cycle</span>
-                      <span className="tabular-nums font-mono text-xs">
-                        {mcuQ.data.scan_cycle_us} µs
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">CPU load</span>
-                      <span className="tabular-nums font-mono text-xs">
-                        {mcuQ.data.load_percent.toFixed(1)} %
-                      </span>
-                    </div>
-                  </div>
+                  <Skeleton className="h-5 w-16" />
                 )}
-              </SectionCard>
-
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <Badge variant={connected ? "default" : "secondary"}>{status}</Badge>
+              </div>
+              <Button variant="outline" size="sm" className="w-fit gap-1.5"
+                onClick={() => void DeviceSessionManager.reconnect()}>
+                <IconRefresh className="size-4" />
+                Reconnect
+              </Button>
             </div>
-          </TabsContent>
+          </SectionCard>
 
-          {/* Options tab */}
-          <TabsContent value="options" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-
-              <SectionCard title="HID Interfaces">
-                <div className="flex flex-col divide-y">
-                  <FormRow label="Keyboard Enabled" description="Send keyboard HID reports">
-                    {optionsQ.isLoading ? <Skeleton className="h-6 w-10" /> : (
-                      <Switch
-                        checked={opts?.keyboard_enabled ?? true}
-                        disabled={!connected}
-                        onCheckedChange={v => kbEnabledMut.mutate(v)}
-                      />
-                    )}
-                  </FormRow>
-                  <FormRow label="Gamepad Enabled" description="Send gamepad HID reports">
-                    {optionsQ.isLoading ? <Skeleton className="h-6 w-10" /> : (
-                      <Switch
-                        checked={opts?.gamepad_enabled ?? false}
-                        disabled={!connected}
-                        onCheckedChange={v => gpEnabledMut.mutate(v)}
-                      />
-                    )}
-                  </FormRow>
-                  <FormRow label="NKRO" description="N-key rollover (requires USB re-enumeration)">
-                    {nkroQ.isLoading ? <Skeleton className="h-6 w-10" /> : (
-                      <Switch
-                        checked={nkroQ.data ?? false}
-                        disabled={!connected}
-                        onCheckedChange={v => nkroMut.mutate(v)}
-                      />
-                    )}
-                  </FormRow>
-                </div>
-              </SectionCard>
-
-              <SectionCard title="Persist Settings" description="Write current configuration to flash">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    disabled={!connected || saveMut.isPending}
-                    onClick={() => saveMut.mutate()}
-                  >
-                    {saveMut.isPending ? "Saving…" : "Save to Flash"}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Settings are applied immediately but lost on reboot unless saved.
-                  </p>
-                </div>
-              </SectionCard>
-
+          <SectionCard title="Options">
+            <div className="flex flex-col divide-y">
+              <FormRow label="Keyboard Enabled">
+                <Switch checked={optionsQ.data?.keyboard_enabled ?? false} disabled={!connected}
+                  onCheckedChange={(v) => toggleMutation.mutate({ key: "keyboard", value: v })} />
+              </FormRow>
+              <FormRow label="Gamepad Enabled">
+                <Switch checked={optionsQ.data?.gamepad_enabled ?? false} disabled={!connected}
+                  onCheckedChange={(v) => toggleMutation.mutate({ key: "gamepad", value: v })} />
+              </FormRow>
+              <FormRow label="NKRO Enabled" description="N-Key Rollover for full anti-ghosting">
+                <Switch checked={nkroEnabledQ.data ?? false} disabled={!connected}
+                  onCheckedChange={(v) => toggleMutation.mutate({ key: "nkro", value: v })} />
+              </FormRow>
+              <FormRow label="LED Enabled">
+                <Switch checked={ledEnabledQ.data ?? false} disabled={!connected}
+                  onCheckedChange={(v) => toggleMutation.mutate({ key: "led", value: v })} />
+              </FormRow>
+              <FormRow label="Developer Mode" description="Enables Diagnostics page">
+                <Switch checked={developerMode}
+                  onCheckedChange={(v) => setDeveloperMode(v)} />
+              </FormRow>
             </div>
-          </TabsContent>
+          </SectionCard>
 
-          {/* Management tab */}
-          <TabsContent value="management" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+          <SectionCard title="Actions">
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5"
+                disabled={!connected || saveMutation.isPending}
+                onClick={() => saveMutation.mutate()}
+              >
+                <IconDatabaseExport className="size-4" />
+                Save to Flash
+              </Button>
 
-              <SectionCard title="Application">
-                <div className="flex flex-col divide-y">
-                  <FormRow
-                    label="Developer Mode"
-                    description="Shows the Diagnostics page in the sidebar and enables developer tools."
-                  >
-                    <Switch
-                      checked={developerMode}
-                      onCheckedChange={setDeveloperMode}
-                    />
-                  </FormRow>
-                </div>
-              </SectionCard>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={!connected || rebootMutation.isPending}
+                onClick={() => rebootMutation.mutate()}
+              >
+                <IconPower className="size-4" />
+                Restart Keyboard
+              </Button>
 
-              <SectionCard title="Reboot">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!connected || rebootPending}
-                    onClick={() => rebootMut.mutate()}
-                  >
-                    {rebootPending ? "Rebooting…" : "Reboot Device"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!connected || bootloaderMut.isPending}
-                    onClick={() => bootloaderMut.mutate()}
-                  >
+              <Dialog open={bootloaderOpen} onOpenChange={setBootloaderOpen}>
+                <DialogTrigger render={
+                  <Button variant="outline" size="sm" className="gap-1.5" disabled={!connected}>
+                    <IconRotateClockwise2 className="size-4" />
                     Enter Bootloader
                   </Button>
-                </div>
-              </SectionCard>
+                } />
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Enter Bootloader</DialogTitle>
+                    <DialogDescription>
+                      The keyboard will reboot into firmware update (DFU) mode. It will be unavailable until reflashed or rebooted.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setBootloaderOpen(false)}>Cancel</Button>
+                    <Button variant="destructive" onClick={() => { setBootloaderOpen(false); enterBootloaderMutation.mutate(); }}>
+                      Confirm
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
-              <SectionCard
-                title="Factory Reset"
-                description="Erase all settings and restore firmware defaults"
-              >
-                <AlertDialog>
-                  <AlertDialogTrigger
-                    render={
-                      <Button variant="destructive" size="sm" disabled={!connected || resetPending}>
-                        {resetPending ? "Resetting…" : "Factory Reset"}
-                      </Button>
-                    }
-                  />
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Factory Reset?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        All key settings, calibration, lighting, and gamepad configuration will be
-                        permanently erased and reset to firmware defaults. This cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => factoryResetMut.mutate()}
-                      >
-                        Reset
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </SectionCard>
-
+              <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+                <DialogTrigger render={
+                  <Button variant="destructive" size="sm" className="gap-1.5" disabled={!connected}>
+                    <IconAlertTriangle className="size-4" />
+                    Factory Reset
+                  </Button>
+                } />
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <IconAlertTriangle className="size-5 text-destructive" />
+                      Factory Reset
+                    </DialogTitle>
+                    <DialogDescription>
+                      This will erase ALL settings including calibration, keymaps, profiles, and gamepad configs. This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
+                    <Button variant="destructive" onClick={() => { setResetOpen(false); factoryResetMutation.mutate(); }}>
+                      Reset Everything
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-          </TabsContent>
-        </Tabs>
+          </SectionCard>
+        </div>
       </div>
     </div>
   );

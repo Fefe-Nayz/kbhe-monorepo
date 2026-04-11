@@ -1,5 +1,11 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { useId, useMemo } from "react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import type { KeyboardKey as KeyboardKeyModel } from "../types";
 import { LEGEND_POSITION_CLASSES, cn, getKeyGeometry, getKeySvgGeometry, safeColor } from "../utils";
 
@@ -18,16 +24,30 @@ interface KeyboardKeyProps {
     label: string;
     index: number;
   }) => ReactNode;
+  overrideColor?: string;
+  theme?: string;
 }
 
-function getLegendStyle(key: KeyboardKeyModel, index: number): CSSProperties {
-  const color = safeColor(key.textColor[index], key.defaultLegendColor);
+function isDefaultLegendColor(color: string | undefined): boolean {
+  if (!color) return true;
+  const c = color.trim().toLowerCase();
+  return c === "" || c === "#111827" || c === "#000000" || c === "#000";
+}
+
+function getLegendStyle(key: KeyboardKeyModel, index: number, theme?: string): CSSProperties {
+  const rawColor = key.textColor[index] || key.defaultLegendColor;
   const size = key.textSize[index] ?? key.defaultLegendSize;
 
-  return {
-    color,
+  const style: CSSProperties = {
     fontSize: `${Math.max(10, size * 4)}px`,
   };
+
+  if (theme === "modern" && isDefaultLegendColor(rawColor)) {
+    return style;
+  }
+
+  style.color = safeColor(rawColor, key.defaultLegendColor);
+  return style;
 }
 
 function isDefaultKeyColor(color: string): boolean {
@@ -45,6 +65,8 @@ export function KeyboardKey({
   showLegendSlots,
   onClick,
   renderLegend,
+  overrideColor,
+  theme,
 }: KeyboardKeyProps) {
   const reactId = useId().replace(/:/g, "");
   const geometry = getKeyGeometry(keyData);
@@ -52,7 +74,7 @@ export function KeyboardKey({
   const bounds = geometry.bounds;
   const rotationOriginX = (keyData.rotationX - bounds.x) * unit;
   const rotationOriginY = (keyData.rotationY - bounds.y) * unit;
-  const hasCustomColor = !isDefaultKeyColor(keyData.color);
+  const hasCustomColor = overrideColor != null || !isDefaultKeyColor(keyData.color);
 
   const wrapperStyle: CSSProperties = {
     left: (bounds.x - offsetX) * unit,
@@ -69,7 +91,7 @@ export function KeyboardKey({
     ["--kle-key-saturation" as string]: keyData.decal ? 0.25 : 1,
     ["--kle-gap" as string]: `${gap}px`,
     ["--kle-top-inset" as string]: `${shape.topInset}px`,
-    ["--kle-key-color" as string]: hasCustomColor ? keyData.color : undefined,
+    ["--kle-key-color" as string]: overrideColor ?? (hasCustomColor ? keyData.color : undefined),
   };
 
   const handleClick = (event: MouseEvent<HTMLButtonElement | HTMLDivElement>) => {
@@ -99,7 +121,7 @@ export function KeyboardKey({
       <span
         key={index}
         className={cn("kle-legend", LEGEND_POSITION_CLASSES[index])}
-        style={getLegendStyle(keyData, index)}
+        style={getLegendStyle(keyData, index, theme)}
       >
         {renderLegend ? renderLegend({ key: keyData, label, index }) : label}
       </span>
@@ -107,6 +129,10 @@ export function KeyboardKey({
   });
 
   const label = keyData.labels[4] || keyData.labels[0] || keyData.id;
+  const tooltipText = keyData.labels
+    .filter(Boolean)
+    .map((l) => l.replace(/\n/g, " ").trim())
+    .join(" / ");
   const clipId = `kle-top-clip-${reactId}`;
   const content = (
     <>
@@ -164,24 +190,37 @@ export function KeyboardKey({
     </>
   );
 
+  const keyElement = interactive ? (
+    <button
+      className={commonKeyClasses}
+      style={appearanceStyle}
+      onClick={handleClick}
+      type="button"
+      aria-label={label}
+      aria-pressed={selected || undefined}
+    >
+      {content}
+    </button>
+  ) : (
+    <div className={commonKeyClasses} style={appearanceStyle} onClick={handleClick} role="img" aria-label={label}>
+      {content}
+    </div>
+  );
+
+  if (!tooltipText) {
+    return <div className="kle-key-wrapper" style={wrapperStyle}>{keyElement}</div>;
+  }
+
   return (
     <div className="kle-key-wrapper" style={wrapperStyle}>
-      {interactive ? (
-        <button
-          className={commonKeyClasses}
-          style={appearanceStyle}
-          onClick={handleClick}
-          type="button"
-          aria-label={label}
-          aria-pressed={selected || undefined}
-        >
-          {content}
-        </button>
-      ) : (
-        <div className={commonKeyClasses} style={appearanceStyle} onClick={handleClick} role="img" aria-label={label}>
-          {content}
-        </div>
-      )}
+      <TooltipProvider delay={400}>
+        <Tooltip>
+          <TooltipTrigger render={keyElement} />
+          <TooltipContent side="top" sideOffset={6}>
+            {tooltipText}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }

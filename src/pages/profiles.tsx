@@ -1,44 +1,62 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useProfileStore } from "@/stores/profileStore";
 import { useKeyboardStore } from "@/stores/keyboard-store";
-import { PageLayout, PageHeader } from "@/components/shared/PageLayout";
-import { SectionCard } from "@/components/shared/SectionCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { IconPlus, IconTrash, IconCopy, IconCheck } from "@tabler/icons-react";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  IconPlus,
+  IconTrash,
+  IconCopy,
+  IconCheck,
+  IconDownload,
+  IconUpload,
+  IconDotsVertical,
+  IconRefresh,
+  IconPencil,
+} from "@tabler/icons-react";
+import { toast } from "sonner";
 
 export default function Profiles() {
   const profiles = useProfileStore((s) => s.profiles);
   const selectedProfile = useProfileStore((s) => s.selectedProfile);
   const save = useProfileStore((s) => s.save);
   const remove = useProfileStore((s) => s.remove);
+  const rename = useProfileStore((s) => s.rename);
   const duplicate = useProfileStore((s) => s.duplicate);
   const selectProfile = useProfileStore((s) => s.selectProfile);
   const init = useProfileStore((s) => s.init);
 
-  const [newName, setNewName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [copyFrom, setCopyFrom] = useState<string | null>(null);
   const [copyName, setCopyName] = useState("");
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [renameTo, setRenameTo] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const importRef = useRef<HTMLInputElement>(null);
+  const importTargetRef = useRef<string | null>(null);
 
   useEffect(() => {
     init();
     useKeyboardStore.getState().setSaveEnabled(true);
-    return () => {
-      useKeyboardStore.getState().setSaveEnabled(false);
-    };
+    return () => { useKeyboardStore.getState().setSaveEnabled(false); };
   }, [init]);
 
   const handleCreate = () => {
@@ -46,178 +64,313 @@ export default function Profiles() {
     if (!name || profiles.find((p) => p.name === name)) return;
     save(name);
     setNewName("");
+    setCreateOpen(false);
+    toast.success(`Profile "${name}" created`);
   };
 
-  const handleDuplicate = () => {
-    if (!copyFrom) return;
-    const name = copyName.trim();
-    if (!name || profiles.find((p) => p.name === name)) return;
-    duplicate(copyFrom, name);
-    setCopyFrom(null);
-    setCopyName("");
+  const handleExport = (profileName: string) => {
+    const profile = profiles.find((p) => p.name === profileName);
+    if (!profile) return;
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${profileName}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported "${profileName}"`);
   };
+
+  const handleImportClick = (profileName: string) => {
+    importTargetRef.current = profileName;
+    importRef.current?.click();
+  };
+
+  const handleImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const target = importTargetRef.current;
+    if (!file || !target) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result as string);
+        if (json.data) {
+          localStorage.setItem(`keyboard-profile:${target}`, JSON.stringify(json.data));
+        } else {
+          localStorage.setItem(`keyboard-profile:${target}`, JSON.stringify(json));
+        }
+        useProfileStore.getState().refresh();
+        toast.success(`Imported into "${target}"`);
+      } catch {
+        toast.error("Invalid JSON file");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }, []);
 
   return (
-    <PageLayout>
-      <PageHeader
-        title="Profiles"
-        description="Manage local keyboard configuration snapshots"
-      />
-
-      <SectionCard
-        title="Saved Profiles"
-        description="Profiles are stored locally. They snapshot your keymap layout."
-      >
-        <div className="flex flex-col gap-1">
-          {profiles.map((profile, i) => {
-            const isActive = selectedProfile?.name === profile.name;
-            return (
-              <div key={profile.name}>
-                {i > 0 && <Separator className="my-1" />}
-                <div className="flex items-center gap-3 py-1.5">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium truncate block">
-                      {profile.name}
-                    </span>
-                  </div>
-                  {isActive && (
-                    <Badge className="shrink-0">
-                      <IconCheck className="size-3 mr-1" />
-                      Active
-                    </Badge>
-                  )}
-                  <div className="flex items-center gap-1 shrink-0">
-                    {!isActive && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => selectProfile(profile.name)}
-                      >
-                        Load
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2"
-                      onClick={() => {
-                        setCopyFrom(profile.name);
-                        setCopyName(`${profile.name} copy`);
-                      }}
-                    >
-                      <IconCopy className="size-3.5" />
-                    </Button>
-                    {profile.name !== "default" && (
-                      <AlertDialog>
-                        <AlertDialogTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-destructive hover:text-destructive"
-                            >
-                              <IconTrash className="size-3.5" />
-                            </Button>
-                          }
-                        />
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete profile?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete &ldquo;{profile.name}&rdquo;. This cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground"
-                              onClick={() => remove(profile.name)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {profiles.length === 0 && (
-            <p className="text-sm text-muted-foreground py-2">
-              No profiles yet. Create one below.
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-lg font-semibold">Configure Profiles</h1>
+            <p className="text-sm text-muted-foreground">
+              Create, import, export, and switch between keyboard configuration snapshots.
             </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {profiles.map((profile) => {
+              const isActive = selectedProfile?.name === profile.name;
+              return (
+                <div
+                  key={profile.name}
+                  className="group rounded-lg border bg-card p-4 shadow-sm flex flex-col gap-3 transition-colors hover:border-primary/30"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-sm font-medium truncate">{profile.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {profile.data ? "Custom layout" : "Default layout"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isActive && (
+                        <Badge className="gap-1 text-[10px]">
+                          <IconCheck className="size-3" />
+                          Active
+                        </Badge>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger render={
+                          <Button variant="ghost" size="icon" className="size-7 transition-opacity">
+                            <IconDotsVertical className="size-4" />
+                            <span className="sr-only">Profile actions</span>
+                          </Button>
+                        } />
+                        <DropdownMenuContent align="end">
+                          {!isActive && (
+                            <DropdownMenuItem onClick={() => selectProfile(profile.name)}>
+                              <IconCheck className="size-4" />
+                              Load
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => {
+                            setCopyFrom(profile.name);
+                            setCopyName(`${profile.name} copy`);
+                          }}>
+                            <IconCopy className="size-4" />
+                            Duplicate
+                          </DropdownMenuItem>
+                          {profile.name !== "default" && (
+                            <DropdownMenuItem onClick={() => {
+                              setRenameTarget(profile.name);
+                              setRenameTo(profile.name);
+                            }}>
+                              <IconPencil className="size-4" />
+                              Rename
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleExport(profile.name)}>
+                            <IconDownload className="size-4" />
+                            Export JSON
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleImportClick(profile.name)}>
+                            <IconUpload className="size-4" />
+                            Import JSON
+                          </DropdownMenuItem>
+                          {profile.name !== "default" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteTarget(profile.name)}
+                              >
+                                <IconTrash className="size-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  {!isActive && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-7 text-xs gap-1"
+                      onClick={() => selectProfile(profile.name)}
+                    >
+                      <IconRefresh className="size-3" />
+                      Load Profile
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => { setNewName(""); setCreateOpen(true); }}
+              className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors min-h-22 cursor-pointer"
+            >
+              <IconPlus className="size-5" />
+              <span className="text-xs font-medium">New Profile</span>
+            </button>
+          </div>
+
+          {profiles.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              No profiles yet. Create one to get started.
+            </div>
           )}
         </div>
-      </SectionCard>
+      </div>
 
-      <SectionCard
-        title="New Profile"
-        description="Creates a blank profile with the default layout."
-      >
-        <div className="flex gap-2">
+      <input
+        ref={importRef}
+        type="file"
+        accept="application/json"
+        onChange={handleImportFile}
+        className="hidden"
+        aria-hidden="true"
+      />
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Profile</DialogTitle>
+            <DialogDescription>
+              Give your new profile a name. It will start with the default layout.
+            </DialogDescription>
+          </DialogHeader>
           <Input
             placeholder="Profile name…"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            className="flex-1"
+            autoFocus
           />
-          <Button
-            onClick={handleCreate}
-            disabled={
-              !newName.trim() ||
-              !!profiles.find((p) => p.name === newName.trim())
-            }
-          >
-            <IconPlus className="size-4 mr-1" />
-            Create
-          </Button>
-        </div>
-        {newName.trim() && profiles.find((p) => p.name === newName.trim()) && (
-          <p className="text-xs text-destructive mt-2">
-            A profile with this name already exists.
-          </p>
-        )}
-      </SectionCard>
-
-      {copyFrom && (
-        <SectionCard
-          title={`Duplicate "${copyFrom}"`}
-          headerRight={
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button
-              variant="ghost"
-              size="sm"
-              className="h-7"
-              onClick={() => setCopyFrom(null)}
+              onClick={handleCreate}
+              disabled={!newName.trim() || !!profiles.find((p) => p.name === newName.trim())}
             >
-              Cancel
+              <IconPlus className="size-4 mr-1" />
+              Create
             </Button>
-          }
-        >
-          <div className="flex gap-2">
-            <Input
-              placeholder="New profile name…"
-              value={copyName}
-              onChange={(e) => setCopyName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleDuplicate()}
-              className="flex-1"
-            />
-            <Button
-              onClick={handleDuplicate}
-              disabled={
-                !copyName.trim() ||
-                !!profiles.find((p) => p.name === copyName.trim())
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete profile?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete &ldquo;{deleteTarget}&rdquo;. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => {
+              if (deleteTarget) {
+                remove(deleteTarget);
+                toast.success(`Deleted "${deleteTarget}"`);
               }
+              setDeleteTarget(null);
+            }}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!copyFrom} onOpenChange={() => setCopyFrom(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duplicate &ldquo;{copyFrom}&rdquo;</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="New profile name…"
+            value={copyName}
+            onChange={(e) => setCopyName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && copyFrom && copyName.trim()) {
+                duplicate(copyFrom, copyName.trim());
+                toast.success(`Duplicated to "${copyName.trim()}"`);
+                setCopyFrom(null);
+              }
+            }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCopyFrom(null)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (copyFrom && copyName.trim()) {
+                  duplicate(copyFrom, copyName.trim());
+                  toast.success(`Duplicated to "${copyName.trim()}"`);
+                  setCopyFrom(null);
+                }
+              }}
+              disabled={!copyName.trim() || !!profiles.find((p) => p.name === copyName.trim())}
             >
               <IconCopy className="size-4 mr-1" />
               Duplicate
             </Button>
-          </div>
-        </SectionCard>
-      )}
-    </PageLayout>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!renameTarget} onOpenChange={() => setRenameTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename &ldquo;{renameTarget}&rdquo;</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this profile.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="New name…"
+            value={renameTo}
+            onChange={(e) => setRenameTo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && renameTarget && renameTo.trim() && renameTo.trim() !== renameTarget && !profiles.find((p) => p.name === renameTo.trim())) {
+                rename(renameTarget, renameTo.trim());
+                toast.success(`Renamed to "${renameTo.trim()}"`);
+                setRenameTarget(null);
+              }
+            }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTarget(null)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (renameTarget && renameTo.trim()) {
+                  rename(renameTarget, renameTo.trim());
+                  toast.success(`Renamed to "${renameTo.trim()}"`);
+                  setRenameTarget(null);
+                }
+              }}
+              disabled={
+                !renameTo.trim() ||
+                renameTo.trim() === renameTarget ||
+                !!profiles.find((p) => p.name === renameTo.trim())
+              }
+            >
+              <IconPencil className="size-4 mr-1" />
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
