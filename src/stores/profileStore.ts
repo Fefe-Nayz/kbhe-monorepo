@@ -1,6 +1,6 @@
 import { create } from "zustand"
-import { useKeyboardStore ,type KeyboardState } from "./keyboard-store"
-import { defaultLayout } from "@/constants/defaultLayout"
+import { useKeyboardStore, type KeyboardState } from "./keyboard-store"
+import { cloneDefaultLayout, normalizeKeyboardLayout } from "@/constants/defaultLayout"
 
 const STORAGE_PREFIX = "keyboard-profile:"
 
@@ -83,6 +83,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
       try {
         const data: KeyboardState = JSON.parse(raw)
+        data.layout = normalizeKeyboardLayout(data.layout)
+        data.currentLayer = data.currentLayer ?? 0
 
         profiles.push({
           name: key.replace(STORAGE_PREFIX, ""),
@@ -104,13 +106,14 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
     // When a new profile is created, initialize it with the default layout
     if (!get().profiles.find(p => p.name === name)) {
-      state = { ...state, layout: defaultLayout }
+      state = { ...state, layout: cloneDefaultLayout() }
     }
 
     const dataToSave = {
       layout: state.layout,
       mode: state.mode,
       displayedInfo: state.displayedInfo,
+      currentLayer: state.currentLayer,
     }
     localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(dataToSave))
     get().refresh()
@@ -159,7 +162,10 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   set({ selectedProfile: profile })
 
   // apply to keyboard store
-  useKeyboardStore.setState({layout: profile.data.layout,})
+  useKeyboardStore.setState({
+    layout: normalizeKeyboardLayout(profile.data.layout),
+    currentLayer: profile.data.currentLayer ?? 0,
+  })
 
   localStorage.setItem(ACTIVE_PROFILE, name)
 },
@@ -180,6 +186,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     layout: data.layout,
     mode: data.mode,
     displayedInfo: data.displayedInfo,
+    currentLayer: data.currentLayer,
   }
 
   localStorage.setItem(
