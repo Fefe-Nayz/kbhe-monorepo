@@ -29,7 +29,6 @@ from ..widgets import (
     KeyboardLayoutWidget,
     SectionCard,
     StatusChip,
-    make_primary_button,
     make_secondary_button,
 )
 
@@ -513,16 +512,14 @@ class KeyboardPage(QWidget):
         btn_row.setSpacing(8)
 
         self.load_btn  = make_secondary_button("Load",         self.load_selected_key_settings)
-        self.apply_btn = make_primary_button("Apply",          self._apply_now)
         self.all_btn   = make_secondary_button("Apply to All", self.apply_to_all_keys)
 
         btn_row.addWidget(self.load_btn)
-        btn_row.addWidget(self.apply_btn)
         btn_row.addWidget(self.all_btn)
         btn_row.addStretch(1)
         bl.addLayout(btn_row)
 
-        hint = QLabel("Live changes are sent immediately. Use Save to Flash (top bar) to persist them.")
+        hint = QLabel("Per-key changes are applied live and autosaved after a short idle. `Apply to All` stays explicit because it is a batch operation.")
         hint.setObjectName("Muted")
         hint.setWordWrap(True)
         bl.addWidget(hint)
@@ -882,14 +879,14 @@ class KeyboardPage(QWidget):
                 ok = device.set_key_settings_extended(idx, self._build_payload())
                 tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
                 if ok and tick_ok:
-                    self._set_status(f"Applied {key_display_name(idx)} live.", "ok")
+                    self._set_status(f"Updated {key_display_name(idx)} live.", "ok")
                 elif ok:
                     self._set_status(
-                        f"Applied {key_display_name(idx)} live, but tick rate update failed.",
+                        f"Updated {key_display_name(idx)} live, but tick rate update failed.",
                         "warn",
                     )
                 else:
-                    self._set_status(f"Apply failed for {key_display_name(idx)}.", "bad")
+                    self._set_status(f"Live update failed for {key_display_name(idx)}.", "bad")
             else:
                 ok = device.set_layer_keycode(
                     layer,
@@ -898,16 +895,16 @@ class KeyboardPage(QWidget):
                 )
                 if ok:
                     self._set_status(
-                        f"Applied {LAYER_NAMES.get(layer, f'Layer {layer}')} for {key_display_name(idx)}.",
+                        f"Updated {LAYER_NAMES.get(layer, f'Layer {layer}')} for {key_display_name(idx)} live.",
                         "ok",
                     )
                 else:
                     self._set_status(
-                        f"Layer apply failed for {key_display_name(idx)}.",
+                        f"Layer live update failed for {key_display_name(idx)}.",
                         "bad",
                     )
         except Exception as exc:
-            self._set_status(f"Apply error: {exc}", "bad")
+            self._set_status(f"Live update error: {exc}", "bad")
 
     def apply_key_settings(self) -> None:
         self._apply_now()

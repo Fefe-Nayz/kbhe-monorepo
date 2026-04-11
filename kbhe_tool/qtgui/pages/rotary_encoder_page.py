@@ -295,7 +295,7 @@ class RotaryEncoderPage(QWidget):
             if self.device.set_rotary_encoder_settings(self._current_settings()):
                 self._sync_hints()
                 self._set_status(
-                    "Rotary encoder settings applied live. Save to Flash to persist them.",
+                "Rotary encoder settings applied live and will autosave after a short idle.",
                     "success",
                 )
             else:

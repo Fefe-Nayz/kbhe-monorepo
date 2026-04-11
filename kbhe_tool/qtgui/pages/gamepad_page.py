@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import math
 
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -36,7 +36,6 @@ from ..widgets import (
     SectionCard,
     StatusChip,
     SubCard,
-    make_primary_button,
     make_secondary_button,
 )
 
@@ -310,6 +309,18 @@ class GamepadPage(QWidget):
         self._curve_points = _default_curve_points()
         self._loaded_api_mode = int(GAMEPAD_API_MODES["HID (DirectInput)"])
         self._mapping_cache = [self._empty_mapping() for _ in range(KEY_COUNT)]
+        self._global_apply_timer = QTimer(self)
+        self._global_apply_timer.setSingleShot(True)
+        self._global_apply_timer.setInterval(180)
+        self._global_apply_timer.timeout.connect(
+            lambda: self.apply_gamepad_settings(announce=False)
+        )
+        self._mapping_apply_timer = QTimer(self)
+        self._mapping_apply_timer.setSingleShot(True)
+        self._mapping_apply_timer.setInterval(140)
+        self._mapping_apply_timer.timeout.connect(
+            lambda: self.apply_focused_mapping(announce=False)
+        )
         try:
             self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
         except Exception:
@@ -388,6 +399,7 @@ class GamepadPage(QWidget):
         self.api_mode_combo = QComboBox()
         for label, value in GAMEPAD_API_MODES.items():
             self.api_mode_combo.addItem(label, value)
+        self.api_mode_combo.currentIndexChanged.connect(self._on_global_setting_changed)
         api_row.addWidget(self.api_mode_combo)
         api_row.addStretch(1)
         tuning.layout.addLayout(api_row)
@@ -396,6 +408,10 @@ class GamepadPage(QWidget):
         self.replace_mapped_check = QCheckBox("Mapped keys replace keyboard output")
         self.square_check = QCheckBox("Square stick")
         self.reactive_check = QCheckBox("Reactive stick")
+        self.keep_keyboard_check.toggled.connect(self._on_global_setting_changed)
+        self.replace_mapped_check.toggled.connect(self._on_global_setting_changed)
+        self.square_check.toggled.connect(self._on_global_setting_changed)
+        self.reactive_check.toggled.connect(self._on_global_setting_changed)
         tuning.layout.addWidget(self.keep_keyboard_check)
         tuning.layout.addWidget(self.replace_mapped_check)
         tuning.layout.addWidget(self.square_check)
@@ -404,6 +420,7 @@ class GamepadPage(QWidget):
         hint = QLabel(
             "The first curve point X position is the only start deadzone control now. "
             "If keyboard output is kept on, you can still suppress it only on mapped keys. "
+            "Normal changes apply live and autosave after a short idle. "
             "Switching API restarts the USB gamepad interface automatically, though some games may still need to be reopened."
         )
         hint.setObjectName("Muted")
@@ -458,7 +475,6 @@ class GamepadPage(QWidget):
         actions = QHBoxLayout()
         actions.setSpacing(8)
         actions.addWidget(make_secondary_button("Reload Global", self.load_global_settings))
-        actions.addWidget(make_primary_button("Apply Global Settings", self.apply_gamepad_settings))
         actions.addStretch(1)
         card.body_layout.addLayout(actions)
         card.body_layout.addStretch(1)
@@ -483,6 +499,7 @@ class GamepadPage(QWidget):
         preview_shell = SubCard()
         preview_shell.layout.setSpacing(12)
         preview_shell.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        preview_shell.setMaximumWidth(380)
         self.preview_widget = StickPreview()
         self.preview_widget.setFixedSize(292, 292)
         self.preview_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -493,6 +510,7 @@ class GamepadPage(QWidget):
         preview_hint.setObjectName("Muted")
         preview_hint.setWordWrap(True)
         preview_hint.setAlignment(Qt.AlignCenter)
+        preview_hint.setMaximumWidth(320)
         preview_shell.layout.addWidget(preview_hint, 0, Qt.AlignCenter)
         card.body_layout.addWidget(preview_shell, 0, Qt.AlignTop)
 
@@ -523,7 +541,7 @@ class GamepadPage(QWidget):
     def _build_focus_mapping_card(self) -> SectionCard:
         card = SectionCard(
             "Focused Key Mapping",
-            "The 82-key layout is the primary selector. Click a keycap to edit the focused key directly.",
+            "The 82-key layout is the primary selector. Click a keycap to edit the focused key directly; mapping changes apply live after a short debounce.",
         )
 
         top = QHBoxLayout()
@@ -541,7 +559,7 @@ class GamepadPage(QWidget):
         card.body_layout.addLayout(body)
 
         left_panel = QWidget()
-        left_panel.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
+        left_panel.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         left = QVBoxLayout(left_panel)
         left.setContentsMargins(0, 0, 0, 0)
         left.setSpacing(10)
@@ -555,9 +573,9 @@ class GamepadPage(QWidget):
         )
         layout_hint.setObjectName("Muted")
         layout_hint.setWordWrap(True)
-        layout_hint.setMaximumWidth(self.preview_layout.maximumWidth())
+        layout_hint.setMaximumWidth(self.preview_layout.sizeHint().width())
         layout_hint.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-        left.addWidget(layout_hint)
+        left.addWidget(layout_hint, 0, Qt.AlignTop | Qt.AlignLeft)
 
         right = QVBoxLayout()
         right.setSpacing(10)
@@ -648,7 +666,6 @@ class GamepadPage(QWidget):
         actions = QHBoxLayout()
         actions.setSpacing(8)
         actions.addWidget(make_secondary_button("Load Focused Mapping", self.load_focused_mapping))
-        actions.addWidget(make_primary_button("Apply Focused Mapping", self.apply_focused_mapping))
         actions.addStretch(1)
         right.addLayout(actions)
         right.addStretch(1)
@@ -735,6 +752,7 @@ class GamepadPage(QWidget):
         self._curve_points = _sanitize_curve_points(points)
         self._sync_curve_spinboxes()
         self._update_curve_deadzone_label()
+        self._schedule_global_apply()
 
     def _on_curve_spin_changed(self) -> None:
         if self._loading:
@@ -745,6 +763,7 @@ class GamepadPage(QWidget):
         self._curve_points = _sanitize_curve_points(points)
         self._sync_curve_spinboxes()
         self._update_curve_deadzone_label()
+        self._schedule_global_apply()
 
     def _refresh_mapping_summary(self, row: int) -> None:
         summary = self._mapping_summary(self._mapping_for_key(row))
@@ -754,9 +773,14 @@ class GamepadPage(QWidget):
 
     def _sync_focused_mapping_from_cache(self) -> None:
         mapping = self._mapping_for_key(self._current_key)
-        self.focus_axis_combo.setCurrentIndex(max(0, self.focus_axis_combo.findData(int(mapping.get("axis", 0)))))
-        self.focus_direction_combo.setCurrentIndex(max(0, self.focus_direction_combo.findData(int(mapping.get("direction", 0)))))
-        self.focus_button_combo.setCurrentIndex(max(0, self.focus_button_combo.findData(int(mapping.get("button", 0)))))
+        previous_loading = self._loading
+        self._loading = True
+        try:
+            self.focus_axis_combo.setCurrentIndex(max(0, self.focus_axis_combo.findData(int(mapping.get("axis", 0)))))
+            self.focus_direction_combo.setCurrentIndex(max(0, self.focus_direction_combo.findData(int(mapping.get("direction", 0)))))
+            self.focus_button_combo.setCurrentIndex(max(0, self.focus_button_combo.findData(int(mapping.get("button", 0)))))
+        finally:
+            self._loading = previous_loading
         summary = self._mapping_summary(mapping)
         self.focus_mapping_summary.set_text_and_level(summary, "neutral")
         self.focus_mapping_live_labels["mapping"].setText(summary)
@@ -776,6 +800,18 @@ class GamepadPage(QWidget):
         if self._loading:
             return
         self._copy_focused_mapping_to_cache()
+        self._mapping_apply_timer.start()
+
+    def _on_global_setting_changed(self) -> None:
+        if self._loading:
+            return
+        self._update_curve_deadzone_label()
+        self._schedule_global_apply()
+
+    def _schedule_global_apply(self) -> None:
+        if self._loading:
+            return
+        self._global_apply_timer.start()
 
     def _current_keyboard_routing(self) -> int:
         if not self.keep_keyboard_check.isChecked():
@@ -844,7 +880,7 @@ class GamepadPage(QWidget):
         self._update_curve_deadzone_label()
         self._update_status("Global gamepad settings loaded.", "success")
 
-    def apply_gamepad_settings(self) -> None:
+    def apply_gamepad_settings(self, announce: bool = True) -> None:
         api_mode = int(self.api_mode_combo.currentData())
         api_changed = api_mode != self._loaded_api_mode
         payload = {
@@ -873,7 +909,7 @@ class GamepadPage(QWidget):
             except Exception:
                 pass
             self._update_status("Gamepad API switched and the USB interface was restarted automatically.", "success")
-        else:
+        elif announce:
             self._update_status("Gamepad settings applied live.", "success")
 
     def load_gamepad_mapping(self) -> None:
@@ -912,7 +948,7 @@ class GamepadPage(QWidget):
         self._sync_focused_mapping_from_cache()
         self._update_status(f"Loaded focused mapping for {key_display_name(row)}.", "success")
 
-    def apply_focused_mapping(self) -> None:
+    def apply_focused_mapping(self, announce: bool = True) -> None:
         row = self._current_key
         try:
             ok = self.device.set_key_gamepad_map(
@@ -927,7 +963,8 @@ class GamepadPage(QWidget):
             self._update_status(f"Focused mapping apply failed: {exc}", "error")
             return
         self._copy_focused_mapping_to_cache()
-        self._update_status(f"Applied mapping for {key_display_name(row)}.", "success")
+        if announce:
+            self._update_status(f"Applied mapping for {key_display_name(row)}.", "success")
 
     def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
         if enabled:
@@ -1007,3 +1044,5 @@ class GamepadPage(QWidget):
 
     def on_page_deactivated(self) -> None:
         self._page_active = False
+        self._global_apply_timer.stop()
+        self._mapping_apply_timer.stop()

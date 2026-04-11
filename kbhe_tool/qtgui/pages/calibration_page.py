@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QScatterSeries, QValueAxis
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
@@ -66,6 +66,12 @@ class CalibrationPage(QWidget):
         self._loading = False
         self._guided_active = False
         self._last_guided_phase: int | None = None
+        self._manual_apply_timer = QTimer(self)
+        self._manual_apply_timer.setSingleShot(True)
+        self._manual_apply_timer.setInterval(180)
+        self._manual_apply_timer.timeout.connect(
+            lambda: self.apply_manual_calibration(announce=False)
+        )
 
         try:
             self.session.liveSettingsChanged.connect(self._on_live_settings_changed)
@@ -89,6 +95,7 @@ class CalibrationPage(QWidget):
         scaffold = PageScaffold(
             "Calibration",
             "Calibre le zero au repos et la course max par touche. "
+            "Les edits manuels s'appliquent en live et s'autosauvent apres un court idle. "
             "La forme de reponse analogique gamepad est maintenant geree depuis la page Gamepad.",
         )
         root.addWidget(scaffold, 1)
@@ -138,7 +145,8 @@ class CalibrationPage(QWidget):
         card = SectionCard(
             "Manual Zero / Max",
             "Edite les valeurs de repos et de pression max de la touche focalisee. "
-            "Ces donnees pilotent les graphes en % et les effets distance.",
+            "Ces donnees pilotent les graphes en % et les effets distance. "
+            "Les edits manuels s'appliquent en live; les actions Auto Zero et Guided restent explicites.",
         )
 
         grid = QGridLayout()
@@ -150,9 +158,7 @@ class CalibrationPage(QWidget):
         lut_lbl.setObjectName("Muted")
         self.lut_zero_spin = QSpinBox()
         self.lut_zero_spin.setRange(-32768, 32767)
-        self.lut_zero_spin.valueChanged.connect(
-            lambda _=None: (not self._loading) and self._refresh_layout_overview()
-        )
+        self.lut_zero_spin.valueChanged.connect(self._on_lut_zero_changed)
         grid.addWidget(lut_lbl, 0, 0)
         grid.addWidget(self.lut_zero_spin, 0, 1)
 
@@ -185,7 +191,6 @@ class CalibrationPage(QWidget):
         actions.addWidget(make_secondary_button("Reload Values", self.load_calibration))
         actions.addWidget(make_secondary_button("Auto Zero Focused", self.auto_calibrate_selected_key))
         actions.addWidget(make_secondary_button("Auto Zero All", self.auto_calibrate_all))
-        actions.addWidget(make_primary_button("Apply Manual Values", self.apply_manual_calibration))
         actions.addStretch(1)
         card.body_layout.addLayout(actions)
         return card
@@ -401,12 +406,25 @@ class CalibrationPage(QWidget):
             return
         self._key_zero_values[self._current_key] = int(value)
         self._refresh_layout_overview()
+        self._schedule_manual_apply()
 
     def _on_key_max_changed(self, value: int) -> None:
         if self._loading:
             return
         self._key_max_values[self._current_key] = int(value)
         self._refresh_layout_overview()
+        self._schedule_manual_apply()
+
+    def _on_lut_zero_changed(self, _value: int) -> None:
+        if self._loading:
+            return
+        self._refresh_layout_overview()
+        self._schedule_manual_apply()
+
+    def _schedule_manual_apply(self) -> None:
+        if self._loading:
+            return
+        self._manual_apply_timer.start()
 
     @staticmethod
     def _bezier_point(
@@ -611,6 +629,7 @@ class CalibrationPage(QWidget):
             self._update_status(f"Failed to load calibration: {exc}", "error")
             return
 
+        self._manual_apply_timer.stop()
         key_zero_values = list(calibration.get("key_zero_values") or [0] * KEY_COUNT)
         key_max_values = list(calibration.get("key_max_values") or [4095] * KEY_COUNT)
         if len(key_zero_values) < KEY_COUNT:
@@ -629,7 +648,7 @@ class CalibrationPage(QWidget):
         self._refresh_layout_overview()
         self._update_status("Calibration values loaded.", "success")
 
-    def apply_manual_calibration(self) -> None:
+    def apply_manual_calibration(self, announce: bool = True) -> None:
         lut_zero = int(self.lut_zero_spin.value())
         self._key_zero_values[self._current_key] = int(self.key_zero_spin.value())
         self._key_max_values[self._current_key] = int(self.key_max_spin.value())
@@ -640,10 +659,11 @@ class CalibrationPage(QWidget):
             self._update_status(f"Error applying calibration: {exc}", "error")
             return
         self._refresh_layout_overview()
-        self._update_status(
-            f"Manual zero/max calibration applied for {key_display_name(self._current_key)}.",
-            "success",
-        )
+        if announce:
+            self._update_status(
+                f"Manual zero/max calibration updated live for {key_display_name(self._current_key)}.",
+                "success",
+            )
 
     def auto_calibrate_selected_key(self) -> None:
         try:
@@ -815,4 +835,4 @@ class CalibrationPage(QWidget):
         self._poll_guided_status()
 
     def on_page_deactivated(self) -> None:
-        pass
+        self._manual_apply_timer.stop()

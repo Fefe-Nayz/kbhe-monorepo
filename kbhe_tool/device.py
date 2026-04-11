@@ -327,8 +327,8 @@ class KBHEDevice:
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def save_settings(self):
-        """Save settings to flash. Uses longer timeout for flash erase operation."""
-        # Flash erase for 128KB sector can take up to 2 seconds on STM32F7
+        """Force an immediate settings flush to flash."""
+        # Consolidation can still erase the sector when the append log is full.
         resp = self.send_command(Command.SAVE_SETTINGS, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     

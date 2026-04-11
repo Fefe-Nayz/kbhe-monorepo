@@ -581,6 +581,19 @@ bool settings_reset(void);
 bool settings_save(void);
 
 /**
+ * @brief Service deferred autosave work.
+ * Call periodically from the main loop.
+ * @param now_ms Current HAL tick in milliseconds
+ */
+void settings_task(uint32_t now_ms);
+
+/**
+ * @brief Check if there are unsaved settings changes pending autosave.
+ * @return true when a deferred save is pending
+ */
+bool settings_has_unsaved_changes(void);
+
+/**
  * @brief Get firmware version
  * @return Firmware version number
  */

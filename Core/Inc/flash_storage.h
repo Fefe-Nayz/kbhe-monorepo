@@ -1,6 +1,6 @@
 /*
  * flash_storage.h
- * Flash storage driver for STM32F723 EEPROM emulation
+ * Flash storage driver for STM32F723 settings persistence
  */
 
 #ifndef FLASH_STORAGE_H_
@@ -60,10 +60,12 @@ bool flash_storage_erase(void);
 bool flash_storage_read(uint32_t offset, void *buf, uint32_t len);
 
 /**
- * @brief Write data to flash storage (word aligned)
- * @param offset Offset from base address (must be word-aligned)
+ * @brief Append a new storage snapshot.
+ *        Reads always target the latest snapshot; legacy raw settings blobs
+ *        are still readable for migration on the first boot after upgrade.
+ * @param offset Must be 0 for snapshot writes
  * @param buf Buffer to write from
- * @param len Length in bytes (must be multiple of 4)
+ * @param len Length in bytes
  * @return true if successful, false otherwise
  */
 bool flash_storage_write(uint32_t offset, const void *buf, uint32_t len);

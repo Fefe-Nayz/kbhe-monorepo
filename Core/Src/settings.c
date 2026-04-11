@@ -48,6 +48,11 @@ static settings_t current_settings;
 
 // Flag indicating if settings have been modified
 static bool settings_dirty = false;
+static uint32_t settings_change_counter = 0u;
+static uint32_t settings_last_seen_change_counter = 0u;
+static uint32_t settings_last_change_ms = 0u;
+
+#define SETTINGS_AUTOSAVE_DELAY_MS 750u
 
 static uint8_t led_effect_restore_mode = LED_EFFECT_STATIC_MATRIX;
 static bool led_effect_restore_valid = false;
@@ -715,6 +720,11 @@ static void settings_default_effect_params(uint8_t effect_mode,
   }
 }
 
+static void settings_mark_dirty(void) {
+  settings_dirty = true;
+  settings_change_counter++;
+}
+
 //--------------------------------------------------------------------+
 // CRC32 Implementation (Simple polynomial)
 //--------------------------------------------------------------------+
@@ -1251,6 +1261,9 @@ void settings_init(void) {
   settings_reset_led_effect_restore_state();
 
   settings_dirty = false;
+  settings_change_counter = 0u;
+  settings_last_seen_change_counter = 0u;
+  settings_last_change_ms = 0u;
 }
 
 const settings_t *settings_get(void) { return &current_settings; }
@@ -1267,17 +1280,18 @@ bool settings_set_gamepad_enabled_live(bool enabled) {
   current_settings.options.gamepad_enabled = enabled ? 1u : 0u;
   gamepad_hid_set_enabled(enabled);
   gamepad_hid_reload_settings();
+  settings_mark_dirty();
   return true;
 }
 
 bool settings_set_keyboard_enabled(bool enabled) {
   current_settings.options.keyboard_enabled = enabled ? 1 : 0;
-  return settings_save();
+  settings_mark_dirty();
+  return true;
 }
 
 bool settings_set_gamepad_enabled(bool enabled) {
-  settings_set_gamepad_enabled_live(enabled);
-  return settings_save();
+  return settings_set_gamepad_enabled_live(enabled);
 }
 
 bool settings_is_nkro_enabled(void) {
@@ -1287,7 +1301,8 @@ bool settings_is_nkro_enabled(void) {
 bool settings_set_nkro_enabled(bool enabled) {
   current_settings.options.nkro_enabled = enabled ? 1 : 0;
   // Note: changing NKRO mode requires USB re-enumeration to take effect
-  return settings_save();
+  settings_mark_dirty();
+  return true;
 }
 
 bool settings_set_options(settings_options_t options) {
@@ -1295,7 +1310,8 @@ bool settings_set_options(settings_options_t options) {
   settings_gamepad_apply_keyboard_routing_option();
   gamepad_hid_set_enabled(options.gamepad_enabled);
   gamepad_hid_reload_settings();
-  return settings_save();
+  settings_mark_dirty();
+  return true;
 }
 
 settings_options_t settings_get_options(void) {
@@ -1331,25 +1347,40 @@ bool settings_save(void) {
   current_settings.crc32 =
       crc32_compute(&current_settings, sizeof(settings_t) - sizeof(uint32_t));
 
-  // Erase flash sector
-  if (!flash_storage_erase()) {
-    return false;
-  }
-
-  // Align size to 4 bytes
-  uint32_t write_size = sizeof(settings_t);
-  if (write_size % 4 != 0) {
-    write_size += 4 - (write_size % 4);
-  }
-
-  // Write settings to flash
-  if (!flash_storage_write(0, &current_settings, write_size)) {
+  // Append a new settings snapshot. The storage backend consolidates only
+  // when the reserved flash sector is full, which keeps normal saves cheap.
+  if (!flash_storage_write(0, &current_settings, sizeof(settings_t))) {
     return false;
   }
 
   settings_dirty = false;
+  settings_last_seen_change_counter = settings_change_counter;
   return true;
 }
+
+void settings_task(uint32_t now_ms) {
+  if (settings_change_counter != settings_last_seen_change_counter) {
+    settings_last_seen_change_counter = settings_change_counter;
+    settings_last_change_ms = now_ms;
+    settings_dirty = true;
+  }
+
+  if (!settings_dirty) {
+    return;
+  }
+
+  if (calibration_guided_is_active()) {
+    return;
+  }
+
+  if ((uint32_t)(now_ms - settings_last_change_ms) < SETTINGS_AUTOSAVE_DELAY_MS) {
+    return;
+  }
+
+  (void)settings_save();
+}
+
+bool settings_has_unsaved_changes(void) { return settings_dirty; }
 
 uint16_t settings_get_firmware_version(void) { return FIRMWARE_VERSION; }
 
@@ -1361,6 +1392,7 @@ bool settings_set_advanced_tick_rate(uint8_t tick_rate) {
   current_settings.advanced_tick_rate =
       settings_sanitize_advanced_tick_rate(tick_rate);
   trigger_reload_settings();
+  settings_mark_dirty();
   return true;
 }
 
@@ -1375,7 +1407,8 @@ bool settings_is_led_enabled(void) {
 bool settings_set_led_enabled(bool enabled) {
   current_settings.options.led_enabled = enabled ? 1 : 0;
   led_matrix_set_enabled(enabled);
-  return true; // Don't auto-save, let user call save explicitly
+  settings_mark_dirty();
+  return true;
 }
 
 uint8_t settings_get_led_brightness(void) {
@@ -1385,7 +1418,8 @@ uint8_t settings_get_led_brightness(void) {
 bool settings_set_led_brightness(uint8_t brightness) {
   current_settings.led.brightness = brightness;
   led_matrix_set_brightness(brightness);
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 const uint8_t *settings_get_led_pixels(void) {
@@ -1398,7 +1432,8 @@ bool settings_set_led_pixels(const uint8_t *pixels) {
 
   memcpy(current_settings.led.pixels, pixels, LED_MATRIX_DATA_BYTES);
   led_matrix_set_raw_data(pixels);
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 bool settings_set_led_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
@@ -1410,7 +1445,8 @@ bool settings_set_led_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
   current_settings.led.pixels[index * 3 + 2] = b;
 
   led_matrix_set_pixel_idx(index, r, g, b);
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 const settings_led_t *settings_get_led(void) { return &current_settings.led; }
@@ -1441,7 +1477,8 @@ bool settings_set_led_effect_mode(uint8_t mode) {
   current_settings.led_effect_mode = mode;
   led_matrix_set_effect((led_effect_mode_t)mode);
   led_matrix_set_effect_params(current_settings.led_effect_params[mode]);
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 uint8_t settings_get_led_effect_speed(void) {
@@ -1451,7 +1488,8 @@ uint8_t settings_get_led_effect_speed(void) {
 bool settings_set_led_effect_speed(uint8_t speed) {
   current_settings.led_effect_speed = speed;
   led_matrix_set_effect_speed(speed);
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 uint8_t settings_get_led_fps_limit(void) {
@@ -1461,7 +1499,8 @@ uint8_t settings_get_led_fps_limit(void) {
 bool settings_set_led_fps_limit(uint8_t fps_limit) {
   current_settings.led_fps_limit = fps_limit;
   led_matrix_set_fps_limit(fps_limit);
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b) {
@@ -1478,7 +1517,8 @@ bool settings_set_led_effect_color(uint8_t r, uint8_t g, uint8_t b) {
   current_settings.led_effect_color_g = g;
   current_settings.led_effect_color_b = b;
   led_matrix_set_effect_color(r, g, b);
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 void settings_get_led_effect_params(uint8_t effect_mode, uint8_t *params) {
@@ -1507,6 +1547,7 @@ bool settings_set_led_effect_params(uint8_t effect_mode, const uint8_t *params) 
     led_matrix_set_effect_params(current_settings.led_effect_params[effect_mode]);
   }
 
+  settings_mark_dirty();
   return true;
 }
 
@@ -1529,6 +1570,7 @@ bool settings_is_filter_enabled(void) {
 bool settings_set_filter_enabled(bool enabled) {
   current_settings.filter_enabled = enabled ? 1 : 0;
   filter_set_enabled(enabled);
+  settings_mark_dirty();
   return true;
 }
 
@@ -1551,6 +1593,7 @@ bool settings_set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
   filter_get_params(&current_settings.filter_noise_band,
                     &current_settings.filter_alpha_min,
                     &current_settings.filter_alpha_max);
+  settings_mark_dirty();
   return true;
 }
 
@@ -1573,7 +1616,8 @@ bool settings_set_key(uint8_t key_index, const settings_key_t *key) {
   trigger_apply_key_settings(key_index, &current_settings.keys[key_index]);
   socd_load_settings();
   gamepad_hid_reload_settings();
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 uint16_t settings_get_layer_keycode(uint8_t layer_index, uint8_t key_index) {
@@ -1608,6 +1652,7 @@ bool settings_set_layer_keycode(uint8_t layer_index, uint8_t key_index,
   }
 
   current_settings.layer_keycodes[layer_index - 1u][key_index] = keycode;
+  settings_mark_dirty();
   return true;
 }
 
@@ -1628,7 +1673,8 @@ bool settings_set_gamepad(const settings_gamepad_t *gamepad) {
   settings_gamepad_sanitize(&current_settings.gamepad);
   settings_gamepad_apply_keyboard_routing_option();
   gamepad_hid_reload_settings();
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 gamepad_api_mode_t settings_get_gamepad_api_mode(void) {
@@ -1646,6 +1692,7 @@ bool settings_set_gamepad_api_mode(gamepad_api_mode_t mode) {
 
   current_settings.gamepad.api_mode = (uint8_t)mode;
   gamepad_hid_reload_settings();
+  settings_mark_dirty();
   return true;
 }
 
@@ -1662,6 +1709,7 @@ bool settings_set_rotary_encoder(const settings_rotary_encoder_t *rotary) {
   memcpy(&sanitized, rotary, sizeof(sanitized));
   settings_rotary_encoder_sanitize(&sanitized);
   current_settings.rotary = sanitized;
+  settings_mark_dirty();
   return true;
 }
 
@@ -1680,7 +1728,8 @@ bool settings_set_calibration(const settings_calibration_t *calibration) {
   memcpy(&current_settings.calibration, calibration,
          sizeof(settings_calibration_t));
   calibration_load_settings();
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 bool settings_set_key_calibration(uint8_t key_index, int16_t zero_value) {
@@ -1689,7 +1738,8 @@ bool settings_set_key_calibration(uint8_t key_index, int16_t zero_value) {
 
   current_settings.calibration.key_zero_values[key_index] = zero_value;
   calibration_load_settings();
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 bool settings_set_key_calibration_max(uint8_t key_index, int16_t max_value) {
@@ -1699,7 +1749,8 @@ bool settings_set_key_calibration_max(uint8_t key_index, int16_t max_value) {
 
   current_settings.calibration.key_max_values[key_index] = max_value;
   calibration_load_settings();
-  return true; // Don't auto-save
+  settings_mark_dirty();
+  return true;
 }
 
 //--------------------------------------------------------------------+
@@ -1718,6 +1769,7 @@ bool settings_set_key_curve(uint8_t key_index, const settings_curve_t *curve) {
 
   memcpy(&current_settings.keys[key_index].curve, curve,
          sizeof(settings_curve_t));
+  settings_mark_dirty();
   return true;
 }
 
@@ -1726,6 +1778,7 @@ bool settings_set_key_curve_enabled(uint8_t key_index, bool enabled) {
     return false;
 
   current_settings.keys[key_index].curve_enabled = enabled ? 1 : 0;
+  settings_mark_dirty();
   return true;
 }
 
@@ -1846,6 +1899,7 @@ bool settings_set_key_gamepad_mapping(
          sizeof(settings_gamepad_mapping_t));
   settings_gamepad_sanitize_mapping(&current_settings.keys[key_index].gamepad_map);
   gamepad_hid_reload_settings();
+  settings_mark_dirty();
   return true;
 }
 
@@ -1860,6 +1914,7 @@ bool settings_set_gamepad_with_keyboard(bool enabled) {
               : (uint8_t)GAMEPAD_KEYBOARD_ROUTING_DISABLED;
   settings_gamepad_apply_keyboard_routing_option();
   gamepad_hid_reload_settings();
+  settings_mark_dirty();
   return true;
 }
 

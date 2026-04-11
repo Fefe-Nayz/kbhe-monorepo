@@ -136,7 +136,11 @@ class EffectsPage(QWidget):
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        scaffold = PageScaffold("Effects", "Choose a mode, tune it per effect, and set the color used by color-aware effects.")
+        scaffold = PageScaffold(
+            "Effects",
+            "Choose a mode, tune it per effect, and set the color used by color-aware effects. "
+            "Changes apply live and autosave after a short idle.",
+        )
         root.addWidget(scaffold, 1)
         self.effect_summary = QLabel()
         self.effect_summary.setObjectName("Muted")
@@ -152,7 +156,10 @@ class EffectsPage(QWidget):
         scaffold.add_stretch()
 
     def _build_mode_card(self) -> QWidget:
-        card = SectionCard("Effect Mode", "Choose a mode. The device applies the change immediately.")
+        card = SectionCard(
+            "Effect Mode",
+            "Choose a mode. The device applies the change immediately and queues it for autosave.",
+        )
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -191,7 +198,10 @@ class EffectsPage(QWidget):
         return col
 
     def _build_speed_card(self) -> QWidget:
-        card = SectionCard("Effect Speed", "Controls how quickly animated effects advance.")
+        card = SectionCard(
+            "Effect Speed",
+            "Controls how quickly animated effects advance. Changes apply live.",
+        )
         self.effect_speed_slider = QSlider(Qt.Horizontal)
         self.effect_speed_slider.setRange(1, 255)
         self.effect_speed_slider.valueChanged.connect(self.on_effect_speed_change)
@@ -203,7 +213,10 @@ class EffectsPage(QWidget):
         return card
 
     def _build_tuning_card(self) -> QWidget:
-        card = SectionCard("Effect Tuning", "Each effect can expose sliders, toggles, and selects.")
+        card = SectionCard(
+            "Effect Tuning",
+            "Each effect can expose sliders, toggles, and selects. These controls apply live and autosave after a short idle.",
+        )
         self.param_container = QWidget()
         self.param_layout = QVBoxLayout(self.param_container)
         self.param_layout.setContentsMargins(0, 0, 0, 0)
@@ -212,7 +225,10 @@ class EffectsPage(QWidget):
         return card
 
     def _build_fps_card(self) -> QWidget:
-        card = SectionCard("FPS Limit", "Caps the frame rate when the firmware supports throttling.")
+        card = SectionCard(
+            "FPS Limit",
+            "Caps the frame rate when the firmware supports throttling. Changes apply live and persist automatically.",
+        )
         self.fps_slider = QSlider(Qt.Horizontal)
         self.fps_slider.setRange(0, 120)
         self.fps_slider.valueChanged.connect(self.on_fps_limit_change)
@@ -224,7 +240,10 @@ class EffectsPage(QWidget):
         return card
 
     def _build_color_card(self) -> QWidget:
-        card = SectionCard("Effect Color", "Used by Solid, Breathing, Reactive, and related effects.")
+        card = SectionCard(
+            "Effect Color",
+            "Used by Solid, Breathing, Reactive, and related effects. Color updates apply live and autosave after a short idle.",
+        )
         self.effect_color_preview = QFrame()
         self.effect_color_preview.setFixedHeight(48)
         card.body_layout.addWidget(self.effect_color_preview)

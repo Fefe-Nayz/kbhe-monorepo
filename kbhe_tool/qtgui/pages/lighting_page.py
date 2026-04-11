@@ -265,9 +265,11 @@ class LightingPage(QWidget):
     def _build_persistence_card(self) -> SectionCard:
         card = SectionCard(
             "Persistence",
-            "Sauvegarde l’état LED courant dans le flash. Le format `.led` exporte maintenant 82 RGB + brightness.",
+            "Les edits LED sont autosauvegardés après une courte inactivité. "
+            "Le sync manuel force juste l’écriture immédiate dans le flash. "
+            "Le format `.led` exporte maintenant 82 RGB + brightness.",
         )
-        self.save_to_flash_btn = make_primary_button("Save to Flash", self.save_to_flash)
+        self.save_to_flash_btn = make_primary_button("Sync Now", self.save_to_flash)
         card.body_layout.addWidget(self.save_to_flash_btn)
         self._register_layout_edit_widget(self.save_to_flash_btn)
 
@@ -628,14 +630,14 @@ class LightingPage(QWidget):
                 return
             if not self.device.save_settings():
                 self._update_status("Failed to save lighting settings.", "error")
-                QMessageBox.critical(self, "Save failed", "Failed to save settings to flash.")
+                QMessageBox.critical(self, "Sync failed", "Failed to flush lighting settings to flash.")
                 return
         except Exception as exc:
-            self._update_status(f"Save failed: {exc}", "error")
-            QMessageBox.critical(self, "Save failed", f"Could not save lighting settings:\n{exc}")
+            self._update_status(f"Sync failed: {exc}", "error")
+            QMessageBox.critical(self, "Sync failed", f"Could not flush lighting settings:\n{exc}")
             return
-        self._update_status("Lighting settings saved to flash.", "success")
-        QMessageBox.information(self, "Saved", "Lighting settings were saved to flash.")
+        self._update_status("Lighting settings flushed to flash immediately.", "success")
+        QMessageBox.information(self, "Synced", "Lighting settings were flushed to flash immediately.")
         self.reload()
 
     save_to_device = save_to_flash

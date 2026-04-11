@@ -114,8 +114,8 @@ class DevicePage(QWidget):
     def _build_interfaces_card(self) -> SectionCard:
         card = SectionCard(
             "HID Interfaces",
-            "Keyboard HID, Gamepad HID, and NKRO are saved immediately. "
-            "LED matrix enable stays live until you explicitly save it.",
+            "Keyboard HID, gamepad HID, NKRO, and LED enable are applied live and autosaved after a short idle. "
+            "Use the manual sync only when you need to flush immediately.",
         )
 
         self.keyboard_enabled = QCheckBox("Keyboard HID (sends keypresses)")
@@ -148,12 +148,12 @@ class DevicePage(QWidget):
 
     def _build_save_card(self) -> SectionCard:
         card = SectionCard(
-            "Save Settings",
-            "Persists the LED matrix state stored in RAM: LED enable, brightness, "
-            "and the current 82-LED pattern.",
+            "Manual Flash Sync",
+            "Forces an immediate flash write of the current settings snapshot. "
+            "Normal edits already autosave after a short idle.",
         )
         card.body_layout.addWidget(
-            make_primary_button("Save All Settings to Flash", self.save_to_device)
+            make_primary_button("Sync Now", self.save_to_device)
         )
         return card
 
@@ -305,8 +305,8 @@ class DevicePage(QWidget):
             self._update_status(f"Save failed: {exc}", "error")
             QMessageBox.critical(self, "Save failed", f"Could not save device settings:\n{exc}")
             return
-        self._update_status("All settings saved to flash.", "success")
-        QMessageBox.information(self, "Saved", "Settings saved to flash successfully.")
+        self._update_status("Settings flushed to flash immediately.", "success")
+        QMessageBox.information(self, "Synced", "Settings were flushed to flash immediately.")
         self.reload()
 
     def export_to_file(self) -> None:
@@ -377,7 +377,7 @@ class DevicePage(QWidget):
         QMessageBox.information(
             self,
             "Imported",
-            "LED pattern imported and sent live.\n\nUse Save Settings if you want to keep it after reboot.",
+            "LED pattern imported and sent live.\n\nIt will autosave after a short idle. Use Sync Now only if you want to flush immediately.",
         )
 
     # ------------------------------------------------------------------
@@ -398,8 +398,7 @@ class DevicePage(QWidget):
             self._update_status("Device rejected the LED enable state.", "error")
             return
         self._update_status(
-            f"LED matrix {'enabled' if enabled else 'disabled'} live only. "
-            "Use Save Settings to keep it after reboot.",
+            f"LED matrix {'enabled' if enabled else 'disabled'} live and queued for autosave.",
             "success",
         )
 
@@ -417,7 +416,7 @@ class DevicePage(QWidget):
             self._update_status("Device rejected the keyboard HID state.", "error")
             return
         self._update_status(
-            f"Keyboard HID {'enabled' if enabled else 'disabled'} and saved immediately.", "success"
+            f"Keyboard HID {'enabled' if enabled else 'disabled'} live and queued for autosave.", "success"
         )
 
     def on_gamepad_enabled_change(self, state: int) -> None:
@@ -434,7 +433,7 @@ class DevicePage(QWidget):
             self._update_status("Device rejected the gamepad HID state.", "error")
             return
         self._update_status(
-            f"Gamepad HID {'enabled' if enabled else 'disabled'} and saved immediately.", "success"
+            f"Gamepad HID {'enabled' if enabled else 'disabled'} live and queued for autosave.", "success"
         )
 
     def on_nkro_enabled_change(self, state: int) -> None:
@@ -451,7 +450,7 @@ class DevicePage(QWidget):
             self._update_status("Device rejected the NKRO mode state.", "error")
             return
         self._update_status(
-            f"NKRO mode {'enabled' if enabled else 'disabled'} and saved immediately. "
+            f"NKRO mode {'enabled' if enabled else 'disabled'} live and queued for autosave. "
             "USB re-enumeration may still be required.",
             "success",
         )

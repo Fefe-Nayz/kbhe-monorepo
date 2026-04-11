@@ -715,6 +715,7 @@ int main(void) {
     rotary_encoder_task(now_ms);
     led_matrix_effect_tick(now_ms);
     led_indicator_tick(now_ms);
+    settings_task(now_ms);
     if (profile_timing) {
       task_led_us = cycles_to_us(DWT->CYCCNT - led_start_cycles);
     }

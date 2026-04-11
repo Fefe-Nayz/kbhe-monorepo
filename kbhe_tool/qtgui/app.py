@@ -237,7 +237,7 @@ class KBHEQtMainWindow(QMainWindow):
 
         # Actions
         outer.addWidget(make_secondary_button("Refresh", self._refresh_active), 0)
-        outer.addWidget(make_primary_button("Save to Flash", self._save_to_flash), 0)
+        outer.addWidget(make_primary_button("Sync Now", self._save_to_flash), 0)
 
         return bar
 
@@ -432,9 +432,9 @@ class KBHEQtMainWindow(QMainWindow):
             if not self.session.device.save_settings():
                 raise RuntimeError("device rejected save")
         except Exception as exc:
-            self.session.set_status(f"Save to Flash failed: {exc}", "error")
+            self.session.set_status(f"Immediate flash sync failed: {exc}", "error")
             return
-        self.session.set_status("Settings saved to flash.", "success")
+        self.session.set_status("Settings flushed to flash immediately.", "success")
         self.session.refresh_snapshot()
 
     def set_status(self, message: str, level: str = "info") -> None:
