@@ -1,0 +1,83 @@
+import { type ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+interface PageLayoutProps {
+  /** Left/top panel — keyboard preview + selection summary */
+  preview?: ReactNode;
+  /** Right/main panel — settings cards */
+  children: ReactNode;
+  /** Extra content for the header bar above both panels */
+  headerContent?: ReactNode;
+  /** If true, layout is vertical (preview on top, content below) */
+  vertical?: boolean;
+  className?: string;
+}
+
+/**
+ * Standard 2-panel page layout used across all config pages.
+ * Left: keyboard preview (fixed width).
+ * Right: scrollable settings content.
+ */
+export function PageLayout({
+  preview,
+  children,
+  headerContent,
+  vertical = false,
+  className,
+}: PageLayoutProps) {
+  if (vertical) {
+    return (
+      <div className={cn("flex flex-col h-full overflow-hidden", className)}>
+        {headerContent && (
+          <div className="shrink-0 border-b px-4 py-2">{headerContent}</div>
+        )}
+        {preview && (
+          <div className="shrink-0 flex justify-center items-center border-b px-4 py-3">
+            {preview}
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 flex flex-col gap-4">{children}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex flex-col h-full overflow-hidden", className)}>
+      {headerContent && (
+        <div className="shrink-0 border-b px-4 py-2">{headerContent}</div>
+      )}
+      <div className="flex flex-1 min-h-0">
+        {preview && (
+          <div className="shrink-0 w-auto flex flex-col items-center border-r overflow-y-auto">
+            <div className="p-4">{preview}</div>
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 flex flex-col gap-4 max-w-2xl mx-auto">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface PageHeaderProps {
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+}
+
+export function PageHeader({ title, description, actions }: PageHeaderProps) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h1 className="text-base font-semibold">{title}</h1>
+        {description && (
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        )}
+      </div>
+      {actions && <div className="shrink-0 flex items-center gap-2">{actions}</div>}
+    </div>
+  );
+}

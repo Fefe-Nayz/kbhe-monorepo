@@ -15,8 +15,8 @@
         "title": "KBHE Configurator",
         "width": 1280,
         "height": 720,
-        "minWidth": 1280,
-        "minHeight": 720,
+        "minWidth": 1024,
+        "minHeight": 768,
         "resizable": true,
         "fullscreen": false
       }
