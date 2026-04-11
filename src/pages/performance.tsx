@@ -1,48 +1,39 @@
+import { useEffect } from "react"
 import BaseKeyboard from "@/components/baseKeyboard"
 import PerformanceButtonDiv from "@/components/div/divPerformance"
-import KeySettingsMapper from "@/components/div/keySettingsMapper"
 import PerformanceZone from "@/components/performance-zone"
+import { useKeyboardStore } from "@/stores/keyboard-store"
 
 export default function Performance() {
+
+  useEffect(() => {
+    useKeyboardStore.getState().setSaveEnabled(true)
+    return () => {
+      useKeyboardStore.getState().setSaveEnabled(false)
+    }
+  }, [])
+
   return (
-    <main className="h-screen flex flex-col">
-       
-        <h1 className="text-3xl flex items-center border border-gray-300 rounded-md justify-center px-6 mt-4 font-bold">Performance</h1> 
-        <p className="text-gray-600 mt-2">Performance page content</p>
-      <div className="flex-shrink-0 overflow-x-auto border-b border-gray-300 flex justify-center items-center">
-        <div className="p-8 pt-4 pb-4">
-          <BaseKeyboard mode="multi" 
-          onButtonClick={(ids) => console.log("All pressed keys:", ids)} />
-        </div>
+    <main className="h-screen flex flex-col overflow-hidden">
+
+      {/* Clavier — fixe en haut */}
+      <div className="flex-shrink-0 flex justify-center items-center border-b border-gray-200 px-8 py-4 overflow-x-auto">
+        <BaseKeyboard
+          mode="multi"
+          onButtonClick={(ids) => console.log("Selected keys:", ids)}
+        />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-8 flex flex-col items-center">
-         
-          
-          <div className="mt-6">
-            <div>
-              <PerformanceButtonDiv />
-            </div>
-          </div>
-          <div className="mt-6 flex justify-center">
-            <PerformanceZone />
-          </div>
-        </div>
+      {/* Boutons d'action */}
+      <div className="flex-shrink-0">
+        <PerformanceButtonDiv />
+      </div>
 
-        <div className="flex flex-row items-center border-t border-gray-300 my-6">
-          <div className="w-[50%] p-8 border border-gray-300 rounded-sm">
-            <h2 className="text-2xl font-bold mb-4">Key Settings</h2>
-            <KeySettingsMapper array={[0.5, 1, 1.5, 2]} />
-          </div>
-
-        </div>
-        <div className="h-32"></div>
+      {/* Zone scrollable */}
+      <div className="flex-1 overflow-y-auto flex flex-col items-center py-4 gap-4">
+        <PerformanceZone />
       </div>
 
     </main>
-
-
-
   )
 }

@@ -1,4 +1,4 @@
-import { Slider } from "@/components/ui/slider"
+import { Slider} from "@/components/ui/slider"
 import { useState } from "react"
 
 
@@ -15,13 +15,14 @@ export default function KeySettingsMapper({ array }: KeySettingsMapperProps) {
             <div >
 
                 <label className="text-sm font-medium">Actuation point : <span>{actuation}</span></label>
-                <Slider 
+                <Slider
                 className="border border-gray-300 rounded-sm h-5 w-5"
                 defaultValue={[50]}
                 value={[actuation]} 
                 min={0} 
                 max={500}
                 step={10} 
+                orientation="vertical"
                 onValueChange={(value) => {
                     const newValue = Array.isArray(value) ? value[0] : value;
                     setActuation(newValue);

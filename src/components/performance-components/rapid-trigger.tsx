@@ -1,62 +1,101 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import * as React from "react"
-import { Slider as SliderPrimitive } from "@base-ui/react/slider"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import SliderVertical from "@/components/performance-components/slider-vertical"
 
-interface RapidTriggerCardProps {
-  value: number
+interface RapidTriggerConfig {
+  press: number
+  release: number
   enabled: boolean
-  onToggle: () => void
-  onChange: (value: number) => void
 }
 
-export default function RapidTriggerCard({ value, enabled, onToggle, onChange }: RapidTriggerCardProps) {
+interface RapidTriggerCardProps {
+  config: RapidTriggerConfig
+  onChange: (config: RapidTriggerConfig) => void
+}
+
+export default function RapidTriggerCard({ config, onChange }: RapidTriggerCardProps) {
   return (
-    <Card className="w-full sm:w-80 md:w-96 lg:w-96 xl:w-[500px] 2xl:w-[600px] rounded-3xl border border-border bg-background shadow-sm">
-      <CardHeader className="pb-4 flex items-center justify-between flex-row">
+    <Card className="w-48 rounded-2xl border border-border bg-background shadow-sm shrink-0">
+      <CardHeader className="pb-1 flex items-center justify-between flex-row">
         <div>
-          <CardTitle className="text-base">Rapid Trigger</CardTitle>
-          <CardDescription className="text-sm">Adjust sensitivity when toggled.</CardDescription>
+          <CardTitle className="text-sm">Rapid Trigger</CardTitle>
+          <CardDescription className="text-xs">Sensitivity</CardDescription>
         </div>
-        <Switch checked={enabled} onCheckedChange={onToggle} />
+        <Switch
+          checked={config.enabled}
+          onCheckedChange={() => onChange({ ...config, enabled: !config.enabled })}
+        />
       </CardHeader>
-      <CardContent className="space-y-4 flex flex-col items-center">
-        <div className="flex items-center justify-between text-sm text-muted-foreground w-full">
-          <span>Value</span>
-          <span className="font-semibold text-foreground">{value.toFixed(1)}</span>
-        </div>
-        <div className="h-40 flex items-center justify-center">
-          <SliderPrimitive.Root
-            className="h-full"
-            orientation="vertical"
-            value={[value]}
-            onValueChange={(newValue) => {
-              const next = Array.isArray(newValue) ? newValue[0] : newValue
-              onChange(Number(next.toFixed(1)))
-            }}
-            min={0.2}
-            max={3}
-            step={0.1}
-            disabled={!enabled}
-            thumbAlignment="center"
-          >
-            <SliderPrimitive.Control className="relative h-full w-160 touch-none select-none flex justify-center">
-              <SliderPrimitive.Track
-                data-slot="slider-track"
-                className="bg-muted border border-slate-300 rounded-sm h-full w-11 relative overflow-hidden select-none"
-              >
-                <SliderPrimitive.Indicator
-                  data-slot="slider-range"
-                  className="bg-primary select-none w-full"
-                />
-              </SliderPrimitive.Track>
-              <SliderPrimitive.Thumb
-                data-slot="slider-thumb"
-                className="block h-2 w-10 border-ring ring-ring/50 relative size-5 rounded-sm border bg-white transition-[color,box-shadow] hover:ring-[3px] focus-visible:ring-[3px] outline-hidden shrink-0 select-none disabled:opacity-50 shadow-md"
-              />
-            </SliderPrimitive.Control>
-          </SliderPrimitive.Root>
-        </div>
+
+      <CardContent className="flex flex-col items-center gap-2">
+
+        {!config.enabled ? (
+          // Désactivé
+          <div className="flex flex-col items-center gap-2 w-full">
+            <div className="flex items-center justify-between text-xs text-muted-foreground w-full">
+              <span>Value</span>
+              <span className="font-semibold text-foreground">{config.press.toFixed(1)} mm</span>
+            </div>
+            <div className="h-36 flex items-center justify-center">
+              <SliderVertical value={config.press} onChange={() => {}} disabled />
+            </div>
+          </div>
+        ) : (
+          // Activé — tabs Basic / Advanced
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="w-full">
+              <TabsTrigger value="basic" className="flex-1 text-xs">Basic</TabsTrigger>
+              <TabsTrigger value="advanced" className="flex-1 text-xs">Advanced</TabsTrigger>
+            </TabsList>
+
+            {/* Basic */}
+            <TabsContent value="basic">
+              <div className="flex flex-col items-center gap-2 w-full">
+                <div className="flex items-center justify-between text-xs text-muted-foreground w-full">
+                  <span>Value</span>
+                  <span className="font-semibold text-foreground">{config.press.toFixed(1)} mm</span>
+                </div>
+                <div className="h-28 flex items-center justify-center">
+                  <SliderVertical
+                    value={config.press}
+                    onChange={(val) => onChange({ ...config, press: val })}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Advanced */}
+            <TabsContent value="advanced">
+  <div className="flex flex-row gap-4 justify-center items-start pt-2">
+    
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-xs text-muted-foreground">Press</span>
+      <span className="text-xs font-semibold">{config.press.toFixed(1)} mm</span>
+      <div className="h-28 flex items-center justify-center">
+        <SliderVertical
+          value={config.press}
+          onChange={(val) => onChange({ ...config, press: val })}
+        />
+      </div>
+    </div>
+
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-xs text-muted-foreground">Release</span>
+      <span className="text-xs font-semibold">{config.release.toFixed(1)} mm</span>
+      <div className="h-28 flex items-center justify-center">
+        <SliderVertical
+          value={config.release}
+          onChange={(val) => onChange({ ...config, release: val })}
+        />
+      </div>
+    </div>
+
+  </div>
+</TabsContent>
+          </Tabs>
+        )}
+
       </CardContent>
     </Card>
   )
