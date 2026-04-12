@@ -16,6 +16,7 @@ interface KeyboardKeyProps {
   offsetY: number;
   selected?: boolean;
   interactive?: boolean;
+  showTooltip?: boolean;
   showLegendSlots?: boolean;
   onClick?: (key: KeyboardKeyModel) => void;
   renderLegend?: (args: {
@@ -91,6 +92,7 @@ function KeyboardKeyComponent({
   offsetY,
   selected,
   interactive,
+  showTooltip = true,
   showLegendSlots,
   onClick,
   renderLegend,
@@ -271,6 +273,7 @@ function KeyboardKeyComponent({
 
   const keyElement = interactive ? (
     <button
+      data-kle-key-id={keyData.id}
       className={commonKeyClasses}
       style={appearanceStyle}
       onClick={handleClick}
@@ -281,17 +284,24 @@ function KeyboardKeyComponent({
       {content}
     </button>
   ) : (
-    <div className={commonKeyClasses} style={appearanceStyle} onClick={handleClick} role="img" aria-label={label}>
+    <div
+      data-kle-key-id={keyData.id}
+      className={commonKeyClasses}
+      style={appearanceStyle}
+      onClick={handleClick}
+      role="img"
+      aria-label={label}
+    >
       {content}
     </div>
   );
 
-  if (!tooltipText) {
-    return <div className="kle-key-wrapper" style={wrapperStyle}>{keyElement}</div>;
+  if (!showTooltip || !tooltipText) {
+    return <div className="kle-key-wrapper" data-kle-key-id={keyData.id} style={wrapperStyle}>{keyElement}</div>;
   }
 
   return (
-    <div className="kle-key-wrapper" style={wrapperStyle}>
+    <div className="kle-key-wrapper" data-kle-key-id={keyData.id} style={wrapperStyle}>
       <Tooltip>
         <TooltipTrigger render={keyElement} />
         <TooltipContent side="top" sideOffset={6}>
@@ -310,6 +320,7 @@ export const KeyboardKey = memo(KeyboardKeyComponent, (prev, next) => (
   prev.offsetY === next.offsetY &&
   prev.selected === next.selected &&
   prev.interactive === next.interactive &&
+  prev.showTooltip === next.showTooltip &&
   prev.showLegendSlots === next.showLegendSlots &&
   prev.onClick === next.onClick &&
   prev.renderLegend === next.renderLegend &&

@@ -179,7 +179,7 @@ export default function Profiles() {
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
+                                variant="destructive"
                                 onClick={() => setDeleteTarget(profile.name)}
                               >
                                 <IconTrash className="size-4" />

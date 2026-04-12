@@ -9,7 +9,7 @@ export default function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AppShell />
-        <Toaster />
+        <Toaster richColors={true} />
       </QueryClientProvider>
     </ThemeProvider>
   );

@@ -10,8 +10,17 @@ interface CommitSliderProps {
   min?: number;
   max?: number;
   step?: number;
+  valueFormatter?: (value: number) => string;
+  hideValue?: boolean;
   disabled?: boolean;
   className?: string;
+}
+
+function getStepPrecision(step: number): number {
+  if (!Number.isFinite(step) || step <= 0) return 0;
+  const stepText = String(step);
+  if (!stepText.includes(".")) return 0;
+  return stepText.split(".")[1]?.length ?? 0;
 }
 
 export function CommitSlider({
@@ -21,6 +30,8 @@ export function CommitSlider({
   min = 0,
   max = 100,
   step = 1,
+  valueFormatter,
+  hideValue = false,
   disabled = false,
   className,
 }: CommitSliderProps) {
@@ -30,6 +41,10 @@ export function CommitSlider({
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const displayValue = draft ?? value;
+  const precision = getStepPrecision(step);
+  const displayText = valueFormatter
+    ? valueFormatter(displayValue)
+    : Number(displayValue).toFixed(precision);
 
   useEffect(() => {
     if (waitingForRef.current === null) return;
@@ -94,6 +109,13 @@ export function CommitSlider({
       onPointerCancel={handlePointerUp}
       onLostPointerCapture={handlePointerUp}
     >
+      {!hideValue && (
+        <div className="mb-1 flex justify-end">
+          <span className="text-xs font-mono tabular-nums text-muted-foreground">
+            {displayText}
+          </span>
+        </div>
+      )}
       <Slider
         min={min}
         max={max}

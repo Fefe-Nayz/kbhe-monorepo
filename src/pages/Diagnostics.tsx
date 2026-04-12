@@ -10,6 +10,7 @@ import BaseKeyboard from "@/components/baseKeyboard";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -1289,28 +1290,44 @@ export default function Diagnostics() {
             </div>
           </div>
 
-          <TabsContent value="travel" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-4xl mx-auto">
-              <TravelTab connected={connected} active={activeTab === "travel"} />
-            </div>
+          <TabsContent value="travel" className="flex-1 min-h-0 mt-0">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <div className="flex flex-col gap-4 max-w-4xl mx-auto">
+                  <TravelTab connected={connected} active={activeTab === "travel"} />
+                </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="raw" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-4xl mx-auto">
-              <RawAdcTab connected={connected} active={activeTab === "raw"} />
-            </div>
+          <TabsContent value="raw" className="flex-1 min-h-0 mt-0">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <div className="flex flex-col gap-4 max-w-4xl mx-auto">
+                  <RawAdcTab connected={connected} active={activeTab === "raw"} />
+                </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="graph" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-5xl mx-auto">
-              <GraphTab connected={connected} active={activeTab === "graph"} />
-            </div>
+          <TabsContent value="graph" className="flex-1 min-h-0 mt-0">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+                  <GraphTab connected={connected} active={activeTab === "graph"} />
+                </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="debug" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-3xl mx-auto">
-              <DebugTab connected={connected} active={activeTab === "debug"} />
-            </div>
+          <TabsContent value="debug" className="flex-1 min-h-0 mt-0">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <div className="flex flex-col gap-4 max-w-3xl mx-auto">
+                  <DebugTab connected={connected} active={activeTab === "debug"} />
+                </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </div>

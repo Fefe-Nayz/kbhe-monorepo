@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
+import { usePageVisible } from "@/hooks/use-page-visible";
 import { selectItemsReverse } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
@@ -12,6 +13,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { ColorPicker, type RGBColor } from "@/components/color-picker";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CommitSlider } from "@/components/ui/commit-slider";
@@ -191,12 +193,6 @@ const EFFECT_PARAM_METADATA: Record<number, ParamSpec[]> = {
   ],
 };
 
-const DIAGNOSTIC_MODES: Record<number, string> = {
-  0: "Normal",
-  1: "DMA Stress",
-  2: "CPU Stress",
-};
-
 const QUICK_COLORS: RGBColor[] = [
   { r: 255, g: 0, b: 0 },
   { r: 255, g: 128, b: 0 },
@@ -207,6 +203,8 @@ const QUICK_COLORS: RGBColor[] = [
   { r: 128, g: 0, b: 255 },
   { r: 255, g: 255, b: 255 },
 ];
+
+const MATRIX_PREVIEW_FRAME_MS = 33;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -255,11 +253,17 @@ function MatrixKeyboard({
   pixelColors,
   connected,
   onPaint,
+  onStrokeEnd,
 }: {
   pixelColors: RGBColor[];
   connected: boolean;
   onPaint: (idx: number) => void;
+  onStrokeEnd?: () => void;
 }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const isPaintingRef = useRef(false);
+  const paintedDuringStrokeRef = useRef<Set<number>>(new Set());
+
   const keyColorMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (let i = 0; i < KEY_COUNT; i++) {
@@ -269,28 +273,74 @@ function MatrixKeyboard({
     return map;
   }, [pixelColors]);
 
-  const handleClick = useCallback(
-    (ids: string[] | string) => {
-      if (!connected) return;
-      const id = Array.isArray(ids) ? ids[0] : ids;
-      if (!id?.startsWith("key-")) return;
-      const idx = parseInt(id.replace("key-", ""), 10);
-      onPaint(idx);
-    },
-    [connected, onPaint],
-  );
+  const paintKeyId = useCallback((keyId: string | null) => {
+    if (!connected || !keyId?.startsWith("key-")) return;
+    const idx = parseInt(keyId.replace("key-", ""), 10);
+    if (!Number.isFinite(idx) || idx < 0 || idx >= KEY_COUNT) return;
+
+    if (isPaintingRef.current) {
+      if (paintedDuringStrokeRef.current.has(idx)) return;
+      paintedDuringStrokeRef.current.add(idx);
+    }
+
+    onPaint(idx);
+  }, [connected, onPaint]);
+
+  const paintFromPoint = useCallback((clientX: number, clientY: number) => {
+    const root = rootRef.current;
+    if (!root) return;
+    const target = document.elementFromPoint(clientX, clientY);
+    if (!(target instanceof Element) || !root.contains(target)) return;
+    const keyNode = target.closest("[data-kle-key-id]");
+    const keyId = keyNode?.getAttribute("data-kle-key-id") ?? null;
+    paintKeyId(keyId);
+  }, [paintKeyId]);
+
+  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!connected) return;
+    event.preventDefault();
+    isPaintingRef.current = true;
+    paintedDuringStrokeRef.current.clear();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    paintFromPoint(event.clientX, event.clientY);
+  }, [connected, paintFromPoint]);
+
+  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!connected || !isPaintingRef.current) return;
+    paintFromPoint(event.clientX, event.clientY);
+  }, [connected, paintFromPoint]);
+
+  const endPaintStroke = useCallback(() => {
+    isPaintingRef.current = false;
+    paintedDuringStrokeRef.current.clear();
+    onStrokeEnd?.();
+  }, [onStrokeEnd]);
 
   return (
-    <BaseKeyboard
-      mode="single"
-      onButtonClick={handleClick}
-      showLayerSelector={false}
-      showRotary={false}
-      keyColorMap={keyColorMap}
-    />
+    <div
+      ref={rootRef}
+      className="select-none touch-none"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endPaintStroke}
+      onPointerCancel={endPaintStroke}
+      onLostPointerCapture={endPaintStroke}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <BaseKeyboard
+        mode="single"
+        onButtonClick={() => { }}
+        showLayerSelector={false}
+        showRotary={false}
+        interactive={false}
+        showTooltips={false}
+        keyColorMap={keyColorMap}
+      />
+    </div>
   );
 }
 
+const LIVE_MATRIX_POLL_MS = 60;
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -298,6 +348,7 @@ function MatrixKeyboard({
 export default function Lighting() {
   const { status } = useDeviceSession();
   const connected = status === "connected";
+  const pageVisible = usePageVisible();
   const qc = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
   const [activeTab, setActiveTab] = useState("effects");
@@ -342,12 +393,6 @@ export default function Lighting() {
     enabled: connected,
   });
 
-  const diagnosticQ = useQuery({
-    queryKey: queryKeys.led.diagnostic(),
-    queryFn: () => kbheDevice.getLedDiagnostic(),
-    enabled: connected,
-  });
-
   const currentEffect = effectQ.data ?? LEDEffect.SOLID;
 
   const paramsQ = useQuery({
@@ -358,17 +403,132 @@ export default function Lighting() {
 
   const isMatrixMode = currentEffect === LEDEffect.MATRIX;
   const matrixVisible = activeTab === "matrix";
+  const liveMatrixPolling = connected && matrixVisible && !isMatrixMode && pageVisible;
 
   const allPixelsQ = useQuery({
     queryKey: queryKeys.led.allPixels(),
     queryFn: () => kbheDevice.ledDownloadAll(),
     enabled: connected && matrixVisible,
-    refetchInterval: matrixVisible && !isMatrixMode ? 2000 : false,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
   });
 
+  const [matrixPixels, setMatrixPixels] = useState<number[] | null>(null);
+  const matrixPixelsRef = useRef<number[] | null>(null);
+  const matrixPreviewPendingRef = useRef<number[] | null>(null);
+  const matrixPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const matrixLastPreviewPushRef = useRef(0);
+
+  const flushMatrixPreview = useCallback(() => {
+    matrixPreviewTimerRef.current = null;
+    const pending = matrixPreviewPendingRef.current;
+    if (!pending) {
+      return;
+    }
+    matrixPreviewPendingRef.current = null;
+    matrixLastPreviewPushRef.current = performance.now();
+    setMatrixPixels(Array.from(pending));
+  }, []);
+
+  const enqueueMatrixPreview = useCallback((frame: number[]) => {
+    matrixPreviewPendingRef.current = frame;
+
+    const elapsed = performance.now() - matrixLastPreviewPushRef.current;
+    const waitMs = Math.max(0, MATRIX_PREVIEW_FRAME_MS - elapsed);
+
+    if (waitMs <= 0 && !matrixPreviewTimerRef.current) {
+      flushMatrixPreview();
+      return;
+    }
+
+    if (!matrixPreviewTimerRef.current) {
+      matrixPreviewTimerRef.current = setTimeout(flushMatrixPreview, waitMs);
+    }
+  }, [flushMatrixPreview]);
+
+  useEffect(() => {
+    return () => {
+      if (matrixPreviewTimerRef.current) {
+        clearTimeout(matrixPreviewTimerRef.current);
+      }
+    };
+  }, []);
+
+  const applyIncomingMatrixFrame = useCallback((frame: ArrayLike<number>) => {
+    const next = Array.from(frame);
+    const prev = matrixPixelsRef.current;
+    if (prev && prev.length === next.length) {
+      let changed = false;
+      for (let i = 0; i < next.length; i += 1) {
+        if (prev[i] !== next[i]) {
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) {
+        return;
+      }
+    }
+
+    matrixPixelsRef.current = next;
+    if (!isMatrixMode) {
+      enqueueMatrixPreview(next);
+      return;
+    }
+    setMatrixPixels(next);
+  }, [enqueueMatrixPreview, isMatrixMode]);
+
+  useEffect(() => {
+    if (!allPixelsQ.data) {
+      matrixPixelsRef.current = null;
+      setMatrixPixels(null);
+      return;
+    }
+
+    applyIncomingMatrixFrame(allPixelsQ.data);
+  }, [allPixelsQ.data, applyIncomingMatrixFrame]);
+
+  useEffect(() => {
+    if (!liveMatrixPolling) {
+      return;
+    }
+
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const tick = async () => {
+      const startedAt = performance.now();
+      try {
+        const frame = await kbheDevice.ledDownloadAll();
+        if (disposed || !frame) {
+          return;
+        }
+        applyIncomingMatrixFrame(frame);
+      } catch {
+        // Ignore transient read errors while live preview polling.
+      } finally {
+        if (!disposed) {
+          const elapsed = performance.now() - startedAt;
+          const waitMs = Math.max(0, LIVE_MATRIX_POLL_MS - elapsed);
+          timer = setTimeout(() => void tick(), waitMs);
+        }
+      }
+    };
+
+    void tick();
+
+    return () => {
+      disposed = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [applyIncomingMatrixFrame, liveMatrixPolling]);
+
   const pixelColors = useMemo(
-    () => (allPixelsQ.data ? pixelsToRgbArray(allPixelsQ.data) : null),
-    [allPixelsQ.data],
+    () => (matrixPixels ? pixelsToRgbArray(matrixPixels) : null),
+    [matrixPixels],
   );
 
   // ---- Mutations ----
@@ -423,19 +583,6 @@ export default function Lighting() {
     optimisticUpdate: (_cur, params) => params,
     onSuccess: markSaved,
     onError: markError,
-  });
-
-  const diagnosticMut = useMutation({
-    mutationFn: async (v: number) => { markSaving(); await kbheDevice.setLedDiagnostic(v); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.diagnostic() }); },
-    onError: markError,
-  });
-
-  const pixelMut = useMutation({
-    mutationFn: async (args: { index: number; color: RGBColor }) => {
-      await kbheDevice.ledSetPixel(args.index, args.color.r, args.color.g, args.color.b);
-    },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() }); },
   });
 
   const fillMut = useMutation({
@@ -496,11 +643,68 @@ export default function Lighting() {
     await kbheDevice.setLedEffectColor(c.r, c.g, c.b);
   });
 
+  const matrixSetPixelPendingRef = useRef<Map<number, RGBColor>>(new Map());
+  const matrixSetPixelInFlightRef = useRef(false);
+
+  const flushMatrixSetPixelQueue = useCallback(async () => {
+    if (matrixSetPixelInFlightRef.current) {
+      return;
+    }
+
+    matrixSetPixelInFlightRef.current = true;
+    try {
+      while (matrixSetPixelPendingRef.current.size > 0) {
+        const batch = Array.from(matrixSetPixelPendingRef.current.entries());
+        matrixSetPixelPendingRef.current.clear();
+
+        for (const [index, color] of batch) {
+          await kbheDevice.ledSetPixel(index, color.r, color.g, color.b);
+        }
+      }
+    } catch {
+      // Ignore transient paint transport errors to keep interaction responsive.
+    } finally {
+      matrixSetPixelInFlightRef.current = false;
+      if (matrixSetPixelPendingRef.current.size > 0) {
+        void flushMatrixSetPixelQueue();
+      }
+    }
+  }, []);
+
+  const paintMatrixKey = useCallback((index: number) => {
+    if (!connected || !isMatrixMode || index < 0 || index >= KEY_COUNT) {
+      return;
+    }
+
+    if (!matrixPixelsRef.current) {
+      matrixPixelsRef.current = Array.from(allPixelsQ.data ?? new Array(KEY_COUNT * 3).fill(0));
+    }
+
+    const next = matrixPixelsRef.current;
+    const offset = index * 3;
+    next[offset] = paintColor.r & 0xff;
+    next[offset + 1] = paintColor.g & 0xff;
+    next[offset + 2] = paintColor.b & 0xff;
+
+    matrixSetPixelPendingRef.current.set(index, {
+      r: paintColor.r & 0xff,
+      g: paintColor.g & 0xff,
+      b: paintColor.b & 0xff,
+    });
+
+    enqueueMatrixPreview(next);
+    void flushMatrixSetPixelQueue();
+  }, [allPixelsQ.data, connected, enqueueMatrixPreview, flushMatrixSetPixelQueue, isMatrixMode, paintColor.b, paintColor.g, paintColor.r]);
+
+  const handleMatrixStrokeEnd = useCallback(() => {
+    void flushMatrixSetPixelQueue();
+  }, [flushMatrixSetPixelQueue]);
+
   // ---- File I/O ----
 
   const handleExport = useCallback(() => {
     const brightness = brightnessQ.data ?? 128;
-    const pixels = allPixelsQ.data ?? new Array(KEY_COUNT * 3).fill(0);
+    const pixels = matrixPixels ?? allPixelsQ.data ?? new Array(KEY_COUNT * 3).fill(0);
     const buf = new Uint8Array(1 + KEY_COUNT * 3);
     buf[0] = brightness & 0xff;
     for (let i = 0; i < KEY_COUNT * 3; i++) {
@@ -513,7 +717,7 @@ export default function Lighting() {
     a.download = "keyboard.led";
     a.click();
     URL.revokeObjectURL(url);
-  }, [brightnessQ.data, allPixelsQ.data]);
+  }, [brightnessQ.data, matrixPixels, allPixelsQ.data]);
 
   const handleImport = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -667,140 +871,142 @@ export default function Lighting() {
           </div>
 
           {/* === Effects Tab === */}
-          <TabsContent value="effects" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[1fr_320px]">
-              {/* Left column */}
-              <div className="flex flex-col gap-4">
-                <SectionCard title="LED Control">
-                  <div className="flex flex-col divide-y">
-                    <FormRow label="LEDs Enabled">
-                      <Switch
-                        checked={enabledQ.data ?? false}
-                        disabled={!connected}
-                        onCheckedChange={(v) => enabledMut.mutate(v)}
-                      />
-                    </FormRow>
-                    <FormRow label="Global Brightness">
-                      <div className="flex items-center gap-3 w-44">
-                        {brightnessQ.data == null ? (
+          <TabsContent value="effects" className="flex-1 min-h-0 mt-0">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[1fr_320px]">
+                  {/* Left column */}
+                  <div className="flex flex-col gap-4">
+                    <SectionCard title="LED Control">
+                      <div className="flex flex-col divide-y">
+                        <FormRow label="LEDs Enabled">
+                          <Switch
+                            checked={enabledQ.data ?? false}
+                            disabled={!connected}
+                            onCheckedChange={(v) => enabledMut.mutate(v)}
+                          />
+                        </FormRow>
+                        <FormRow label="Global Brightness">
+                          <div className="flex items-center gap-3 w-44">
+                            {brightnessQ.data == null ? (
+                              <Skeleton className="h-5 w-full" />
+                            ) : (
+                              <CommitSlider
+                                min={0} max={255} step={1}
+                                value={brightnessQ.data}
+                                onLiveChange={(v) => liveBrightness(v)}
+                                onCommit={(v) => brightnessMut.mutate(v)}
+                                disabled={!connected} className="flex-1"
+                              />
+                            )}
+                          </div>
+                        </FormRow>
+                      </div>
+                    </SectionCard>
+
+                    <SectionCard
+                      title="Effect Mode"
+                      description={EFFECT_DESCRIPTIONS[currentEffect]}
+                    >
+                      {effectQ.isLoading ? (
+                        <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-6 w-48" />)}</div>
+                      ) : (
+                        <RadioGroup
+                          value={String(effectQ.data ?? 0)}
+                          onValueChange={(v: string) => effectMut.mutate(Number(v))}
+                          disabled={!connected}
+                          className="flex flex-col gap-4"
+                        >
+                          {EFFECT_GROUPS.map((group) => (
+                            <div key={group.category}>
+                              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{group.category}</p>
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                                {group.effects.map((eff) => (
+                                  <div key={eff.id} className="flex items-center gap-2">
+                                    <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
+                                    <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      )}
+                    </SectionCard>
+                  </div>
+
+                  {/* Right column */}
+                  <div className="flex flex-col gap-4">
+                    <SectionCard
+                      title="Effect Tuning"
+                      description={effectName(currentEffect)}
+                    >
+                      {paramsQ.isLoading ? (
+                        <div className="space-y-3">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
+                      ) : (
+                        renderEffectParams()
+                      )}
+                    </SectionCard>
+
+                    <SectionCard title="Effect Speed">
+                      <div className="flex items-center gap-3">
+                        {speedQ.data == null ? (
                           <Skeleton className="h-5 w-full" />
                         ) : (
                           <CommitSlider
-                            min={0} max={255} step={1}
-                            value={brightnessQ.data}
-                            onLiveChange={(v) => liveBrightness(v)}
-                            onCommit={(v) => brightnessMut.mutate(v)}
+                            min={1} max={255} step={1}
+                            value={speedQ.data}
+                            onLiveChange={(v) => liveSpeed(v)}
+                            onCommit={(v) => speedMut.mutate(v)}
                             disabled={!connected} className="flex-1"
                           />
                         )}
                       </div>
-                    </FormRow>
-                  </div>
-                </SectionCard>
+                    </SectionCard>
 
-                <SectionCard
-                  title="Effect Mode"
-                  description={EFFECT_DESCRIPTIONS[currentEffect]}
-                >
-                  {effectQ.isLoading ? (
-                    <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-6 w-48" />)}</div>
-                  ) : (
-                    <RadioGroup
-                      value={String(effectQ.data ?? 0)}
-                      onValueChange={(v: string) => effectMut.mutate(Number(v))}
-                      disabled={!connected}
-                      className="flex flex-col gap-4"
-                    >
-                      {EFFECT_GROUPS.map((group) => (
-                        <div key={group.category}>
-                          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{group.category}</p>
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                            {group.effects.map((eff) => (
-                              <div key={eff.id} className="flex items-center gap-2">
-                                <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
-                                <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
-                              </div>
+                    <SectionCard title="Effect Color" description="Used by Solid, Breathing, Reactive, and related effects.">
+                      {colorQ.data == null ? (
+                        <Skeleton className="h-8 w-16" />
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-3">
+                            <ColorPicker color={effectColor} onLiveChange={(c) => liveColor(c)} onChange={(c) => colorMut.mutate(c)} />
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {rgbToHex(effectColor.r, effectColor.g, effectColor.b)}
+                            </span>
+                          </div>
+                          <div className="flex gap-1.5">
+                            {QUICK_COLORS.map((c, i) => (
+                              <button
+                                key={i}
+                                className="size-6 rounded-md border border-border transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring"
+                                style={{ backgroundColor: rgbToHex(c.r, c.g, c.b) }}
+                                title={rgbToHex(c.r, c.g, c.b)}
+                                onClick={() => colorMut.mutate(c)}
+                              />
                             ))}
                           </div>
                         </div>
-                      ))}
-                    </RadioGroup>
-                  )}
-                </SectionCard>
-              </div>
+                      )}
+                    </SectionCard>
 
-              {/* Right column */}
-              <div className="flex flex-col gap-4">
-                <SectionCard
-                  title="Effect Tuning"
-                  description={effectName(currentEffect)}
-                >
-                  {paramsQ.isLoading ? (
-                    <div className="space-y-3">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
-                  ) : (
-                    renderEffectParams()
-                  )}
-                </SectionCard>
-
-                <SectionCard title="Effect Speed">
-                  <div className="flex items-center gap-3">
-                    {speedQ.data == null ? (
-                      <Skeleton className="h-5 w-full" />
-                    ) : (
-                      <CommitSlider
-                        min={1} max={255} step={1}
-                        value={speedQ.data}
-                        onLiveChange={(v) => liveSpeed(v)}
-                        onCommit={(v) => speedMut.mutate(v)}
-                        disabled={!connected} className="flex-1"
-                      />
-                    )}
-                  </div>
-                </SectionCard>
-
-                <SectionCard title="Effect Color" description="Used by Solid, Breathing, Reactive, and related effects.">
-                  {colorQ.data == null ? (
-                    <Skeleton className="h-8 w-16" />
-                  ) : (
-                    <div className="flex flex-col gap-3">
+                    <SectionCard title="FPS Limit">
                       <div className="flex items-center gap-3">
-                        <ColorPicker color={effectColor} onLiveChange={(c) => liveColor(c)} onChange={(c) => colorMut.mutate(c)} />
-                        <span className="text-xs font-mono text-muted-foreground">
-                          {rgbToHex(effectColor.r, effectColor.g, effectColor.b)}
-                        </span>
-                      </div>
-                      <div className="flex gap-1.5">
-                        {QUICK_COLORS.map((c, i) => (
-                          <button
-                            key={i}
-                            className="size-6 rounded-md border border-border transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring"
-                            style={{ backgroundColor: rgbToHex(c.r, c.g, c.b) }}
-                            title={rgbToHex(c.r, c.g, c.b)}
-                            onClick={() => colorMut.mutate(c)}
+                        {fpsQ.data == null ? (
+                          <Skeleton className="h-5 w-full" />
+                        ) : (
+                          <CommitSlider
+                            min={0} max={120} step={1}
+                            value={fpsQ.data}
+                            onLiveChange={(v) => liveFps(v)}
+                            onCommit={(v) => fpsMut.mutate(v)}
+                            disabled={!connected} className="flex-1"
                           />
-                        ))}
+                        )}
                       </div>
-                    </div>
-                  )}
-                </SectionCard>
+                    </SectionCard>
 
-                <SectionCard title="FPS Limit">
-                  <div className="flex items-center gap-3">
-                    {fpsQ.data == null ? (
-                      <Skeleton className="h-5 w-full" />
-                    ) : (
-                      <CommitSlider
-                        min={0} max={120} step={1}
-                        value={fpsQ.data}
-                        onLiveChange={(v) => liveFps(v)}
-                        onCommit={(v) => fpsMut.mutate(v)}
-                        disabled={!connected} className="flex-1"
-                      />
-                    )}
-                  </div>
-                </SectionCard>
-
-                {/* <SectionCard title="LED Diagnostic Mode" description="Stress-test modes for hardware verification">
+                    {/* <SectionCard title="LED Diagnostic Mode" description="Stress-test modes for hardware verification">
                   {diagnosticQ.isLoading ? (
                     <Skeleton className="h-8 w-36" />
                   ) : (
@@ -819,74 +1025,81 @@ export default function Lighting() {
                     </RadioGroup>
                   )}
                 </SectionCard> */}
+                  </div>
+                </div>
               </div>
-            </div>
+            </ScrollArea>
           </TabsContent>
 
           {/* === Matrix Tab === */}
-          <TabsContent value="matrix" className="flex-1 overflow-y-auto p-4 mt-0">
-            <div className="flex flex-col gap-4 max-w-3xl mx-auto">
-              <SectionCard title="Paint Color">
-                <div className="flex items-center gap-4">
-                  <ColorPicker color={paintColor} onChange={setPaintColor} />
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <IconDropletFilled className="size-4" style={{ color: rgbToHex(paintColor.r, paintColor.g, paintColor.b) }} />
-                    <span className="font-mono text-xs">{rgbToHex(paintColor.r, paintColor.g, paintColor.b)}</span>
-                  </div>
-                </div>
-              </SectionCard>
+          <TabsContent value="matrix" className="mt-0 flex-1 min-h-0 select-none">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <div className="flex flex-col gap-4 max-w-3xl mx-auto">
+                  <SectionCard title="Paint Color">
+                    <div className="flex items-center gap-4">
+                      <ColorPicker color={paintColor} onChange={setPaintColor} />
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <IconDropletFilled className="size-4" style={{ color: rgbToHex(paintColor.r, paintColor.g, paintColor.b) }} />
+                        <span className="font-mono text-xs">{rgbToHex(paintColor.r, paintColor.g, paintColor.b)}</span>
+                      </div>
+                    </div>
+                  </SectionCard>
 
-              <SectionCard
-                title="LED Matrix"
-                description={isMatrixMode ? "Software matrix mode — click to paint" : "Live LED state (read-only while an effect is active)"}
-                headerRight={
-                  <div className="flex gap-1.5 flex-wrap justify-end">
-                    <Button variant="outline" size="sm" disabled={!connected} onClick={() => fillMut.mutate(paintColor)}>
-                      <IconBrush className="size-3.5 mr-1" />Fill
-                    </Button>
-                    <Button variant="outline" size="sm" disabled={!connected} onClick={() => clearMut.mutate()}>
-                      <IconTrash className="size-3.5 mr-1" />Clear
-                    </Button>
-                    <Button variant="outline" size="sm" disabled={!connected} onClick={() => rainbowMut.mutate()}>
-                      <IconRainbow className="size-3.5 mr-1" />Rainbow
-                    </Button>
-                  </div>
-                }
-              >
-                {pixelColors ? (
-                  <MatrixKeyboard
-                    pixelColors={pixelColors}
-                    connected={connected}
-                    onPaint={(idx) => pixelMut.mutate({ index: idx, color: paintColor })}
-                  />
-                ) : allPixelsQ.isLoading ? (
-                  <Skeleton className="h-40 w-full" />
-                ) : (
-                  <p className="text-sm text-muted-foreground py-4">
-                    {connected ? "Failed to read LED data. Try refreshing." : "Connect a device to view the LED matrix."}
-                  </p>
-                )}
-              </SectionCard>
+                  <SectionCard
+                    title="LED Matrix"
+                    description={isMatrixMode ? "Software matrix mode — click to paint" : "Live LED state (read-only while an effect is active)"}
+                    headerRight={
+                      <div className="flex gap-1.5 flex-wrap justify-end">
+                        <Button variant="outline" size="sm" disabled={!connected} onClick={() => fillMut.mutate(paintColor)}>
+                          <IconBrush className="size-3.5 mr-1" />Fill
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={!connected} onClick={() => clearMut.mutate()}>
+                          <IconTrash className="size-3.5 mr-1" />Clear
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={!connected} onClick={() => rainbowMut.mutate()}>
+                          <IconRainbow className="size-3.5 mr-1" />Rainbow
+                        </Button>
+                      </div>
+                    }
+                  >
+                    {pixelColors ? (
+                      <MatrixKeyboard
+                        pixelColors={pixelColors}
+                        connected={connected && isMatrixMode}
+                        onPaint={paintMatrixKey}
+                        onStrokeEnd={handleMatrixStrokeEnd}
+                      />
+                    ) : allPixelsQ.isLoading ? (
+                      <Skeleton className="h-40 w-full" />
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-4">
+                        {connected ? "Failed to read LED data. Try refreshing." : "Connect a device to view the LED matrix."}
+                      </p>
+                    )}
+                  </SectionCard>
 
-              <SectionCard title="Transfer">
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" disabled={!connected} onClick={() => { if (pixelColors) uploadMut.mutate(rgbArrayToPixels(pixelColors)); }}>
-                    <IconUpload className="size-3.5 mr-1" />Upload All
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={!connected} onClick={() => downloadMut.mutate()}>
-                    <IconDownload className="size-3.5 mr-1" />Download All
-                  </Button>
-                  <div className="w-px bg-border mx-1 self-stretch" />
-                  <Button variant="outline" size="sm" onClick={handleExport} disabled={!connected || !allPixelsQ.data}>
-                    <IconFileExport className="size-3.5 mr-1" />Export .led
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!connected}>
-                    <IconFileImport className="size-3.5 mr-1" />Import .led
-                  </Button>
-                  <input ref={fileInputRef} type="file" accept=".led" className="hidden" aria-label="Import .led file" onChange={handleImport} />
+                  <SectionCard title="Transfer">
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" disabled={!connected} onClick={() => { if (pixelColors) uploadMut.mutate(rgbArrayToPixels(pixelColors)); }}>
+                        <IconUpload className="size-3.5 mr-1" />Upload All
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={!connected} onClick={() => downloadMut.mutate()}>
+                        <IconDownload className="size-3.5 mr-1" />Download All
+                      </Button>
+                      <div className="w-px bg-border mx-1 self-stretch" />
+                      <Button variant="outline" size="sm" onClick={handleExport} disabled={!connected || (!matrixPixels && !allPixelsQ.data)}>
+                        <IconFileExport className="size-3.5 mr-1" />Export .led
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!connected}>
+                        <IconFileImport className="size-3.5 mr-1" />Import .led
+                      </Button>
+                      <input ref={fileInputRef} type="file" accept=".led" className="hidden" aria-label="Import .led file" onChange={handleImport} />
+                    </div>
+                  </SectionCard>
                 </div>
-              </SectionCard>
-            </div>
+              </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </div>

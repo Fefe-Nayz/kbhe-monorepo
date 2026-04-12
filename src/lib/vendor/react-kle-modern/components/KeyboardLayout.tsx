@@ -12,6 +12,7 @@ export const KeyboardLayout = memo(function KeyboardLayout({
   gap = 6,
   showLegendSlots = false,
   interactive = false,
+  showTooltips = true,
   selectedKeyId,
   selectedKeyIds,
   theme = "kle",
@@ -66,6 +67,7 @@ export const KeyboardLayout = memo(function KeyboardLayout({
               offsetY={bounds.minY}
               selected={selectedKeySet?.has(key.id) ?? selectedKeyId === key.id}
               interactive={interactive}
+              showTooltip={showTooltips}
               onClick={onKeyClick}
               showLegendSlots={showLegendSlots}
               renderLegend={renderLegend}

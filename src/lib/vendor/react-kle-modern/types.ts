@@ -87,6 +87,7 @@ export interface KeyboardLayoutProps {
   gap?: number;
   showLegendSlots?: boolean;
   interactive?: boolean;
+  showTooltips?: boolean;
   selectedKeyId?: string;
   selectedKeyIds?: string[];
   theme?: KeyboardRenderTheme;

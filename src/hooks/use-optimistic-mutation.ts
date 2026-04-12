@@ -36,9 +36,9 @@ export function useOptimisticMutation<TData, TVars, TResult = void>({
       qc.setQueryData<TData>(queryKey, (old) => optimisticUpdate(old, vars));
       return { prev };
     },
-    onError: (err, vars, ctx) => {
+    onError: (err, vars, ctx, mutationContext) => {
       if (ctx?.prev !== undefined) qc.setQueryData(queryKey, ctx.prev);
-      onErrorProp?.(err, vars, ctx);
+      onErrorProp?.(err, vars, ctx, mutationContext);
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey });

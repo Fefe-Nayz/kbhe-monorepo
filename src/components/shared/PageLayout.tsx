@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface PageLayoutProps {
   /** Left/top panel — keyboard preview + selection summary */
@@ -36,9 +37,9 @@ export function PageLayout({
             {preview}
           </div>
         )}
-        <div className="flex-1 overflow-y-auto">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 flex flex-col gap-4">{children}</div>
-        </div>
+        </ScrollArea>
       </div>
     );
   }
@@ -50,13 +51,13 @@ export function PageLayout({
       )}
       <div className="flex flex-1 min-h-0">
         {preview && (
-          <div className="shrink-0 w-auto flex flex-col items-center border-r overflow-y-auto">
-            <div className="p-4">{preview}</div>
-          </div>
+          <ScrollArea className="shrink-0 w-auto border-r">
+            <div className="flex flex-col items-center p-4">{preview}</div>
+          </ScrollArea>
         )}
-        <div className="flex-1 overflow-y-auto">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 flex flex-col gap-4 max-w-2xl mx-auto">{children}</div>
-        </div>
+        </ScrollArea>
       </div>
     </div>
   );
@@ -111,8 +112,8 @@ export function PageContent({
   containerClassName = "max-w-3xl",
 }: PageContentProps) {
   return (
-    <div className={cn("flex-1 overflow-y-auto p-4", className)}>
-      <div className={cn("mx-auto flex w-full flex-col gap-4", containerClassName)}>{children}</div>
-    </div>
+    <ScrollArea className={cn("flex-1 min-h-0", className)}>
+      <div className={cn("mx-auto flex w-full flex-col gap-4 p-4", containerClassName)}>{children}</div>
+    </ScrollArea>
   );
 }

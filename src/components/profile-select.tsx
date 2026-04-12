@@ -28,7 +28,7 @@ export function ProfileSelect() {
       items={items}
       onValueChange={(v) => selectProfile(v as string)}
     >
-      <SelectTrigger size="sm" className="gap-1.5 text-xs font-medium">
+      <SelectTrigger className="gap-1.5 text-xs font-medium">
         <IconLayoutGrid className="size-3.5 text-muted-foreground" />
         <SelectValue />
       </SelectTrigger>

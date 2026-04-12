@@ -23,6 +23,7 @@ import {
   u16le,
   u32le,
 } from "./protocol";
+import { invoke } from "@tauri-apps/api/core";
 import { KbheCommander, kbheCommander } from "./commander";
 import {
   kbheTransport,
@@ -161,6 +162,15 @@ export interface KeyStatesSnapshot {
   distances_mm: number[];
 }
 
+interface NativeKeyStatesSnapshotWire {
+  states?: number[];
+  distances?: number[];
+  distances_01mm?: number[];
+  distances_mm?: number[];
+  distances01mm?: number[];
+  distancesMm?: number[];
+}
+
 export interface AdcCaptureStatus {
   active: boolean;
   key_index: number;
@@ -188,6 +198,8 @@ export interface LockStates {
 type DevicePathLogger = ((message: string) => void) | undefined;
 
 export class KBHEDevice {
+  private keyStatesNativeCommandAvailable: boolean | null = null;
+
   constructor(
     private readonly commander: KbheCommander = kbheCommander,
     private readonly transport: KbheTransport = kbheTransport,
@@ -1528,7 +1540,62 @@ export class KBHEDevice {
     return this.getAllAdcValues((startIndex) => this.getCalibratedAdcChunk(startIndex), keyCount);
   }
 
+  private normalizeNativeKeyStatesSnapshot(
+    snapshot: NativeKeyStatesSnapshotWire | null,
+  ): KeyStatesSnapshot | null {
+    if (!snapshot || !Array.isArray(snapshot.states) || !Array.isArray(snapshot.distances)) {
+      return null;
+    }
+
+    const distances01mm = Array.isArray(snapshot.distances_01mm)
+      ? snapshot.distances_01mm
+      : Array.isArray(snapshot.distances01mm)
+        ? snapshot.distances01mm
+        : null;
+    const distancesMm = Array.isArray(snapshot.distances_mm)
+      ? snapshot.distances_mm
+      : Array.isArray(snapshot.distancesMm)
+        ? snapshot.distancesMm
+        : null;
+
+    if (!distances01mm || !distancesMm) {
+      return null;
+    }
+
+    if (
+      snapshot.states.length !== KEY_COUNT ||
+      snapshot.distances.length !== KEY_COUNT ||
+      distances01mm.length !== KEY_COUNT ||
+      distancesMm.length !== KEY_COUNT
+    ) {
+      return null;
+    }
+
+    return {
+      states: snapshot.states,
+      distances: snapshot.distances,
+      distances_01mm: distances01mm,
+      distances_mm: distancesMm,
+    };
+  }
+
   async getKeyStates(): Promise<KeyStatesSnapshot | null> {
+    if (this.keyStatesNativeCommandAvailable !== false) {
+      try {
+        const wireSnapshot = await invoke<NativeKeyStatesSnapshotWire>("kbhe_get_key_states");
+        const snapshot = this.normalizeNativeKeyStatesSnapshot(wireSnapshot);
+        if (snapshot) {
+          this.keyStatesNativeCommandAvailable = true;
+          return snapshot;
+        }
+
+        this.keyStatesNativeCommandAvailable = false;
+      } catch {
+        // Cache the miss so non-Tauri runtimes or old backends don't throw on every poll tick.
+        this.keyStatesNativeCommandAvailable = false;
+      }
+    }
+
     const states = Array.from({ length: KEY_COUNT }, () => 0);
     const distances = Array.from({ length: KEY_COUNT }, () => 0);
     const distances01mm = Array.from({ length: KEY_COUNT }, () => 0);

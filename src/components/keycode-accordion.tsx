@@ -189,6 +189,7 @@ interface KeycodeAccordionProps {
 
 export function KeycodeAccordion({ onSelect, selectedCode, className, resolveLegend }: KeycodeAccordionProps) {
   const [search, setSearch] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
   const hookResolveKeycapLegend = useOSKeycapLegend();
   const resolveKeycapLegend = resolveLegend ?? hookResolveKeycapLegend;
 
@@ -205,7 +206,16 @@ export function KeycodeAccordion({ onSelect, selectedCode, className, resolveLeg
     })).filter((cat) => cat.keys.length > 0);
   }, [search, categories]);
 
-  const defaultOpen = search.trim() ? filtered.map((c) => c.label) : ["Letters"];
+  const defaultOpen = search.trim()
+    ? filtered.map((c) => c.label)
+    : hasSearched
+      ? []
+      : ["Letters"];
+  const accordionKey = search.trim()
+    ? `search:${filtered.map((c) => c.label).join("|")}`
+    : hasSearched
+      ? "cleared"
+      : "default";
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -214,17 +224,27 @@ export function KeycodeAccordion({ onSelect, selectedCode, className, resolveLeg
         <Input
           placeholder="Search keycodes..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            const nextValue = e.target.value;
+            if (nextValue.trim().length > 0) {
+              setHasSearched(true);
+            }
+            setSearch(nextValue);
+          }}
           className="pl-9 h-8 text-sm"
         />
       </div>
       <ScrollArea className="flex-1">
-        <Accordion multiple defaultValue={defaultOpen} className="w-full">
+        <Accordion key={accordionKey} multiple defaultValue={defaultOpen} className="w-full">
           {filtered.map((cat) => (
             <AccordionItem key={cat.label} value={cat.label}>
-              <AccordionTrigger className="text-sm font-medium py-2">
-                {cat.label}
-                <span className="ml-auto mr-2 text-xs text-muted-foreground">{cat.keys.length}</span>
+              <AccordionTrigger className="items-center py-2 text-sm font-medium">
+                <div className="flex min-w-0 flex-1 items-center pr-8">
+                  <span className="truncate">{cat.label}</span>
+                </div>
+                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-xs tabular-nums text-muted-foreground">
+                  {cat.keys.length}
+                </span>
               </AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-wrap gap-1.5 pb-2">

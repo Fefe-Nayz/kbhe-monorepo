@@ -12,6 +12,10 @@ const KBHE_UPDATER_PID: u16 = 0x0003;
 const KBHE_RAW_HID_USAGE_PAGE: u16 = 0xFF00;
 const KBHE_APP_RAW_HID_INTERFACE: i32 = 1;
 const KBHE_PACKET_SIZE: usize = 64;
+const KBHE_KEY_COUNT: usize = 82;
+const KBHE_KEY_STATES_PER_CHUNK: usize = 15;
+const CMD_GET_KEY_STATES: u8 = 0xE1;
+const STATUS_OK: u8 = 0x00;
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +46,14 @@ pub struct KbheConnectionState {
     path: Option<String>,
     pid: Option<u16>,
     kind: Option<KbheDeviceKind>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct KbheKeyStatesSnapshot {
+    states: Vec<u8>,
+    distances: Vec<u8>,
+    distances_01mm: Vec<u16>,
+    distances_mm: Vec<f32>,
 }
 
 struct ActiveConnection {
@@ -164,6 +176,63 @@ fn active_connection_state(active: Option<&ActiveConnection>) -> KbheConnectionS
     }
 }
 
+fn send_command_on_active(
+    connection: &mut ActiveConnection,
+    command: u8,
+    data: &[u8],
+    timeout_ms: u64,
+) -> Result<Option<Vec<u8>>, String> {
+    let mut flush_buffer = [0u8; KBHE_PACKET_SIZE];
+    for _ in 0..8 {
+        let read = connection
+            .device
+            .read_timeout(&mut flush_buffer, 0)
+            .map_err(|error| error.to_string())?;
+        if read == 0 {
+            break;
+        }
+    }
+
+    let mut report = vec![0u8; KBHE_PACKET_SIZE + 1];
+    report[0] = 0;
+    report[1] = command;
+    for (index, byte) in data.iter().enumerate() {
+        let offset = index + 2;
+        if offset >= report.len() {
+            break;
+        }
+        report[offset] = *byte;
+    }
+
+    connection
+        .device
+        .write(&report)
+        .map_err(|error| error.to_string())?;
+
+    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    let mut read_buffer = [0u8; KBHE_PACKET_SIZE];
+
+    while Instant::now() < deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let timeout = i32::try_from(remaining.as_millis().max(1)).unwrap_or(i32::MAX);
+        let read = connection
+            .device
+            .read_timeout(&mut read_buffer, timeout)
+            .map_err(|error| error.to_string())?;
+
+        if read == 0 {
+            continue;
+        }
+
+        let response = read_buffer[..read].to_vec();
+        if response.len() >= 2 && response[0] == command {
+            return Ok(Some(response));
+        }
+    }
+
+    Ok(None)
+}
+
 #[tauri::command]
 pub fn kbhe_list_devices() -> Result<Vec<KbheHidDeviceInfo>, String> {
     enumerate_kbhe_devices()
@@ -265,6 +334,70 @@ pub fn kbhe_read_report(
         .map_err(|error| error.to_string())?;
 
     Ok(buffer[..read].to_vec())
+}
+
+#[tauri::command]
+pub fn kbhe_get_key_states(
+    state: State<'_, KbheTransportState>,
+) -> Result<KbheKeyStatesSnapshot, String> {
+    let mut active = lock_active(&state)?;
+    let connection = active
+        .as_mut()
+        .ok_or_else(|| "no KBHE HID device is currently connected".to_string())?;
+
+    let mut states = vec![0u8; KBHE_KEY_COUNT];
+    let mut distances = vec![0u8; KBHE_KEY_COUNT];
+    let mut distances_01mm = vec![0u16; KBHE_KEY_COUNT];
+    let mut distances_mm = vec![0f32; KBHE_KEY_COUNT];
+
+    let mut next_index = 0usize;
+    while next_index < KBHE_KEY_COUNT {
+        let response = send_command_on_active(
+            connection,
+            CMD_GET_KEY_STATES,
+            &[0, next_index as u8],
+            150,
+        )?
+        .ok_or_else(|| "timeout waiting for GET_KEY_STATES response".to_string())?;
+
+        if response.len() < 4 || response[1] != STATUS_OK {
+            return Err("invalid GET_KEY_STATES response header".to_string());
+        }
+
+        let start_index = usize::from(response[2]);
+        let key_count = usize::from(response[3]);
+
+        if start_index != next_index || key_count == 0 || key_count > KBHE_KEY_STATES_PER_CHUNK {
+            return Err("invalid GET_KEY_STATES chunk metadata".to_string());
+        }
+
+        let expected_len = 4 + key_count * 4;
+        if response.len() < expected_len {
+            return Err("truncated GET_KEY_STATES chunk payload".to_string());
+        }
+
+        for index in 0..key_count {
+            let offset = 4 + index * 4;
+            let key_index = start_index + index;
+            let state_value = response[offset];
+            let distance_value = response[offset + 1];
+            let value_01mm = u16::from(response[offset + 2]) | (u16::from(response[offset + 3]) << 8);
+
+            states[key_index] = state_value;
+            distances[key_index] = distance_value;
+            distances_01mm[key_index] = value_01mm;
+            distances_mm[key_index] = f32::from(value_01mm) / 100.0;
+        }
+
+        next_index += key_count;
+    }
+
+    Ok(KbheKeyStatesSnapshot {
+        states,
+        distances,
+        distances_01mm,
+        distances_mm,
+    })
 }
 
 #[tauri::command]

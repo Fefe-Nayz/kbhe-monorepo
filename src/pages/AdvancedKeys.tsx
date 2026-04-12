@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
-import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { useKeyboardPreviewLegends } from "@/hooks/use-keyboard-preview-legends";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
@@ -81,20 +80,13 @@ export default function AdvancedKeys() {
 
   const tickMutation = useOptimisticMutation<number, number>({
     queryKey: queryKeys.device.advancedTickRate(),
-    mutationFn: (v) => kbheDevice.setAdvancedTickRate(v),
+    mutationFn: async (v) => {
+      await kbheDevice.setAdvancedTickRate(v);
+    },
     optimisticUpdate: (_cur, v) => v,
   });
 
   const settings = keySettingsQ.data;
-
-  const liveKey = useThrottledCall(async (patch: Partial<KeySettings>) => {
-    if (keyIndex == null || !settings) return;
-    await kbheDevice.setKeySettingsExtended(keyIndex, { ...settings, ...patch });
-  });
-
-  const liveTick = useThrottledCall(async (v: number) => {
-    await kbheDevice.setAdvancedTickRate(v);
-  });
   const noSelection = keyIndex == null;
 
   const menubar = (

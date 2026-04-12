@@ -72,6 +72,7 @@ pub fn run() {
             commands::kbhe_flush_input,
             commands::kbhe_write_report,
             commands::kbhe_read_report,
+            commands::kbhe_get_key_states,
             commands::kbhe_wait_for_device,
             commands::kbhe_wait_for_disconnect,
             commands::kbhe_get_os_key_variants,
