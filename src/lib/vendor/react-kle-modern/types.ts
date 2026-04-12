@@ -99,6 +99,7 @@ export interface KeyboardLayoutProps {
   /** Per-key CSS color override map (key id -> CSS color string). Used for RGB matrix / heatmaps. */
   keyColorMap?: Record<string, string>;
   keyLegendMap?: Record<string, ReactNode>;
+  keyLegendSlotsMap?: Record<string, Array<ReactNode | undefined>>;
   keyLegendClassNameMap?: Record<string, string | undefined>;
   keyLegendColorMap?: Record<string, string | undefined>;
   keyLegendFontSizeMap?: Record<string, number | undefined>;

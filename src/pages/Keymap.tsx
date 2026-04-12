@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
-import { useOSLayout } from "@/hooks/use-os-layout";
+import { useOSKeycapLegend } from "@/hooks/use-os-layout";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { KeycodeAccordion } from "@/components/keycode-accordion";
@@ -11,9 +11,13 @@ import { Button } from "@/components/ui/button";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
-import { HID_KEYCODE_NAMES, KEY_COUNT } from "@/lib/kbhe/protocol";
+import { HID_KEYCODE_NAMES, HID_KEYCODES, KEY_COUNT } from "@/lib/kbhe/protocol";
+import { buildKeycodeLegendSlots } from "@/lib/kbhe/keycode-icons";
+import { previewKeys } from "@/constants/defaultLayout";
 import { queryKeys } from "@/lib/query/keys";
 import { IconRestore } from "@tabler/icons-react";
+
+const EMPTY_KEY_SLOTS: Array<string | undefined> = Array.from({ length: 12 }, () => "");
 
 async function fetchAllLayerKeycodes(layer: number): Promise<Record<number, number>> {
   const codes: Record<number, number> = {};
@@ -41,7 +45,7 @@ export default function Keymap() {
   const { status }      = useDeviceSession();
   const connected       = status === "connected";
   const { saveState, markSaving, markSaved } = useAutosave();
-  const resolveKeycodeLabel = useOSLayout();
+  const resolveKeycapLegend = useOSKeycapLegend();
 
   const layerKeycodes = useQuery({
     queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer),
@@ -88,17 +92,29 @@ export default function Keymap() {
     return layerKeycodes.data?.[idx];
   })();
 
-  const keyLegendMap = useMemo(() => {
-    if (!layerKeycodes.data) return undefined;
+  const keyLegendSlotsMap = useMemo(() => {
+    const map: Record<string, Array<ReactNode | undefined>> = {};
+    for (const key of previewKeys) {
+      map[key.id] = [...EMPTY_KEY_SLOTS];
+    }
 
-    const map: Record<string, string> = {};
+    if (!connected || !layerKeycodes.data) {
+      return map;
+    }
+
     for (const [index, code] of Object.entries(layerKeycodes.data)) {
       const numericCode = Number(code);
+      if (numericCode === HID_KEYCODES.TRANSPARENT) {
+        map[`key-${index}`] = [...EMPTY_KEY_SLOTS];
+        continue;
+      }
+
       const fallback = HID_KEYCODE_NAMES[numericCode] ?? `0x${numericCode.toString(16)}`;
-      map[`key-${index}`] = resolveKeycodeLabel(numericCode, fallback);
+      const legend = resolveKeycapLegend(numericCode, fallback);
+      map[`key-${index}`] = buildKeycodeLegendSlots(numericCode, legend.slots, "size-3.5");
     }
     return map;
-  }, [layerKeycodes.data, resolveKeycodeLabel]);
+  }, [connected, layerKeycodes.data, resolveKeycapLegend]);
 
   const menubar = (
     <>
@@ -123,8 +139,8 @@ export default function Keymap() {
           onButtonClick={() => {}}
           showLayerSelector={false}
           showRotary={false}
-          keyLegendMap={connected ? keyLegendMap : undefined}
-          keyLegendClassName="text-[9px] leading-tight truncate"
+          keyLegendSlotsMap={keyLegendSlotsMap}
+          keyLegendClassName="text-[9px] leading-[1.05]"
         />
       }
       menubar={menubar}
@@ -133,6 +149,7 @@ export default function Keymap() {
         onSelect={handleKeycodeSelect}
         selectedCode={selectedCode}
         className="h-full"
+        resolveLegend={resolveKeycapLegend}
       />
     </KeyboardEditor>
   );

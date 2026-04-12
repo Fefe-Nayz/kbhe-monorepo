@@ -308,6 +308,7 @@ export const HID_KEYCODES: Record<string, number> = {
   LEFTBRACE: 0x2f,
   RIGHTBRACE: 0x30,
   BACKSLASH: 0x31,
+  NONUS_HASH: 0x32,
   SEMICOLON: 0x33,
   APOSTROPHE: 0x34,
   GRAVE: 0x35,

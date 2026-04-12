@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
+import { useKeyboardPreviewLegends } from "@/hooks/use-keyboard-preview-legends";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { KeycodeAccordion } from "@/components/keycode-accordion";
@@ -47,6 +48,7 @@ export default function AdvancedKeys() {
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
   const { status }      = useDeviceSession();
   const connected       = status === "connected";
+  const keyLegendSlotsMap = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
   const focusedKeyId = selectedKeys[0] ?? null;
@@ -322,6 +324,8 @@ export default function AdvancedKeys() {
           onButtonClick={() => {}}
           showLayerSelector={false}
           showRotary={false}
+          keyLegendSlotsMap={keyLegendSlotsMap}
+          keyLegendClassName="text-[9px] leading-[1.05]"
         />
       }
       menubar={menubar}

@@ -1,5 +1,5 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import { memo, useId, useMemo } from "react";
+import { isValidElement, memo, useId, useMemo } from "react";
 import {
   Tooltip,
   TooltipTrigger,
@@ -25,6 +25,7 @@ interface KeyboardKeyProps {
   }) => ReactNode;
   overrideColor?: string;
   primaryLegend?: ReactNode;
+  legendSlots?: Array<ReactNode | undefined>;
   primaryLegendClassName?: string;
   primaryLegendColor?: string;
   primaryLegendFontSize?: number;
@@ -63,6 +64,25 @@ function isDefaultKeyColor(color: string): boolean {
   return color.trim().toLowerCase() === "#cccccc";
 }
 
+function getLegendText(value: ReactNode | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+
+  if (isValidElement<{ [key: string]: unknown }>(value)) {
+    const fromData = value.props["data-keycap-text"];
+    if (typeof fromData === "string" && fromData.trim().length > 0) {
+      return fromData;
+    }
+
+    const ariaLabel = value.props["aria-label"];
+    if (typeof ariaLabel === "string" && ariaLabel.trim().length > 0) {
+      return ariaLabel;
+    }
+  }
+
+  return undefined;
+}
+
 function KeyboardKeyComponent({
   keyData,
   unit,
@@ -76,6 +96,7 @@ function KeyboardKeyComponent({
   renderLegend,
   overrideColor,
   primaryLegend,
+  legendSlots,
   primaryLegendClassName,
   primaryLegendColor,
   primaryLegendFontSize,
@@ -123,20 +144,31 @@ function KeyboardKeyComponent({
     interactive && "kle-key--interactive",
   );
 
-  const legends = keyData.labels.map((label, index) => {
+  const slotCount = Math.max(
+    keyData.labels.length,
+    legendSlots?.length ?? 0,
+    showLegendSlots ? 12 : 0,
+  );
+
+  const legends = Array.from({ length: slotCount }, (_, index) => {
+    const label = keyData.labels[index] ?? "";
+    const slotLegend = legendSlots?.[index];
+    const hasSlotLegendOverride = slotLegend !== undefined;
     const hasPrimaryLegendOverride = index === 0 && primaryLegend !== undefined;
 
-    if (!label && !hasPrimaryLegendOverride) {
+    if (!label && !hasPrimaryLegendOverride && !hasSlotLegendOverride) {
       return showLegendSlots ? (
         <span key={index} className={cn("kle-legend kle-legend--placeholder", LEGEND_POSITION_CLASSES[index])} />
       ) : null;
     }
 
-    const legendContent = hasPrimaryLegendOverride
-      ? primaryLegend
-      : renderLegend
-        ? renderLegend({ key: keyData, label, index })
-        : label;
+    const legendContent = hasSlotLegendOverride
+      ? slotLegend
+      : hasPrimaryLegendOverride
+        ? primaryLegend
+        : renderLegend
+          ? renderLegend({ key: keyData, label, index })
+          : label;
 
     return (
       <span
@@ -144,7 +176,7 @@ function KeyboardKeyComponent({
         className={cn(
           "kle-legend",
           LEGEND_POSITION_CLASSES[index],
-          hasPrimaryLegendOverride && primaryLegendClassName,
+          (hasPrimaryLegendOverride || hasSlotLegendOverride) && primaryLegendClassName,
         )}
         style={getLegendStyle(
           keyData,
@@ -159,9 +191,25 @@ function KeyboardKeyComponent({
     );
   });
 
-  const label = keyData.labels[4] || keyData.labels[0] || keyData.id;
-  const tooltipText = keyData.labels
-    .filter(Boolean)
+  const effectiveLegendTexts = Array.from({ length: slotCount }, (_, index) => {
+    const label = keyData.labels[index] ?? "";
+    const slotLegend = legendSlots?.[index];
+    if (slotLegend !== undefined) {
+      const slotText = getLegendText(slotLegend);
+      if (slotText && slotText.trim().length > 0) return slotText;
+      return undefined;
+    }
+    if (index === 0 && primaryLegend !== undefined) {
+      const primaryText = getLegendText(primaryLegend);
+      if (primaryText && primaryText.trim().length > 0) return primaryText;
+      return undefined;
+    }
+    return label;
+  });
+
+  const label = effectiveLegendTexts[4] || effectiveLegendTexts[0] || keyData.id;
+  const tooltipText = effectiveLegendTexts
+    .filter((value): value is string => Boolean(value && value.trim().length > 0))
     .map((l) => l.replace(/\n/g, " ").trim())
     .join(" / ");
   const clipId = `kle-top-clip-${reactId}`;
@@ -267,6 +315,7 @@ export const KeyboardKey = memo(KeyboardKeyComponent, (prev, next) => (
   prev.renderLegend === next.renderLegend &&
   prev.overrideColor === next.overrideColor &&
   prev.primaryLegend === next.primaryLegend &&
+  prev.legendSlots === next.legendSlots &&
   prev.primaryLegendClassName === next.primaryLegendClassName &&
   prev.primaryLegendColor === next.primaryLegendColor &&
   prev.primaryLegendFontSize === next.primaryLegendFontSize &&

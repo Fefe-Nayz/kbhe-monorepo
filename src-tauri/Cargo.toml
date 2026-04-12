@@ -33,4 +33,6 @@ windows = { version = "0.61", features = [
   "Win32_Media_Audio",
   "Win32_System_Com",
   "Win32_Media_Audio_Endpoints",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
 ] }

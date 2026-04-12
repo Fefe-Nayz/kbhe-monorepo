@@ -1,5 +1,6 @@
 use hidapi::{DeviceInfo, HidApi, HidDevice};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -303,4 +304,196 @@ pub fn kbhe_wait_for_disconnect(kind: String, timeout_ms: u64) -> Result<bool, S
 
         std::thread::sleep(Duration::from_millis(50));
     }
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct KbheOsKeyVariants {
+    base: Option<String>,
+    shift: Option<String>,
+    alt_gr: Option<String>,
+    shift_alt_gr: Option<String>,
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Clone, Copy)]
+struct KeyProbe {
+    code: &'static str,
+    scan_code: u32,
+}
+
+#[cfg(target_os = "windows")]
+const KEY_PROBES: &[KeyProbe] = &[
+    KeyProbe { code: "Backquote", scan_code: 0x29 },
+    KeyProbe { code: "Digit1", scan_code: 0x02 },
+    KeyProbe { code: "Digit2", scan_code: 0x03 },
+    KeyProbe { code: "Digit3", scan_code: 0x04 },
+    KeyProbe { code: "Digit4", scan_code: 0x05 },
+    KeyProbe { code: "Digit5", scan_code: 0x06 },
+    KeyProbe { code: "Digit6", scan_code: 0x07 },
+    KeyProbe { code: "Digit7", scan_code: 0x08 },
+    KeyProbe { code: "Digit8", scan_code: 0x09 },
+    KeyProbe { code: "Digit9", scan_code: 0x0A },
+    KeyProbe { code: "Digit0", scan_code: 0x0B },
+    KeyProbe { code: "Minus", scan_code: 0x0C },
+    KeyProbe { code: "Equal", scan_code: 0x0D },
+    KeyProbe { code: "KeyQ", scan_code: 0x10 },
+    KeyProbe { code: "KeyW", scan_code: 0x11 },
+    KeyProbe { code: "KeyE", scan_code: 0x12 },
+    KeyProbe { code: "KeyR", scan_code: 0x13 },
+    KeyProbe { code: "KeyT", scan_code: 0x14 },
+    KeyProbe { code: "KeyY", scan_code: 0x15 },
+    KeyProbe { code: "KeyU", scan_code: 0x16 },
+    KeyProbe { code: "KeyI", scan_code: 0x17 },
+    KeyProbe { code: "KeyO", scan_code: 0x18 },
+    KeyProbe { code: "KeyP", scan_code: 0x19 },
+    KeyProbe { code: "BracketLeft", scan_code: 0x1A },
+    KeyProbe { code: "BracketRight", scan_code: 0x1B },
+    KeyProbe { code: "IntlHash", scan_code: 0x2B },
+    KeyProbe { code: "Backslash", scan_code: 0x2B },
+    KeyProbe { code: "KeyA", scan_code: 0x1E },
+    KeyProbe { code: "KeyS", scan_code: 0x1F },
+    KeyProbe { code: "KeyD", scan_code: 0x20 },
+    KeyProbe { code: "KeyF", scan_code: 0x21 },
+    KeyProbe { code: "KeyG", scan_code: 0x22 },
+    KeyProbe { code: "KeyH", scan_code: 0x23 },
+    KeyProbe { code: "KeyJ", scan_code: 0x24 },
+    KeyProbe { code: "KeyK", scan_code: 0x25 },
+    KeyProbe { code: "KeyL", scan_code: 0x26 },
+    KeyProbe { code: "Semicolon", scan_code: 0x27 },
+    KeyProbe { code: "Quote", scan_code: 0x28 },
+    KeyProbe { code: "IntlBackslash", scan_code: 0x56 },
+    KeyProbe { code: "KeyZ", scan_code: 0x2C },
+    KeyProbe { code: "KeyX", scan_code: 0x2D },
+    KeyProbe { code: "KeyC", scan_code: 0x2E },
+    KeyProbe { code: "KeyV", scan_code: 0x2F },
+    KeyProbe { code: "KeyB", scan_code: 0x30 },
+    KeyProbe { code: "KeyN", scan_code: 0x31 },
+    KeyProbe { code: "KeyM", scan_code: 0x32 },
+    KeyProbe { code: "Comma", scan_code: 0x33 },
+    KeyProbe { code: "Period", scan_code: 0x34 },
+    KeyProbe { code: "Slash", scan_code: 0x35 },
+];
+
+#[cfg(target_os = "windows")]
+fn normalize_variant_value(value: Option<String>) -> Option<String> {
+    let value = value?;
+    let trimmed = value.trim().to_string();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed)
+}
+
+#[cfg(target_os = "windows")]
+fn extract_variant_for_state(
+    hkl: windows::Win32::UI::Input::KeyboardAndMouse::HKL,
+    vk: u32,
+    scan_code: u32,
+    key_state: &[u8; 256],
+) -> Option<String> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::ToUnicodeEx;
+
+    let mut buffer = [0u16; 8];
+
+    let len = unsafe { ToUnicodeEx(vk, scan_code, key_state, &mut buffer, 0, Some(hkl)) };
+
+    if len == 0 {
+        return None;
+    }
+
+    let take = len.unsigned_abs() as usize;
+    let value = String::from_utf16_lossy(&buffer[..take]);
+
+    if len < 0 {
+        let empty_state = [0u8; 256];
+        for _ in 0..8 {
+            let mut flush_buffer = [0u16; 8];
+            let flush = unsafe { ToUnicodeEx(vk, scan_code, &empty_state, &mut flush_buffer, 0, Some(hkl)) };
+            if flush >= 0 {
+                break;
+            }
+        }
+    }
+
+    normalize_variant_value(Some(value))
+}
+
+#[cfg(target_os = "windows")]
+fn get_os_key_variants_impl() -> Result<HashMap<String, KbheOsKeyVariants>, String> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetKeyboardLayout, MapVirtualKeyExW, MAPVK_VSC_TO_VK_EX, VK_CONTROL, VK_MENU, VK_RCONTROL,
+        VK_RMENU, VK_RSHIFT, VK_SHIFT,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+
+    fn current_keyboard_layout() -> windows::Win32::UI::Input::KeyboardAndMouse::HKL {
+        let foreground = unsafe { GetForegroundWindow() };
+        if !foreground.0.is_null() {
+            let mut process_id = 0u32;
+            let thread_id = unsafe { GetWindowThreadProcessId(foreground, Some(&mut process_id)) };
+            if thread_id != 0 {
+                return unsafe { GetKeyboardLayout(thread_id) };
+            }
+        }
+
+        unsafe { GetKeyboardLayout(0) }
+    }
+
+    let hkl = current_keyboard_layout();
+    let mut result = HashMap::new();
+
+    for probe in KEY_PROBES {
+        let vk = unsafe { MapVirtualKeyExW(probe.scan_code, MAPVK_VSC_TO_VK_EX, Some(hkl)) };
+        if vk == 0 {
+            continue;
+        }
+
+        let base_state = [0u8; 256];
+
+        let mut shift_state = [0u8; 256];
+        shift_state[VK_SHIFT.0 as usize] = 0x80;
+        shift_state[VK_RSHIFT.0 as usize] = 0x80;
+
+        let mut altgr_state = [0u8; 256];
+        altgr_state[VK_CONTROL.0 as usize] = 0x80;
+        altgr_state[VK_MENU.0 as usize] = 0x80;
+        altgr_state[VK_RCONTROL.0 as usize] = 0x80;
+        altgr_state[VK_RMENU.0 as usize] = 0x80;
+
+        let mut shift_altgr_state = altgr_state;
+        shift_altgr_state[VK_SHIFT.0 as usize] = 0x80;
+        shift_altgr_state[VK_RSHIFT.0 as usize] = 0x80;
+
+        let base = extract_variant_for_state(hkl, vk, probe.scan_code, &base_state);
+        let shift = extract_variant_for_state(hkl, vk, probe.scan_code, &shift_state);
+        let alt_gr = extract_variant_for_state(hkl, vk, probe.scan_code, &altgr_state);
+        let shift_alt_gr = extract_variant_for_state(hkl, vk, probe.scan_code, &shift_altgr_state);
+
+        if base.is_none() && shift.is_none() && alt_gr.is_none() && shift_alt_gr.is_none() {
+            continue;
+        }
+
+        result.insert(
+            probe.code.to_string(),
+            KbheOsKeyVariants {
+                base,
+                shift,
+                alt_gr,
+                shift_alt_gr,
+            },
+        );
+    }
+
+    Ok(result)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_os_key_variants_impl() -> Result<HashMap<String, KbheOsKeyVariants>, String> {
+    Ok(HashMap::new())
+}
+
+#[tauri::command]
+pub fn kbhe_get_os_key_variants() -> Result<HashMap<String, KbheOsKeyVariants>, String> {
+    get_os_key_variants_impl()
 }

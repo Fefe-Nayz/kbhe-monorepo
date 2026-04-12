@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * Maps DOM KeyboardEvent.code → HID keycode (subset for printable keys).
@@ -17,12 +18,57 @@ const HID_TO_DOM_CODE: Record<number, string> = {
   0x26: "Digit9", 0x27: "Digit0",
   0x2d: "Minus", 0x2e: "Equal",
   0x2f: "BracketLeft", 0x30: "BracketRight", 0x31: "Backslash",
+  0x32: "IntlHash",
   0x33: "Semicolon", 0x34: "Quote", 0x35: "Backquote",
   0x36: "Comma", 0x37: "Period", 0x38: "Slash",
   0x64: "IntlBackslash",
+  0x28: "Enter",
+  0x29: "Escape",
+  0x2a: "Backspace",
+  0x2b: "Tab",
+  0x2c: "Space",
+  0x39: "CapsLock",
+  0x49: "Insert",
+  0x4a: "Home",
+  0x4b: "PageUp",
+  0x4c: "Delete",
+  0x4d: "End",
+  0x4e: "PageDown",
+  0x4f: "ArrowRight",
+  0x50: "ArrowLeft",
+  0x51: "ArrowDown",
+  0x52: "ArrowUp",
+  0xe0: "ControlLeft",
+  0xe1: "ShiftLeft",
+  0xe2: "AltLeft",
+  0xe3: "MetaLeft",
+  0xe4: "ControlRight",
+  0xe5: "ShiftRight",
+  0xe6: "AltRight",
+  0xe7: "MetaRight",
 };
 
+const ALIGN4_LINE_TO_SLOT = [0, 6, 2, 8] as const;
+
 type LayoutMap = Map<string, string>;
+
+interface OsKeyVariantEntry {
+  base?: string;
+  shift?: string;
+  altGr?: string;
+  shiftAltGr?: string;
+}
+
+type OsKeyVariantMap = Record<string, OsKeyVariantEntry>;
+
+export interface KeycapLegend {
+  primary: string;
+  secondary?: string;
+  lines: string[];
+  slots: Array<string | undefined>;
+  text: string;
+  searchText: string;
+}
 
 async function getOSLayoutMap(): Promise<LayoutMap | null> {
   try {
@@ -36,6 +82,137 @@ async function getOSLayoutMap(): Promise<LayoutMap | null> {
   return null;
 }
 
+async function getOsKeyVariantsFromSystem(): Promise<OsKeyVariantMap | null> {
+  try {
+    return await invoke<OsKeyVariantMap>("kbhe_get_os_key_variants");
+  } catch {
+    return null;
+  }
+}
+
+function normalizeOsLabel(value: string): string {
+  if (value.length === 1 && /^[a-z]$/.test(value)) {
+    return value.toUpperCase();
+  }
+  return value;
+}
+
+function buildLegendFromLines(lines: string[]): KeycapLegend {
+  const normalizedLines = lines.map((line) => line.trim()).filter(Boolean);
+  const safeLines = normalizedLines.length > 0 ? normalizedLines : [""];
+  const slots: Array<string | undefined> = Array.from({ length: 12 }, () => "");
+
+  for (let i = 0; i < 4; i += 1) {
+    const line = lines[i]?.trim();
+    if (!line) continue;
+    slots[ALIGN4_LINE_TO_SLOT[i]] = line;
+  }
+
+  if (!slots.some((slot) => slot && slot.length > 0) && safeLines[0]) {
+    slots[0] = safeLines[0];
+  }
+
+  return {
+    primary: safeLines[0] ?? "",
+    secondary: safeLines[1],
+    lines: safeLines,
+    slots,
+    text: safeLines.join("\n"),
+    searchText: safeLines.join(" ").toLowerCase(),
+  };
+}
+
+function buildSimpleLegend(text: string): KeycapLegend {
+  return buildLegendFromLines([text]);
+}
+
+function addUniqueLine(target: string[], value: string | undefined): void {
+  if (!value) return;
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  const normalized = normalizeOsLabel(trimmed);
+  if (!target.includes(normalized)) target.push(normalized);
+}
+
+function normalizeLegendValue(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return normalizeOsLabel(trimmed);
+}
+
+function buildLegendFromSlots(
+  slotsInput: Array<string | undefined>,
+  fallbackName: string,
+): KeycapLegend {
+  const slots: Array<string | undefined> = Array.from({ length: 12 }, () => "");
+
+  for (const slotIndex of [0, 6, 2, 8] as const) {
+    const value = slotsInput[slotIndex];
+    if (value) {
+      slots[slotIndex] = value;
+    }
+  }
+
+  const lines: string[] = [];
+  addUniqueLine(lines, slots[0]);
+  addUniqueLine(lines, slots[6]);
+  addUniqueLine(lines, slots[2]);
+  addUniqueLine(lines, slots[8]);
+
+  if (lines.length === 0) {
+    addUniqueLine(lines, fallbackName);
+  }
+
+  if (!slots.some((slot) => slot && slot.length > 0) && lines[0]) {
+    slots[0] = lines[0];
+  }
+
+  return {
+    primary: lines[0] ?? "",
+    secondary: lines[1],
+    lines,
+    slots,
+    text: lines.join("\n"),
+    searchText: lines.join(" ").toLowerCase(),
+  };
+}
+
+function resolvePrintableLegend(
+  domCode: string,
+  fallbackName: string,
+  layoutMap: LayoutMap | null,
+  osVariants: OsKeyVariantMap | null,
+): KeycapLegend {
+  const layoutBase = normalizeLegendValue(layoutMap?.get(domCode));
+  const variants = osVariants?.[domCode];
+  const base = layoutBase ?? normalizeLegendValue(variants?.base);
+  const shift = normalizeLegendValue(variants?.shift);
+  const altGr = normalizeLegendValue(variants?.altGr);
+  const shiftAltGr = normalizeLegendValue(variants?.shiftAltGr);
+
+  const slots: Array<string | undefined> = Array.from({ length: 12 }, () => undefined);
+  const hasDistinctShiftLegend = Boolean(shift && shift !== base);
+
+  if (hasDistinctShiftLegend) {
+    slots[0] = shift;
+  }
+
+  if (base) {
+    slots[hasDistinctShiftLegend ? 6 : 0] = base;
+  }
+
+  if (shiftAltGr && shiftAltGr !== shift && shiftAltGr !== altGr) {
+    slots[2] = shiftAltGr;
+  }
+
+  if (altGr && altGr !== base) {
+    slots[8] = altGr;
+  }
+
+  return buildLegendFromSlots(slots, fallbackName);
+}
+
 /**
  * Returns a function that resolves an HID keycode to an OS-specific label.
  * Falls back to the provided `fallback` name if no OS mapping is available.
@@ -44,7 +221,31 @@ export function useOSLayout() {
   const [layoutMap, setLayoutMap] = useState<LayoutMap | null>(null);
 
   useEffect(() => {
-    void getOSLayoutMap().then(setLayoutMap);
+    let cancelled = false;
+
+    const refreshLayoutMap = () => {
+      void getOSLayoutMap().then((nextLayoutMap) => {
+        if (!cancelled) {
+          setLayoutMap(nextLayoutMap);
+        }
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshLayoutMap();
+      }
+    };
+
+    refreshLayoutMap();
+    window.addEventListener("focus", refreshLayoutMap);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshLayoutMap);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   return useCallback((hidKeycode: number, fallbackName: string): string => {
@@ -53,6 +254,54 @@ export function useOSLayout() {
     if (!domCode) return fallbackName;
     const osLabel = layoutMap.get(domCode);
     if (!osLabel) return fallbackName;
-    return osLabel.length === 1 ? osLabel.toUpperCase() : osLabel;
+    return normalizeOsLabel(osLabel);
   }, [layoutMap]);
+}
+
+/**
+ * Resolves an HID keycode to a keycap-like legend for UI display.
+ * Printable keys can return two entries (top/bottom), e.g. "!\n1".
+ */
+export function useOSKeycapLegend() {
+  const [layoutMap, setLayoutMap] = useState<LayoutMap | null>(null);
+  const [osVariants, setOsVariants] = useState<OsKeyVariantMap | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshLegends = () => {
+      void Promise.all([getOSLayoutMap(), getOsKeyVariantsFromSystem()]).then(
+        ([nextLayoutMap, nextVariants]) => {
+          if (cancelled) {
+            return;
+          }
+          setLayoutMap(nextLayoutMap);
+          setOsVariants(nextVariants);
+        },
+      );
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshLegends();
+      }
+    };
+
+    refreshLegends();
+    window.addEventListener("focus", refreshLegends);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshLegends);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  return useCallback((hidKeycode: number, fallbackName: string): KeycapLegend => {
+    const domCode = HID_TO_DOM_CODE[hidKeycode];
+    if (!domCode) return buildSimpleLegend(fallbackName);
+
+    return resolvePrintableLegend(domCode, fallbackName, layoutMap, osVariants);
+  }, [layoutMap, osVariants]);
 }

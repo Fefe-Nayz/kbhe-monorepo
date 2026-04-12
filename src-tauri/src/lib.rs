@@ -74,6 +74,7 @@ pub fn run() {
             commands::kbhe_read_report,
             commands::kbhe_wait_for_device,
             commands::kbhe_wait_for_disconnect,
+            commands::kbhe_get_os_key_variants,
             volume::kbhe_get_system_volume,
         ])
         .run(tauri::generate_context!())

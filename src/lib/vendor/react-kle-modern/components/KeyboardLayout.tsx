@@ -19,6 +19,7 @@ export const KeyboardLayout = memo(function KeyboardLayout({
   renderLegend,
   keyColorMap,
   keyLegendMap,
+  keyLegendSlotsMap,
   keyLegendClassNameMap,
   keyLegendColorMap,
   keyLegendFontSizeMap,
@@ -70,6 +71,7 @@ export const KeyboardLayout = memo(function KeyboardLayout({
               renderLegend={renderLegend}
               overrideColor={keyColorMap?.[key.id]}
               primaryLegend={keyLegendMap?.[key.id]}
+              legendSlots={keyLegendSlotsMap?.[key.id]}
               primaryLegendClassName={keyLegendClassNameMap?.[key.id]}
               primaryLegendColor={keyLegendColorMap?.[key.id]}
               primaryLegendFontSize={keyLegendFontSizeMap?.[key.id]}

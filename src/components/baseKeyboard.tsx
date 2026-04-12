@@ -19,13 +19,31 @@ interface BaseKeyboardProps {
   showLayerSelector?: boolean;
   showRotary?: boolean;
   keyLegendMap?: Record<string, React.ReactNode>;
+  keyLegendSlotsMap?: Record<string, Array<React.ReactNode | undefined>>;
   keyLegendClassName?: string;
   renderKeyOverlay?: (keyId: string) => React.ReactNode;
   keyColorMap?: Record<string, string>;
 }
 
 function resolveLabel(label: string): React.ReactNode {
-  return labelRegistry[label] ?? label;
+  const registered = labelRegistry[label];
+  if (registered) return registered;
+
+  const lines = label
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length >= 2) {
+    return (
+      <span className="flex flex-col items-center leading-[1.05]">
+        <span>{lines[0]}</span>
+        <span>{lines.slice(1).join(" ")}</span>
+      </span>
+    );
+  }
+
+  return label;
 }
 
 const FRAME_PADDING = 18;
@@ -91,6 +109,7 @@ export default function BaseKeyboard({
   showLayerSelector = true,
   showRotary = true,
   keyLegendMap,
+  keyLegendSlotsMap,
   keyLegendClassName,
   renderKeyOverlay,
   keyColorMap,
@@ -210,14 +229,22 @@ export default function BaseKeyboard({
   }, [currentLayer, layout.bindings, overlayLegendMap]);
 
   const resolvedKeyLegendClassNameMap = useMemo(() => {
-    if (!keyLegendClassName || !overlayLegendMap) return undefined;
+    if (!keyLegendClassName) return undefined;
+
+    const legendIds = new Set<string>([
+      ...Object.keys(overlayLegendMap ?? {}),
+      ...Object.keys(keyLegendSlotsMap ?? {}),
+      ...Object.keys(keyLegendMap ?? {}),
+    ]);
+
+    if (legendIds.size === 0) return undefined;
 
     const next: Record<string, string> = {};
-    for (const keyId of Object.keys(overlayLegendMap)) {
+    for (const keyId of legendIds) {
       next[keyId] = keyLegendClassName;
     }
     return next;
-  }, [keyLegendClassName, overlayLegendMap]);
+  }, [keyLegendClassName, overlayLegendMap, keyLegendSlotsMap, keyLegendMap]);
 
   const resolvedKeyLegendColorMap = useMemo(() => {
     const next: Record<string, string | undefined> = {};
@@ -310,6 +337,7 @@ export default function BaseKeyboard({
                 onKeyClick={handleKeyClick}
                 keyColorMap={keyColorMap}
                 keyLegendMap={resolvedKeyLegendMap}
+                keyLegendSlotsMap={keyLegendSlotsMap}
                 keyLegendClassNameMap={resolvedKeyLegendClassNameMap}
                 keyLegendColorMap={resolvedKeyLegendColorMap}
                 keyLegendFontSizeMap={resolvedKeyLegendFontSizeMap}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BaseKeyboard from "@/components/baseKeyboard";
@@ -19,9 +19,6 @@ import {
   GAMEPAD_DIRECTIONS,
   GAMEPAD_API_MODES,
   GAMEPAD_KEYBOARD_ROUTING,
-  GAMEPAD_BUTTON_NAMES,
-  GAMEPAD_AXIS_NAMES,
-  GAMEPAD_DIRECTION_NAMES,
 } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -35,6 +32,7 @@ import {
 import { IconDeviceGamepad, IconDeviceGamepad2 } from "@tabler/icons-react";
 import { cn, selectItems } from "@/lib/utils";
 import { usePageVisible } from "@/hooks/use-page-visible";
+import { useKeyboardPreviewLegends } from "@/hooks/use-keyboard-preview-legends";
 
 const VIEW_W = 350;
 const VIEW_H = 200;
@@ -67,6 +65,7 @@ export default function Gamepad() {
   const { status } = useDeviceSession();
   const connected = status === "connected";
   const visible = usePageVisible();
+  const keyLegendSlotsMap = useKeyboardPreviewLegends();
   const qc = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
@@ -188,26 +187,6 @@ export default function Gamepad() {
     [gs, gamepadMutation],
   );
 
-  // ── Render key overlay showing current gamepad mapping ──
-
-  const keyLegendMap = useMemo(() => {
-    if (!km || keyIndex == null) return undefined;
-
-    const parts: string[] = [];
-    if (km.button !== 0) parts.push(GAMEPAD_BUTTON_NAMES[km.button] ?? `B${km.button}`);
-    if (km.axis !== 0) {
-      const axisName = GAMEPAD_AXIS_NAMES[km.axis] ?? `A${km.axis}`;
-      const dir = GAMEPAD_DIRECTION_NAMES[km.direction] ?? "+";
-      parts.push(`${axisName} ${dir}`);
-    }
-
-    if (parts.length === 0) return undefined;
-
-    return {
-      [`key-${keyIndex}`]: parts.join(", "),
-    };
-  }, [km, keyIndex]);
-
   // ── XInput / HID toggle ──
 
   const isXInput = gs?.api_mode === GAMEPAD_API_MODES["XInput (Xbox Compatible)"];
@@ -250,8 +229,8 @@ export default function Gamepad() {
           onButtonClick={() => {}}
           showLayerSelector={false}
           showRotary={false}
-          keyLegendMap={connected ? keyLegendMap : undefined}
-          keyLegendClassName="text-[9px] leading-tight truncate text-primary"
+          keyLegendSlotsMap={keyLegendSlotsMap}
+          keyLegendClassName="text-[9px] leading-[1.05]"
         />
       }
       menubar={menubar}
@@ -449,7 +428,7 @@ export default function Gamepad() {
               description="Drag points to shape the distance-to-output mapping"
             >
               {!connected || gamepadQ.isLoading ? (
-                <Skeleton className="h-[240px] w-full" />
+                <Skeleton className="h-60 w-full" />
               ) : !gs ? (
                 <p className="text-sm text-muted-foreground py-4">
                   Connect device to edit analog curve.

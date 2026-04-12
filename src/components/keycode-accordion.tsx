@@ -1,16 +1,19 @@
 import { useState, useMemo } from "react";
 import { HID_KEYCODES } from "@/lib/kbhe/protocol";
-import { useOSLayout } from "@/hooks/use-os-layout";
+import { buildKeycodeLegendSlots } from "@/lib/kbhe/keycode-icons";
+import { useOSKeycapLegend, type KeycapLegend } from "@/hooks/use-os-layout";
+import { KeycapButton } from "@/components/keycap-button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { IconSearch } from "@tabler/icons-react";
 
+const KEYCODE_TILE_UNIT = 50;
+
 interface KeycodeEntry {
   name: string;
-  displayName: string;
+  legend: KeycapLegend;
   code: number;
 }
 
@@ -46,6 +49,7 @@ const FRIENDLY_LABELS: Record<string, string> = {
   DOT: ".",
   SLASH: "/",
   BACKSLASH: "\\",
+  NONUS_HASH: "ISO #",
   NONUS_BACKSLASH: "ISO \\",
   LCTRL: "L-Ctrl",
   RCTRL: "R-Ctrl",
@@ -110,7 +114,7 @@ function formatKeycodeName(name: string): string {
   return name;
 }
 
-function categorize(resolveLabel: (hidKeycode: number, fallbackName: string) => string): KeycodeCategory[] {
+function categorize(resolveLegend: (hidKeycode: number, fallbackName: string) => KeycapLegend): KeycodeCategory[] {
   const letters: KeycodeCategory["keys"] = [];
   const numbers: KeycodeCategory["keys"] = [];
   const modifiers: KeycodeCategory["keys"] = [];
@@ -131,7 +135,11 @@ function categorize(resolveLabel: (hidKeycode: number, fallbackName: string) => 
     if (seen.has(code)) continue;
     seen.add(code);
 
-    const entry = { name, displayName: resolveLabel(code, formatKeycodeName(name)), code };
+    const entry = {
+      name,
+      legend: resolveLegend(code, formatKeycodeName(name)),
+      code,
+    };
     if (/^[A-Z]$/.test(name)) letters.push(entry);
     else if (/^[0-9]$/.test(name)) numbers.push(entry);
     else if (/^F\d+$/.test(name)) fkeys.push(entry);
@@ -147,7 +155,7 @@ function categorize(resolveLabel: (hidKeycode: number, fallbackName: string) => 
     else system.push(entry);
   }
 
-  return [
+  const categories = [
     { label: "Special", keys: special },
     { label: "Letters", keys: letters },
     { label: "Numbers", keys: numbers },
@@ -162,19 +170,29 @@ function categorize(resolveLabel: (hidKeycode: number, fallbackName: string) => 
     { label: "Gamepad", keys: gamepad },
     { label: "System", keys: system },
   ].filter((c) => c.keys.length > 0);
+
+  for (const category of categories) {
+    category.keys.sort((a, b) =>
+      a.legend.searchText.localeCompare(b.legend.searchText, undefined, { sensitivity: "base" }),
+    );
+  }
+
+  return categories;
 }
 
 interface KeycodeAccordionProps {
   onSelect: (code: number, name: string) => void;
   selectedCode?: number;
   className?: string;
+  resolveLegend?: (hidKeycode: number, fallbackName: string) => KeycapLegend;
 }
 
-export function KeycodeAccordion({ onSelect, selectedCode, className }: KeycodeAccordionProps) {
+export function KeycodeAccordion({ onSelect, selectedCode, className, resolveLegend }: KeycodeAccordionProps) {
   const [search, setSearch] = useState("");
-  const resolveKeycodeLabel = useOSLayout();
+  const hookResolveKeycapLegend = useOSKeycapLegend();
+  const resolveKeycapLegend = resolveLegend ?? hookResolveKeycapLegend;
 
-  const categories = useMemo(() => categorize(resolveKeycodeLabel), [resolveKeycodeLabel]);
+  const categories = useMemo(() => categorize(resolveKeycapLegend), [resolveKeycapLegend]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return categories;
@@ -182,7 +200,7 @@ export function KeycodeAccordion({ onSelect, selectedCode, className }: KeycodeA
     return categories.map((cat) => ({
       ...cat,
       keys: cat.keys.filter((k) =>
-        k.displayName.toLowerCase().includes(q) || k.name.toLowerCase().includes(q),
+        k.legend.searchText.includes(q) || k.name.toLowerCase().includes(q),
       ),
     })).filter((cat) => cat.keys.length > 0);
   }, [search, categories]);
@@ -211,19 +229,20 @@ export function KeycodeAccordion({ onSelect, selectedCode, className }: KeycodeA
               <AccordionContent>
                 <div className="flex flex-wrap gap-1.5 pb-2">
                   {cat.keys.map((k) => (
-                    <Button
+                    <KeycapButton
                       key={k.code}
-                      variant={selectedCode === k.code ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 px-2 text-xs font-mono"
-                      onClick={() => onSelect(k.code, k.displayName)}
+                      keyId={`keycode-${k.code}`}
+                      legendSlots={buildKeycodeLegendSlots(k.code, k.legend.slots, "size-3.5")}
+                      labelText={k.legend.text}
+                      unit={KEYCODE_TILE_UNIT}
+                      selected={selectedCode === k.code}
+                      className={cn("rounded-md", selectedCode === k.code && "ring-2 ring-primary/20")}
+                      onClick={() => onSelect(k.code, k.legend.text)}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         onSelect(0, "NO");
                       }}
-                    >
-                      {k.displayName}
-                    </Button>
+                    />
                   ))}
                 </div>
               </AccordionContent>
