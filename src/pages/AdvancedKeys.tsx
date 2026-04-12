@@ -43,11 +43,11 @@ const BEHAVIOR_INFO = [
 
 
 export default function AdvancedKeys() {
-  const selectedKeys    = useKeyboardStore((s) => s.selectedKeys);
-  const currentLayer    = useKeyboardStore((s) => s.currentLayer);
+  const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
+  const currentLayer = useKeyboardStore((s) => s.currentLayer);
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
-  const { status }      = useDeviceSession();
-  const connected       = status === "connected";
+  const { status } = useDeviceSession();
+  const connected = status === "connected";
   const keyLegendSlotsMap = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
@@ -114,7 +114,7 @@ export default function AdvancedKeys() {
         {BEHAVIOR_INFO.map((b) => (
           <Button
             key={b.id}
-                      variant={settings?.behavior_mode === b.id ? "default" : "outline"}
+            variant={settings?.behavior_mode === b.id ? "default" : "outline"}
             className="h-auto flex-col items-start gap-1 p-4"
             onClick={() => keyMutation.mutate({ behavior_mode: b.id })}
             disabled={!connected || noSelection}
@@ -245,7 +245,7 @@ export default function AdvancedKeys() {
                   <DistanceSlider
                     label={`Zone ${i + 1} Travel End`}
                     value={zone.end_mm}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     disabled={!connected}
                   />
                   <FormRow label={`Zone ${i + 1} Action`}>
@@ -321,7 +321,7 @@ export default function AdvancedKeys() {
       keyboard={
         <BaseKeyboard
           mode="single"
-          onButtonClick={() => {}}
+          onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
           keyLegendSlotsMap={keyLegendSlotsMap}
@@ -338,7 +338,7 @@ export default function AdvancedKeys() {
           {noSelection ? (
             <p className="text-sm text-muted-foreground py-2">Click any key to configure it.</p>
           ) : keySettingsQ.isLoading ? (
-            <div className="space-y-3">{[0,1,2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            <div className="space-y-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : !settings ? (
             <p className="text-sm text-muted-foreground">Could not load settings.</p>
           ) : (

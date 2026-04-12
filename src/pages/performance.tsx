@@ -24,11 +24,11 @@ import {
 type FilterParams = { noise_band: number; alpha_min_denom: number; alpha_max_denom: number };
 
 export default function Performance() {
-  const selectedKeys   = useKeyboardStore((s) => s.selectedKeys);
-  const selectAll      = useKeyboardStore((s) => s.selectAll);
+  const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
+  const selectAll = useKeyboardStore((s) => s.selectAll);
   const clearSelection = useKeyboardStore((s) => s.clearSelection);
-  const { status }     = useDeviceSession();
-  const connected      = status === "connected";
+  const { status } = useDeviceSession();
+  const connected = status === "connected";
   const keyLegendSlotsMap = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
@@ -151,7 +151,7 @@ export default function Performance() {
       keyboard={
         <BaseKeyboard
           mode="multi"
-          onButtonClick={() => {}}
+          onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
           keyLegendSlotsMap={keyLegendSlotsMap}
@@ -168,7 +168,7 @@ export default function Performance() {
           {noSelection ? (
             <p className="text-sm text-muted-foreground py-2">Click any key to configure it.</p>
           ) : keySettingsQ.isLoading ? (
-            <div className="space-y-3">{[0,1,2,3].map(i => <Skeleton key={i} className="h-9 w-full" />)}</div>
+            <div className="space-y-3">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-9 w-full" />)}</div>
           ) : !settings ? (
             <p className="text-sm text-muted-foreground">Could not load settings.</p>
           ) : (

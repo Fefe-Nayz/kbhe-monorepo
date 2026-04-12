@@ -37,13 +37,13 @@ async function fetchAllLayerKeycodes(layer: number): Promise<Record<number, numb
 }
 
 export default function Keymap() {
-  const selectedKeys    = useKeyboardStore((s) => s.selectedKeys);
-  const currentLayer    = useKeyboardStore((s) => s.currentLayer);
+  const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
+  const currentLayer = useKeyboardStore((s) => s.currentLayer);
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
   const updateKeyConfig = useKeyboardStore((s) => s.updateKeyConfig);
-  const clearSelection  = useKeyboardStore((s) => s.clearSelection);
-  const { status }      = useDeviceSession();
-  const connected       = status === "connected";
+  const clearSelection = useKeyboardStore((s) => s.clearSelection);
+  const { status } = useDeviceSession();
+  const connected = status === "connected";
   const { saveState, markSaving, markSaved } = useAutosave();
   const resolveKeycapLegend = useOSKeycapLegend();
 
@@ -136,7 +136,7 @@ export default function Keymap() {
       keyboard={
         <BaseKeyboard
           mode="single"
-          onButtonClick={() => {}}
+          onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
           keyLegendSlotsMap={keyLegendSlotsMap}

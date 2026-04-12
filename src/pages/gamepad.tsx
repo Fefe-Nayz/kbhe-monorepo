@@ -226,7 +226,7 @@ export default function Gamepad() {
       keyboard={
         <BaseKeyboard
           mode="single"
-          onButtonClick={() => {}}
+          onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
           keyLegendSlotsMap={keyLegendSlotsMap}
