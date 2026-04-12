@@ -83,21 +83,28 @@ const DEV_ITEMS: NavItem[] = [
   { title: "Diagnostics", path: "/diagnostics", icon: IconActivity },
 ];
 
+interface AppSidebarProps {
+  variant?: "sidebar" | "floating" | "inset";
+}
+
 function KeyboardMenu() {
   const { status, deviceInfo } = useDeviceSession();
   const connected = status === "connected" || status === "updater";
 
   return (
-    <SidebarMenu>
+    <SidebarMenu className="gap-1">
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <SidebarMenuButton
+                size="lg"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              >
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <IconKeyboard className="size-4" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate font-medium">
                     {connected ? (deviceInfo?.product ?? "KBHE Keyboard") : "KBHE Configurator"}
                   </span>
@@ -107,7 +114,7 @@ function KeyboardMenu() {
                       : "No device"}
                   </span>
                 </div>
-                <IconChevronDown className="ml-auto size-4" />
+                <IconChevronDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
               </SidebarMenuButton>
             }
           />
@@ -130,7 +137,7 @@ function KeyboardMenu() {
   );
 }
 
-export function AppSidebar() {
+export function AppSidebar({ variant = "inset" }: AppSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const developerMode = useDeviceSession((s) => s.developerMode);
@@ -143,17 +150,17 @@ export function AppSidebar() {
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
+    <Sidebar variant={variant} collapsible="icon">
+      <SidebarHeader className="pb-1">
         <KeyboardMenu />
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="gap-1 pt-1">
         {NAV_GROUPS.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-1">
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
@@ -178,7 +185,7 @@ export function AppSidebar() {
               Developer
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-1">
                 {DEV_ITEMS.map((item) => (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton

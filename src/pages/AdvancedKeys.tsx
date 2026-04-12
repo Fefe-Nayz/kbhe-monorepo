@@ -12,13 +12,13 @@ import { LayerSelect } from "@/components/layer-select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { CommitSlider } from "@/components/ui/slider";
+import { CommitSlider } from "@/components/ui/commit-slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
@@ -231,7 +231,9 @@ export default function AdvancedKeys() {
                 onValueChange={(v) => keyMutation.mutate({ dynamic_zone_count: Number(v) })} disabled={!connected}>
                 <SelectTrigger className="w-24 h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 4].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                  <SelectGroup>
+                    {[1, 2, 3, 4].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </FormRow>
@@ -368,12 +370,14 @@ export default function AdvancedKeys() {
                 >
                   <SelectTrigger className="w-44 h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent className="max-h-60">
-                    <SelectItem value="none">None (disabled)</SelectItem>
-                    {Array.from({ length: KEY_COUNT }, (_, i) => i)
-                      .filter(i => i !== keyIndex)
-                      .map(i => (
-                        <SelectItem key={i} value={String(i)}>Key {i}</SelectItem>
-                      ))}
+                    <SelectGroup>
+                      <SelectItem value="none">None (disabled)</SelectItem>
+                      {Array.from({ length: KEY_COUNT }, (_, i) => i)
+                        .filter(i => i !== keyIndex)
+                        .map(i => (
+                          <SelectItem key={i} value={String(i)}>Key {i}</SelectItem>
+                        ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </FormRow>
@@ -385,9 +389,11 @@ export default function AdvancedKeys() {
                       onValueChange={v => keyMutation.mutate({ socd_resolution: Number(v) })}>
                       <SelectTrigger className="w-44 h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(SOCD_RESOLUTIONS).map(([name, val]) => (
-                          <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(SOCD_RESOLUTIONS).map(([name, val]) => (
+                            <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>

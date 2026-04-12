@@ -3,6 +3,7 @@ import { useProfileStore } from "@/stores/profileStore";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -32,11 +33,13 @@ export function ProfileSelect() {
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {profiles.map((p) => (
-          <SelectItem key={p.name} value={p.name}>
-            {p.name}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {profiles.map((p) => (
+            <SelectItem key={p.name} value={p.name}>
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );

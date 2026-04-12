@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Maps DOM KeyboardEvent.code → HID keycode (subset for printable keys).
@@ -47,12 +47,12 @@ export function useOSLayout() {
     void getOSLayoutMap().then(setLayoutMap);
   }, []);
 
-  return function resolveKeycodeLabel(hidKeycode: number, fallbackName: string): string {
+  return useCallback((hidKeycode: number, fallbackName: string): string => {
     if (!layoutMap) return fallbackName;
     const domCode = HID_TO_DOM_CODE[hidKeycode];
     if (!domCode) return fallbackName;
     const osLabel = layoutMap.get(domCode);
     if (!osLabel) return fallbackName;
     return osLabel.length === 1 ? osLabel.toUpperCase() : osLabel;
-  };
+  }, [layoutMap]);
 }

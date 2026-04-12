@@ -3,7 +3,7 @@ import { kbheDevice } from "@/lib/kbhe/device";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { queryKeys } from "@/lib/query/keys";
 import { SectionCard } from "@/components/shared/SectionCard";
-import { PageHeader } from "@/components/shared/PageLayout";
+import { PageContent } from "@/components/shared/PageLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,100 +77,93 @@ function QuickLink({ icon: Icon, title, path, description }: {
 }
 
 export default function Dashboard() {
-  const { status, firmwareVersion, deviceInfo } = useDeviceSession();
+  const { status, firmwareVersion } = useDeviceSession();
   const { gamepad, nkro, ledEffect, mcu, connected } = useDeviceOverview();
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2">
-        <PageHeader title="Dashboard" description={deviceInfo?.product ?? "KBHE Configurator"} />
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4 max-w-4xl mx-auto">
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <SectionCard>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Status</span>
-                <Badge variant={connected ? "default" : "secondary"} className="w-fit">{status}</Badge>
-              </div>
-            </SectionCard>
-            <SectionCard>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Firmware</span>
-                {firmwareVersion ? (
-                  <span className="text-sm font-mono">{firmwareVersion}</span>
-                ) : (
-                  <Skeleton className="h-4 w-16" />
-                )}
-              </div>
-            </SectionCard>
-            <SectionCard>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">LED Effect</span>
-                {ledEffect != null ? (
-                  <span className="text-sm">{LED_EFFECT_NAMES[ledEffect as number] ?? `Effect ${ledEffect}`}</span>
-                ) : (
-                  <Skeleton className="h-4 w-20" />
-                )}
-              </div>
-            </SectionCard>
-            <SectionCard>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Modes</span>
-                <div className="flex flex-wrap gap-1">
+      <PageContent containerClassName="max-w-4xl">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <SectionCard>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Status</span>
+              <Badge variant={connected ? "default" : "secondary"} className="w-fit">{status}</Badge>
+            </div>
+          </SectionCard>
+          <SectionCard>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Firmware</span>
+              {firmwareVersion ? (
+                <span className="text-sm font-mono">{firmwareVersion}</span>
+              ) : (
+                <Skeleton className="h-4 w-16" />
+              )}
+            </div>
+          </SectionCard>
+          <SectionCard>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">LED Effect</span>
+              {ledEffect != null ? (
+                <span className="text-sm">{LED_EFFECT_NAMES[ledEffect as number] ?? `Effect ${ledEffect}`}</span>
+              ) : (
+                <Skeleton className="h-4 w-20" />
+              )}
+            </div>
+          </SectionCard>
+          <SectionCard>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Modes</span>
+              <div className="flex flex-wrap gap-1">
+                <Badge variant="secondary" className="text-xs">
+                  <IconKeyboard className="size-3 mr-1" />KB
+                </Badge>
+                {gamepad && (
                   <Badge variant="secondary" className="text-xs">
-                    <IconKeyboard className="size-3 mr-1" />KB
+                    <IconDeviceGamepad2 className="size-3 mr-1" />GP
                   </Badge>
-                  {gamepad && (
-                    <Badge variant="secondary" className="text-xs">
-                      <IconDeviceGamepad2 className="size-3 mr-1" />GP
-                    </Badge>
-                  )}
-                  {nkro && <Badge variant="secondary" className="text-xs">NKRO</Badge>}
-                </div>
+                )}
+                {nkro && <Badge variant="secondary" className="text-xs">NKRO</Badge>}
               </div>
-            </SectionCard>
-          </div>
-
-          {mcu && (
-            <SectionCard title="MCU Metrics">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Temperature</span>
-                  <span className="text-sm font-mono">{mcu.temperature_c?.toFixed(1) ?? "—"} °C</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Vref</span>
-                  <span className="text-sm font-mono">{(mcu.vref_mv / 1000).toFixed(3)} V</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">Scan Rate</span>
-                  <span className="text-sm font-mono">{mcu.scan_rate_hz} Hz</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground">CPU Load</span>
-                  <span className="text-sm font-mono">{(mcu.load_percent).toFixed(1)}%</span>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          <SectionCard title="Quick Links">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <QuickLink icon={IconKeyboard} title="Keymap" path="/keymap" description="Remap keys" />
-              <QuickLink icon={IconBrandSpeedtest} title="Performance" path="/performance" description="Actuation & RT" />
-              <QuickLink icon={IconBulb} title="Lighting" path="/lighting" description="Effects & Matrix" />
-              <QuickLink icon={IconDeviceGamepad2} title="Gamepad" path="/gamepad" description="Controller setup" />
-              <QuickLink icon={IconUpload} title="Firmware" path="/firmware" description="Update firmware" />
-              <QuickLink icon={IconSettings} title="Device" path="/device" description="Settings" />
-              <QuickLink icon={IconActivity} title="Diagnostics" path="/diagnostics" description="Debug tools" />
-              <QuickLink icon={IconCpu} title="Calibration" path="/calibration" description="Sensor tuning" />
             </div>
           </SectionCard>
         </div>
-      </div>
+
+        {mcu && (
+          <SectionCard title="MCU Metrics">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Temperature</span>
+                <span className="text-sm font-mono">{mcu.temperature_c?.toFixed(1) ?? "—"} °C</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Vref</span>
+                <span className="text-sm font-mono">{(mcu.vref_mv / 1000).toFixed(3)} V</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Scan Rate</span>
+                <span className="text-sm font-mono">{mcu.scan_rate_hz} Hz</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">CPU Load</span>
+                <span className="text-sm font-mono">{(mcu.load_percent).toFixed(1)}%</span>
+              </div>
+            </div>
+          </SectionCard>
+        )}
+
+        <SectionCard title="Quick Links">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <QuickLink icon={IconKeyboard} title="Keymap" path="/keymap" description="Remap keys" />
+            <QuickLink icon={IconBrandSpeedtest} title="Performance" path="/performance" description="Actuation & RT" />
+            <QuickLink icon={IconBulb} title="Lighting" path="/lighting" description="Effects & Matrix" />
+            <QuickLink icon={IconDeviceGamepad2} title="Gamepad" path="/gamepad" description="Controller setup" />
+            <QuickLink icon={IconUpload} title="Firmware" path="/firmware" description="Update firmware" />
+            <QuickLink icon={IconSettings} title="Device" path="/device" description="Settings" />
+            <QuickLink icon={IconActivity} title="Diagnostics" path="/diagnostics" description="Debug tools" />
+            <QuickLink icon={IconCpu} title="Calibration" path="/calibration" description="Sensor tuning" />
+          </div>
+        </SectionCard>
+      </PageContent>
     </div>
   );
 }

@@ -81,3 +81,38 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
     </div>
   );
 }
+
+interface PageHeaderBarProps extends PageHeaderProps {
+  className?: string;
+}
+
+export function PageHeaderBar({
+  title,
+  description,
+  actions,
+  className,
+}: PageHeaderBarProps) {
+  return (
+    <div className={cn("shrink-0 border-b px-4 py-2", className)}>
+      <PageHeader title={title} description={description} actions={actions} />
+    </div>
+  );
+}
+
+interface PageContentProps {
+  children: ReactNode;
+  className?: string;
+  containerClassName?: string;
+}
+
+export function PageContent({
+  children,
+  className,
+  containerClassName = "max-w-3xl",
+}: PageContentProps) {
+  return (
+    <div className={cn("flex-1 overflow-y-auto p-4", className)}>
+      <div className={cn("mx-auto flex w-full flex-col gap-4", containerClassName)}>{children}</div>
+    </div>
+  );
+}

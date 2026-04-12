@@ -1,10 +1,9 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import { useId, useMemo } from "react";
+import { memo, useId, useMemo } from "react";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-  TooltipProvider,
 } from "@/components/ui/tooltip";
 import type { KeyboardKey as KeyboardKeyModel } from "../types";
 import { LEGEND_POSITION_CLASSES, cn, getKeyGeometry, getKeySvgGeometry, safeColor } from "../utils";
@@ -25,6 +24,10 @@ interface KeyboardKeyProps {
     index: number;
   }) => ReactNode;
   overrideColor?: string;
+  primaryLegend?: ReactNode;
+  primaryLegendClassName?: string;
+  primaryLegendColor?: string;
+  primaryLegendFontSize?: number;
   theme?: string;
 }
 
@@ -34,9 +37,15 @@ function isDefaultLegendColor(color: string | undefined): boolean {
   return c === "" || c === "#111827" || c === "#000000" || c === "#000";
 }
 
-function getLegendStyle(key: KeyboardKeyModel, index: number, theme?: string): CSSProperties {
-  const rawColor = key.textColor[index] || key.defaultLegendColor;
-  const size = key.textSize[index] ?? key.defaultLegendSize;
+function getLegendStyle(
+  key: KeyboardKeyModel,
+  index: number,
+  theme?: string,
+  overrideColor?: string,
+  overrideFontSize?: number,
+): CSSProperties {
+  const rawColor = overrideColor ?? key.textColor[index] ?? key.defaultLegendColor;
+  const size = overrideFontSize ?? key.textSize[index] ?? key.defaultLegendSize;
 
   const style: CSSProperties = {
     fontSize: `${Math.max(10, size * 4)}px`,
@@ -54,7 +63,7 @@ function isDefaultKeyColor(color: string): boolean {
   return color.trim().toLowerCase() === "#cccccc";
 }
 
-export function KeyboardKey({
+function KeyboardKeyComponent({
   keyData,
   unit,
   gap,
@@ -66,6 +75,10 @@ export function KeyboardKey({
   onClick,
   renderLegend,
   overrideColor,
+  primaryLegend,
+  primaryLegendClassName,
+  primaryLegendColor,
+  primaryLegendFontSize,
   theme,
 }: KeyboardKeyProps) {
   const reactId = useId().replace(/:/g, "");
@@ -111,19 +124,37 @@ export function KeyboardKey({
   );
 
   const legends = keyData.labels.map((label, index) => {
-    if (!label) {
+    const hasPrimaryLegendOverride = index === 0 && primaryLegend !== undefined;
+
+    if (!label && !hasPrimaryLegendOverride) {
       return showLegendSlots ? (
         <span key={index} className={cn("kle-legend kle-legend--placeholder", LEGEND_POSITION_CLASSES[index])} />
       ) : null;
     }
 
+    const legendContent = hasPrimaryLegendOverride
+      ? primaryLegend
+      : renderLegend
+        ? renderLegend({ key: keyData, label, index })
+        : label;
+
     return (
       <span
         key={index}
-        className={cn("kle-legend", LEGEND_POSITION_CLASSES[index])}
-        style={getLegendStyle(keyData, index, theme)}
+        className={cn(
+          "kle-legend",
+          LEGEND_POSITION_CLASSES[index],
+          hasPrimaryLegendOverride && primaryLegendClassName,
+        )}
+        style={getLegendStyle(
+          keyData,
+          index,
+          theme,
+          index === 0 ? primaryLegendColor : undefined,
+          index === 0 ? primaryLegendFontSize : undefined,
+        )}
       >
-        {renderLegend ? renderLegend({ key: keyData, label, index }) : label}
+        {legendContent}
       </span>
     );
   });
@@ -213,14 +244,33 @@ export function KeyboardKey({
 
   return (
     <div className="kle-key-wrapper" style={wrapperStyle}>
-      <TooltipProvider delay={400}>
-        <Tooltip>
-          <TooltipTrigger render={keyElement} />
-          <TooltipContent side="top" sideOffset={6}>
-            {tooltipText}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger render={keyElement} />
+        <TooltipContent side="top" sideOffset={6}>
+          {tooltipText}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
+
+export const KeyboardKey = memo(KeyboardKeyComponent, (prev, next) => (
+  prev.keyData === next.keyData &&
+  prev.unit === next.unit &&
+  prev.gap === next.gap &&
+  prev.offsetX === next.offsetX &&
+  prev.offsetY === next.offsetY &&
+  prev.selected === next.selected &&
+  prev.interactive === next.interactive &&
+  prev.showLegendSlots === next.showLegendSlots &&
+  prev.onClick === next.onClick &&
+  prev.renderLegend === next.renderLegend &&
+  prev.overrideColor === next.overrideColor &&
+  prev.primaryLegend === next.primaryLegend &&
+  prev.primaryLegendClassName === next.primaryLegendClassName &&
+  prev.primaryLegendColor === next.primaryLegendColor &&
+  prev.primaryLegendFontSize === next.primaryLegendFontSize &&
+  prev.theme === next.theme
+));
+
+KeyboardKey.displayName = "KeyboardKey";

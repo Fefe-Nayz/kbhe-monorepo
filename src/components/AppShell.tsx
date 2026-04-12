@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect, useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DeviceBanner } from "@/components/DeviceBanner";
 import { ThemeButton } from "@/components/nav-components/themeButton";
@@ -26,6 +27,25 @@ const Diagnostics  = lazy(() => import("@/pages/Diagnostics"));
 
 const MIN_WIDTH  = 1024;
 const MIN_HEIGHT = 768;
+
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Dashboard",
+  "/profiles": "Profiles",
+  "/keymap": "Keymap",
+  "/performance": "Performance",
+  "/advanced-keys": "Advanced Keys",
+  "/gamepad": "Gamepad",
+  "/calibration": "Calibration",
+  "/lighting": "Lighting",
+  "/rotary": "Rotary Encoder",
+  "/device": "Device",
+  "/firmware": "Firmware",
+  "/diagnostics": "Diagnostics",
+};
+
+function getPageTitle(pathname: string): string {
+  return PAGE_TITLES[pathname] ?? "KBHE Configurator";
+}
 
 function TooSmallScreen() {
   return (
@@ -51,23 +71,28 @@ function PageFallback() {
   );
 }
 
-function AppHeader() {
+function AppHeader({ title }: { title: string }) {
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-      <SidebarTrigger className="-ml-1" />
-      <div className="h-4 w-px shrink-0 bg-border" />
-      <ProfileSelect />
-      <div className="flex-1" />
-      <ThemeButton />
+    <header className="flex h-(--header-height) shrink-0 items-center border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+        <SidebarTrigger className="-ml-1" />
+        <Separator orientation="vertical" className="mx-2 h-4 data-vertical:self-auto" />
+        <h1 className="text-sm font-semibold tracking-tight truncate">{title}</h1>
+        <div className="flex-1" />
+        <ProfileSelect />
+        <ThemeButton />
+      </div>
     </header>
   );
 }
 
 export function AppShell() {
+  const location = useLocation();
   const [tooSmall, setTooSmall] = useState(
     () => window.innerWidth < MIN_WIDTH || window.innerHeight < MIN_HEIGHT,
   );
   const developerMode = useDeviceSession((s) => s.developerMode);
+  const pageTitle = getPageTitle(location.pathname);
 
   useEffect(() => {
     const handler = () => {
@@ -85,12 +110,19 @@ export function AppShell() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset className="flex flex-col min-h-0 overflow-hidden">
-          <AppHeader />
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset className="flex min-w-0 flex-col min-h-0 overflow-hidden">
+          <AppHeader title={pageTitle} />
           <DeviceBanner />
-          <main className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          <main className="flex min-w-0 flex-1 flex-col min-h-0 overflow-hidden">
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/"              element={<Dashboard />} />

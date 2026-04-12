@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ensureParsedKeyboardLayout } from "../parser";
 import type { KeyboardLayoutProps } from "../types";
 import { cn, getKeyboardBounds } from "../utils";
 import { KeyboardKey } from "./KeyboardKey";
 
-export function KeyboardLayout({
+export const KeyboardLayout = memo(function KeyboardLayout({
   layout,
   className,
   unit = 56,
@@ -17,9 +18,17 @@ export function KeyboardLayout({
   onKeyClick,
   renderLegend,
   keyColorMap,
+  keyLegendMap,
+  keyLegendClassNameMap,
+  keyLegendColorMap,
+  keyLegendFontSizeMap,
 }: KeyboardLayoutProps) {
   const parsed = useMemo(() => ensureParsedKeyboardLayout(layout), [layout]);
   const bounds = useMemo(() => getKeyboardBounds(parsed.keys), [parsed.keys]);
+  const selectedKeySet = useMemo(
+    () => (selectedKeyIds ? new Set(selectedKeyIds) : null),
+    [selectedKeyIds],
+  );
 
   const framePadding = 18;
   const frameBorder = 1;
@@ -45,26 +54,32 @@ export function KeyboardLayout({
           height,
         }}
       >
-        {parsed.keys.map((key) => (
-          <KeyboardKey
-            key={key.id}
-            keyData={key}
-            unit={unit}
-            gap={gap}
-            offsetX={bounds.minX}
-            offsetY={bounds.minY}
-            selected={
-              selectedKeyIds?.includes(key.id) ?? selectedKeyId === key.id
-            }
-            interactive={interactive}
-            onClick={onKeyClick}
-            showLegendSlots={showLegendSlots}
-            renderLegend={renderLegend}
-            overrideColor={keyColorMap?.[key.id]}
-            theme={theme}
-          />
-        ))}
+        <TooltipProvider delay={400}>
+          {parsed.keys.map((key) => (
+            <KeyboardKey
+              key={key.id}
+              keyData={key}
+              unit={unit}
+              gap={gap}
+              offsetX={bounds.minX}
+              offsetY={bounds.minY}
+              selected={selectedKeySet?.has(key.id) ?? selectedKeyId === key.id}
+              interactive={interactive}
+              onClick={onKeyClick}
+              showLegendSlots={showLegendSlots}
+              renderLegend={renderLegend}
+              overrideColor={keyColorMap?.[key.id]}
+              primaryLegend={keyLegendMap?.[key.id]}
+              primaryLegendClassName={keyLegendClassNameMap?.[key.id]}
+              primaryLegendColor={keyLegendColorMap?.[key.id]}
+              primaryLegendFontSize={keyLegendFontSizeMap?.[key.id]}
+              theme={theme}
+            />
+          ))}
+        </TooltipProvider>
       </div>
     </div>
   );
-}
+});
+
+KeyboardLayout.displayName = "KeyboardLayout";

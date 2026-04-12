@@ -31,6 +31,7 @@ import {
   IconPencil,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
+import { PageContent } from "@/components/shared/PageLayout";
 
 export default function Profiles() {
   const profiles = useProfileStore((s) => s.profiles);
@@ -112,16 +113,8 @@ export default function Profiles() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-lg font-semibold">Configure Profiles</h1>
-            <p className="text-sm text-muted-foreground">
-              Create, import, export, and switch between keyboard configuration snapshots.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+      <PageContent>
+        <div className="grid grid-cols-2 gap-4">
             {profiles.map((profile) => {
               const isActive = selectedProfile?.name === profile.name;
               return (
@@ -228,8 +221,7 @@ export default function Profiles() {
               No profiles yet. Create one to get started.
             </div>
           )}
-        </div>
-      </div>
+      </PageContent>
 
       <input
         ref={importRef}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
@@ -8,7 +8,6 @@ import { queryKeys } from "@/lib/query/keys";
 import { previewKeys } from "@/constants/defaultLayout";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { useKeyboardStore } from "@/stores/keyboard-store";
-import { PageHeader } from "@/components/shared/PageLayout";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -559,9 +559,11 @@ function GraphTab({ connected, active }: { connected: boolean; active: boolean }
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DATA_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{DATA_TYPE_LABELS[t]}</SelectItem>
-                ))}
+                <SelectGroup>
+                  {DATA_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{DATA_TYPE_LABELS[t]}</SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -1263,33 +1265,28 @@ export default function Diagnostics() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2 flex items-center justify-between gap-4">
-        <PageHeader
-          title="Diagnostics"
-          description="Live ADC, travel, timing, MCU metrics"
-        />
-        <Badge variant="destructive" className="text-[10px] h-5">
-          DEV
-        </Badge>
-      </div>
-
       <div className="flex-1 overflow-hidden min-h-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-          <div className="shrink-0 border-b px-4">
-            <TabsList className="h-9 mt-1">
-              <TabsTrigger value="travel" className="gap-1.5">
-                <IconKeyboard className="size-3" /> Travel
-              </TabsTrigger>
-              <TabsTrigger value="raw" className="gap-1.5">
-                <IconWaveSquare className="size-3" /> Raw ADC
-              </TabsTrigger>
-              <TabsTrigger value="graph" className="gap-1.5">
-                <IconChartLine className="size-3" /> Graph
-              </TabsTrigger>
-              <TabsTrigger value="debug" className="gap-1.5">
-                <IconBug className="size-3" /> Debug
-              </TabsTrigger>
-            </TabsList>
+          <div className="shrink-0 border-b px-4 py-1">
+            <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+              <TabsList className="h-9">
+                <TabsTrigger value="travel" className="gap-1.5">
+                  <IconKeyboard className="size-3" /> Travel
+                </TabsTrigger>
+                <TabsTrigger value="raw" className="gap-1.5">
+                  <IconWaveSquare className="size-3" /> Raw ADC
+                </TabsTrigger>
+                <TabsTrigger value="graph" className="gap-1.5">
+                  <IconChartLine className="size-3" /> Graph
+                </TabsTrigger>
+                <TabsTrigger value="debug" className="gap-1.5">
+                  <IconBug className="size-3" /> Debug
+                </TabsTrigger>
+              </TabsList>
+              <Badge variant="destructive" className="text-[10px] h-5">
+                DEV
+              </Badge>
+            </div>
           </div>
 
           <TabsContent value="travel" className="flex-1 overflow-y-auto p-4 mt-0">

@@ -3,7 +3,7 @@ import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import { queryKeys } from "@/lib/query/keys";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
-import { PageHeader } from "@/components/shared/PageLayout";
+import { PageContent } from "@/components/shared/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -94,12 +94,7 @@ export default function Device() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2 flex items-center justify-between gap-4">
-        <PageHeader title="Device" description="Settings, options, and actions" />
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4 max-w-3xl mx-auto">
+      <PageContent>
 
           <SectionCard title="Connection">
             <div className="flex flex-col gap-3">
@@ -234,8 +229,7 @@ export default function Device() {
               </Dialog>
             </div>
           </SectionCard>
-        </div>
-      </div>
+      </PageContent>
     </div>
   );
 }

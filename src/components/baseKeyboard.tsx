@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useCallback, useRef, useState, useMemo } fr
 import {
   keyboardPreviewBaseLayout,
   LAYER_NAMES,
-  previewKeyMetaById,
+  previewKeys,
   type RotaryTargetId,
 } from "@/constants/defaultLayout";
 import { KeyboardLayout } from "@/lib/vendor/react-kle-modern";
@@ -18,6 +18,8 @@ interface BaseKeyboardProps {
   onButtonClick: (ids: string[] | string) => void;
   showLayerSelector?: boolean;
   showRotary?: boolean;
+  keyLegendMap?: Record<string, React.ReactNode>;
+  keyLegendClassName?: string;
   renderKeyOverlay?: (keyId: string) => React.ReactNode;
   keyColorMap?: Record<string, string>;
 }
@@ -29,41 +31,58 @@ function resolveLabel(label: string): React.ReactNode {
 const FRAME_PADDING = 18;
 const FRAME_BORDER = 1;
 const BASE_GAP = 5;
+const BASE_UNIT = 56;
+const ROOT_HORIZONTAL_PADDING = 32;
 
-function computeUnit(containerWidth: number, boardWidth: number): number {
-  const available = containerWidth - 32;
-  if (available <= 0 || boardWidth <= 0) return 50;
-  const ideal = (available - FRAME_PADDING * 2 - FRAME_BORDER * 2) / boardWidth;
+function computeUnit(contentWidth: number, boardWidth: number): number {
+  if (contentWidth <= 0 || boardWidth <= 0) return 50;
+  const ideal = (contentWidth - FRAME_PADDING * 2 - FRAME_BORDER * 2) / boardWidth;
   return Math.max(20, Math.min(70, ideal));
 }
 
-function useAutoUnit(
+function getContentWidth(element: HTMLDivElement): number {
+  return Math.max(0, element.clientWidth - ROOT_HORIZONTAL_PADDING);
+}
+
+function useAutoScale(
   containerRef: React.RefObject<HTMLDivElement | null>,
   layoutBounds: { width: number; height: number },
 ) {
-  const [unit, setUnit] = useState<number | null>(null);
+  const [scale, setScale] = useState<number | null>(null);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    setUnit(computeUnit(el.clientWidth, layoutBounds.width));
+    setScale(computeUnit(getContentWidth(el), layoutBounds.width) / BASE_UNIT);
   }, [containerRef, layoutBounds.width]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
+    let frame = 0;
+    let lastScale = computeUnit(getContentWidth(el), layoutBounds.width) / BASE_UNIT;
+
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setUnit(computeUnit(entry.contentRect.width, layoutBounds.width));
+
+      const nextScale = computeUnit(entry.contentRect.width, layoutBounds.width) / BASE_UNIT;
+      if (Math.abs(nextScale - lastScale) < 0.001) return;
+
+      lastScale = nextScale;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setScale(nextScale));
     });
 
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
   }, [containerRef, layoutBounds.width]);
 
-  return unit;
+  return scale;
 }
 
 export default function BaseKeyboard({
@@ -71,6 +90,8 @@ export default function BaseKeyboard({
   onButtonClick,
   showLayerSelector = true,
   showRotary = true,
+  keyLegendMap,
+  keyLegendClassName,
   renderKeyOverlay,
   keyColorMap,
 }: BaseKeyboardProps) {
@@ -90,7 +111,11 @@ export default function BaseKeyboard({
     [],
   );
   const bounds = useMemo(() => getKeyboardBounds(parsed.keys), [parsed.keys]);
-  const unit = useAutoUnit(containerRef, bounds);
+  const scale = useAutoScale(containerRef, bounds);
+  const boardWidth = Math.max(0, bounds.width * BASE_UNIT);
+  const boardHeight = Math.max(0, bounds.height * BASE_UNIT);
+  const framedWidth = boardWidth + FRAME_PADDING * 2 + FRAME_BORDER * 2;
+  const framedHeight = boardHeight + FRAME_PADDING * 2 + FRAME_BORDER * 2;
 
   const handleSelection = useCallback(
     (id: string) => {
@@ -106,6 +131,11 @@ export default function BaseKeyboard({
       onButtonClick(mode === "single" ? (nextSelection[0] ?? "") : nextSelection);
     },
     [mode, selectedKeys, toggleKeySelection, onButtonClick],
+  );
+
+  const handleKeyClick = useCallback(
+    (key: { id: string }) => handleSelection(key.id),
+    [handleSelection],
   );
 
   useEffect(() => {
@@ -145,13 +175,87 @@ export default function BaseKeyboard({
   };
 
   const keyboardSelectedIds = selectedKeys.filter((key) => key.startsWith("key-"));
+  const overlayLegendMap = useMemo(() => {
+    if (keyLegendMap) return keyLegendMap;
+    if (!renderKeyOverlay) return undefined;
 
-  const ready = unit != null;
+    const next: Record<string, React.ReactNode> = {};
+    for (const key of previewKeys) {
+      const overlay = renderKeyOverlay(key.id);
+      if (overlay !== undefined) {
+        next[key.id] = overlay;
+      }
+    }
+    return next;
+  }, [keyLegendMap, renderKeyOverlay]);
+
+  const resolvedKeyLegendMap = useMemo(() => {
+    const next: Record<string, React.ReactNode> = {};
+
+    for (const meta of previewKeys) {
+      const customLegend = overlayLegendMap?.[meta.id];
+      if (customLegend !== undefined) {
+        next[meta.id] = customLegend;
+        continue;
+      }
+
+      const configuredLabel = layout.bindings[meta.id]?.label[0];
+      const layerDefault =
+        currentLayer === 1 ? meta.fnLabel || meta.baseLabel || "" : meta.baseLabel || "";
+
+      next[meta.id] = resolveLabel(configuredLabel || layerDefault);
+    }
+
+    return next;
+  }, [currentLayer, layout.bindings, overlayLegendMap]);
+
+  const resolvedKeyLegendClassNameMap = useMemo(() => {
+    if (!keyLegendClassName || !overlayLegendMap) return undefined;
+
+    const next: Record<string, string> = {};
+    for (const keyId of Object.keys(overlayLegendMap)) {
+      next[keyId] = keyLegendClassName;
+    }
+    return next;
+  }, [keyLegendClassName, overlayLegendMap]);
+
+  const resolvedKeyLegendColorMap = useMemo(() => {
+    const next: Record<string, string | undefined> = {};
+
+    for (const meta of previewKeys) {
+      if (overlayLegendMap?.[meta.id] !== undefined) continue;
+
+      const color = layout.bindings[meta.id]?.color;
+      if (color) {
+        next[meta.id] = color;
+      }
+    }
+
+    return next;
+  }, [layout.bindings, overlayLegendMap]);
+
+  const resolvedKeyLegendFontSizeMap = useMemo(() => {
+    const next: Record<string, number | undefined> = {};
+
+    for (const meta of previewKeys) {
+      if (overlayLegendMap?.[meta.id] !== undefined) continue;
+
+      const fontSize = layout.bindings[meta.id]?.fontSize;
+      if (fontSize != null) {
+        next[meta.id] = fontSize;
+      }
+    }
+
+    return next;
+  }, [layout.bindings, overlayLegendMap]);
+
+  const ready = scale != null;
+  const appliedScale = scale ?? 1;
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full rounded-lg border bg-card p-4"
+      className="relative w-full rounded-lg  p-4"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -181,28 +285,37 @@ export default function BaseKeyboard({
 
       {ready && (
         <div className="flex items-start justify-center gap-6">
-          <KeyboardLayout
-            layout={keyboardPreviewBaseLayout}
-            theme="modern"
-            interactive
-            unit={unit}
-            gap={BASE_GAP}
-            selectedKeyIds={keyboardSelectedIds}
-            onKeyClick={(key) => handleSelection(key.id)}
-            keyColorMap={keyColorMap}
-            renderLegend={({ key, index }) => {
-              if (renderKeyOverlay) {
-                const overlay = renderKeyOverlay(key.id);
-                if (overlay !== undefined) return overlay;
-              }
-              if (index !== 0) return null;
-              const meta = previewKeyMetaById[key.id];
-              const configuredLabel = layout.bindings[key.id]?.label[0];
-              const layerDefault =
-                currentLayer === 1 ? meta?.fnLabel || meta?.baseLabel || "" : meta?.baseLabel || "";
-              return resolveLabel(configuredLabel || layerDefault);
+          <div
+            className="shrink-0"
+            style={{
+              width: framedWidth * appliedScale,
+              height: framedHeight * appliedScale,
             }}
-          />
+          >
+            <div
+              style={{
+                width: framedWidth,
+                height: framedHeight,
+                transform: `scale(${appliedScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <KeyboardLayout
+                layout={keyboardPreviewBaseLayout}
+                theme="modern"
+                interactive
+                unit={BASE_UNIT}
+                gap={BASE_GAP}
+                selectedKeyIds={keyboardSelectedIds}
+                onKeyClick={handleKeyClick}
+                keyColorMap={keyColorMap}
+                keyLegendMap={resolvedKeyLegendMap}
+                keyLegendClassNameMap={resolvedKeyLegendClassNameMap}
+                keyLegendColorMap={resolvedKeyLegendColorMap}
+                keyLegendFontSizeMap={resolvedKeyLegendFontSizeMap}
+              />
+            </div>
+          </div>
 
           {showRotary && (
             <div className="shrink-0">

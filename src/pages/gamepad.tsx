@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BaseKeyboard from "@/components/baseKeyboard";
@@ -27,6 +27,7 @@ import { queryKeys } from "@/lib/query/keys";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -189,27 +190,23 @@ export default function Gamepad() {
 
   // ── Render key overlay showing current gamepad mapping ──
 
-  const renderKeyOverlay = useCallback(
-    (keyId: string) => {
-      if (!km || !keyId.startsWith("key-")) return undefined;
-      const idx = parseInt(keyId.replace("key-", ""), 10);
-      if (idx !== keyIndex) return undefined;
-      const parts: string[] = [];
-      if (km.button !== 0) parts.push(GAMEPAD_BUTTON_NAMES[km.button] ?? `B${km.button}`);
-      if (km.axis !== 0) {
-        const axisName = GAMEPAD_AXIS_NAMES[km.axis] ?? `A${km.axis}`;
-        const dir = GAMEPAD_DIRECTION_NAMES[km.direction] ?? "+";
-        parts.push(`${axisName} ${dir}`);
-      }
-      if (parts.length === 0) return undefined;
-      return (
-        <span className="text-[9px] leading-tight truncate text-primary">
-          {parts.join(", ")}
-        </span>
-      );
-    },
-    [km, keyIndex],
-  );
+  const keyLegendMap = useMemo(() => {
+    if (!km || keyIndex == null) return undefined;
+
+    const parts: string[] = [];
+    if (km.button !== 0) parts.push(GAMEPAD_BUTTON_NAMES[km.button] ?? `B${km.button}`);
+    if (km.axis !== 0) {
+      const axisName = GAMEPAD_AXIS_NAMES[km.axis] ?? `A${km.axis}`;
+      const dir = GAMEPAD_DIRECTION_NAMES[km.direction] ?? "+";
+      parts.push(`${axisName} ${dir}`);
+    }
+
+    if (parts.length === 0) return undefined;
+
+    return {
+      [`key-${keyIndex}`]: parts.join(", "),
+    };
+  }, [km, keyIndex]);
 
   // ── XInput / HID toggle ──
 
@@ -253,7 +250,8 @@ export default function Gamepad() {
           onButtonClick={() => {}}
           showLayerSelector={false}
           showRotary={false}
-          renderKeyOverlay={connected ? renderKeyOverlay : undefined}
+          keyLegendMap={connected ? keyLegendMap : undefined}
+          keyLegendClassName="text-[9px] leading-tight truncate text-primary"
         />
       }
       menubar={menubar}
@@ -358,9 +356,11 @@ export default function Gamepad() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(GAMEPAD_AXES).map(([name, val]) => (
-                          <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(GAMEPAD_AXES).map(([name, val]) => (
+                            <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>
@@ -381,9 +381,11 @@ export default function Gamepad() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(GAMEPAD_DIRECTIONS).map(([name, val]) => (
-                          <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(GAMEPAD_DIRECTIONS).map(([name, val]) => (
+                            <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>
@@ -418,9 +420,11 @@ export default function Gamepad() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(GAMEPAD_KEYBOARD_ROUTING).map(([name, val]) => (
-                            <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                          ))}
+                          <SelectGroup>
+                            {Object.entries(GAMEPAD_KEYBOARD_ROUTING).map(([name, val]) => (
+                              <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                            ))}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                     )}

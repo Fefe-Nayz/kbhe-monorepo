@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CommitSlider } from "@/components/ui/slider";
+import { CommitSlider } from "@/components/ui/commit-slider";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
@@ -111,21 +111,16 @@ export default function Calibration() {
     return map;
   }, [distances]);
 
-  const renderKeyOverlay = useCallback(
-    (keyId: string) => {
-      if (!distances) return undefined;
-      if (!keyId.startsWith("key-")) return undefined;
-      const idx = parseInt(keyId.replace("key-", ""), 10);
-      const distMm = distances[idx];
-      if (distMm === undefined) return undefined;
-      return (
-        <span className="text-[8px] font-mono text-white drop-shadow-[0_0_2px_rgba(0,0,0,.8)]">
-          {distMm.toFixed(1)}
-        </span>
-      );
-    },
-    [distances],
-  );
+  const keyLegendMap = useMemo(() => {
+    if (!distances) return undefined;
+    const map: Record<string, string> = {};
+    for (let i = 0; i < KEY_COUNT; i++) {
+      const distMm = distances[i];
+      if (distMm === undefined) continue;
+      map[`key-${i}`] = distMm.toFixed(1);
+    }
+    return map;
+  }, [distances]);
 
   const menubar = (
     <>
@@ -155,7 +150,8 @@ export default function Calibration() {
           showLayerSelector={false}
           showRotary={false}
           keyColorMap={keyColorMap}
-          renderKeyOverlay={connected ? renderKeyOverlay : undefined}
+          keyLegendMap={connected ? keyLegendMap : undefined}
+          keyLegendClassName="text-[8px] font-mono text-white drop-shadow-[0_0_2px_rgba(0,0,0,.8)]"
         />
       }
       menubar={menubar}

@@ -10,14 +10,14 @@ interface KeyboardEditorProps {
 
 export function KeyboardEditor({ keyboard, menubar, children, className }: KeyboardEditorProps) {
   return (
-    <div className={cn("flex h-full flex-col overflow-hidden", className)}>
-      <div className="shrink-0 p-4 pb-2">
+    <div className={cn("flex h-full w-full min-w-0 flex-col overflow-hidden", className)}>
+      <div className="w-full min-w-0 shrink-0 p-4 pb-2">
         {keyboard}
       </div>
       {menubar && (
         <KeyboardEditorMenubar>{menubar}</KeyboardEditorMenubar>
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="w-full min-w-0 flex-1 min-h-0 overflow-y-auto">
         <KeyboardEditorContainer>
           {children}
         </KeyboardEditorContainer>
@@ -28,8 +28,8 @@ export function KeyboardEditor({ keyboard, menubar, children, className }: Keybo
 
 function KeyboardEditorMenubar({ children }: { children: ReactNode }) {
   return (
-    <header className="flex h-12 shrink-0 items-center border-y">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4">
+    <header className="flex h-12 w-full min-w-0 shrink-0 items-center border-b">
+      <div className="mx-auto flex w-full min-w-0 max-w-7xl items-center justify-between gap-4 px-4">
         {children}
       </div>
     </header>
@@ -38,7 +38,7 @@ function KeyboardEditorMenubar({ children }: { children: ReactNode }) {
 
 function KeyboardEditorContainer({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-7xl p-4">
+    <div className="mx-auto w-full min-w-0 max-w-7xl p-4">
       {children}
     </div>
   );

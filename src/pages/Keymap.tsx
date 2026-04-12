@@ -1,5 +1,5 @@
-import { useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useOSLayout } from "@/hooks/use-os-layout";
 import BaseKeyboard from "@/components/baseKeyboard";
@@ -40,8 +40,7 @@ export default function Keymap() {
   const clearSelection  = useKeyboardStore((s) => s.clearSelection);
   const { status }      = useDeviceSession();
   const connected       = status === "connected";
-  const qc              = useQueryClient();
-  const { saveState, markSaving, markSaved, markError } = useAutosave();
+  const { saveState, markSaving, markSaved } = useAutosave();
   const resolveKeycodeLabel = useOSLayout();
 
   const layerKeycodes = useQuery({
@@ -57,7 +56,7 @@ export default function Keymap() {
       markSaving();
       await kbheDevice.setLayerKeycode(currentLayer, keyIndex, keycode);
     },
-    optimisticUpdate: (cur, { keyIndex, keycode }) => ({ ...cur, [keyIndex]: keycode }),
+    optimisticUpdate: (cur, { keyIndex, keycode }) => ({ ...(cur ?? {}), [keyIndex]: keycode }),
     onSuccess: () => markSaved(),
   });
 
@@ -89,23 +88,17 @@ export default function Keymap() {
     return layerKeycodes.data?.[idx];
   })();
 
-  const renderKeyOverlay = useCallback(
-    (keyId: string) => {
-      if (!layerKeycodes.data) return undefined;
-      if (!keyId.startsWith("key-")) return undefined;
-      const idx = parseInt(keyId.replace("key-", ""), 10);
-      const code = layerKeycodes.data[idx];
-      if (code === undefined) return undefined;
-      const fallback = HID_KEYCODE_NAMES[code] ?? `0x${code.toString(16)}`;
-      const label = resolveKeycodeLabel(code, fallback);
-      return (
-        <span className="text-[9px] leading-tight truncate">
-          {label}
-        </span>
-      );
-    },
-    [layerKeycodes.data, resolveKeycodeLabel],
-  );
+  const keyLegendMap = useMemo(() => {
+    if (!layerKeycodes.data) return undefined;
+
+    const map: Record<string, string> = {};
+    for (const [index, code] of Object.entries(layerKeycodes.data)) {
+      const numericCode = Number(code);
+      const fallback = HID_KEYCODE_NAMES[numericCode] ?? `0x${numericCode.toString(16)}`;
+      map[`key-${index}`] = resolveKeycodeLabel(numericCode, fallback);
+    }
+    return map;
+  }, [layerKeycodes.data, resolveKeycodeLabel]);
 
   const menubar = (
     <>
@@ -130,7 +123,8 @@ export default function Keymap() {
           onButtonClick={() => {}}
           showLayerSelector={false}
           showRotary={false}
-          renderKeyOverlay={connected ? renderKeyOverlay : undefined}
+          keyLegendMap={connected ? keyLegendMap : undefined}
+          keyLegendClassName="text-[9px] leading-tight truncate"
         />
       }
       menubar={menubar}

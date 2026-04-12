@@ -11,11 +11,11 @@ import {
 import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
-import { PageHeader } from "@/components/shared/PageLayout";
-import { CommitSlider } from "@/components/ui/slider";
+import { PageContent } from "@/components/shared/PageLayout";
+import { CommitSlider } from "@/components/ui/commit-slider";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ColorPicker } from "@/components/color-picker";
@@ -129,13 +129,10 @@ export default function Rotary() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2 flex items-center justify-between gap-4">
-        <PageHeader title="Rotary Encoder" description="Rotation, button, RGB, and progress bar settings" />
-        <AutosaveStatus state={saveState} />
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4 max-w-3xl mx-auto">
+      <PageContent>
+        <div className="flex justify-end">
+          <AutosaveStatus state={saveState} />
+        </div>
 
           {rotaryQ.isLoading ? (
             <SectionCard>
@@ -159,9 +156,11 @@ export default function Rotary() {
                       onValueChange={v => write({ rotation_action: Number(v) })}>
                       <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(ROTARY_ACTIONS).map(([name, val]) => (
-                          <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(ROTARY_ACTIONS).map(([name, val]) => (
+                            <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>
@@ -205,9 +204,11 @@ export default function Rotary() {
                     onValueChange={v => write({ button_action: Number(v) })}>
                     <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {Object.entries(ROTARY_BUTTON_ACTIONS).map(([name, val]) => (
-                        <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {Object.entries(ROTARY_BUTTON_ACTIONS).map(([name, val]) => (
+                          <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </FormRow>
@@ -221,9 +222,11 @@ export default function Rotary() {
                       onValueChange={v => write({ rgb_behavior: Number(v) })}>
                       <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(ROTARY_RGB_BEHAVIORS).map(([name, val]) => (
-                          <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(ROTARY_RGB_BEHAVIORS).map(([name, val]) => (
+                            <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>
@@ -233,9 +236,11 @@ export default function Rotary() {
                       onValueChange={v => write({ rgb_effect_mode: Number(v) })}>
                       <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(LED_EFFECT_NAMES).map(([val, name]) => (
-                          <SelectItem key={val} value={val}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(LED_EFFECT_NAMES).map(([val, name]) => (
+                            <SelectItem key={val} value={val}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>
@@ -250,9 +255,11 @@ export default function Rotary() {
                       onValueChange={v => write({ progress_style: Number(v) })}>
                       <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(ROTARY_PROGRESS_STYLES).map(([name, val]) => (
-                          <SelectItem key={val} value={String(val)}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(ROTARY_PROGRESS_STYLES).map(([name, val]) => (
+                            <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>
@@ -262,9 +269,11 @@ export default function Rotary() {
                       onValueChange={v => write({ progress_effect_mode: Number(v) })}>
                       <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {Object.entries(LED_EFFECT_NAMES).map(([val, name]) => (
-                          <SelectItem key={val} value={val}>{name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {Object.entries(LED_EFFECT_NAMES).map(([val, name]) => (
+                            <SelectItem key={val} value={val}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormRow>
@@ -284,8 +293,7 @@ export default function Rotary() {
             </>
           )}
 
-        </div>
-      </div>
+      </PageContent>
     </div>
   );
 }

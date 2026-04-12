@@ -8,7 +8,7 @@ import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { CommitSlider } from "@/components/ui/slider";
+import { CommitSlider } from "@/components/ui/commit-slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";

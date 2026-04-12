@@ -29,6 +29,7 @@ import {
   IconPlugConnectedX,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { PageContent } from "@/components/shared/PageLayout";
 
 type FlashState = "idle" | "flashing" | "success" | "error";
 
@@ -119,17 +120,7 @@ export default function Firmware() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-base font-semibold">Firmware Update</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Flash new firmware to your KBHE keyboard.</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
+      <PageContent containerClassName="max-w-3xl">
 
           {/* ── Device status strip ─────────────────────────────── */}
           <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
@@ -323,8 +314,7 @@ export default function Firmware() {
             </div>
           </div>
 
-        </div>
-      </div>
+      </PageContent>
 
       {/* ── Confirm dialog ──────────────────────────────────── */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

@@ -11,11 +11,10 @@ import BaseKeyboard from "@/components/baseKeyboard";
 import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
-import { PageHeader } from "@/components/shared/PageLayout";
 import { ColorPicker, type RGBColor } from "@/components/color-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { CommitSlider } from "@/components/ui/slider";
+import { CommitSlider } from "@/components/ui/commit-slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -260,11 +260,14 @@ function MatrixKeyboard({
   connected: boolean;
   onPaint: (idx: number) => void;
 }) {
-  const keyColorMap: Record<string, string> = {};
-  for (let i = 0; i < KEY_COUNT; i++) {
-    const c = pixelColors[i];
-    if (c) keyColorMap[`key-${i}`] = rgbToHex(c.r, c.g, c.b);
-  }
+  const keyColorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (let i = 0; i < KEY_COUNT; i++) {
+      const c = pixelColors[i];
+      if (c) map[`key-${i}`] = rgbToHex(c.r, c.g, c.b);
+    }
+    return map;
+  }, [pixelColors]);
 
   const handleClick = useCallback(
     (ids: string[] | string) => {
@@ -605,9 +608,11 @@ export default function Lighting() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {spec.options.map(([v, l]) => (
-                      <SelectItem key={v} value={String(v)}>{l}</SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {spec.options.map(([v, l]) => (
+                        <SelectItem key={v} value={String(v)}>{l}</SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -649,18 +654,16 @@ export default function Lighting() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="shrink-0 border-b px-4 py-2 flex items-center justify-between gap-4">
-        <PageHeader title="Lighting" description="LED effects, matrix editor, and diagnostics" />
-        <AutosaveStatus state={saveState} />
-      </div>
-
       <div className="flex-1 overflow-hidden min-h-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-          <div className="shrink-0 border-b px-4">
-            <TabsList className="h-9 mt-1">
-              <TabsTrigger value="effects">Effects</TabsTrigger>
-              <TabsTrigger value="matrix">Matrix</TabsTrigger>
-            </TabsList>
+          <div className="shrink-0 border-b px-4 py-1">
+            <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+              <TabsList className="h-9">
+                <TabsTrigger value="effects">Effects</TabsTrigger>
+                <TabsTrigger value="matrix">Matrix</TabsTrigger>
+              </TabsList>
+              <AutosaveStatus state={saveState} />
+            </div>
           </div>
 
           {/* === Effects Tab === */}

@@ -2,6 +2,7 @@ import { LAYER_NAMES } from "@/constants/defaultLayout";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -23,11 +24,13 @@ export function LayerSelect({ value, onChange, className }: LayerSelectProps) {
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.entries(LAYER_NAMES).map(([idx, name]) => (
-          <SelectItem key={idx} value={idx}>
-            {name}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {Object.entries(LAYER_NAMES).map(([idx, name]) => (
+            <SelectItem key={idx} value={idx}>
+              {name}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );

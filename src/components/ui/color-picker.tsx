@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -391,11 +392,13 @@ export const ColorPickerOutput = ({ className, ...props }: ColorPickerOutputProp
         <SelectValue placeholder="Mode" />
       </SelectTrigger>
       <SelectContent>
-        {formats.map(format => (
-          <SelectItem className="text-xs" key={format} value={format}>
-            {format.toUpperCase()}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {formats.map(format => (
+            <SelectItem className="text-xs" key={format} value={format}>
+              {format.toUpperCase()}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   )

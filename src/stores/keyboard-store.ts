@@ -65,30 +65,77 @@ export const useKeyboardStore = create<KeyboardState>()((set, get) => ({
   selectAll: () => set({ selectedKeys: Array.from({ length: 82 }, (_, i) => `key-${i}`) }),
 
   updateKeyConfig: (keyIds, update) => {
-    const { layout } = get();
-    const next = cloneLayout(layout);
+    set((state) => {
+      const { bindings, rotaryBindings } = state.layout;
+      let nextBindings = bindings;
+      let nextRotaryBindings = rotaryBindings;
+      let changed = false;
 
-    keyIds.forEach((keyId) => {
-      if (keyId in next.bindings) {
-        next.bindings[keyId] = {
-          ...next.bindings[keyId],
-          ...update,
-          label: update.label ? [...update.label] : next.bindings[keyId].label,
-        };
-        return;
+      keyIds.forEach((keyId) => {
+        if (keyId in bindings) {
+          const current = bindings[keyId];
+          const nextConfig = {
+            ...current,
+            ...update,
+            label: update.label ? [...update.label] : current.label,
+          };
+
+          if (
+            current.value === nextConfig.value &&
+            current.color === nextConfig.color &&
+            current.fontSize === nextConfig.fontSize &&
+            current.label === nextConfig.label
+          ) {
+            return;
+          }
+
+          if (nextBindings === bindings) {
+            nextBindings = { ...bindings };
+          }
+
+          nextBindings[keyId] = nextConfig;
+          changed = true;
+          return;
+        }
+
+        if (keyId in rotaryBindings) {
+          const rotaryKey = keyId as keyof typeof rotaryBindings;
+          const current = rotaryBindings[rotaryKey];
+          const nextConfig = {
+            ...current,
+            ...update,
+            label: update.label ? [...update.label] : current.label,
+          };
+
+          if (
+            current.value === nextConfig.value &&
+            current.color === nextConfig.color &&
+            current.fontSize === nextConfig.fontSize &&
+            current.label === nextConfig.label
+          ) {
+            return;
+          }
+
+          if (nextRotaryBindings === rotaryBindings) {
+            nextRotaryBindings = { ...rotaryBindings };
+          }
+
+          nextRotaryBindings[rotaryKey] = nextConfig;
+          changed = true;
+        }
+      });
+
+      if (!changed) {
+        return state;
       }
 
-      if (keyId in next.rotaryBindings) {
-        const rotaryKey = keyId as keyof typeof next.rotaryBindings;
-        next.rotaryBindings[rotaryKey] = {
-          ...next.rotaryBindings[rotaryKey],
-          ...update,
-          label: update.label ? [...update.label] : next.rotaryBindings[rotaryKey].label,
-        };
-      }
+      return {
+        layout: {
+          bindings: nextBindings,
+          rotaryBindings: nextRotaryBindings,
+        },
+      };
     });
-
-    set({ layout: next });
   },
 
   updateLayout: (layout) => set({ layout: cloneLayout(layout) }),
