@@ -36,7 +36,7 @@ import { PageContent } from "@/components/shared/PageLayout";
 type FlashState = "idle" | "flashing" | "success" | "error";
 
 export default function Firmware() {
-  const { status, firmwareVersion } = useDeviceSession();
+  const { status, firmwareVersion, developerMode } = useDeviceSession();
   const connected = status === "connected" || status === "updater";
 
   const [firmwareBytes, setFirmwareBytes] = useState<Uint8Array | null>(null);
@@ -52,6 +52,7 @@ export default function Firmware() {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragDepthRef = useRef(0);
   const dropZoneRef = useRef<HTMLElement | null>(null);
+  const logEndRef = useRef<HTMLSpanElement | null>(null);
 
   const appendLog = useCallback((msg: string) => {
     setFlashLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -335,6 +336,10 @@ export default function Firmware() {
     await processDroppedPath(droppedPath);
   }, [extractDroppedPath, hasBinExtension, isFileDrag, isPointInDropZone, processDroppedPath, processSelectedFirmware]);
 
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ block: "end" });
+  }, [flashLog]);
+
   const handleFlash = useCallback(async () => {
     if (!firmwareBytes) return;
     setConfirmOpen(false);
@@ -343,6 +348,10 @@ export default function Firmware() {
     setFlashLog([]);
 
     try {
+      appendLog("Preparing flash session...");
+      await DeviceSessionManager.disconnect();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
       const finalVersion = await kbheFirmware.flashFirmware(firmwareBytes, {
         timeoutMs: timeoutSec * 1000,
         retries,
@@ -352,15 +361,20 @@ export default function Firmware() {
 
       appendLog(`Flash complete! Version: ${formatFirmwareVersion(finalVersion)}`);
       setFlashState("success");
-
-      appendLog("Reconnecting to runtime device...");
-      await new Promise((r) => setTimeout(r, 2000));
-      await DeviceSessionManager.reconnect();
-      appendLog("Reconnected successfully.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       appendLog(`Error: ${msg}`);
       setFlashState("error");
+    } finally {
+      appendLog("Reconnecting device session...");
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      try {
+        await DeviceSessionManager.connect();
+        appendLog("Reconnected successfully.");
+      } catch (reconnectError) {
+        const reconnectMsg = reconnectError instanceof Error ? reconnectError.message : String(reconnectError);
+        appendLog(`Reconnect failed: ${reconnectMsg}`);
+      }
     }
   }, [firmwareBytes, timeoutSec, retries, appendLog]);
 
@@ -514,38 +528,40 @@ export default function Firmware() {
           </div>
         </div>
 
-        {/* ── Flash options ───────────────────────────────────── */}
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-4 py-3">
-            <h2 className="text-sm font-medium">Flash Options</h2>
-          </div>
-          <div className="p-4 flex flex-col gap-5">
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Timeout per operation</Label>
-                <span className="text-sm tabular-nums font-mono text-muted-foreground">{timeoutSec}s</span>
-              </div>
-              <Slider
-                min={1} max={30} step={1}
-                value={[timeoutSec]}
-                onValueChange={(v) => { const n = sliderVal(v); if (n !== undefined) setTimeoutSec(n); }}
-                disabled={flashState === "flashing"}
-              />
+        {/* ── Flash options (developer mode) ─────────────────── */}
+        {developerMode && (
+          <div className="rounded-lg border bg-card">
+            <div className="border-b px-4 py-3">
+              <h2 className="text-sm font-medium">Flash Options</h2>
             </div>
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Retry attempts</Label>
-                <span className="text-sm tabular-nums font-mono text-muted-foreground">{retries}</span>
+            <div className="p-4 flex flex-col gap-5">
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Timeout per operation</Label>
+                  <span className="text-sm tabular-nums font-mono text-muted-foreground">{timeoutSec}s</span>
+                </div>
+                <Slider
+                  min={1} max={30} step={1}
+                  value={[timeoutSec]}
+                  onValueChange={(v) => { const n = sliderVal(v); if (n !== undefined) setTimeoutSec(n); }}
+                  disabled={flashState === "flashing"}
+                />
               </div>
-              <Slider
-                min={1} max={20} step={1}
-                value={[retries]}
-                onValueChange={(v) => { const n = sliderVal(v); if (n !== undefined) setRetries(n); }}
-                disabled={flashState === "flashing"}
-              />
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Retry attempts</Label>
+                  <span className="text-sm tabular-nums font-mono text-muted-foreground">{retries}</span>
+                </div>
+                <Slider
+                  min={1} max={20} step={1}
+                  value={[retries]}
+                  onValueChange={(v) => { const n = sliderVal(v); if (n !== undefined) setRetries(n); }}
+                  disabled={flashState === "flashing"}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* ── Flash action + progress ─────────────────────────── */}
         <div className="rounded-lg border bg-card">
@@ -588,6 +604,7 @@ export default function Firmware() {
               <ScrollArea className="h-44 rounded-md border bg-muted/30 p-3">
                 <pre className="text-xs font-mono whitespace-pre-wrap text-muted-foreground">
                   {flashLog.join("\n")}
+                  <span ref={logEndRef} />
                 </pre>
               </ScrollArea>
             )}

@@ -11,10 +11,9 @@ import BaseKeyboard from "@/components/baseKeyboard";
 
 import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
+import { KeyboardEditor } from "@/components/keyboard-editor";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { ColorPicker, type RGBColor } from "@/components/color-picker";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { CommitSlider } from "@/components/ui/commit-slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -32,12 +31,10 @@ import {
 import {
   IconBrush,
   IconTrash,
-  IconRainbow,
   IconUpload,
   IconDownload,
   IconFileImport,
   IconFileExport,
-  IconDropletFilled,
 } from "@tabler/icons-react";
 
 // ---------------------------------------------------------------------------
@@ -245,6 +242,28 @@ function effectName(id: number): string {
   return `Mode ${id}`;
 }
 
+function buildDefaultEffectParams(meta: ParamSpec[]): number[] {
+  const maxIndex = meta.reduce((max, spec) => {
+    if (spec.kind === "color") {
+      return max;
+    }
+    return Math.max(max, spec.index);
+  }, -1);
+
+  if (maxIndex < 0) {
+    return [];
+  }
+
+  const defaults = new Array(maxIndex + 1).fill(0);
+  for (const spec of meta) {
+    if (spec.kind === "color") {
+      continue;
+    }
+    defaults[spec.index] = spec.default;
+  }
+  return defaults;
+}
+
 // ---------------------------------------------------------------------------
 // Matrix Keyboard sub-component
 // ---------------------------------------------------------------------------
@@ -319,7 +338,7 @@ function MatrixKeyboard({
   return (
     <div
       ref={rootRef}
-      className="select-none touch-none"
+      className="h-full w-full select-none touch-none"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endPaintStroke}
@@ -351,7 +370,6 @@ export default function Lighting() {
   const pageVisible = usePageVisible();
   const qc = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
-  const [activeTab, setActiveTab] = useState("effects");
   const [paintColor, setPaintColor] = useState<RGBColor>({ r: 255, g: 0, b: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -361,36 +379,42 @@ export default function Lighting() {
     queryKey: queryKeys.led.enabled(),
     queryFn: () => kbheDevice.ledGetEnabled(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const brightnessQ = useQuery({
     queryKey: queryKeys.led.brightness(),
     queryFn: () => kbheDevice.ledGetBrightness(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const effectQ = useQuery({
     queryKey: queryKeys.led.effect(),
     queryFn: () => kbheDevice.getLedEffect(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const speedQ = useQuery({
     queryKey: queryKeys.led.effectSpeed(),
     queryFn: () => kbheDevice.getLedEffectSpeed(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const colorQ = useQuery({
     queryKey: queryKeys.led.effectColor(),
     queryFn: () => kbheDevice.getLedEffectColor(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const fpsQ = useQuery({
     queryKey: queryKeys.led.fpsLimit(),
     queryFn: () => kbheDevice.getLedFpsLimit(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const currentEffect = effectQ.data ?? LEDEffect.SOLID;
@@ -398,17 +422,18 @@ export default function Lighting() {
   const paramsQ = useQuery({
     queryKey: queryKeys.led.effectParams(currentEffect),
     queryFn: () => kbheDevice.getLedEffectParams(currentEffect),
-    enabled: connected && effectQ.data != null,
+    enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const isMatrixMode = currentEffect === LEDEffect.MATRIX;
-  const matrixVisible = activeTab === "matrix";
-  const liveMatrixPolling = connected && matrixVisible && !isMatrixMode && pageVisible;
+  const liveMatrixPolling = connected && !isMatrixMode && pageVisible;
 
   const allPixelsQ = useQuery({
     queryKey: queryKeys.led.allPixels(),
     queryFn: () => kbheDevice.ledDownloadAll(),
-    enabled: connected && matrixVisible,
+    enabled: connected,
+    placeholderData: (previous) => previous,
     refetchInterval: false,
     refetchOnWindowFocus: false,
     refetchIntervalInBackground: false,
@@ -526,10 +551,25 @@ export default function Lighting() {
     };
   }, [applyIncomingMatrixFrame, liveMatrixPolling]);
 
+  useEffect(() => {
+    if (!connected || !isMatrixMode) {
+      return;
+    }
+
+    void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
+  }, [connected, isMatrixMode, qc]);
+
   const pixelColors = useMemo(
     () => (matrixPixels ? pixelsToRgbArray(matrixPixels) : null),
     [matrixPixels],
   );
+
+  const updateMatrixPixelsLocal = useCallback((next: number[]) => {
+    const snapshot = Array.from(next);
+    matrixPixelsRef.current = snapshot;
+    setMatrixPixels(snapshot);
+    qc.setQueryData(queryKeys.led.allPixels(), snapshot);
+  }, [qc]);
 
   // ---- Mutations ----
 
@@ -587,25 +627,38 @@ export default function Lighting() {
 
   const fillMut = useMutation({
     mutationFn: async (c: RGBColor) => { markSaving(); await kbheDevice.ledFill(c.r, c.g, c.b); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() }); },
+    onSuccess: (_data, c) => {
+      const filled = new Array(KEY_COUNT * 3).fill(0);
+      for (let i = 0; i < KEY_COUNT; i++) {
+        const offset = i * 3;
+        filled[offset] = c.r & 0xff;
+        filled[offset + 1] = c.g & 0xff;
+        filled[offset + 2] = c.b & 0xff;
+      }
+      updateMatrixPixelsLocal(filled);
+      markSaved();
+      void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
+    },
     onError: markError,
   });
 
   const clearMut = useMutation({
     mutationFn: async () => { markSaving(); await kbheDevice.ledClear(); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() }); },
-    onError: markError,
-  });
-
-  const rainbowMut = useMutation({
-    mutationFn: async () => { markSaving(); await kbheDevice.ledTestRainbow(); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() }); },
+    onSuccess: () => {
+      updateMatrixPixelsLocal(new Array(KEY_COUNT * 3).fill(0));
+      markSaved();
+      void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
+    },
     onError: markError,
   });
 
   const uploadMut = useMutation({
     mutationFn: async (pixels: number[]) => { markSaving(); await kbheDevice.ledUploadAll(pixels); },
-    onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() }); },
+    onSuccess: (_data, pixels) => {
+      updateMatrixPixelsLocal(pixels);
+      markSaved();
+      void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
+    },
     onError: markError,
   });
 
@@ -747,21 +800,22 @@ export default function Lighting() {
   const currentMeta = EFFECT_PARAM_METADATA[currentEffect];
 
   function renderEffectParams() {
-    if (!currentMeta || !paramsQ.data) {
-      if (effectQ.data != null && !EFFECT_PARAM_METADATA[currentEffect]) {
-        return (
-          <p className="text-sm text-muted-foreground py-2">
-            This effect has no additional tuning controls.
-          </p>
-        );
-      }
-      return null;
+    if (!currentMeta) {
+      return (
+        <p className="text-sm text-muted-foreground py-2">
+          This effect has no additional tuning controls.
+        </p>
+      );
     }
 
-    const params = paramsQ.data;
+    const paramsLoaded = paramsQ.data != null;
+    const params = paramsQ.data ?? buildDefaultEffectParams(currentMeta);
 
     return (
       <div className="flex flex-col gap-3">
+        {!paramsLoaded && (
+          <p className="text-xs text-muted-foreground">Loading current values...</p>
+        )}
         {currentMeta.map((spec, i) => {
           if (spec.kind === "color") {
             return (
@@ -781,7 +835,7 @@ export default function Lighting() {
                 <Label className="text-sm">{spec.label}</Label>
                 <Switch
                   checked={checked}
-                  disabled={!connected}
+                  disabled={!connected || !paramsLoaded}
                   onCheckedChange={(v) => {
                     const next = [...params];
                     next[spec.index] = v ? 1 : 0;
@@ -802,6 +856,7 @@ export default function Lighting() {
                 <Select
                   value={String(val)}
                   items={selectItemsReverse(optMap)}
+                  disabled={!connected || !paramsLoaded}
                   onValueChange={(v) => {
                     const next = [...params];
                     next[spec.index] = Number(v);
@@ -847,7 +902,7 @@ export default function Lighting() {
                   next[spec.index] = v;
                   paramsMut.mutate(next);
                 }}
-                disabled={!connected}
+                disabled={!connected || !paramsLoaded}
               />
             </div>
           );
@@ -856,253 +911,234 @@ export default function Lighting() {
     );
   }
 
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-hidden min-h-0">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-          <div className="shrink-0 border-b px-4 py-1">
-            <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-              <TabsList className="h-9">
-                <TabsTrigger value="effects">Effects</TabsTrigger>
-                <TabsTrigger value="matrix">Matrix</TabsTrigger>
-              </TabsList>
-              <AutosaveStatus state={saveState} />
-            </div>
-          </div>
+  const previewKeyColorMap = useMemo(() => {
+    if (!pixelColors) {
+      return undefined;
+    }
 
-          {/* === Effects Tab === */}
-          <TabsContent value="effects" className="flex-1 min-h-0 mt-0">
-            <ScrollArea className="h-full">
-              <div className="p-4">
-                <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[1fr_320px]">
-                  {/* Left column */}
-                  <div className="flex flex-col gap-4">
-                    <SectionCard title="LED Control">
-                      <div className="flex flex-col divide-y">
-                        <FormRow label="LEDs Enabled">
-                          <Switch
-                            checked={enabledQ.data ?? false}
-                            disabled={!connected}
-                            onCheckedChange={(v) => enabledMut.mutate(v)}
-                          />
-                        </FormRow>
-                        <FormRow label="Global Brightness">
-                          <div className="flex items-center gap-3 w-44">
-                            {brightnessQ.data == null ? (
-                              <Skeleton className="h-5 w-full" />
-                            ) : (
-                              <CommitSlider
-                                min={0} max={255} step={1}
-                                value={brightnessQ.data}
-                                onLiveChange={(v) => liveBrightness(v)}
-                                onCommit={(v) => brightnessMut.mutate(v)}
-                                disabled={!connected} className="flex-1"
-                              />
-                            )}
-                          </div>
-                        </FormRow>
-                      </div>
-                    </SectionCard>
+    const map: Record<string, string> = {};
+    for (let i = 0; i < KEY_COUNT; i++) {
+      const c = pixelColors[i];
+      if (!c) {
+        continue;
+      }
+      map[`key-${i}`] = rgbToHex(c.r, c.g, c.b);
+    }
+    return map;
+  }, [pixelColors]);
 
-                    <SectionCard
-                      title="Effect Mode"
-                      description={EFFECT_DESCRIPTIONS[currentEffect]}
-                    >
-                      {effectQ.isLoading ? (
-                        <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-6 w-48" />)}</div>
-                      ) : (
-                        <RadioGroup
-                          value={String(effectQ.data ?? 0)}
-                          onValueChange={(v: string) => effectMut.mutate(Number(v))}
-                          disabled={!connected}
-                          className="flex flex-col gap-4"
-                        >
-                          {EFFECT_GROUPS.map((group) => (
-                            <div key={group.category}>
-                              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{group.category}</p>
-                              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                                {group.effects.map((eff) => (
-                                  <div key={eff.id} className="flex items-center gap-2">
-                                    <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
-                                    <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      )}
-                    </SectionCard>
-                  </div>
+  const keyboardPreview = pixelColors ? (
+    <MatrixKeyboard
+      pixelColors={pixelColors}
+      connected={connected && isMatrixMode}
+      onPaint={paintMatrixKey}
+      onStrokeEnd={handleMatrixStrokeEnd}
+    />
+  ) : (
+    <BaseKeyboard
+      mode="single"
+      onButtonClick={() => { }}
+      showLayerSelector={false}
+      showRotary={false}
+      interactive={false}
+      showTooltips={false}
+      keyColorMap={previewKeyColorMap}
+      loading={connected && allPixelsQ.isLoading}
+    />
+  );
 
-                  {/* Right column */}
-                  <div className="flex flex-col gap-4">
-                    <SectionCard
-                      title="Effect Tuning"
-                      description={effectName(currentEffect)}
-                    >
-                      {paramsQ.isLoading ? (
-                        <div className="space-y-3">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
-                      ) : (
-                        renderEffectParams()
-                      )}
-                    </SectionCard>
+  const matrixToolsVisible = connected && isMatrixMode;
 
-                    <SectionCard title="Effect Speed">
-                      <div className="flex items-center gap-3">
-                        {speedQ.data == null ? (
-                          <Skeleton className="h-5 w-full" />
-                        ) : (
-                          <CommitSlider
-                            min={1} max={255} step={1}
-                            value={speedQ.data}
-                            onLiveChange={(v) => liveSpeed(v)}
-                            onCommit={(v) => speedMut.mutate(v)}
-                            disabled={!connected} className="flex-1"
-                          />
-                        )}
-                      </div>
-                    </SectionCard>
-
-                    <SectionCard title="Effect Color" description="Used by Solid, Breathing, Reactive, and related effects.">
-                      {colorQ.data == null ? (
-                        <Skeleton className="h-8 w-16" />
-                      ) : (
-                        <div className="flex flex-col gap-3">
-                          <div className="flex items-center gap-3">
-                            <ColorPicker color={effectColor} onLiveChange={(c) => liveColor(c)} onChange={(c) => colorMut.mutate(c)} />
-                            <span className="text-xs font-mono text-muted-foreground">
-                              {rgbToHex(effectColor.r, effectColor.g, effectColor.b)}
-                            </span>
-                          </div>
-                          <div className="flex gap-1.5">
-                            {QUICK_COLORS.map((c, i) => (
-                              <button
-                                key={i}
-                                className="size-6 rounded-md border border-border transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring"
-                                style={{ backgroundColor: rgbToHex(c.r, c.g, c.b) }}
-                                title={rgbToHex(c.r, c.g, c.b)}
-                                onClick={() => colorMut.mutate(c)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </SectionCard>
-
-                    <SectionCard title="FPS Limit">
-                      <div className="flex items-center gap-3">
-                        {fpsQ.data == null ? (
-                          <Skeleton className="h-5 w-full" />
-                        ) : (
-                          <CommitSlider
-                            min={0} max={120} step={1}
-                            value={fpsQ.data}
-                            onLiveChange={(v) => liveFps(v)}
-                            onCommit={(v) => fpsMut.mutate(v)}
-                            disabled={!connected} className="flex-1"
-                          />
-                        )}
-                      </div>
-                    </SectionCard>
-
-                    {/* <SectionCard title="LED Diagnostic Mode" description="Stress-test modes for hardware verification">
-                  {diagnosticQ.isLoading ? (
-                    <Skeleton className="h-8 w-36" />
-                  ) : (
-                    <RadioGroup
-                      value={String(diagnosticQ.data ?? 0)}
-                      onValueChange={(v: string) => diagnosticMut.mutate(Number(v))}
-                      disabled={!connected}
-                      className="flex gap-4"
-                    >
-                      {Object.entries(DIAGNOSTIC_MODES).map(([val, name]) => (
-                        <div key={val} className="flex items-center gap-2">
-                          <RadioGroupItem value={val} id={`diag-${val}`} />
-                          <Label htmlFor={`diag-${val}`} className="text-sm font-normal cursor-pointer">{name}</Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  )}
-                </SectionCard> */}
-                  </div>
-                </div>
-              </div>
-            </ScrollArea>
-          </TabsContent>
-
-          {/* === Matrix Tab === */}
-          <TabsContent value="matrix" className="mt-0 flex-1 min-h-0 select-none">
-            <ScrollArea className="h-full">
-              <div className="p-4">
-                <div className="flex flex-col gap-4 max-w-3xl mx-auto">
-                  <SectionCard title="Paint Color">
-                    <div className="flex items-center gap-4">
-                      <ColorPicker color={paintColor} onChange={setPaintColor} />
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <IconDropletFilled className="size-4" style={{ color: rgbToHex(paintColor.r, paintColor.g, paintColor.b) }} />
-                        <span className="font-mono text-xs">{rgbToHex(paintColor.r, paintColor.g, paintColor.b)}</span>
-                      </div>
-                    </div>
-                  </SectionCard>
-
-                  <SectionCard
-                    title="LED Matrix"
-                    description={isMatrixMode ? "Software matrix mode — click to paint" : "Live LED state (read-only while an effect is active)"}
-                    headerRight={
-                      <div className="flex gap-1.5 flex-wrap justify-end">
-                        <Button variant="outline" size="sm" disabled={!connected} onClick={() => fillMut.mutate(paintColor)}>
-                          <IconBrush className="size-3.5 mr-1" />Fill
-                        </Button>
-                        <Button variant="outline" size="sm" disabled={!connected} onClick={() => clearMut.mutate()}>
-                          <IconTrash className="size-3.5 mr-1" />Clear
-                        </Button>
-                        <Button variant="outline" size="sm" disabled={!connected} onClick={() => rainbowMut.mutate()}>
-                          <IconRainbow className="size-3.5 mr-1" />Rainbow
-                        </Button>
-                      </div>
-                    }
-                  >
-                    {pixelColors ? (
-                      <MatrixKeyboard
-                        pixelColors={pixelColors}
-                        connected={connected && isMatrixMode}
-                        onPaint={paintMatrixKey}
-                        onStrokeEnd={handleMatrixStrokeEnd}
-                      />
-                    ) : allPixelsQ.isLoading ? (
-                      <Skeleton className="h-40 w-full" />
-                    ) : (
-                      <p className="text-sm text-muted-foreground py-4">
-                        {connected ? "Failed to read LED data. Try refreshing." : "Connect a device to view the LED matrix."}
-                      </p>
-                    )}
-                  </SectionCard>
-
-                  <SectionCard title="Transfer">
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" disabled={!connected} onClick={() => { if (pixelColors) uploadMut.mutate(rgbArrayToPixels(pixelColors)); }}>
-                        <IconUpload className="size-3.5 mr-1" />Upload All
-                      </Button>
-                      <Button variant="outline" size="sm" disabled={!connected} onClick={() => downloadMut.mutate()}>
-                        <IconDownload className="size-3.5 mr-1" />Download All
-                      </Button>
-                      <div className="w-px bg-border mx-1 self-stretch" />
-                      <Button variant="outline" size="sm" onClick={handleExport} disabled={!connected || (!matrixPixels && !allPixelsQ.data)}>
-                        <IconFileExport className="size-3.5 mr-1" />Export .led
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!connected}>
-                        <IconFileImport className="size-3.5 mr-1" />Import .led
-                      </Button>
-                      <input ref={fileInputRef} type="file" accept=".led" className="hidden" aria-label="Import .led file" onChange={handleImport} />
-                    </div>
-                  </SectionCard>
-                </div>
-              </div>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+  const menubar = (
+    <>
+      <div className="min-w-0">
+        <span className="block truncate text-xs text-muted-foreground">
+          {matrixToolsVisible
+            ? "Matrix mode actif - peins directement sur le clavier"
+            : `Apercu live (lecture seule) - ${effectName(currentEffect)}`}
+        </span>
       </div>
-    </div>
+      <div className="flex items-center gap-2">
+        {matrixToolsVisible && (
+          <>
+            <ColorPicker color={paintColor} onChange={setPaintColor} />
+            <Button variant="outline" size="sm" onClick={() => fillMut.mutate(paintColor)}>
+              <IconBrush className="size-3.5 mr-1" />Fill
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => clearMut.mutate()}>
+              <IconTrash className="size-3.5 mr-1" />Clear
+            </Button>
+          </>
+        )}
+        <AutosaveStatus state={saveState} />
+      </div>
+    </>
+  );
+
+  return (
+    <KeyboardEditor
+      keyboard={keyboardPreview}
+      menubar={menubar}
+    >
+      <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Left column */}
+        <div className="flex flex-col gap-4">
+          <SectionCard title="LED Control">
+            <div className="flex flex-col divide-y">
+              <FormRow label="LEDs Enabled">
+                <Switch
+                  checked={enabledQ.data ?? false}
+                  disabled={!connected}
+                  onCheckedChange={(v) => enabledMut.mutate(v)}
+                />
+              </FormRow>
+              <FormRow label="Global Brightness">
+                <div className="flex items-center gap-3 w-44">
+                  <CommitSlider
+                    min={0} max={255} step={1}
+                    value={brightnessQ.data ?? 128}
+                    onLiveChange={(v) => liveBrightness(v)}
+                    onCommit={(v) => brightnessMut.mutate(v)}
+                    disabled={!connected || brightnessQ.data == null}
+                    className="flex-1"
+                  />
+                </div>
+              </FormRow>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Effect Mode"
+            description={EFFECT_DESCRIPTIONS[currentEffect]}
+          >
+            <RadioGroup
+              value={String(effectQ.data ?? currentEffect)}
+              onValueChange={(v: string) => effectMut.mutate(Number(v))}
+              disabled={!connected || effectQ.data == null}
+              className="flex flex-col gap-4"
+            >
+              {EFFECT_GROUPS.map((group) => (
+                <div key={group.category}>
+                  <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{group.category}</p>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    {group.effects.map((eff) => (
+                      <div key={eff.id} className="flex items-center gap-2">
+                        <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
+                        <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </RadioGroup>
+          </SectionCard>
+
+          <SectionCard title="Matrix Transfer">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" disabled={!connected || !pixelColors} onClick={() => {
+                if (pixelColors) {
+                  uploadMut.mutate(rgbArrayToPixels(pixelColors));
+                }
+              }}>
+                <IconUpload className="size-3.5 mr-1" />Upload All
+              </Button>
+              <Button variant="outline" size="sm" disabled={!connected} onClick={() => downloadMut.mutate()}>
+                <IconDownload className="size-3.5 mr-1" />Download All
+              </Button>
+              <div className="w-px bg-border mx-1 self-stretch" />
+              <Button variant="outline" size="sm" onClick={handleExport} disabled={!connected || (!matrixPixels && !allPixelsQ.data)}>
+                <IconFileExport className="size-3.5 mr-1" />Export .led
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!connected}>
+                <IconFileImport className="size-3.5 mr-1" />Import .led
+              </Button>
+              <input ref={fileInputRef} type="file" accept=".led" className="hidden" aria-label="Import .led file" onChange={handleImport} />
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* Right column */}
+        <div className="flex flex-col gap-4">
+          <SectionCard
+            title="Effect Tuning"
+            description={effectName(currentEffect)}
+          >
+            {renderEffectParams()}
+          </SectionCard>
+
+          <SectionCard title="Effect Speed">
+            <div className="flex items-center gap-3">
+              <CommitSlider
+                min={1} max={255} step={1}
+                value={speedQ.data ?? 128}
+                onLiveChange={(v) => liveSpeed(v)}
+                onCommit={(v) => speedMut.mutate(v)}
+                disabled={!connected || speedQ.data == null}
+                className="flex-1"
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Effect Color" description="Used by Solid, Breathing, Reactive, and related effects.">
+            {colorQ.data == null ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <ColorPicker color={effectColor} onLiveChange={(c) => liveColor(c)} onChange={(c) => colorMut.mutate(c)} />
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {rgbToHex(effectColor.r, effectColor.g, effectColor.b)}
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  {QUICK_COLORS.map((c, i) => (
+                    <button
+                      key={i}
+                      className="size-6 rounded-md border border-border transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring"
+                      style={{ backgroundColor: rgbToHex(c.r, c.g, c.b) }}
+                      title={rgbToHex(c.r, c.g, c.b)}
+                      onClick={() => colorMut.mutate(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="FPS Limit">
+            <div className="flex items-center gap-3">
+              <CommitSlider
+                min={0} max={120} step={1}
+                value={fpsQ.data ?? 0}
+                onLiveChange={(v) => liveFps(v)}
+                onCommit={(v) => fpsMut.mutate(v)}
+                disabled={!connected || fpsQ.data == null}
+                className="flex-1"
+              />
+            </div>
+          </SectionCard>
+
+          {/* <SectionCard title="LED Diagnostic Mode" description="Stress-test modes for hardware verification">
+        {diagnosticQ.isLoading ? (
+          <Skeleton className="h-8 w-36" />
+        ) : (
+          <RadioGroup
+            value={String(diagnosticQ.data ?? 0)}
+            onValueChange={(v: string) => diagnosticMut.mutate(Number(v))}
+            disabled={!connected}
+            className="flex gap-4"
+          >
+            {Object.entries(DIAGNOSTIC_MODES).map(([val, name]) => (
+              <div key={val} className="flex items-center gap-2">
+                <RadioGroupItem value={val} id={`diag-${val}`} />
+                <Label htmlFor={`diag-${val}`} className="text-sm font-normal cursor-pointer">{name}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+        )}
+      </SectionCard> */}
+        </div>
+      </div>
+    </KeyboardEditor>
   );
 }

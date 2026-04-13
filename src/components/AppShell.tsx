@@ -21,6 +21,7 @@ import Rotary from "@/pages/Rotary";
 import Device from "@/pages/Device";
 import Firmware from "@/pages/Firmware";
 import Diagnostics from "@/pages/Diagnostics";
+import AppSettings from "@/pages/AppSettings";
 import { IconDeviceDesktop } from "@tabler/icons-react";
 
 const MIN_WIDTH  = 1024;
@@ -38,6 +39,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/rotary": "Rotary Encoder",
   "/device": "Device",
   "/firmware": "Firmware",
+  "/settings": "App Settings",
   "/diagnostics": "Diagnostics",
 };
 
@@ -120,6 +122,7 @@ export function AppShell() {
               <Route path="/rotary"        element={<Rotary />} />
               <Route path="/device"        element={<Device />} />
               <Route path="/firmware"      element={<Firmware />} />
+              <Route path="/settings"      element={<AppSettings />} />
               {developerMode && (
                 <Route path="/diagnostics" element={<Diagnostics />} />
               )}

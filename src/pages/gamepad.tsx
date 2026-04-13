@@ -65,7 +65,7 @@ export default function Gamepad() {
   const { status } = useDeviceSession();
   const connected = status === "connected";
   const visible = usePageVisible();
-  const keyLegendSlotsMap = useKeyboardPreviewLegends();
+  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
   const qc = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
@@ -79,6 +79,12 @@ export default function Gamepad() {
   const gamepadQ = useQuery({
     queryKey: queryKeys.gamepad.settings(),
     queryFn: () => kbheDevice.getGamepadSettings(),
+    enabled: connected,
+  });
+
+  const optionsQ = useQuery({
+    queryKey: queryKeys.device.options(),
+    queryFn: () => kbheDevice.getOptions(),
     enabled: connected,
   });
 
@@ -133,6 +139,7 @@ export default function Gamepad() {
 
   const gs = gamepadQ.data;
   const km = keyMapQ.data;
+  const keyboardEnabled = optionsQ.data?.keyboard_enabled ?? false;
 
   // ── Assign button helper ──
 
@@ -229,6 +236,7 @@ export default function Gamepad() {
           onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
+          loading={keyboardPreviewLoading}
           keyLegendSlotsMap={keyLegendSlotsMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />
@@ -378,17 +386,20 @@ export default function Gamepad() {
                 <div className="flex flex-col divide-y">
                   <FormRow
                     label="Keyboard Routing"
-                    description="How keyboard output behaves alongside gamepad"
+                    description={keyboardEnabled
+                      ? "How keyboard output behaves alongside gamepad"
+                      : "Enable Keyboard in Device page to change this"
+                    }
                   >
                     {gamepadQ.isLoading ? (
                       <Skeleton className="h-8 w-36" />
                     ) : (
                       <Select
                         value={String(gs?.keyboard_routing ?? 1)}
-                        disabled={!connected}
+                        disabled={!connected || !keyboardEnabled}
                         items={selectItems(GAMEPAD_KEYBOARD_ROUTING)}
                         onValueChange={(v) => {
-                          if (!gs) return;
+                          if (!gs || !keyboardEnabled) return;
                           gamepadMutation.mutate({
                             ...gs,
                             keyboard_routing: Number(v),

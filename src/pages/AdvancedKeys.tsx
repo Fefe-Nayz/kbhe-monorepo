@@ -136,8 +136,8 @@ export default function AdvancedKeys() {
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
   const { status } = useDeviceSession();
   const connected = status === "connected";
-  const keyLegendSlotsMap = useKeyboardPreviewLegends();
   const resolveKeycapLegend = useOSKeycapLegend();
+  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
   const queryClient = useQueryClient();
 
@@ -943,6 +943,7 @@ export default function AdvancedKeys() {
           showLayerSelector={false}
           showRotary={false}
           keyLegendSlotsMap={keyboardLegendSlotsMap}
+          loading={keyboardPreviewLoading}
           keyLegendClassName="text-[9px] leading-[1.05]"
           keyColorMap={keyboardKeyColorMap}
         />

@@ -183,7 +183,7 @@ fn send_command_on_active(
     timeout_ms: u64,
 ) -> Result<Option<Vec<u8>>, String> {
     let mut flush_buffer = [0u8; KBHE_PACKET_SIZE];
-    for _ in 0..8 {
+    loop {
         let read = connection
             .device
             .read_timeout(&mut flush_buffer, 0)
@@ -334,6 +334,21 @@ pub fn kbhe_read_report(
         .map_err(|error| error.to_string())?;
 
     Ok(buffer[..read].to_vec())
+}
+
+#[tauri::command]
+pub fn kbhe_send_command(
+    command: u8,
+    data: Vec<u8>,
+    timeout_ms: u64,
+    state: State<'_, KbheTransportState>,
+) -> Result<Option<Vec<u8>>, String> {
+    let mut active = lock_active(&state)?;
+    let connection = active
+        .as_mut()
+        .ok_or_else(|| "no KBHE HID device is currently connected".to_string())?;
+
+    send_command_on_active(connection, command, &data, timeout_ms)
 }
 
 #[tauri::command]

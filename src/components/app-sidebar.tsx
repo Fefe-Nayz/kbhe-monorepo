@@ -37,6 +37,8 @@ import {
   IconChevronDown,
   IconPlugConnected,
   IconPlugConnectedX,
+  IconDeviceDesktop,
+  IconHome,
 } from "@tabler/icons-react";
 import type { Icon } from "@tabler/icons-react";
 
@@ -47,6 +49,10 @@ interface NavItem {
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Overview",
+    items: [{ title: "Dashboard", path: "/", icon: IconHome }],
+  },
   {
     label: "Profiles",
     items: [
@@ -61,13 +67,13 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { title: "Advanced Keys", path: "/advanced-keys", icon: IconArrowBigUpLines },
       { title: "Gamepad", path: "/gamepad", icon: IconDeviceGamepad2 },
       { title: "Calibration", path: "/calibration", icon: IconCrosshair },
+      { title: "Rotary", path: "/rotary", icon: IconRotateClockwise },
     ],
   },
   {
     label: "Lighting",
     items: [
       { title: "Lighting", path: "/lighting", icon: IconBulb },
-      { title: "Rotary", path: "/rotary", icon: IconRotateClockwise },
     ],
   },
   {
@@ -205,6 +211,19 @@ export function AppSidebar({ variant = "inset" }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
+        <SidebarMenu className="mb-1 gap-1">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={isActive("/settings")}
+              tooltip="App Settings"
+              onClick={() => navigate("/settings")}
+            >
+              <IconDeviceDesktop className="size-4" />
+              <span>App Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
         <div className="flex flex-col gap-1 px-2 py-1.5 text-xs group-data-[collapsible=icon]:hidden">
           <div className="flex items-center gap-1.5">
             {connected ? (

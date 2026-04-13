@@ -73,5 +73,14 @@ export function useKeyboardPreviewLegends() {
         return map;
     }, [connected, layerKeycodes.data, resolveKeycapLegend]);
 
-    return keyLegendSlotsMap;
+    const isLoading =
+        connected && (
+            (layerKeycodes.isLoading && !layerKeycodes.data) ||
+            !resolveKeycapLegend.isReady
+        );
+
+    return {
+        keyLegendSlotsMap,
+        isLoading,
+    };
 }

@@ -41,7 +41,7 @@ function sanitizeKeyboardName(value: string): string {
 }
 
 export default function Device() {
-  const { status, deviceInfo, firmwareVersion, setDeveloperMode, developerMode } = useDeviceSession();
+  const { status, deviceInfo, firmwareVersion } = useDeviceSession();
   const connected = status === "connected";
   const qc = useQueryClient();
 
@@ -77,7 +77,14 @@ export default function Device() {
   const toggleMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
       switch (key) {
-        case "keyboard": await kbheDevice.setKeyboardEnabled(value); break;
+        case "keyboard": {
+          await kbheDevice.setKeyboardEnabled(value);
+          // Keep keyboard output strictly disabled in all modes.
+          if (!value) {
+            await kbheDevice.setGamepadWithKeyboard(false);
+          }
+          break;
+        }
         case "gamepad": await kbheDevice.setGamepadEnabled(value); break;
         case "nkro": await kbheDevice.setNkroEnabled(value); break;
         case "led": await kbheDevice.ledSetEnabled(value); break;
@@ -150,6 +157,7 @@ export default function Device() {
 
   const identitySupported = connected && deviceIdentityQ.data !== null;
   const keyboardNameDisabled = !identitySupported || setKeyboardNameMutation.isPending;
+  const keyboardEnabled = optionsQ.data?.keyboard_enabled ?? false;
 
   const handleKeyboardNameChange = (value: string) => {
     const sanitized = sanitizeKeyboardName(value);
@@ -216,7 +224,7 @@ export default function Device() {
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
+
                       disabled={keyboardNameDisabled || !keyboardNameDirty}
                       onClick={() => setKeyboardNameMutation.mutate(keyboardNameInput)}
                     >
@@ -224,7 +232,7 @@ export default function Device() {
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+
                       disabled={keyboardNameDisabled || !keyboardNameDirty}
                       onClick={() => {
                         setKeyboardNameInput(deviceKeyboardName);
@@ -251,25 +259,38 @@ export default function Device() {
 
           <SectionCard title="Options">
             <div className="flex flex-col divide-y">
-              <FormRow label="Keyboard Enabled">
-                <Switch checked={optionsQ.data?.keyboard_enabled ?? false} disabled={!connected}
-                  onCheckedChange={(v) => toggleMutation.mutate({ key: "keyboard", value: v })} />
-              </FormRow>
+              <div className="py-3 first:pt-0 last:pb-0">
+                <FormRow label="Keyboard Enabled" className="py-0">
+                  <Switch
+                    checked={keyboardEnabled}
+                    disabled={!connected}
+                    onCheckedChange={(v) => toggleMutation.mutate({ key: "keyboard", value: v })}
+                  />
+                </FormRow>
+                <div className="mt-3 ml-3 border-l pl-4">
+                  <FormRow
+                    label="NKRO Enabled"
+                    description={keyboardEnabled
+                      ? "N-Key Rollover for full anti-ghosting"
+                      : "Enable Keyboard first to modify NKRO"
+                    }
+                    className="py-1"
+                  >
+                    <Switch
+                      checked={nkroEnabledQ.data ?? false}
+                      disabled={!connected || !keyboardEnabled}
+                      onCheckedChange={(v) => toggleMutation.mutate({ key: "nkro", value: v })}
+                    />
+                  </FormRow>
+                </div>
+              </div>
               <FormRow label="Gamepad Enabled">
                 <Switch checked={optionsQ.data?.gamepad_enabled ?? false} disabled={!connected}
                   onCheckedChange={(v) => toggleMutation.mutate({ key: "gamepad", value: v })} />
               </FormRow>
-              <FormRow label="NKRO Enabled" description="N-Key Rollover for full anti-ghosting">
-                <Switch checked={nkroEnabledQ.data ?? false} disabled={!connected}
-                  onCheckedChange={(v) => toggleMutation.mutate({ key: "nkro", value: v })} />
-              </FormRow>
               <FormRow label="LED Enabled">
                 <Switch checked={ledEnabledQ.data ?? false} disabled={!connected}
                   onCheckedChange={(v) => toggleMutation.mutate({ key: "led", value: v })} />
-              </FormRow>
-              <FormRow label="Developer Mode" description="Enables Diagnostics page">
-                <Switch checked={developerMode}
-                  onCheckedChange={(v) => setDeveloperMode(v)} />
               </FormRow>
             </div>
           </SectionCard>

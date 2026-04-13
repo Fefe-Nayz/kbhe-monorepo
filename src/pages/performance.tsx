@@ -29,7 +29,7 @@ export default function Performance() {
   const clearSelection = useKeyboardStore((s) => s.clearSelection);
   const { status } = useDeviceSession();
   const connected = status === "connected";
-  const keyLegendSlotsMap = useKeyboardPreviewLegends();
+  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
   const focusedKeyId = selectedKeys[0] ?? null;
@@ -154,6 +154,7 @@ export default function Performance() {
           onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
+          loading={keyboardPreviewLoading}
           keyLegendSlotsMap={keyLegendSlotsMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />

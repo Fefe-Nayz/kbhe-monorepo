@@ -69,19 +69,19 @@ export function DeviceBanner() {
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-4 py-2 text-sm border-b",
+        "flex min-h-11 items-center gap-3 border-b px-4 py-2 text-sm",
         isError
           ? "bg-destructive/10 border-destructive/30 text-destructive"
           : "bg-muted/60 border-border text-muted-foreground",
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         {isError ? (
           <IconAlertTriangle className="size-4 shrink-0" />
         ) : (
           <IconPlugConnectedX className="size-4 shrink-0" />
         )}
-        <span>
+        <span className="truncate">
           {isError
             ? `Device error: ${error ?? "unknown"}`
             : status === "connecting"
@@ -90,21 +90,21 @@ export function DeviceBanner() {
         </span>
       </div>
 
-      {status !== "connecting" && (
+      <div className="flex w-36 shrink-0 items-center justify-end gap-2">
+        {firmwareVersion && (
+          <span className="truncate text-xs opacity-60">fw {firmwareVersion}</span>
+        )}
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1.5 text-xs"
+          className={cn("h-7 gap-1.5 text-xs", status === "connecting" && "invisible pointer-events-none")}
+          disabled={status === "connecting"}
           onClick={() => void DeviceSessionManager.reconnect()}
         >
           <IconRefresh className="size-3" />
           Retry
         </Button>
-      )}
-
-      {firmwareVersion && (
-        <span className="text-xs opacity-60">fw {firmwareVersion}</span>
-      )}
+      </div>
     </div>
   );
 }
