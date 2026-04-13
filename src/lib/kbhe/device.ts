@@ -46,13 +46,11 @@ export interface KeySettings {
   hid_keycode: number;
   actuation_point_mm: number;
   release_point_mm: number;
-  rapid_trigger_activation: number;
   rapid_trigger_press: number;
   rapid_trigger_release: number;
   socd_pair: number | null;
   socd_resolution: number;
   rapid_trigger_enabled: boolean;
-  disable_kb_on_gamepad: boolean;
   continuous_rapid_trigger: boolean;
   behavior_mode: number;
   hold_threshold_ms: number;
@@ -713,24 +711,29 @@ export class KBHEDevice {
 
   async getKeySettings(keyIndex: number): Promise<KeySettings | null> {
     const response = await this.sendCommand(Command.GET_KEY_SETTINGS, [0, keyIndex]);
-    if (response && response.length >= 13 && response[1] === Status.OK) {
-      const hasSocdResolution = response.length >= 14;
-      const socdResolution = hasSocdResolution ? this.sanitizeSocdResolution(response[11]) : 0;
-      const rapidIndex = hasSocdResolution ? 12 : 11;
-      const disableIndex = hasSocdResolution ? 13 : 12;
-      const continuousIndex = response.length > 14 ? 14 : null;
-      const behaviorIndex = response.length > 15 ? 15 : null;
-      const holdIndex = response.length > 16 ? 16 : null;
-      const zoneCountIndex = response.length > 17 ? 17 : null;
-      const secondaryIndex = response.length > 19 ? 18 : null;
+    if (response && response.length >= 12 && response[1] === Status.OK) {
+      const hasLegacyRapidActivation =
+        response.length >= 14 && response[10] > 3 && this.sanitizeSocdResolution(response[11]) === response[11];
+      const rapidTriggerPressIndex = hasLegacyRapidActivation ? 8 : 7;
+      const rapidTriggerReleaseIndex = hasLegacyRapidActivation ? 9 : 8;
+      const socdPairIndex = hasLegacyRapidActivation ? 10 : 9;
+      const socdResolutionIndex = hasLegacyRapidActivation ? 11 : 10;
+      const rapidIndex = hasLegacyRapidActivation ? 12 : 11;
+      const disableIndex = hasLegacyRapidActivation ? 13 : 12;
+      const continuousIndex = disableIndex + 1;
+      const behaviorIndex = continuousIndex + 1;
+      const holdIndex = behaviorIndex + 1;
+      const zoneCountIndex = holdIndex + 1;
+      const secondaryIndex = zoneCountIndex + 1;
+      const dynamicZoneStart = secondaryIndex + 2;
       const primaryKeycode = this.unpackU16(response, 3);
       let dynamicZones = this.defaultDynamicZones(primaryKeycode);
 
-      if (response.length >= 32) {
+      if (response.length >= dynamicZoneStart + 12) {
         dynamicZones = this.sanitizeDynamicZones(
           Array.from({ length: 4 }, (_, index) => ({
-            end_mm_tenths: response[20 + index * 3] ?? 0,
-            hid_keycode: this.unpackU16(response, 21 + index * 3),
+            end_mm_tenths: response[dynamicZoneStart + index * 3] ?? 0,
+            hid_keycode: this.unpackU16(response, dynamicZoneStart + 1 + index * 3),
           })),
           primaryKeycode,
         );
@@ -741,26 +744,27 @@ export class KBHEDevice {
         hid_keycode: primaryKeycode,
         actuation_point_mm: response[5] / 10.0,
         release_point_mm: response[6] / 10.0,
-        rapid_trigger_activation: response[7] / 10.0,
-        rapid_trigger_press: response[8] / 100.0,
-        rapid_trigger_release: response[9] / 100.0,
-        socd_pair: response[10] !== 255 ? response[10] : null,
-        socd_resolution: socdResolution,
+        rapid_trigger_press: response[rapidTriggerPressIndex] / 100.0,
+        rapid_trigger_release: response[rapidTriggerReleaseIndex] / 100.0,
+        socd_pair: response[socdPairIndex] !== 255 ? response[socdPairIndex] : null,
+        socd_resolution:
+          response.length > socdResolutionIndex
+            ? this.sanitizeSocdResolution(response[socdResolutionIndex])
+            : 0,
         rapid_trigger_enabled: Boolean(response[rapidIndex]),
-        disable_kb_on_gamepad: Boolean(response[disableIndex]),
         continuous_rapid_trigger:
-          continuousIndex !== null ? Boolean(response[continuousIndex]) : false,
+          response.length > continuousIndex ? Boolean(response[continuousIndex]) : false,
         behavior_mode:
-          behaviorIndex !== null
+          response.length > behaviorIndex
             ? this.sanitizeKeyBehaviorMode(response[behaviorIndex])
             : KEY_BEHAVIORS.Normal,
-        hold_threshold_ms: holdIndex !== null ? response[holdIndex] * 10 : 200,
+        hold_threshold_ms: response.length > holdIndex ? response[holdIndex] * 10 : 200,
         dynamic_zone_count:
-          zoneCountIndex !== null
+          response.length > zoneCountIndex
             ? Math.max(1, Math.min(4, response[zoneCountIndex]))
             : 1,
         secondary_hid_keycode:
-          secondaryIndex !== null ? this.unpackU16(response, secondaryIndex) : 0,
+          response.length > secondaryIndex + 1 ? this.unpackU16(response, secondaryIndex) : 0,
         dynamic_zones: dynamicZones,
       };
     }
@@ -800,6 +804,16 @@ export class KBHEDevice {
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
+  async resetKeyTriggerSettings(keyIndex: number): Promise<boolean> {
+    const boundedKeyIndex = Math.max(0, Math.min(KEY_COUNT - 1, Math.trunc(keyIndex)));
+    const response = await this.sendCommand(
+      Command.RESET_KEY_TRIGGER_SETTINGS,
+      [0, boundedKeyIndex],
+      300,
+    );
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
   async setKeySettings(
     keyIndex: number,
     hidKeycode: number,
@@ -814,12 +828,10 @@ export class KBHEDevice {
       actuation_point_mm: actuationMm,
       release_point_mm: releaseMm,
       rapid_trigger_enabled: false,
-      rapid_trigger_activation: 0.5,
       rapid_trigger_press: rapidTriggerMm,
       rapid_trigger_release: rapidTriggerMm,
       socd_pair: socdPair ?? 255,
       socd_resolution: this.sanitizeSocdResolution(socdResolution),
-      disable_kb_on_gamepad: false,
       continuous_rapid_trigger: false,
       behavior_mode: KEY_BEHAVIORS.Normal,
       hold_threshold_ms: 200,
@@ -838,15 +850,14 @@ export class KBHEDevice {
       Math.trunc(keyIndex) & 0xff,
       hidKeycode & 0xff,
       (hidKeycode >> 8) & 0xff,
-      Math.round((settings.actuation_point_mm ?? 2.0) * 10),
-      Math.round((settings.release_point_mm ?? 1.8) * 10),
-      Math.round((settings.rapid_trigger_activation ?? 0.5) * 10),
-      Math.round((settings.rapid_trigger_press ?? 0.3) * 100),
-      Math.round((settings.rapid_trigger_release ?? 0.3) * 100),
+      Math.max(1, Math.min(255, Math.round((settings.actuation_point_mm ?? 2.0) * 10))),
+      Math.max(0, Math.min(255, Math.round((settings.release_point_mm ?? 1.8) * 10))),
+      Math.max(0, Math.min(255, Math.round((settings.rapid_trigger_press ?? 0.3) * 100))),
+      Math.max(0, Math.min(255, Math.round((settings.rapid_trigger_release ?? 0.3) * 100))),
       Math.trunc(settings.socd_pair ?? 255) & 0xff,
       this.sanitizeSocdResolution(settings.socd_resolution ?? 0),
       settings.rapid_trigger_enabled ? 1 : 0,
-      settings.disable_kb_on_gamepad ? 1 : 0,
+      0,
       settings.continuous_rapid_trigger ? 1 : 0,
       this.sanitizeKeyBehaviorMode(settings.behavior_mode ?? KEY_BEHAVIORS.Normal),
       Math.max(1, Math.min(255, Math.round((settings.hold_threshold_ms ?? 200) / 10.0))),
@@ -879,22 +890,34 @@ export class KBHEDevice {
         return null;
       }
 
+      const firstNewFlags = response[11];
+      const firstLegacyFlags = response[12];
+      const usesLegacyChunkLayout = !(firstNewFlags !== undefined && firstNewFlags <= 0x0f)
+        && firstLegacyFlags !== undefined
+        && firstLegacyFlags <= 0x0f;
+      const entrySize = usesLegacyChunkLayout ? 9 : 8;
+
       for (let index = 0; index < keyCount; index += 1) {
-        const offset = 4 + index * 9;
+        const offset = 4 + index * entrySize;
+        const rapidPressIndex = usesLegacyChunkLayout ? 5 : 4;
+        const rapidReleaseIndex = usesLegacyChunkLayout ? 6 : 5;
+        const socdPairIndex = usesLegacyChunkLayout ? 7 : 6;
+        const flagsIndex = usesLegacyChunkLayout ? 8 : 7;
         const hidKeycode = this.unpackU16(response, offset);
-        const flags = response[offset + 8];
+        const flags = response[offset + flagsIndex] ?? 0;
         keys.push({
           key_index: startIndex + index,
           hid_keycode: hidKeycode,
           actuation_point_mm: response[offset + 2] / 10.0,
           release_point_mm: response[offset + 3] / 10.0,
-          rapid_trigger_activation: response[offset + 4] / 10.0,
-          rapid_trigger_press: response[offset + 5] / 100.0,
-          rapid_trigger_release: response[offset + 6] / 100.0,
-          socd_pair: response[offset + 7] !== 255 ? response[offset + 7] : null,
+          rapid_trigger_press: response[offset + rapidPressIndex] / 100.0,
+          rapid_trigger_release: response[offset + rapidReleaseIndex] / 100.0,
+          socd_pair:
+            response[offset + socdPairIndex] !== 255
+              ? response[offset + socdPairIndex]
+              : null,
           socd_resolution: this.sanitizeSocdResolution((flags >> 2) & 0x03),
           rapid_trigger_enabled: Boolean(flags & 0x01),
-          disable_kb_on_gamepad: Boolean(flags & 0x02),
           continuous_rapid_trigger: false,
           behavior_mode: KEY_BEHAVIORS.Normal,
           hold_threshold_ms: 200,

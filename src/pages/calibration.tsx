@@ -27,6 +27,7 @@ import {
   IconRefresh,
   IconPlayerPlay,
   IconPlayerStop,
+  IconPointer,
 } from "@tabler/icons-react";
 
 const MAX_TRAVEL_MM = 4.0;
@@ -727,49 +728,17 @@ export default function Calibration() {
   return (
     <KeyboardEditor keyboard={selectionKeyboard} menubar={menubar}>
       <div className="flex flex-col gap-4">
-        {(keyIndex == null || guidedState === "running") && (
-          <SectionCard title="Calibration Procedure">
-            <div className="flex flex-col gap-4">
-              <p className="text-sm text-muted-foreground">
-                Guided calibration removes the current calibration for all keys, then recomputes zero and max values key by key.
-                Start it only when no key is selected, and follow LED prompts until completion.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {guidedState === "running" ? (
-                  <Button variant="destructive" size="sm" onClick={() => void guidedAbort()}>
-                    <IconPlayerStop className="size-4" />
-                    Abort Guided Calibration
-                  </Button>
-                ) : (
-                  <Button size="sm" disabled={!connected || keyIndex != null} onClick={() => void guidedStart()}>
-                    <IconPlayerPlay className="size-4" />
-                    Start Guided Calibration
-                  </Button>
-                )}
-
-                {guidedTargetLabel && (guidedStatus?.phase === 2 || guidedStatus?.phase === 3) && (
-                  <Badge variant="outline" className="text-xs">
-                    Press: {guidedTargetLabel}
-                  </Badge>
-                )}
-              </div>
-
-              {guidedState !== "idle" && (
-                <div className="flex flex-col gap-2">
-                  <Progress value={guidedProgress} className="h-2" />
-                  <span className="text-xs text-muted-foreground">
-                    {guidedState === "running" && `Calibrating... ${guidedProgress}%`}
-                    {guidedState === "success" && "Calibration complete."}
-                    {guidedState === "error" && "Calibration failed."}
-                  </span>
-                </div>
-              )}
+        {keyIndex == null ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/20 border-dashed">
+            <div className="flex size-14 items-center justify-center rounded-full bg-muted/50 mb-4">
+              <IconPointer className="size-6 text-muted-foreground" />
             </div>
-          </SectionCard>
-        )}
-
-        {keyIndex != null ? (
+            <h3 className="text-sm font-semibold text-foreground">Sélectionnez une touche</h3>
+            <p className="text-xs text-muted-foreground max-w-[300px] mt-1.5">
+              Cliquez sur une touche du clavier interactif ci-dessus pour modifier ses paramètres de calibration individuellement.
+            </p>
+          </div>
+        ) : (
           <SectionCard title={`Key ${focusedKeyLabel} Calibration`}>
             <div className="flex flex-col gap-4">
               {calibrationQ.isLoading ? (
@@ -854,7 +823,51 @@ export default function Calibration() {
               )}
             </div>
           </SectionCard>
-        ) : (
+        )}
+
+        {(keyIndex == null || guidedState === "running") && (
+          <SectionCard title="Calibration Procedure">
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Guided calibration removes the current calibration for all keys, then recomputes zero and max values key by key.
+                Start it only when no key is selected, and follow LED prompts until completion.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {guidedState === "running" ? (
+                  <Button variant="destructive" size="sm" onClick={() => void guidedAbort()}>
+                    <IconPlayerStop className="size-4" />
+                    Abort Guided Calibration
+                  </Button>
+                ) : (
+                  <Button size="sm" disabled={!connected || keyIndex != null} onClick={() => void guidedStart()}>
+                    <IconPlayerPlay className="size-4" />
+                    Start Guided Calibration
+                  </Button>
+                )}
+
+                {guidedTargetLabel && (guidedStatus?.phase === 2 || guidedStatus?.phase === 3) && (
+                  <Badge variant="outline" className="text-xs">
+                    Press: {guidedTargetLabel}
+                  </Badge>
+                )}
+              </div>
+
+              {guidedState !== "idle" && (
+                <div className="flex flex-col gap-2">
+                  <Progress value={guidedProgress} className="h-2" />
+                  <span className="text-xs text-muted-foreground">
+                    {guidedState === "running" && `Calibrating... ${guidedProgress}%`}
+                    {guidedState === "success" && "Calibration complete."}
+                    {guidedState === "error" && "Calibration failed."}
+                  </span>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+        )}
+
+        {keyIndex == null && (
           <SectionCard title="Restore Calibration">
             {calibrationQ.isLoading ? (
               <div className="flex flex-col gap-2">

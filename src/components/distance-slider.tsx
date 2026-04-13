@@ -13,6 +13,7 @@ interface DistanceSliderProps {
   min?: number;
   max?: number;
   step?: number;
+  displayDecimals?: number;
   disabled?: boolean;
   className?: string;
 }
@@ -25,6 +26,7 @@ export function DistanceSlider({
   min = 0.1,
   max = 4.0,
   step = 0.1,
+  displayDecimals = 1,
   disabled = false,
   className,
 }: DistanceSliderProps) {
@@ -34,7 +36,7 @@ export function DistanceSlider({
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const displayValue = draft ?? value;
-  const displayMm = Math.round(displayValue * 10) / 10;
+  const precision = Math.max(0, Math.min(3, Math.trunc(displayDecimals)));
 
   // Clear draft as soon as the value prop catches up to the committed value.
   useEffect(() => {
@@ -88,7 +90,7 @@ export function DistanceSlider({
       <div className="flex items-center justify-between">
         <Label className="text-sm font-medium">{label}</Label>
         <span className="text-sm font-mono tabular-nums text-muted-foreground">
-          {displayMm.toFixed(1)} mm
+          {displayValue.toFixed(precision)} mm
         </span>
       </div>
       <div
