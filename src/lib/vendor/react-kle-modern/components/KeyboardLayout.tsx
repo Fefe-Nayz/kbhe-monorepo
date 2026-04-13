@@ -17,6 +17,7 @@ export const KeyboardLayout = memo(function KeyboardLayout({
   selectedKeyIds,
   theme = "kle",
   onKeyClick,
+  onKeyHoverChange,
   renderLegend,
   keyColorMap,
   keyLegendMap,
@@ -69,6 +70,7 @@ export const KeyboardLayout = memo(function KeyboardLayout({
               interactive={interactive}
               showTooltip={showTooltips}
               onClick={onKeyClick}
+              onHoverChange={onKeyHoverChange}
               showLegendSlots={showLegendSlots}
               renderLegend={renderLegend}
               overrideColor={keyColorMap?.[key.id]}
