@@ -1,58 +1,194 @@
-# KBHE Firmware
+# KBHE - Firmware, Bootloader et Outils de Configuration
 
-## Premier flash avec le bootloader custom
+KBHE est un projet de clavier analogique (Hall Effect) base sur STM32F723.
+Le depot contient :
 
-Cette procédure sert pour une carte neuve ou une carte entièrement effacée.
+- le firmware principal (gestion des touches, USB HID, LED, gamepad, calibration)
+- un bootloader custom RAW HID pour la mise a jour firmware sans outil ST
+- des outils Python CLI/GUI pour configurer, monitorer, calibrer et flasher
+- des utilitaires d'analyse de donnees ADC et de regression/LUT
 
-### 1. Construire les binaires Release
+## Vision d'ensemble
 
-Le build `Release` génère les fichiers utiles :
+Le systeme est pense pour separer clairement :
+
+- la logique temps reel embarquee (scan analogique, trigger, HID)
+- la configuration utilisateur (RAW HID depuis PC)
+- le cycle de mise a jour firmware robuste
+
+Le clavier expose une interface RAW HID qui sert de canal de controle entre le firmware et les outils Python.
+
+## Architecture du depot
+
+- `Core/`: firmware principal (application)
+- `Bootloader/`: bootloader custom de mise a jour
+- `kbhe_tool/`: librairie Python de communication + GUI Qt
+- `raw_hid.py`: point d'entree CLI principal
+- `firmware_updater.py`: protocole de flash updater (PID dedie)
+- `adc_capture_cli.py`, `value_extractor.py`, `regression.py`, `lut_extractor.py`: outils d'analyse/calibration
+- `docs/RAW_HID_PROTOCOL.MD`: reference de protocole RAW HID
+- `CMakeLists.txt`, `CMakePresets.json`: build embedded (Debug/Release/AppOnly)
+
+## Fonctionnalites principales (detaillees)
+
+### 1. Moteur clavier analogique
+
+- Scan analogique multi-touches avec pipeline de traitement dedie.
+- Parametrage par touche des seuils d'activation/release.
+- Rapid Trigger configurable : activation, sensibilite appui, sensibilite relache.
+- Modes de comportement avances par touche :
+	- Normal
+	- Tap-Hold
+	- Toggle
+	- Dynamic Mapping (zones de course 1 a 4)
+- Gestion SOCD (liaison de paires + strategie de resolution).
+- Support de couches (layers) : base + overlays avec keycodes par couche.
+
+### 2. Sorties USB HID et mode gamepad
+
+- Clavier HID standard + mode NKRO.
+- Consumer/media controls et fonctions systeme.
+- Mode gamepad activable, avec options de routage clavier/gamepad.
+- Mapping par touche vers axe/direction/bouton gamepad.
+- Choix du mode API gamepad :
+	- HID (DirectInput)
+	- XInput (Xbox compatible)
+- Courbe gamepad configurable (4 points), deadzone, modes de reactivite.
+
+### 3. Eclairage LED matrice
+
+- Activation/desactivation de la matrice LED.
+- Reglage de luminosite globale.
+- Gestion pixel, ligne, frame complete et upload/download chunkes.
+- Effets integres (rainbow, breathing, plasma, fire, reactive, etc.).
+- Parametres d'effet persistants (couleur, vitesse, params specifiques).
+- Limitation FPS LED et modes de diagnostic LED (normal/DMA stress/CPU stress).
+- Overlay volume hote (niveau audio Windows pousse vers le clavier).
+
+### 4. Calibration et precision capteur
+
+- Calibration manuelle des valeurs zero/max par touche.
+- Auto-calibration globale ou par touche.
+- Calibration guidee (sequence pilotee, suivi d'etat, progression, abort).
+- Support des courbes analogiques par touche (modele de reponse).
+- Outils PC pour construire et valider les LUT a partir de mesures reelles.
+
+### 5. Debug, telemetrie et acquisition
+
+- Lecture ADC raw + filtre (formats legacy et etendu pris en charge).
+- Lecture etat des touches + distances normalisees et en 0.01 mm.
+- Telemetrie MCU : temperature, Vref, charge de scan, temps des taches.
+- Capture ADC en RAM MCU avec export CSV (chunks, statut, overflow).
+- Outils de visualisation/graphes pour analyse de bruit et regressions.
+
+### 6. Mise a jour firmware robuste
+
+- Bootloader custom avec protocole de flash (HELLO/BEGIN/DATA/FINISH/BOOT).
+- Detection et resolution de version firmware depuis le binaire.
+- Verification CRC image et echanges controles par sequence/ack.
+- Gestion des timeouts et retries au niveau paquet.
+- Script d'auto-retry global pour scenarios de recuperation.
+
+## Outils Python disponibles
+
+### CLI principal
+
+Commande d'entree :
+
+```powershell
+python raw_hid.py
+```
+
+Options principales :
+
+- `--gui` : lance le configurateur Qt
+- `--demo` : GUI en mode simulation (sans clavier)
+- `--flash <firmware.bin>` : flash via updater
+- `--fw-version`, `--timeout`, `--retries` : options avancees de flash
+
+### GUI configurateur (PySide6)
+
+Le configurateur offre des pages dediees :
+
+- Overview / etat global
+- Keyboard (mapping, comportements avances, layers, SOCD)
+- Calibration (manuel + guide)
+- Travel / Graph / Raw ADC / Debug sensors
+- Gamepad
+- Rotary encoder
+- Lighting + Effects
+- Firmware (mise a jour)
+
+### Scripts d'analyse
+
+- `adc_capture_cli.py` : capture ADC brute/filtree et export CSV
+- `value_extractor.py` : extraction de points ADC <-> distance
+- `regression.py` : ajustements mathematiques et comparaison de modeles
+- `lut_extractor.py` : generation/validation LUT depuis modeles et CSV
+- `parse_adc_data.py` / `analysis_data.py` : conversion et analyse rapide
+
+## Build firmware
+
+Le projet utilise CMake + presets.
+
+Presets disponibles :
+
+- `Debug`
+- `Release`
+- `Release-apponly` (sans bootloader custom)
+
+Exemple :
+
+```powershell
+cmake --preset Release
+cmake --build --preset Release
+```
+
+Artifacts attendus en `Release` :
 
 - `build/Release/kbhe_bootloader.hex`
 - `build/Release/kbhe_bootloader.bin`
 - `build/Release/kbhe.hex`
 - `build/Release/kbhe.bin`
 
-### 2. Mettre la carte en DFU ROM ST
+## Flash initial d'une carte neuve (bootloader custom)
 
-1. Basculer le switch physique sur le mode `DFU / FS`.
-2. Brancher le clavier en USB.
-3. Ouvrir `STM32CubeProgrammer`.
-4. Se connecter en `USB`.
+### 1) Construire les binaires Release
 
-### 3. Effacer complètement la puce
+Verifier la presence des 4 artifacts ci-dessus.
 
-Dans `STM32CubeProgrammer` :
+### 2) Passer en DFU ROM ST
 
-1. Faire un `Full chip erase` / `Mass erase`.
+1. Basculer le switch physique en mode `DFU / FS`
+2. Brancher en USB
+3. Ouvrir STM32CubeProgrammer
+4. Se connecter en USB
 
-### 4. Flasher le bootloader puis l’application
+### 3) Effacer la puce
 
-Toujours dans `STM32CubeProgrammer` :
+Faire un full chip erase (mass erase).
 
-1. Ouvrir `build/Release/kbhe_bootloader.hex`
-2. Cliquer sur `Download`
-3. Ouvrir `build/Release/kbhe.hex`
-4. Cliquer sur `Download`
-5. Déconnecter la carte
+### 4) Flasher bootloader puis application
 
-Important :
+Dans STM32CubeProgrammer :
 
-- utiliser les `.hex` pour éviter les erreurs d’adresse
-- le bootloader va à `0x08000000`
-- l’application va à `0x08010000`
-- avec les `.hex`, CubeProgrammer applique déjà les bonnes adresses
+1. Flasher `build/Release/kbhe_bootloader.hex`
+2. Flasher `build/Release/kbhe.hex`
 
-### 5. Premier boot en mode normal
+Notes importantes :
 
-1. Repasser le switch physique en mode normal
-2. Rebrancher le clavier en USB
+- preferer les `.hex` (adresses embarquees)
+- bootloader a `0x08000000`
+- application a `0x08010000`
 
-Après ce premier flash ST, le clavier peut démarrer sur l’updater logiciel tant que le trailer d’application n’a pas encore été écrit.
+### 5) Premier boot normal
 
-### 6. Reflasher une dernière fois via le CLI
+1. Remettre le switch en mode normal
+2. Rebrancher le clavier
 
-Installer la dépendance Python si besoin :
+### 6) Finaliser via updater RAW HID
+
+Installer la dependance HID si necessaire :
 
 ```powershell
 pip install hidapi
@@ -64,39 +200,43 @@ Puis lancer :
 python raw_hid.py --flash build/Release/kbhe.bin
 ```
 
-Cette étape :
+Cette etape finalise l'image applicative avec le cycle updater complet.
 
-- parle au bootloader custom via RAW HID
-- réécrit l’application
-- écrit le trailer de validation
-- redémarre ensuite sur le firmware normal
+## Mises a jour firmware suivantes
 
-Une fois cette étape terminée, le clavier peut être mis à jour normalement via le logiciel Python.
-
-## Mises à jour suivantes
-
-Après l’installation initiale :
-
-- ne pas refaire toute la procédure CubeProgrammer
-- utiliser le logiciel Python ou le CLI :
+Apres installation initiale, utiliser directement :
 
 ```powershell
 python raw_hid.py --flash build/Release/kbhe.bin
 ```
 
+Pas besoin de repasser par la procedure complete CubeProgrammer.
+
 ## Variante sans bootloader custom
 
-Pour un flash simple sans updater custom, utiliser la build `Release-apponly` :
+Utiliser le preset `Release-apponly`, puis flasher :
 
 - `build/Release-apponly/kbhe.hex`
 
-Cette image se flashe directement à `0x08000000`.
+Cette image se flashe directement a l'adresse `0x08000000`.
+
+## Dependances cote PC
+
+- Obligatoire : `hidapi` (package Python `hid`)
+- GUI : `PySide6`
+- Analyse scientifique (selon scripts) : `numpy`, `matplotlib`, `pandas`
+
+Exemple rapide :
+
+```powershell
+pip install hidapi PySide6 numpy matplotlib pandas
+```
+
+## Documentation complementaire
+
+- Protocole RAW HID : `docs/RAW_HID_PROTOCOL.MD`
+- Notes d'usage RAW HID : `RAW_HID.md`
 
 ## Note CubeMX / DMA
 
-Si CubeMX régénère le code et casse ensuite le DMA, vérifier que `MPU_Config()` remet bien les buffers DMA critiques en non-cacheable, notamment :
-
-- `adc_buffer`
-- `ws2812_dma_buffer`
-
-Le symptôme typique est un DMA qui semble configuré correctement mais qui ne produit plus le comportement attendu après régénération. Dans ce cas, comparer `MPU_Config()` avec la version fonctionnelle du repo avant de continuer le debug firmware.
+Si une regeneration CubeMX degrade le DMA, verifier `MPU_Config()` et la configuration non-cacheable des buffers DMA critiques (notamment les buffers ADC et WS2812).

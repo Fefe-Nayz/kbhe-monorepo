@@ -3,6 +3,17 @@
 
 Move hidapi.dll in the same folder of python executable
 
+## Global protocol documentation
+
+See the complete protocol reference (application RAW HID + updater RAW HID):
+
+- docs/RAW_HID_PROTOCOL.MD
+
+New identity commands:
+
+- `GET_DEVICE_INFO (0x2B)` returns firmware version, serial number (UID base62), and keyboard name
+- `GET_KEYBOARD_NAME (0x2C)` / `SET_KEYBOARD_NAME (0x2D)` read/write custom keyboard name (32 chars)
+
 ### Firmware Update
 Flash the application image with the integrated updater command:
 

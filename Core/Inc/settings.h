@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x0011         // Layer keymaps and firmware action keys
+#define SETTINGS_VERSION 0x0012         // Device identity: persistent keyboard name
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -40,6 +40,7 @@ extern "C" {
 #define SETTINGS_ADVANCED_TICK_RATE_MIN 1u
 #define SETTINGS_ADVANCED_TICK_RATE_MAX 100u
 #define SETTINGS_DEFAULT_ADVANCED_TICK_RATE 1u
+#define SETTINGS_KEYBOARD_NAME_LENGTH 32u
 
 //--------------------------------------------------------------------+
 // Gamepad Mapping Constants
@@ -371,6 +372,7 @@ typedef struct __attribute__((packed)) {
   uint8_t filter_alpha_min;  // Alpha min denominator (1/N, default 32)
   uint8_t filter_alpha_max;  // Alpha max denominator (1/N, default 4)
   uint8_t advanced_tick_rate; // Delay in scan ticks between advanced actions
+  char keyboard_name[SETTINGS_KEYBOARD_NAME_LENGTH];
 
   // Footer
   uint32_t magic_end; // Magic number to validate end
@@ -598,6 +600,24 @@ bool settings_has_unsaved_changes(void);
  * @return Firmware version number
  */
 uint16_t settings_get_firmware_version(void);
+
+/**
+ * @brief Get the persistent keyboard name (NUL-terminated RAM cache).
+ * @return Pointer to a read-only C string.
+ */
+const char *settings_get_keyboard_name(void);
+
+/**
+ * @brief Set the persistent keyboard name.
+ *
+ * Input bytes are sanitized to printable ASCII and persisted through settings.
+ * The value is also cached in RAM for fast reads.
+ *
+ * @param name Input bytes (not required to be NUL-terminated)
+ * @param length Number of bytes available in @p name
+ * @return true if accepted
+ */
+bool settings_set_keyboard_name(const char *name, uint8_t length);
 
 /**
  * @brief Get advanced action tick rate.

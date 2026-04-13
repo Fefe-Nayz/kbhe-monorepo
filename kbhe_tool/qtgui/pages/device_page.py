@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QVBoxLayout,
     QWidget,
@@ -102,11 +103,27 @@ class DevicePage(QWidget):
         card = SectionCard("Device Summary")
         self.firmware_label = QLabel("Firmware Version: Loading…")
         self.firmware_label.setObjectName("Muted")
+        self.serial_label = QLabel("Serial Number: Loading…")
+        self.serial_label.setObjectName("Muted")
+        self.keyboard_name_label = QLabel("Keyboard Name: Loading…")
+        self.keyboard_name_label.setObjectName("Muted")
         self.brightness_label = QLabel("Brightness: --")
         self.brightness_label.setObjectName("Muted")
         self.led_count_label = QLabel("Lit pixels: --")
         self.led_count_label.setObjectName("Muted")
         card.body_layout.addWidget(self.firmware_label)
+        card.body_layout.addWidget(self.serial_label)
+        card.body_layout.addWidget(self.keyboard_name_label)
+
+        name_row = QHBoxLayout()
+        name_row.setSpacing(8)
+        self.keyboard_name_input = QLineEdit()
+        self.keyboard_name_input.setMaxLength(32)
+        self.keyboard_name_input.setPlaceholderText("Custom keyboard name (max 32)")
+        name_row.addWidget(self.keyboard_name_input, 1)
+        name_row.addWidget(make_secondary_button("Apply Name", self.apply_keyboard_name))
+        card.body_layout.addLayout(name_row)
+
         card.body_layout.addWidget(self.brightness_label)
         card.body_layout.addWidget(self.led_count_label)
         return card
@@ -229,13 +246,41 @@ class DevicePage(QWidget):
 
     def reload(self) -> None:
         errors = []
+        info = None
+
         try:
-            version = self.device.get_firmware_version()
+            info = self.device.get_device_info()
+        except Exception:
+            info = None
+
+        try:
+            version = None
+            if info and info.get("firmware_version"):
+                version = info.get("firmware_version")
+            if not version:
+                version = self.device.get_firmware_version()
             self.firmware_label.setText(
                 f"Firmware Version: {version if version else 'Unknown'}"
             )
         except Exception as exc:
             errors.append(f"firmware version: {exc}")
+
+        try:
+            serial_number = "Unknown"
+            keyboard_name = None
+            if info:
+                serial_number = info.get("serial_number") or "Unknown"
+                keyboard_name = info.get("keyboard_name")
+            else:
+                keyboard_name = self.device.get_keyboard_name()
+
+            self.serial_label.setText(f"Serial Number: {serial_number}")
+            if keyboard_name:
+                self.keyboard_name_label.setText(f"Keyboard Name: {keyboard_name}")
+                with QSignalBlocker(self.keyboard_name_input):
+                    self.keyboard_name_input.setText(str(keyboard_name))
+        except Exception as exc:
+            errors.append(f"device identity: {exc}")
 
         try:
             brightness = self.device.led_get_brightness()
@@ -287,6 +332,19 @@ class DevicePage(QWidget):
             )
         else:
             self._update_status("Device state loaded from firmware.", "success")
+
+    def apply_keyboard_name(self) -> None:
+        name = self.keyboard_name_input.text().strip()
+        try:
+            if not self.device.set_keyboard_name(name):
+                raise RuntimeError("device rejected keyboard name update")
+        except Exception as exc:
+            self._update_status(f"Keyboard name update failed: {exc}", "error")
+            QMessageBox.critical(self, "Update failed", f"Could not update keyboard name:\n{exc}")
+            return
+
+        self._update_status("Keyboard name updated (autosave pending).", "success")
+        self.reload()
 
     load_from_device = reload
     refresh_from_device = reload

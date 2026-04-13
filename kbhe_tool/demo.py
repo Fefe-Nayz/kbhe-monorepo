@@ -35,6 +35,8 @@ class DemoDevice:
     def __init__(self) -> None:
         self.connected = True
         self._firmware_version = "2.4-demo"
+        self._serial_number = "KBHE-F7-DEMO000000000000"
+        self._keyboard_name = "KBHE Demo Keyboard"
         self._options = {
             "keyboard_enabled": True,
             "gamepad_enabled": True,
@@ -138,6 +140,22 @@ class DemoDevice:
 
     def get_firmware_version(self):
         return self._firmware_version
+
+    def get_device_info(self):
+        return {
+            "firmware_version": self._firmware_version,
+            "firmware_version_raw": 0x0204,
+            "serial_number": self._serial_number,
+            "keyboard_name": self._keyboard_name,
+        }
+
+    def get_keyboard_name(self):
+        return self._keyboard_name
+
+    def set_keyboard_name(self, name):
+        cleaned = str(name or "").strip()
+        self._keyboard_name = cleaned[:32] if cleaned else "KBHE Demo Keyboard"
+        return True
 
     def get_options(self):
         return dict(self._options)

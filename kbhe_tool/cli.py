@@ -8,8 +8,12 @@ from .gui import HAS_GUI, launch_gui
 def print_status(device):
     print("\n--- Device Status ---")
 
-    version = device.get_firmware_version()
+    info = device.get_device_info()
+    version = info.get("firmware_version") if info else device.get_firmware_version()
     print(f"Firmware Version: {version if version else 'Unknown'}")
+    if info:
+        print(f"Serial Number:    {info.get('serial_number') or 'Unknown'}")
+        print(f"Keyboard Name:    {info.get('keyboard_name') or 'Unknown'}")
 
     options = device.get_options()
     if options:

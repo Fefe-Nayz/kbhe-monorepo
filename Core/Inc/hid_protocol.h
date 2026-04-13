@@ -48,6 +48,9 @@ typedef enum {
   CMD_SET_NKRO_ENABLED = 0x28,
   CMD_GET_ADVANCED_TICK_RATE = 0x29,
   CMD_SET_ADVANCED_TICK_RATE = 0x2A,
+  CMD_GET_DEVICE_INFO = 0x2B,
+  CMD_GET_KEYBOARD_NAME = 0x2C,
+  CMD_SET_KEYBOARD_NAME = 0x2D,
 
   // Key settings commands (0x40 - 0x5F)
   CMD_GET_KEY_SETTINGS = 0x40,
@@ -143,6 +146,7 @@ typedef enum {
 #define HID_CALIBRATION_VALUES_PER_CHUNK 29
 #define HID_KEY_STATES_PER_CHUNK 15
 #define HID_LED_BYTES_PER_CHUNK 60
+#define HID_DEVICE_SERIAL_MAX_LEN 26
 
 /**
  * @brief Generic command packet header
@@ -162,6 +166,22 @@ typedef struct __attribute__((packed)) {
   uint16_t version;
   uint8_t reserved[60];
 } hid_resp_firmware_version_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint16_t version;
+  char serial[HID_DEVICE_SERIAL_MAX_LEN];
+  char keyboard_name[SETTINGS_KEYBOARD_NAME_LENGTH];
+  uint8_t reserved[2];
+} hid_packet_device_info_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  char keyboard_name[SETTINGS_KEYBOARD_NAME_LENGTH];
+  uint8_t reserved[30];
+} hid_packet_keyboard_name_t;
 
 /**
  * @brief Options get/set packet

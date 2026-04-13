@@ -17,6 +17,8 @@ from .protocol import (
     GAMEPAD_CURVE_MAX_DISTANCE_MM,
     GAMEPAD_CURVE_POINT_COUNT,
     GAMEPAD_KEYBOARD_ROUTING,
+    DEVICE_SERIAL_LENGTH,
+    KEYBOARD_NAME_LENGTH,
     LAYER_COUNT,
     KEY_BEHAVIORS,
     KEY_COUNT,
@@ -265,6 +267,11 @@ class KBHEDevice:
             return 0
         start_01mm = max(0, min(int(GAMEPAD_CURVE_MAX_DISTANCE_MM * 100), int(points[0].get("x_01mm", 0))))
         return int(round((start_01mm * 255.0) / (GAMEPAD_CURVE_MAX_DISTANCE_MM * 100.0)))
+
+    @staticmethod
+    def _decode_c_string(data):
+        raw = bytes(int(v) & 0xFF for v in data)
+        return raw.split(b"\x00", 1)[0].decode("ascii", errors="ignore")
     
     def get_firmware_version(self):
         """Get firmware version."""
@@ -275,6 +282,42 @@ class KBHEDevice:
             minor = version & 0xFF
             return f"{major}.{minor}"
         return None
+
+    def get_device_info(self):
+        """Get firmware version, serial number, and keyboard name."""
+        resp = self.send_command(Command.GET_DEVICE_INFO)
+        if resp and len(resp) >= 64 and resp[1] == Status.OK:
+            version = resp[2] | (resp[3] << 8)
+            major = (version >> 8) & 0xFF
+            minor = version & 0xFF
+            serial_start = 4
+            serial_end = serial_start + DEVICE_SERIAL_LENGTH
+            keyboard_end = serial_end + KEYBOARD_NAME_LENGTH
+            serial = self._decode_c_string(resp[serial_start:serial_end])
+            keyboard_name = self._decode_c_string(resp[serial_end:keyboard_end])
+            return {
+                "firmware_version": f"{major}.{minor}",
+                "firmware_version_raw": int(version),
+                "serial_number": serial,
+                "keyboard_name": keyboard_name,
+            }
+        return None
+
+    def get_keyboard_name(self):
+        """Get persistent keyboard custom name."""
+        resp = self.send_command(Command.GET_KEYBOARD_NAME)
+        if resp and len(resp) >= 34 and resp[1] == Status.OK:
+            return self._decode_c_string(resp[2:34])
+        return None
+
+    def set_keyboard_name(self, name):
+        """Set persistent keyboard custom name (max 32 bytes)."""
+        if name is None:
+            name = ""
+        name_bytes = str(name).encode("ascii", errors="ignore")[:KEYBOARD_NAME_LENGTH]
+        payload = [0] + list(name_bytes) + [0] * (KEYBOARD_NAME_LENGTH - len(name_bytes))
+        resp = self.send_command(Command.SET_KEYBOARD_NAME, payload, timeout_ms=3000)
+        return resp and len(resp) >= 34 and resp[1] == Status.OK
     
     def get_options(self):
         """Get all options."""

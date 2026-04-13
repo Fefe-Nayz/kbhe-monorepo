@@ -95,6 +95,66 @@ static inline void hid_fill_key_settings_chunk_entry(
   entry->flags = hid_key_flags_from_settings(key);
 }
 
+#define HID_DEVICE_SERIAL_PREFIX "75HE-NF-"
+#define HID_DEVICE_UID_BYTES 12u
+#define HID_DEVICE_UID_B62_CHARS 17u
+
+_Static_assert((sizeof(HID_DEVICE_SERIAL_PREFIX) - 1u + HID_DEVICE_UID_B62_CHARS +
+                1u) <= HID_DEVICE_SERIAL_MAX_LEN,
+               "HID_DEVICE_SERIAL_MAX_LEN too small for configured prefix");
+
+static char s_device_serial_cache[HID_DEVICE_SERIAL_MAX_LEN];
+
+static void hid_encode_uid_base62_12(const uint8_t *uid_bytes, char *out_b62) {
+  static const char base62_table[] =
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  uint8_t work[HID_DEVICE_UID_BYTES];
+
+  for (uint8_t i = 0u; i < HID_DEVICE_UID_BYTES; ++i) {
+    work[i] = uid_bytes[HID_DEVICE_UID_BYTES - 1u - i];
+  }
+
+  for (int8_t out_index = (int8_t)(HID_DEVICE_UID_B62_CHARS - 1u);
+       out_index >= 0; --out_index) {
+    uint16_t remainder = 0u;
+    for (uint8_t i = 0u; i < HID_DEVICE_UID_BYTES; ++i) {
+      uint16_t acc = (uint16_t)(remainder * 256u + work[i]);
+      work[i] = (uint8_t)(acc / 62u);
+      remainder = (uint16_t)(acc % 62u);
+    }
+    out_b62[out_index] = base62_table[remainder];
+  }
+
+  out_b62[HID_DEVICE_UID_B62_CHARS] = '\0';
+}
+
+static void hid_prepare_device_serial_cache(void) {
+  uint32_t uid0 = HAL_GetUIDw0();
+  uint32_t uid1 = HAL_GetUIDw1();
+  uint32_t uid2 = HAL_GetUIDw2();
+  uint8_t uid_bytes[HID_DEVICE_UID_BYTES] = {
+      (uint8_t)(uid0 & 0xFFu),
+      (uint8_t)((uid0 >> 8u) & 0xFFu),
+      (uint8_t)((uid0 >> 16u) & 0xFFu),
+      (uint8_t)((uid0 >> 24u) & 0xFFu),
+      (uint8_t)(uid1 & 0xFFu),
+      (uint8_t)((uid1 >> 8u) & 0xFFu),
+      (uint8_t)((uid1 >> 16u) & 0xFFu),
+      (uint8_t)((uid1 >> 24u) & 0xFFu),
+      (uint8_t)(uid2 & 0xFFu),
+      (uint8_t)((uid2 >> 8u) & 0xFFu),
+      (uint8_t)((uid2 >> 16u) & 0xFFu),
+      (uint8_t)((uid2 >> 24u) & 0xFFu),
+  };
+  char uid_b62[HID_DEVICE_UID_B62_CHARS + 1u];
+  const uint8_t prefix_len = (uint8_t)(sizeof(HID_DEVICE_SERIAL_PREFIX) - 1u);
+
+  memset(s_device_serial_cache, 0, sizeof(s_device_serial_cache));
+  hid_encode_uid_base62_12(uid_bytes, uid_b62);
+  memcpy(s_device_serial_cache, HID_DEVICE_SERIAL_PREFIX, prefix_len);
+  memcpy(&s_device_serial_cache[prefix_len], uid_b62, HID_DEVICE_UID_B62_CHARS);
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - System Commands
 //--------------------------------------------------------------------+
@@ -260,6 +320,44 @@ static void cmd_set_advanced_tick_rate(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_SET_ADVANCED_TICK_RATE;
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
   resp->tick_rate = settings_get_advanced_tick_rate();
+}
+
+static void cmd_get_device_info(const uint8_t *in, uint8_t *out) {
+  hid_packet_device_info_t *resp = (hid_packet_device_info_t *)out;
+  const char *name = settings_get_keyboard_name();
+  (void)in;
+
+  resp->command_id = CMD_GET_DEVICE_INFO;
+  resp->status = HID_RESP_OK;
+  resp->version = settings_get_firmware_version();
+  memset(resp->serial, 0, sizeof(resp->serial));
+  memset(resp->keyboard_name, 0, sizeof(resp->keyboard_name));
+  memcpy(resp->serial, s_device_serial_cache, sizeof(resp->serial));
+  memcpy(resp->keyboard_name, name, SETTINGS_KEYBOARD_NAME_LENGTH);
+}
+
+static void cmd_get_keyboard_name(const uint8_t *in, uint8_t *out) {
+  hid_packet_keyboard_name_t *resp = (hid_packet_keyboard_name_t *)out;
+  const char *name = settings_get_keyboard_name();
+  (void)in;
+
+  resp->command_id = CMD_GET_KEYBOARD_NAME;
+  resp->status = HID_RESP_OK;
+  memset(resp->keyboard_name, 0, sizeof(resp->keyboard_name));
+  memcpy(resp->keyboard_name, name, SETTINGS_KEYBOARD_NAME_LENGTH);
+}
+
+static void cmd_set_keyboard_name(const uint8_t *in, uint8_t *out) {
+  const hid_packet_keyboard_name_t *req = (const hid_packet_keyboard_name_t *)in;
+  hid_packet_keyboard_name_t *resp = (hid_packet_keyboard_name_t *)out;
+  const char *name = settings_get_keyboard_name();
+  bool success =
+      settings_set_keyboard_name(req->keyboard_name, SETTINGS_KEYBOARD_NAME_LENGTH);
+
+  resp->command_id = CMD_SET_KEYBOARD_NAME;
+  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  memset(resp->keyboard_name, 0, sizeof(resp->keyboard_name));
+  memcpy(resp->keyboard_name, name, SETTINGS_KEYBOARD_NAME_LENGTH);
 }
 
 //--------------------------------------------------------------------+
@@ -1769,6 +1867,7 @@ static void cmd_unknown(const uint8_t *in, uint8_t *out) {
 //--------------------------------------------------------------------+
 
 void hid_protocol_init(void) {
+  hid_prepare_device_serial_cache();
   adc_capture_init();
 }
 
@@ -1843,6 +1942,18 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_ADVANCED_TICK_RATE:
     cmd_set_advanced_tick_rate(in_packet, out_packet);
+    break;
+
+  case CMD_GET_DEVICE_INFO:
+    cmd_get_device_info(in_packet, out_packet);
+    break;
+
+  case CMD_GET_KEYBOARD_NAME:
+    cmd_get_keyboard_name(in_packet, out_packet);
+    break;
+
+  case CMD_SET_KEYBOARD_NAME:
+    cmd_set_keyboard_name(in_packet, out_packet);
     break;
 
   // Key settings commands
