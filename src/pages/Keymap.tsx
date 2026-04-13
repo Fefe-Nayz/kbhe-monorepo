@@ -139,6 +139,10 @@ export default function Keymap() {
           onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
+          loading={
+            connected &&
+            ((layerKeycodes.isLoading && !layerKeycodes.data) || !resolveKeycapLegend.isReady)
+          }
           keyLegendSlotsMap={keyLegendSlotsMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />

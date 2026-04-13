@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 /**
@@ -61,6 +61,99 @@ interface OsKeyVariantEntry {
 
 type OsKeyVariantMap = Record<string, OsKeyVariantEntry>;
 
+interface OsLegendCacheState {
+  layoutMap: LayoutMap | null;
+  osVariants: OsKeyVariantMap | null;
+  initialized: boolean;
+}
+
+const osLegendCache: OsLegendCacheState = {
+  layoutMap: null,
+  osVariants: null,
+  initialized: false,
+};
+
+const osLegendListeners = new Set<() => void>();
+let osLegendInFlight: Promise<void> | null = null;
+
+function snapshotOsLegendCache(): OsLegendCacheState {
+  return {
+    layoutMap: osLegendCache.layoutMap,
+    osVariants: osLegendCache.osVariants,
+    initialized: osLegendCache.initialized,
+  };
+}
+
+function notifyOsLegendListeners(): void {
+  for (const listener of osLegendListeners) {
+    listener();
+  }
+}
+
+async function refreshOsLegendCache(force = false): Promise<void> {
+  if (osLegendInFlight && !force) {
+    return osLegendInFlight;
+  }
+
+  osLegendInFlight = (async () => {
+    const [nextLayoutMapRaw, nextVariantsRaw] = await Promise.all([
+      getOSLayoutMap(),
+      getOsKeyVariantsFromSystem(),
+    ]);
+
+    // Keep the last known good mapping to avoid visual regressions during transient refresh failures.
+    const nextLayoutMap = nextLayoutMapRaw ?? osLegendCache.layoutMap;
+    const nextVariants = nextVariantsRaw ?? osLegendCache.osVariants;
+    const changed =
+      nextLayoutMap !== osLegendCache.layoutMap ||
+      nextVariants !== osLegendCache.osVariants ||
+      !osLegendCache.initialized;
+
+    osLegendCache.layoutMap = nextLayoutMap;
+    osLegendCache.osVariants = nextVariants;
+    osLegendCache.initialized = true;
+
+    if (changed) {
+      notifyOsLegendListeners();
+    }
+  })().finally(() => {
+    osLegendInFlight = null;
+  });
+
+  return osLegendInFlight;
+}
+
+function useOsLegendCacheState(): OsLegendCacheState {
+  const [state, setState] = useState<OsLegendCacheState>(() => snapshotOsLegendCache());
+
+  useEffect(() => {
+    const onCacheChange = () => setState(snapshotOsLegendCache());
+    osLegendListeners.add(onCacheChange);
+
+    const refresh = () => {
+      void refreshOsLegendCache(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+
+    void refreshOsLegendCache(false);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      osLegendListeners.delete(onCacheChange);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  return state;
+}
+
 export interface KeycapLegend {
   primary: string;
   secondary?: string;
@@ -69,6 +162,10 @@ export interface KeycapLegend {
   text: string;
   searchText: string;
 }
+
+export type KeycapLegendResolver = ((hidKeycode: number, fallbackName: string) => KeycapLegend) & {
+  isReady: boolean;
+};
 
 async function getOSLayoutMap(): Promise<LayoutMap | null> {
   try {
@@ -218,35 +315,7 @@ function resolvePrintableLegend(
  * Falls back to the provided `fallback` name if no OS mapping is available.
  */
 export function useOSLayout() {
-  const [layoutMap, setLayoutMap] = useState<LayoutMap | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const refreshLayoutMap = () => {
-      void getOSLayoutMap().then((nextLayoutMap) => {
-        if (!cancelled) {
-          setLayoutMap(nextLayoutMap);
-        }
-      });
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refreshLayoutMap();
-      }
-    };
-
-    refreshLayoutMap();
-    window.addEventListener("focus", refreshLayoutMap);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", refreshLayoutMap);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
+  const { layoutMap } = useOsLegendCacheState();
 
   return useCallback((hidKeycode: number, fallbackName: string): string => {
     if (!layoutMap) return fallbackName;
@@ -263,45 +332,17 @@ export function useOSLayout() {
  * Printable keys can return two entries (top/bottom), e.g. "!\n1".
  */
 export function useOSKeycapLegend() {
-  const [layoutMap, setLayoutMap] = useState<LayoutMap | null>(null);
-  const [osVariants, setOsVariants] = useState<OsKeyVariantMap | null>(null);
+  const { layoutMap, osVariants, initialized } = useOsLegendCacheState();
 
-  useEffect(() => {
-    let cancelled = false;
+  return useMemo(() => {
+    const resolver = ((hidKeycode: number, fallbackName: string): KeycapLegend => {
+      const domCode = HID_TO_DOM_CODE[hidKeycode];
+      if (!domCode) return buildSimpleLegend(fallbackName);
 
-    const refreshLegends = () => {
-      void Promise.all([getOSLayoutMap(), getOsKeyVariantsFromSystem()]).then(
-        ([nextLayoutMap, nextVariants]) => {
-          if (cancelled) {
-            return;
-          }
-          setLayoutMap(nextLayoutMap);
-          setOsVariants(nextVariants);
-        },
-      );
-    };
+      return resolvePrintableLegend(domCode, fallbackName, layoutMap, osVariants);
+    }) as KeycapLegendResolver;
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refreshLegends();
-      }
-    };
-
-    refreshLegends();
-    window.addEventListener("focus", refreshLegends);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", refreshLegends);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
-
-  return useCallback((hidKeycode: number, fallbackName: string): KeycapLegend => {
-    const domCode = HID_TO_DOM_CODE[hidKeycode];
-    if (!domCode) return buildSimpleLegend(fallbackName);
-
-    return resolvePrintableLegend(domCode, fallbackName, layoutMap, osVariants);
-  }, [layoutMap, osVariants]);
+    resolver.isReady = initialized;
+    return resolver;
+  }, [initialized, layoutMap, osVariants]);
 }

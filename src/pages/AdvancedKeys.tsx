@@ -47,7 +47,7 @@ export default function AdvancedKeys() {
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
   const { status } = useDeviceSession();
   const connected = status === "connected";
-  const keyLegendSlotsMap = useKeyboardPreviewLegends();
+  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
   const focusedKeyId = selectedKeys[0] ?? null;
@@ -316,6 +316,7 @@ export default function AdvancedKeys() {
           onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
+          loading={keyboardPreviewLoading}
           keyLegendSlotsMap={keyLegendSlotsMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />

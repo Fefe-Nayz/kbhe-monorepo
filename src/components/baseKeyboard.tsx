@@ -12,6 +12,7 @@ import { getKeyboardBounds } from "@/lib/vendor/react-kle-modern/utils";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { labelRegistry } from "@/ui/labels/labelRegistry";
 import { cn } from "@/lib/utils";
+import { IconLoader2 } from "@tabler/icons-react";
 
 interface BaseKeyboardProps {
   mode: "single" | "multi";
@@ -23,6 +24,7 @@ interface BaseKeyboardProps {
   keyLegendMap?: Record<string, React.ReactNode>;
   keyLegendSlotsMap?: Record<string, Array<React.ReactNode | undefined>>;
   keyLegendClassName?: string;
+  loading?: boolean;
   renderKeyOverlay?: (keyId: string) => React.ReactNode;
   keyColorMap?: Record<string, string>;
 }
@@ -165,6 +167,7 @@ export default function BaseKeyboard({
   keyLegendMap,
   keyLegendSlotsMap,
   keyLegendClassName,
+  loading = false,
   renderKeyOverlay,
   keyColorMap,
 }: BaseKeyboardProps) {
@@ -423,6 +426,15 @@ export default function BaseKeyboard({
           </div>
         )}
       </div>
+
+      {ready && loading && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-background/70 backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 rounded-md px-3 py-2 shadow-sm">
+            <IconLoader2 className="size-4 animate-spin text-muted-foreground" />
+            {/* <span className="text-xs text-muted-foreground">Loading keyboard layout...</span> */}
+          </div>
+        </div>
+      )}
 
       {areaStart && areaEnd && (
         <div

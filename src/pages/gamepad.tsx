@@ -65,7 +65,7 @@ export default function Gamepad() {
   const { status } = useDeviceSession();
   const connected = status === "connected";
   const visible = usePageVisible();
-  const keyLegendSlotsMap = useKeyboardPreviewLegends();
+  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
   const qc = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
@@ -236,6 +236,7 @@ export default function Gamepad() {
           onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
+          loading={keyboardPreviewLoading}
           keyLegendSlotsMap={keyLegendSlotsMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />
