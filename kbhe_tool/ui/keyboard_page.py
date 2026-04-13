@@ -102,16 +102,6 @@ class KeyboardPageMixin:
 
         add_slider_row(
             self.rapid_settings_frame,
-            "Activation Distance:",
-            "key_rapid_activation_var",
-            "key_rapid_activation_label_var",
-            0.5,
-            0.1,
-            2.0,
-            2,
-        )
-        add_slider_row(
-            self.rapid_settings_frame,
             "Press Sensitivity:",
             "key_rapid_press_var",
             "key_rapid_press_label_var",
@@ -143,7 +133,7 @@ class KeyboardPageMixin:
 
         ttk.Label(
             rapid_card,
-            text="Rapid trigger fires when the key moves by the configured sensitivity after the initial actuation.",
+            text="Rapid trigger fires when the key moves by the configured sensitivity while using the same actuation/release thresholds as fixed mode.",
             style="SurfaceSubtle.TLabel",
         ).pack(anchor=tk.W, pady=(6, 0))
 
@@ -269,7 +259,6 @@ class KeyboardPageMixin:
             "actuation_point_mm": self.key_actuation_var.get(),
             "release_point_mm": self.key_release_var.get(),
             "rapid_trigger_enabled": self.key_rapid_enabled_var.get(),
-            "rapid_trigger_activation": self.key_rapid_activation_var.get(),
             "rapid_trigger_press": self.key_rapid_press_var.get(),
             "rapid_trigger_release": (
                 self.key_rapid_release_var.get()
@@ -314,13 +303,10 @@ class KeyboardPageMixin:
             self.key_rapid_enabled_var.set(rapid_enabled)
             self.on_rapid_trigger_toggle()
 
-            rapid_activation = float(settings.get("rapid_trigger_activation", 0.5))
             rapid_press = float(settings.get("rapid_trigger_press", 0.3))
             rapid_release = float(settings.get("rapid_trigger_release", rapid_press))
-            self.key_rapid_activation_var.set(rapid_activation)
             self.key_rapid_press_var.set(rapid_press)
             self.key_rapid_release_var.set(rapid_release)
-            self.key_rapid_activation_label_var.set(f"{rapid_activation:.2f}mm")
             self.key_rapid_press_label_var.set(f"{rapid_press:.2f}mm")
             self.key_rapid_release_label_var.set(f"{rapid_release:.2f}mm")
 

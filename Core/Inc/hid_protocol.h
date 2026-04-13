@@ -229,10 +229,8 @@ typedef struct __attribute__((packed)) {
   uint8_t status;
   uint8_t key_index;
   uint16_t hid_keycode; // HID/custom keycode for this key
-  uint8_t
-      actuation_point_mm;   // Fixed actuation point in 0.1mm (when RT disabled)
-  uint8_t release_point_mm; // Fixed release point in 0.1mm (when RT disabled)
-  uint8_t rapid_trigger_activation; // RT initial activation in 0.1mm
+  uint8_t actuation_point_mm;   // Actuation point in 0.1mm
+  uint8_t release_point_mm;     // Release point in 0.1mm
   uint8_t rapid_trigger_press;      // RT press sensitivity in 0.01mm
   uint8_t rapid_trigger_release;    // RT release sensitivity in 0.01mm
   uint8_t socd_pair;                // SOCD paired key index (255 = none)
@@ -248,7 +246,7 @@ typedef struct __attribute__((packed)) {
     uint8_t end_mm_tenths;
     uint16_t hid_keycode;
   } dynamic_zones[SETTINGS_DYNAMIC_ZONE_COUNT];
-  uint8_t reserved[34];
+  uint8_t reserved[33];
 } hid_packet_key_settings_t;
 
 /**
@@ -258,7 +256,6 @@ typedef struct __attribute__((packed)) {
   uint16_t hid_keycode;
   uint8_t actuation_point_mm;
   uint8_t release_point_mm;
-  uint8_t rapid_trigger_activation;
   uint8_t rapid_trigger_press;
   uint8_t rapid_trigger_release;
   uint8_t socd_pair;
@@ -274,7 +271,7 @@ typedef struct __attribute__((packed)) {
   uint8_t start_index;
   uint8_t key_count;
   hid_key_settings_chunk_entry_t keys[HID_KEY_SETTINGS_PER_CHUNK];
-  uint8_t reserved[6];
+  uint8_t reserved[12];
 } hid_packet_all_keys_t;
 
 /**

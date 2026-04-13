@@ -87,6 +87,11 @@ Codes status updater:
 | GET_KEYBOARD_NAME | 0x2C | aucun | status + keyboard_name |
 | SET_KEYBOARD_NAME | 0x2D | keyboard_name[32] | status + keyboard_name applique |
 
+Note option `raw_hid_echo`:
+
+- Le champ est bien persiste/expose via GET/SET_OPTIONS.
+- Dans l'implementation actuelle, il n'active/desactive pas un comportement runtime distinct (commande ECHO 0xFE toujours disponible).
+
 GET_DEVICE_INFO (0x2B) payload reponse:
 
 - version u16
@@ -132,7 +137,6 @@ Valeurs par defaut usine (profil courant):
 - Clavier par touche (defaults):
   - actuation_point_mm=12 (1.2 mm)
   - release_point_mm=12 (1.2 mm)
-  - rapid_trigger_activation=4 (0.4 mm)
 - Gamepad global:
   - keyboard_routing=2 (Unmapped only)
   - api_mode=1 (XInput)
@@ -154,7 +158,7 @@ Serial number details:
 - calcule une seule fois au demarrage (cache RAM)
 - source: UID STM32 (96 bits)
 - encodage: base62 sur 12 octets UID
-- format: prefixe `KBHE-F7-` + base62 UID (17 chars)
+- format: prefixe `75HE-NF-` + base62 UID (17 chars)
 
 ### 3.3 Configuration touches, layers, calibration, gamepad (0x40..0x58)
 
@@ -169,7 +173,6 @@ GET_KEY_SETTINGS (0x40)
   - hid_keycode (u16)
   - actuation_point_mm (0.1 mm)
   - release_point_mm (0.1 mm)
-  - rapid_trigger_activation (0.1 mm)
   - rapid_trigger_press (0.01 mm)
   - rapid_trigger_release (0.01 mm)
   - socd_pair (0xFF = none)
@@ -182,6 +185,13 @@ GET_KEY_SETTINGS (0x40)
   - dynamic_zone_count (1..4)
   - secondary_hid_keycode (u16)
   - dynamic_zones[4]: end_mm_tenths + hid_keycode(u16)
+
+Notes runtime:
+
+- Le firmware applique toujours les memes seuils de base:
+  - press si distance >= actuation_point_mm
+  - release si distance < release_point_mm
+- Rapid Trigger est une surcouche de sensibilite (press/release), il ne remplace pas ces seuils.
 
 SET_KEY_SETTINGS (0x41)
 
@@ -326,6 +336,11 @@ SET_KEY_CURVE (0x4A)
 - Requete: key_index, curve_enabled, p1_x, p1_y, p2_x, p2_y
 - Reponse: status + echo
 
+Note runtime:
+
+- Ces champs sont persistes et relus via 0x49/0x4A.
+- Dans le firmware actuel, la sortie runtime active n'applique pas encore cette courbe par touche.
+
 #### 3.3.6 Mapping gamepad par touche
 
 GET_KEY_GAMEPAD_MAP (0x4B)
@@ -344,7 +359,12 @@ Enums utiles:
 - direction: 0 positive, 1 negative
 - button: 0..17 (A/B/X/Y/LB/RB/LT/RT/Select/Start/L3/R3/DPad/Home)
 
-#### 3.3.7 Mode gamepad + clavier
+#### 3.3.7 Mode gamepad + clavier (compat legacy)
+
+Note:
+
+- Interface recommandee: `keyboard_routing` via `GET_GAMEPAD_SETTINGS` (0x44) / `SET_GAMEPAD_SETTINGS` (0x45).
+- `GET_GAMEPAD_WITH_KB` / `SET_GAMEPAD_WITH_KB` restent disponibles pour compatibilite ancienne, mais ne couvrent que ON/OFF.
 
 GET_GAMEPAD_WITH_KB (0x4D)
 
@@ -408,7 +428,6 @@ RESET_KEY_TRIGGER_SETTINGS (0x58)
   - remet uniquement les champs trigger de la touche aux valeurs par defaut firmware:
     - actuation_point_mm
     - release_point_mm
-    - rapid_trigger_activation
     - rapid_trigger_press
     - rapid_trigger_release
     - rapid_trigger_enabled

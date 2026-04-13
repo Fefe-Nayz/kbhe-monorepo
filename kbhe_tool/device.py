@@ -544,23 +544,23 @@ class KBHEDevice:
         if resp and len(resp) >= 13 and resp[1] == Status.OK:
             has_socd_resolution = len(resp) >= 14
             socd_resolution = (
-                self._sanitize_socd_resolution(resp[11]) if has_socd_resolution else 0
+                self._sanitize_socd_resolution(resp[10]) if has_socd_resolution else 0
             )
-            rapid_idx = 12 if has_socd_resolution else 11
-            disable_idx = 13 if has_socd_resolution else 12
-            continuous_idx = 14 if len(resp) > 14 else None
-            behavior_idx = 15 if len(resp) > 15 else None
-            hold_idx = 16 if len(resp) > 16 else None
-            zone_count_idx = 17 if len(resp) > 17 else None
-            secondary_idx = 18 if len(resp) > 19 else None
+            rapid_idx = 11 if has_socd_resolution else 10
+            disable_idx = 12 if has_socd_resolution else 11
+            continuous_idx = 13 if len(resp) > 13 else None
+            behavior_idx = 14 if len(resp) > 14 else None
+            hold_idx = 15 if len(resp) > 15 else None
+            zone_count_idx = 16 if len(resp) > 16 else None
+            secondary_idx = 17 if len(resp) > 18 else None
             primary_keycode = self._unpack_u16(resp, 3)
             dynamic_zones = self._default_dynamic_zones(primary_keycode)
-            if len(resp) >= 32:
+            if len(resp) >= 31:
                 dynamic_zones = self._sanitize_dynamic_zones(
                     [
                         {
-                            "end_mm_tenths": int(resp[20 + i * 3]),
-                            "hid_keycode": self._unpack_u16(resp, 21 + i * 3),
+                            "end_mm_tenths": int(resp[19 + i * 3]),
+                            "hid_keycode": self._unpack_u16(resp, 20 + i * 3),
                         }
                         for i in range(4)
                     ],
@@ -571,10 +571,9 @@ class KBHEDevice:
                 'hid_keycode': primary_keycode,
                 'actuation_point_mm': resp[5] / 10.0,  # 0.1mm to mm
                 'release_point_mm': resp[6] / 10.0,
-                'rapid_trigger_activation': resp[7] / 10.0,  # 0.1mm
-                'rapid_trigger_press': resp[8] / 100.0,  # 0.01mm to mm
-                'rapid_trigger_release': resp[9] / 100.0,
-                'socd_pair': resp[10] if resp[10] != 255 else None,
+                'rapid_trigger_press': resp[7] / 100.0,  # 0.01mm to mm
+                'rapid_trigger_release': resp[8] / 100.0,
+                'socd_pair': resp[9] if resp[9] != 255 else None,
                 'socd_resolution': socd_resolution,
                 'rapid_trigger_enabled': bool(resp[rapid_idx]),
                 'disable_kb_on_gamepad': bool(resp[disable_idx]),
@@ -627,7 +626,6 @@ class KBHEDevice:
             'actuation_point_mm': actuation_mm,
             'release_point_mm': release_mm,
             'rapid_trigger_enabled': False,
-            'rapid_trigger_activation': 0.5,
             'rapid_trigger_press': rapid_trigger_mm,
             'rapid_trigger_release': rapid_trigger_mm,
             'socd_pair': socd_pair if socd_pair is not None else 255,
@@ -656,7 +654,6 @@ class KBHEDevice:
             (hid_keycode >> 8) & 0xFF,
             int(settings.get('actuation_point_mm', 2.0) * 10),  # mm to 0.1mm
             int(settings.get('release_point_mm', 1.8) * 10),
-            int(settings.get('rapid_trigger_activation', 0.5) * 10),  # mm to 0.1mm
             int(settings.get('rapid_trigger_press', 0.3) * 100),  # mm to 0.01mm
             int(settings.get('rapid_trigger_release', 0.3) * 100),
             settings.get('socd_pair', 255),
@@ -693,17 +690,16 @@ class KBHEDevice:
                 return None
 
             for i in range(key_count):
-                offset = 4 + i * 9
+                offset = 4 + i * 8
                 hid_keycode = self._unpack_u16(resp, offset)
-                flags = resp[offset + 8]
+                flags = resp[offset + 7]
                 keys.append({
                     'hid_keycode': hid_keycode,
                     'actuation_point_mm': resp[offset + 2] / 10.0,
                     'release_point_mm': resp[offset + 3] / 10.0,
-                    'rapid_trigger_activation': resp[offset + 4] / 10.0,
-                    'rapid_trigger_press': resp[offset + 5] / 100.0,
-                    'rapid_trigger_release': resp[offset + 6] / 100.0,
-                    'socd_pair': resp[offset + 7] if resp[offset + 7] != 255 else None,
+                    'rapid_trigger_press': resp[offset + 4] / 100.0,
+                    'rapid_trigger_release': resp[offset + 5] / 100.0,
+                    'socd_pair': resp[offset + 6] if resp[offset + 6] != 255 else None,
                     'socd_resolution': self._sanitize_socd_resolution((flags >> 2) & 0x03),
                     'rapid_trigger_enabled': bool(flags & 0x01),
                     'disable_kb_on_gamepad': bool(flags & 0x02),
@@ -1021,20 +1017,31 @@ class KBHEDevice:
         resp = self.send_command(Command.SET_KEY_GAMEPAD_MAP, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
-    # --- Gamepad + Keyboard Mode ---
+    # --- Gamepad + Keyboard Mode (compat wrappers mapped to keyboard_routing) ---
     
     def get_gamepad_with_keyboard(self):
-        """Get gamepad+keyboard mode."""
-        resp = self.send_command(Command.GET_GAMEPAD_WITH_KB)
-        if resp and len(resp) >= 3 and resp[1] == Status.OK:
-            return resp[2] != 0
-        return None
+        """Compatibility helper mapped to gamepad keyboard_routing."""
+        settings = self.get_gamepad_settings()
+        if not settings:
+            return None
+        routing = self._sanitize_gamepad_routing(
+            settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])
+        )
+        return routing != int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
     
     def set_gamepad_with_keyboard(self, enabled):
-        """Set gamepad+keyboard mode."""
-        data = [0, 1 if enabled else 0]
-        resp = self.send_command(Command.SET_GAMEPAD_WITH_KB, data)
-        return resp and len(resp) >= 2 and resp[1] == Status.OK
+        """Compatibility helper mapped to gamepad keyboard_routing."""
+        settings = self.get_gamepad_settings()
+        if not settings:
+            return False
+
+        settings = dict(settings)
+        settings["keyboard_routing"] = (
+            int(GAMEPAD_KEYBOARD_ROUTING["All Keys"])
+            if enabled
+            else int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
+        )
+        return bool(self.set_gamepad_settings(settings))
     
     # --- LED Effect Commands ---
     

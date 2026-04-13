@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x0012         // Device identity: persistent keyboard name
+#define SETTINGS_VERSION 0x0013         // Trigger model cleanup: remove rapid_trigger_activation
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -231,7 +231,6 @@ typedef struct __attribute__((packed)) {
   uint16_t hid_keycode;       // HID keycode / custom keycode for this key
   uint8_t actuation_point_mm; // Actuation point in 0.1mm (e.g., 20 = 2.0mm)
   uint8_t release_point_mm;   // Release point in 0.1mm
-  uint8_t rapid_trigger_activation; // Initial activation distance in 0.1mm
   uint8_t
       rapid_trigger_press; // Press sensitivity in 0.01mm (e.g., 30 = 0.30mm)
   uint8_t rapid_trigger_release;     // Release sensitivity in 0.01mm
@@ -417,7 +416,6 @@ typedef struct __attribute__((packed)) {
   {.hid_keycode = HID_KEY_Q_CODE,                                              \
   .actuation_point_mm = 12,                                                   \
   .release_point_mm = 12,                                                     \
-  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -429,7 +427,6 @@ typedef struct __attribute__((packed)) {
   {.hid_keycode = HID_KEY_W_CODE,                                              \
   .actuation_point_mm = 12,                                                   \
   .release_point_mm = 12,                                                     \
-  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -441,7 +438,6 @@ typedef struct __attribute__((packed)) {
   {.hid_keycode = HID_KEY_E_CODE,                                              \
   .actuation_point_mm = 12,                                                   \
   .release_point_mm = 12,                                                     \
-  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -453,7 +449,6 @@ typedef struct __attribute__((packed)) {
   {.hid_keycode = HID_KEY_A_CODE,                                              \
   .actuation_point_mm = 12,                                                   \
   .release_point_mm = 12,                                                     \
-  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 5,                                                             \
@@ -465,7 +460,6 @@ typedef struct __attribute__((packed)) {
   {.hid_keycode = HID_KEY_S_CODE,                                              \
   .actuation_point_mm = 12,                                                   \
   .release_point_mm = 12,                                                     \
-  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -477,7 +471,6 @@ typedef struct __attribute__((packed)) {
   {.hid_keycode = HID_KEY_D_CODE,                                              \
   .actuation_point_mm = 12,                                                   \
   .release_point_mm = 12,                                                     \
-  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 3,                                                             \

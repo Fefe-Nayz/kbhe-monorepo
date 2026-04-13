@@ -88,7 +88,6 @@ static inline void hid_fill_key_settings_chunk_entry(
   entry->hid_keycode = key->hid_keycode;
   entry->actuation_point_mm = key->actuation_point_mm;
   entry->release_point_mm = key->release_point_mm;
-  entry->rapid_trigger_activation = key->rapid_trigger_activation;
   entry->rapid_trigger_press = key->rapid_trigger_press;
   entry->rapid_trigger_release = key->rapid_trigger_release;
   entry->socd_pair = key->socd_pair;
@@ -102,7 +101,6 @@ static inline void hid_fill_key_settings_packet(hid_packet_key_settings_t *resp,
   resp->hid_keycode = key->hid_keycode;
   resp->actuation_point_mm = key->actuation_point_mm;
   resp->release_point_mm = key->release_point_mm;
-  resp->rapid_trigger_activation = key->rapid_trigger_activation;
   resp->rapid_trigger_press = key->rapid_trigger_press;
   resp->rapid_trigger_release = key->rapid_trigger_release;
   resp->socd_pair = key->socd_pair;
@@ -434,7 +432,6 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   key.hid_keycode = req->hid_keycode;
   key.actuation_point_mm = req->actuation_point_mm;
   key.release_point_mm = req->release_point_mm;
-  key.rapid_trigger_activation = req->rapid_trigger_activation;
   key.rapid_trigger_press = req->rapid_trigger_press;
   key.rapid_trigger_release = req->rapid_trigger_release;
   key.socd_pair = req->socd_pair;
@@ -550,7 +547,6 @@ static void cmd_set_all_key_settings(const uint8_t *in, uint8_t *out) {
     key.hid_keycode = req->keys[i].hid_keycode;
     key.actuation_point_mm = req->keys[i].actuation_point_mm;
     key.release_point_mm = req->keys[i].release_point_mm;
-    key.rapid_trigger_activation = req->keys[i].rapid_trigger_activation;
     key.rapid_trigger_press = req->keys[i].rapid_trigger_press;
     key.rapid_trigger_release = req->keys[i].rapid_trigger_release;
     key.socd_pair = req->keys[i].socd_pair;

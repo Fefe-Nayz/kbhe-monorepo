@@ -12,10 +12,10 @@
 typedef struct {
     uint16_t primary_keycode;
     uint16_t actuation_point;
+    uint16_t release_point;
     
     // Rapid trigger settings
     bool is_rapid_trigger_enabled;
-    bool use_rapid_trigger_press_sensitivity;
     bool continuous_rapid_trigger;
     uint16_t rapid_trigger_press_sensitivity;
     uint16_t rapid_trigger_release_sensitivity;

@@ -11,7 +11,6 @@ def _default_key_settings(index: int) -> dict:
         "actuation_point_mm": 1.2 + ((index % 5) * 0.2),
         "release_point_mm": 1.0 + ((index % 5) * 0.2),
         "rapid_trigger_enabled": bool(index % 3 == 0),
-        "rapid_trigger_activation": 0.5,
         "rapid_trigger_press": 0.2 + ((index % 3) * 0.05),
         "rapid_trigger_release": 0.2 + ((index % 4) * 0.04),
         "continuous_rapid_trigger": bool(index % 5 == 0),
@@ -302,10 +301,17 @@ class DemoDevice:
         return True
 
     def get_gamepad_with_keyboard(self):
-        return bool(self._gamepad_settings.get("keyboard_routing", 1) != 0)
+        return bool(
+            int(self._gamepad_settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"]))
+            != int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
+        )
 
     def set_gamepad_with_keyboard(self, enabled):
-        self._gamepad_settings["keyboard_routing"] = 1 if enabled else 0
+        self._gamepad_settings["keyboard_routing"] = (
+            int(GAMEPAD_KEYBOARD_ROUTING["All Keys"])
+            if enabled
+            else int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
+        )
         return True
 
     def get_gamepad_settings(self):

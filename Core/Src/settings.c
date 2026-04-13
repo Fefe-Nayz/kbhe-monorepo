@@ -21,9 +21,10 @@
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0107 // v1.7.0
+#define FIRMWARE_VERSION 0x0108 // v1.8.0
 #define KBHE_FW_VERSION_RECORD_MAGIC 0x4B465756u
-#define SETTINGS_VERSION_PREVIOUS 0x0011
+#define SETTINGS_VERSION_V16 0x0012
+#define SETTINGS_VERSION_V15 0x0011
 #define SETTINGS_VERSION_V14 0x0010
 #define SETTINGS_VERSION_V13 0x000E
 #define SETTINGS_VERSION_V12 0x000C
@@ -87,6 +88,23 @@ typedef struct __attribute__((packed)) {
   uint8_t reserved_bits : 5;
   settings_curve_t curve;
   settings_gamepad_mapping_t gamepad_map;
+  settings_key_advanced_t advanced;
+} settings_key_v16_t;
+
+typedef struct __attribute__((packed)) {
+  uint16_t hid_keycode;
+  uint8_t actuation_point_mm;
+  uint8_t release_point_mm;
+  uint8_t rapid_trigger_activation;
+  uint8_t rapid_trigger_press;
+  uint8_t rapid_trigger_release;
+  uint8_t socd_pair;
+  uint8_t rapid_trigger_enabled : 1;
+  uint8_t disable_kb_on_gamepad : 1;
+  uint8_t curve_enabled : 1;
+  uint8_t reserved_bits : 5;
+  settings_curve_t curve;
+  settings_gamepad_mapping_t gamepad_map;
 } settings_key_v13_t;
 
 typedef struct __attribute__((packed)) {
@@ -105,7 +123,40 @@ typedef struct __attribute__((packed)) {
   settings_options_t options;
   uint8_t padding1[3];
 
-  settings_key_t keys[NUM_KEYS];
+  settings_key_v16_t keys[NUM_KEYS];
+  uint16_t layer_keycodes[SETTINGS_LAYER_COUNT - 1u][NUM_KEYS];
+
+  settings_gamepad_t gamepad;
+  settings_calibration_t calibration;
+  settings_led_t led;
+  uint8_t led_effect_mode;
+  uint8_t led_effect_speed;
+  uint8_t led_effect_color_r;
+  uint8_t led_effect_color_g;
+  uint8_t led_effect_color_b;
+  uint8_t led_fps_limit;
+  uint8_t led_effect_params[LED_EFFECT_MAX][LED_EFFECT_PARAM_COUNT];
+  settings_rotary_encoder_t rotary;
+  uint8_t filter_enabled;
+  uint8_t filter_noise_band;
+  uint8_t filter_alpha_min;
+  uint8_t filter_alpha_max;
+  uint8_t advanced_tick_rate;
+  char keyboard_name[SETTINGS_KEYBOARD_NAME_LENGTH];
+
+  uint32_t magic_end;
+  uint32_t crc32;
+} settings_v16_t;
+
+typedef struct __attribute__((packed)) {
+  uint32_t magic_start;
+  uint16_t version;
+  uint16_t reserved;
+
+  settings_options_t options;
+  uint8_t padding1[3];
+
+  settings_key_v16_t keys[NUM_KEYS];
 
   settings_gamepad_t gamepad;
   settings_calibration_t calibration;
@@ -164,7 +215,7 @@ typedef struct __attribute__((packed)) {
   settings_options_t options;
   uint8_t padding1[3];
 
-  settings_key_t keys[NUM_KEYS];
+  settings_key_v16_t keys[NUM_KEYS];
 
   settings_gamepad_t gamepad;
   settings_calibration_t calibration;
@@ -391,7 +442,6 @@ static void settings_copy_key_from_v13(settings_key_t *dst,
   dst->hid_keycode = src->hid_keycode;
   dst->actuation_point_mm = src->actuation_point_mm;
   dst->release_point_mm = src->release_point_mm;
-  dst->rapid_trigger_activation = src->rapid_trigger_activation;
   dst->rapid_trigger_press = src->rapid_trigger_press;
   dst->rapid_trigger_release = src->rapid_trigger_release;
   dst->socd_pair = src->socd_pair;
@@ -402,6 +452,35 @@ static void settings_copy_key_from_v13(settings_key_t *dst,
   dst->curve = src->curve;
   dst->gamepad_map = src->gamepad_map;
   settings_default_key_advanced(&dst->advanced, dst->hid_keycode);
+}
+
+static void settings_copy_key_from_v16(settings_key_t *dst,
+                                       const settings_key_v16_t *src,
+                                       uint8_t key_index) {
+  settings_key_t defaults = settings_default_key(key_index);
+
+  if (dst == NULL) {
+    return;
+  }
+
+  *dst = defaults;
+  if (src == NULL) {
+    return;
+  }
+
+  dst->hid_keycode = src->hid_keycode;
+  dst->actuation_point_mm = src->actuation_point_mm;
+  dst->release_point_mm = src->release_point_mm;
+  dst->rapid_trigger_press = src->rapid_trigger_press;
+  dst->rapid_trigger_release = src->rapid_trigger_release;
+  dst->socd_pair = src->socd_pair;
+  dst->rapid_trigger_enabled = src->rapid_trigger_enabled;
+  dst->disable_kb_on_gamepad = src->disable_kb_on_gamepad;
+  dst->curve_enabled = src->curve_enabled;
+  dst->reserved_bits = src->reserved_bits;
+  dst->curve = src->curve;
+  dst->gamepad_map = src->gamepad_map;
+  dst->advanced = src->advanced;
 }
 
 static void settings_sanitize_key_advanced(uint16_t primary_hid_keycode,
@@ -851,6 +930,8 @@ static uint32_t crc32_compute(const void *data, uint32_t len) {
 
 _Static_assert(sizeof(settings_t) <= FLASH_STORAGE_SIZE,
                "settings_t must fit in the flash storage sector");
+_Static_assert(sizeof(settings_v16_t) <= FLASH_STORAGE_SIZE,
+               "settings_v16_t must fit in the flash storage sector");
 _Static_assert(sizeof(settings_v15_t) <= FLASH_STORAGE_SIZE,
                "settings_v15_t must fit in the flash storage sector");
 _Static_assert(sizeof(settings_v14_t) <= FLASH_STORAGE_SIZE,
@@ -867,7 +948,6 @@ static settings_key_t settings_default_key(uint8_t key_index) {
       .hid_keycode = layout_get_default_keycode(key_index),
   .actuation_point_mm = 12,
   .release_point_mm = 12,
-  .rapid_trigger_activation = 4,
       .rapid_trigger_press = 30,
       .rapid_trigger_release = 30,
       .socd_pair = 255,
@@ -892,6 +972,14 @@ static void settings_sanitize_key_config(uint8_t key_index, settings_key_t *key)
 
   if (key->socd_pair >= NUM_KEYS || key->socd_pair == key_index) {
     key->socd_pair = SETTINGS_SOCD_PAIR_NONE;
+  }
+
+  if (key->actuation_point_mm == 0u) {
+    key->actuation_point_mm = 1u;
+  }
+
+  if (key->release_point_mm > key->actuation_point_mm) {
+    key->release_point_mm = key->actuation_point_mm;
   }
 
   resolution = settings_key_get_socd_resolution(key);
@@ -1034,12 +1122,31 @@ static bool settings_validate_v15(const settings_v15_t *s) {
   if (s->magic_end != SETTINGS_MAGIC_END) {
     return false;
   }
-  if (s->version != SETTINGS_VERSION_PREVIOUS) {
+  if (s->version != SETTINGS_VERSION_V15) {
     return false;
   }
 
   if (s->crc32 !=
       crc32_compute(s, sizeof(settings_v15_t) - sizeof(uint32_t))) {
+    return false;
+  }
+
+  return true;
+}
+
+static bool settings_validate_v16(const settings_v16_t *s) {
+  if (s->magic_start != SETTINGS_MAGIC_START) {
+    return false;
+  }
+  if (s->magic_end != SETTINGS_MAGIC_END) {
+    return false;
+  }
+  if (s->version != SETTINGS_VERSION_V16) {
+    return false;
+  }
+
+  if (s->crc32 !=
+      crc32_compute(s, sizeof(settings_v16_t) - sizeof(uint32_t))) {
     return false;
   }
 
@@ -1181,7 +1288,7 @@ static void settings_migrate_v14(const settings_v14_t *legacy) {
   memcpy(current_settings.padding1, legacy->padding1,
          sizeof(current_settings.padding1));
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
-    current_settings.keys[i] = legacy->keys[i];
+    settings_copy_key_from_v16(&current_settings.keys[i], &legacy->keys[i], i);
   }
   settings_default_layer_keycodes();
   current_settings.gamepad = legacy->gamepad;
@@ -1217,6 +1324,54 @@ static void settings_migrate_v14(const settings_v14_t *legacy) {
   current_settings.crc32 = 0u;
 }
 
+static void settings_migrate_v16(const settings_v16_t *legacy) {
+  memset(&current_settings, 0, sizeof(current_settings));
+  current_settings.magic_start = SETTINGS_MAGIC_START;
+  current_settings.version = SETTINGS_VERSION;
+  current_settings.reserved = legacy->reserved;
+  current_settings.options = legacy->options;
+  memcpy(current_settings.padding1, legacy->padding1,
+    sizeof(current_settings.padding1));
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    settings_copy_key_from_v16(&current_settings.keys[i], &legacy->keys[i], i);
+  }
+  memcpy(current_settings.layer_keycodes, legacy->layer_keycodes,
+    sizeof(current_settings.layer_keycodes));
+  current_settings.gamepad = legacy->gamepad;
+  current_settings.calibration = legacy->calibration;
+  current_settings.led = legacy->led;
+  current_settings.led_effect_mode = legacy->led_effect_mode;
+  current_settings.led_effect_speed = legacy->led_effect_speed;
+  current_settings.led_effect_color_r = legacy->led_effect_color_r;
+  current_settings.led_effect_color_g = legacy->led_effect_color_g;
+  current_settings.led_effect_color_b = legacy->led_effect_color_b;
+  current_settings.led_fps_limit = legacy->led_fps_limit;
+  memcpy(current_settings.led_effect_params, legacy->led_effect_params,
+    sizeof(current_settings.led_effect_params));
+  current_settings.rotary = legacy->rotary;
+  current_settings.filter_enabled = legacy->filter_enabled;
+  current_settings.filter_noise_band = legacy->filter_noise_band;
+  current_settings.filter_alpha_min = legacy->filter_alpha_min;
+  current_settings.filter_alpha_max = legacy->filter_alpha_max;
+  current_settings.advanced_tick_rate = legacy->advanced_tick_rate;
+  memcpy(current_settings.keyboard_name, legacy->keyboard_name,
+    sizeof(current_settings.keyboard_name));
+
+  for (uint8_t i = 0; i < NUM_KEYS; i++) {
+    settings_sanitize_key_config(i, &current_settings.keys[i]);
+  }
+  settings_sanitize_layer_keycodes();
+  settings_gamepad_sanitize(&current_settings.gamepad);
+  settings_gamepad_apply_keyboard_routing_option();
+  settings_rotary_encoder_sanitize(&current_settings.rotary);
+  current_settings.advanced_tick_rate = settings_sanitize_advanced_tick_rate(
+      current_settings.advanced_tick_rate);
+  settings_sanitize_keyboard_name();
+  settings_reset_led_effect_restore_state();
+  current_settings.magic_end = SETTINGS_MAGIC_END;
+  current_settings.crc32 = 0u;
+}
+
 static void settings_migrate_v15(const settings_v15_t *legacy) {
   memset(&current_settings, 0, sizeof(current_settings));
   current_settings.magic_start = SETTINGS_MAGIC_START;
@@ -1226,7 +1381,7 @@ static void settings_migrate_v15(const settings_v15_t *legacy) {
   memcpy(current_settings.padding1, legacy->padding1,
          sizeof(current_settings.padding1));
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
-    current_settings.keys[i] = legacy->keys[i];
+    settings_copy_key_from_v16(&current_settings.keys[i], &legacy->keys[i], i);
   }
   settings_default_layer_keycodes();
   current_settings.gamepad = legacy->gamepad;
@@ -1307,6 +1462,7 @@ static void settings_migrate_v12(const settings_v12_t *legacy) {
 
 static bool settings_load_from_flash(bool *migrated) {
   settings_t temp;
+  settings_v16_t legacy_v16;
   settings_v15_t legacy_v15;
   settings_v14_t legacy_v14;
   settings_v13_t legacy_v13;
@@ -1336,6 +1492,18 @@ static bool settings_load_from_flash(bool *migrated) {
         current_settings.advanced_tick_rate);
     settings_sanitize_keyboard_name();
     settings_reset_led_effect_restore_state();
+    return true;
+  }
+
+  if (!flash_storage_read(0, &legacy_v16, sizeof(settings_v16_t))) {
+    return false;
+  }
+
+  if (settings_validate_v16(&legacy_v16)) {
+    settings_migrate_v16(&legacy_v16);
+    if (migrated != NULL) {
+      *migrated = true;
+    }
     return true;
   }
 
@@ -1873,7 +2041,6 @@ bool settings_reset_key_trigger_settings(uint8_t key_index) {
 
   key.actuation_point_mm = defaults.actuation_point_mm;
   key.release_point_mm = defaults.release_point_mm;
-  key.rapid_trigger_activation = defaults.rapid_trigger_activation;
   key.rapid_trigger_press = defaults.rapid_trigger_press;
   key.rapid_trigger_release = defaults.rapid_trigger_release;
   key.rapid_trigger_enabled = defaults.rapid_trigger_enabled;

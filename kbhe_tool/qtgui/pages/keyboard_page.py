@@ -332,13 +332,10 @@ class KeyboardPage(QWidget):
         rapid_bl.setSpacing(8)
         bl.addWidget(self.rapid_body)
 
-        self.rt_activation_row = _SliderRow("Activation distance", 0.1, 2.0, 0.5, decimals=2, scale=100)
         self.rt_press_row = _SliderRow("Press sensitivity", 0.1, 1.0, 0.3, decimals=2, scale=100)
-        rapid_bl.addWidget(self.rt_activation_row)
         rapid_bl.addWidget(self.rt_press_row)
-        self.rt_activation_row.slider.valueChanged.connect(self._on_changed)
         self.rt_press_row.slider.valueChanged.connect(self._on_changed)
-        self._controls += [self.rt_activation_row.slider, self.rt_press_row.slider]
+        self._controls += [self.rt_press_row.slider]
 
         self.separate_check = QCheckBox("Use separate release sensitivity")
         self.separate_check.stateChanged.connect(self._on_separate_toggled)
@@ -355,7 +352,7 @@ class KeyboardPage(QWidget):
         self._controls.append(self.rt_release_row.slider)
         rapid_bl.addWidget(self.release_body)
 
-        hint = QLabel("Fires when the key moves by the sensitivity threshold after initial actuation.")
+        hint = QLabel("Fires when the key moves by the configured sensitivity, while respecting the same actuation/release thresholds as fixed mode.")
         hint.setObjectName("Muted")
         hint.setWordWrap(True)
         bl.addWidget(hint)
@@ -605,7 +602,6 @@ class KeyboardPage(QWidget):
             self.socd_resolution_combo,
             self.rapid_check,
             self.continuous_rt_check,
-            self.rt_activation_row.slider,
             self.rt_press_row.slider,
             self.separate_check,
             self.rt_release_row.slider,
@@ -689,7 +685,6 @@ class KeyboardPage(QWidget):
             "actuation_point_mm":     self.fixed_actuation_row.get_value(),
             "release_point_mm":       self.fixed_release_row.get_value(),
             "rapid_trigger_enabled":  self.rapid_check.isChecked(),
-            "rapid_trigger_activation": self.rt_activation_row.get_value(),
             "rapid_trigger_press":    rt_press,
             "rapid_trigger_release":  rt_release,
             "continuous_rapid_trigger": self.continuous_rt_check.isChecked(),
@@ -720,7 +715,6 @@ class KeyboardPage(QWidget):
             self.fixed_release_row.set_value(_safe_float(s.get("release_point_mm", 1.8)))
 
             self.rapid_check.setChecked(bool(s.get("rapid_trigger_enabled", False)))
-            self.rt_activation_row.set_value(_safe_float(s.get("rapid_trigger_activation", 0.5)))
             self.rt_press_row.set_value(_safe_float(s.get("rapid_trigger_press", 0.3)))
             self.rt_release_row.set_value(_safe_float(s.get("rapid_trigger_release", 0.3)))
             self.continuous_rt_check.setChecked(bool(s.get("continuous_rapid_trigger", False)))

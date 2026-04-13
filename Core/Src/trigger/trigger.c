@@ -48,6 +48,10 @@ static inline bool is_below_actuation_point(int16_t distance, uint16_t actuation
     return distance >= actuation_point;
 }
 
+static inline bool is_above_release_point(int16_t distance, uint16_t release_point) {
+    return distance >= release_point;
+}
+
 static inline void reset_rapid_trigger_extremums(uint8_t key, int16_t current_distance) {
     key_rapid_trigger_states[key].max_bottom_distance = current_distance;
     key_rapid_trigger_states[key].min_top_distance = current_distance;
@@ -424,17 +428,31 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
     int16_t current_distance = analog_read_distance_value(key);
     const key_trigger_settings_t *settings = &key_trigger_settings[key];
     uint16_t actuation_point = settings->actuation_point;
+    uint16_t release_point = settings->release_point;
     key_rapid_trigger_data_t *rt_data = &key_rapid_trigger_states[key];
 
     if (!settings->is_rapid_trigger_enabled) {
-        if (!is_below_actuation_point(current_distance, actuation_point)) {
-            release_key(key);
+        if (key_states[key] == RELEASED) {
+            if (is_below_actuation_point(current_distance, actuation_point)) {
+                press_key(key, current_distance, now_ms);
+            }
         } else {
-            press_key(key, current_distance, now_ms);
+            if (!is_above_release_point(current_distance, release_point)) {
+                release_key(key);
+            }
         }
     } else if (!settings->continuous_rapid_trigger) {
-        if (!is_below_actuation_point(current_distance, actuation_point)) {
+        if (key_states[key] == PRESSED &&
+            !is_above_release_point(current_distance, release_point)) {
             release_key(key);
+            reset_rapid_trigger_extremums(key, current_distance);
+            rt_data->last_distance = current_distance;
+        } else if (key_states[key] == RELEASED &&
+                   !is_below_actuation_point(current_distance, actuation_point)) {
+            rt_data->last_distance = current_distance;
+            if (current_distance < rt_data->min_top_distance) {
+                rt_data->min_top_distance = current_distance;
+            }
         } else {
             handle_rapid_trigger(key, current_distance, settings, now_ms);
         }
@@ -447,12 +465,19 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
                 }
                 return;
             }
-        }
 
-        handle_rapid_trigger(key, current_distance, settings, now_ms);
-        if (key_states[key] == PRESSED) {
             rt_data->continuous_armed = true;
         }
+
+        if (key_states[key] == PRESSED &&
+            !is_above_release_point(current_distance, release_point)) {
+            release_key(key);
+            reset_rapid_trigger_extremums(key, current_distance);
+            rt_data->last_distance = current_distance;
+        } else {
+            handle_rapid_trigger(key, current_distance, settings, now_ms);
+        }
+
         if (current_distance <= 0) {
             if (key_states[key] == PRESSED) {
                 release_key(key);
@@ -495,11 +520,11 @@ void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings) {
     runtime->is_rapid_trigger_enabled = settings->rapid_trigger_enabled ? true : false;
     runtime->continuous_rapid_trigger =
         settings_key_is_continuous_rapid_trigger_enabled(settings);
-    runtime->actuation_point = runtime->is_rapid_trigger_enabled
-                                   ? mm_tenths_to_um(settings->rapid_trigger_activation)
-                                   : mm_tenths_to_um(settings->actuation_point_mm);
-    runtime->use_rapid_trigger_press_sensitivity =
-        settings->rapid_trigger_press != settings->rapid_trigger_release;
+    runtime->actuation_point = mm_tenths_to_um(settings->actuation_point_mm);
+    runtime->release_point = mm_tenths_to_um(settings->release_point_mm);
+    if (runtime->release_point > runtime->actuation_point) {
+        runtime->release_point = runtime->actuation_point;
+    }
     runtime->rapid_trigger_press_sensitivity =
         mm_hundredths_to_um(settings->rapid_trigger_press);
     runtime->rapid_trigger_release_sensitivity =
@@ -543,8 +568,8 @@ void trigger_init() {
     for (int i = 0; i < NUM_KEYS; i++) {
         key_trigger_settings[i].primary_keycode = KC_NO;
         key_trigger_settings[i].actuation_point = DEFAULT_ACTUATION_POINT;
+        key_trigger_settings[i].release_point = DEFAULT_ACTUATION_POINT;
         key_trigger_settings[i].is_rapid_trigger_enabled = false;
-        key_trigger_settings[i].use_rapid_trigger_press_sensitivity = false;
         key_trigger_settings[i].continuous_rapid_trigger = false;
         key_trigger_settings[i].rapid_trigger_press_sensitivity = DEFAULT_RAPID_TRIGGER_SENSITIVITY;
         key_trigger_settings[i].rapid_trigger_release_sensitivity = DEFAULT_RAPID_TRIGGER_SENSITIVITY;

@@ -35,7 +35,7 @@ Le clavier expose une interface RAW HID qui sert de canal de controle entre le f
 
 - Scan analogique multi-touches avec pipeline de traitement dedie.
 - Parametrage par touche des seuils d'activation/release.
-- Rapid Trigger configurable : activation, sensibilite appui, sensibilite relache.
+- Rapid Trigger configurable : sensibilite appui, sensibilite relache (en surcouche des memes seuils actuation/release).
 - Modes de comportement avances par touche :
 	- Normal
 	- Tap-Hold

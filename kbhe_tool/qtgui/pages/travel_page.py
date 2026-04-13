@@ -368,7 +368,6 @@ class TravelPage(QWidget):
             [
                 ("Actuation", "actuation"),
                 ("Release", "release"),
-                ("RT Activation", "rt_activation"),
                 ("RT Press", "rt_press"),
                 ("RT Release", "rt_release"),
                 ("SOCD Pair", "socd"),
@@ -484,9 +483,6 @@ class TravelPage(QWidget):
         self.focus_distance.setText(f"{distance_mm:.2f} mm")
         self.threshold_labels["actuation"].setText(f"{thresholds.get('actuation_point_mm', 0):.2f} mm")
         self.threshold_labels["release"].setText(f"{thresholds.get('release_point_mm', 0):.2f} mm")
-        self.threshold_labels["rt_activation"].setText(
-            f"{thresholds.get('rapid_trigger_activation', 0):.2f} mm"
-        )
         self.threshold_labels["rt_press"].setText(f"{thresholds.get('rapid_trigger_press', 0):.2f} mm")
         self.threshold_labels["rt_release"].setText(f"{thresholds.get('rapid_trigger_release', 0):.2f} mm")
         socd_pair = thresholds.get("socd_pair", None)
