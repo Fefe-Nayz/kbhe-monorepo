@@ -1,5 +1,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
+import { kbheDevice } from "@/lib/kbhe/device";
+import { queryKeys } from "@/lib/query/keys";
 import {
   Sidebar,
   SidebarContent,
@@ -95,7 +98,23 @@ interface AppSidebarProps {
 
 function KeyboardMenu() {
   const { status, deviceInfo } = useDeviceSession();
+  const runtimeConnected = status === "connected";
   const connected = status === "connected" || status === "updater";
+
+  const identityQ = useQuery({
+    queryKey: queryKeys.device.identity(),
+    queryFn: () => kbheDevice.getDeviceInfo(),
+    enabled: runtimeConnected,
+    staleTime: 30_000,
+  });
+
+  const keyboardName = identityQ.data?.keyboard_name?.trim()
+    || deviceInfo?.product?.trim()
+    || "KBHE Keyboard";
+
+  const serialNumber = identityQ.data?.serial_number?.trim()
+    || deviceInfo?.serialNumber?.trim()
+    || null;
 
   return (
     <SidebarMenu className="gap-1">
@@ -112,12 +131,10 @@ function KeyboardMenu() {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate font-medium">
-                    {connected ? (deviceInfo?.product ?? "KBHE Keyboard") : "KBHE Configurator"}
+                    {connected ? keyboardName : "KBHE Configurator"}
                   </span>
                   <span className="truncate font-mono text-xs text-muted-foreground">
-                    {connected && deviceInfo
-                      ? `${deviceInfo.vid.toString(16).padStart(4, "0")}:${deviceInfo.pid.toString(16).padStart(4, "0")}`
-                      : "No device"}
+                    {connected ? (serialNumber ? `${serialNumber}` : "SN unavailable") : "No device"}
                   </span>
                 </div>
                 <IconChevronDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
