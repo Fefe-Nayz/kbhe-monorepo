@@ -288,8 +288,13 @@ static bool layout_should_emit_keyboard_for_key(uint8_t key) {
   const settings_key_t *settings_key = NULL;
   const settings_gamepad_t *gamepad = NULL;
 
+  // Keyboard master switch always has priority over routing modes.
+  if (!settings_is_keyboard_enabled()) {
+    return false;
+  }
+
   if (!settings_is_gamepad_enabled()) {
-    return settings_is_keyboard_enabled();
+    return true;
   }
 
   settings_key = settings_get_key(key);

@@ -14,6 +14,8 @@
 #include "trigger/socd.h"
 #include "trigger/trigger.h"
 #include "hid/gamepad_hid.h"
+#include "hid/keyboard_hid.h"
+#include "hid/keyboard_nkro_hid.h"
 #include <string.h>
 
 //--------------------------------------------------------------------+
@@ -1478,7 +1480,16 @@ bool settings_set_gamepad_enabled_live(bool enabled) {
 }
 
 bool settings_set_keyboard_enabled(bool enabled) {
-  current_settings.options.keyboard_enabled = enabled ? 1 : 0;
+  bool was_enabled = current_settings.options.keyboard_enabled != 0u;
+  current_settings.options.keyboard_enabled = enabled ? 1u : 0u;
+
+  if (was_enabled && !enabled) {
+    // Ensure no stale keyboard report remains active after disabling keyboard output.
+    keyboard_hid_release_all();
+    keyboard_hid_reset_state();
+    keyboard_nkro_hid_release_all();
+  }
+
   settings_mark_dirty();
   return true;
 }
@@ -1499,7 +1510,15 @@ bool settings_set_nkro_enabled(bool enabled) {
 }
 
 bool settings_set_options(settings_options_t options) {
+  bool was_enabled = current_settings.options.keyboard_enabled != 0u;
   current_settings.options = options;
+
+  if (was_enabled && current_settings.options.keyboard_enabled == 0u) {
+    keyboard_hid_release_all();
+    keyboard_hid_reset_state();
+    keyboard_nkro_hid_release_all();
+  }
+
   settings_gamepad_apply_keyboard_routing_option();
   gamepad_hid_set_enabled(options.gamepad_enabled);
   gamepad_hid_reload_settings();
