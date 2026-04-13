@@ -245,6 +245,28 @@ function effectName(id: number): string {
   return `Mode ${id}`;
 }
 
+function buildDefaultEffectParams(meta: ParamSpec[]): number[] {
+  const maxIndex = meta.reduce((max, spec) => {
+    if (spec.kind === "color") {
+      return max;
+    }
+    return Math.max(max, spec.index);
+  }, -1);
+
+  if (maxIndex < 0) {
+    return [];
+  }
+
+  const defaults = new Array(maxIndex + 1).fill(0);
+  for (const spec of meta) {
+    if (spec.kind === "color") {
+      continue;
+    }
+    defaults[spec.index] = spec.default;
+  }
+  return defaults;
+}
+
 // ---------------------------------------------------------------------------
 // Matrix Keyboard sub-component
 // ---------------------------------------------------------------------------
@@ -361,36 +383,42 @@ export default function Lighting() {
     queryKey: queryKeys.led.enabled(),
     queryFn: () => kbheDevice.ledGetEnabled(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const brightnessQ = useQuery({
     queryKey: queryKeys.led.brightness(),
     queryFn: () => kbheDevice.ledGetBrightness(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const effectQ = useQuery({
     queryKey: queryKeys.led.effect(),
     queryFn: () => kbheDevice.getLedEffect(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const speedQ = useQuery({
     queryKey: queryKeys.led.effectSpeed(),
     queryFn: () => kbheDevice.getLedEffectSpeed(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const colorQ = useQuery({
     queryKey: queryKeys.led.effectColor(),
     queryFn: () => kbheDevice.getLedEffectColor(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const fpsQ = useQuery({
     queryKey: queryKeys.led.fpsLimit(),
     queryFn: () => kbheDevice.getLedFpsLimit(),
     enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const currentEffect = effectQ.data ?? LEDEffect.SOLID;
@@ -398,7 +426,8 @@ export default function Lighting() {
   const paramsQ = useQuery({
     queryKey: queryKeys.led.effectParams(currentEffect),
     queryFn: () => kbheDevice.getLedEffectParams(currentEffect),
-    enabled: connected && effectQ.data != null,
+    enabled: connected,
+    placeholderData: (previous) => previous,
   });
 
   const isMatrixMode = currentEffect === LEDEffect.MATRIX;
@@ -409,6 +438,7 @@ export default function Lighting() {
     queryKey: queryKeys.led.allPixels(),
     queryFn: () => kbheDevice.ledDownloadAll(),
     enabled: connected && matrixVisible,
+    placeholderData: (previous) => previous,
     refetchInterval: false,
     refetchOnWindowFocus: false,
     refetchIntervalInBackground: false,
@@ -747,21 +777,22 @@ export default function Lighting() {
   const currentMeta = EFFECT_PARAM_METADATA[currentEffect];
 
   function renderEffectParams() {
-    if (!currentMeta || !paramsQ.data) {
-      if (effectQ.data != null && !EFFECT_PARAM_METADATA[currentEffect]) {
-        return (
-          <p className="text-sm text-muted-foreground py-2">
-            This effect has no additional tuning controls.
-          </p>
-        );
-      }
-      return null;
+    if (!currentMeta) {
+      return (
+        <p className="text-sm text-muted-foreground py-2">
+          This effect has no additional tuning controls.
+        </p>
+      );
     }
 
-    const params = paramsQ.data;
+    const paramsLoaded = paramsQ.data != null;
+    const params = paramsQ.data ?? buildDefaultEffectParams(currentMeta);
 
     return (
       <div className="flex flex-col gap-3">
+        {!paramsLoaded && (
+          <p className="text-xs text-muted-foreground">Loading current values...</p>
+        )}
         {currentMeta.map((spec, i) => {
           if (spec.kind === "color") {
             return (
@@ -781,7 +812,7 @@ export default function Lighting() {
                 <Label className="text-sm">{spec.label}</Label>
                 <Switch
                   checked={checked}
-                  disabled={!connected}
+                  disabled={!connected || !paramsLoaded}
                   onCheckedChange={(v) => {
                     const next = [...params];
                     next[spec.index] = v ? 1 : 0;
@@ -802,6 +833,7 @@ export default function Lighting() {
                 <Select
                   value={String(val)}
                   items={selectItemsReverse(optMap)}
+                  disabled={!connected || !paramsLoaded}
                   onValueChange={(v) => {
                     const next = [...params];
                     next[spec.index] = Number(v);
@@ -847,7 +879,7 @@ export default function Lighting() {
                   next[spec.index] = v;
                   paramsMut.mutate(next);
                 }}
-                disabled={!connected}
+                disabled={!connected || !paramsLoaded}
               />
             </div>
           );
@@ -888,17 +920,14 @@ export default function Lighting() {
                         </FormRow>
                         <FormRow label="Global Brightness">
                           <div className="flex items-center gap-3 w-44">
-                            {brightnessQ.data == null ? (
-                              <Skeleton className="h-5 w-full" />
-                            ) : (
-                              <CommitSlider
-                                min={0} max={255} step={1}
-                                value={brightnessQ.data}
-                                onLiveChange={(v) => liveBrightness(v)}
-                                onCommit={(v) => brightnessMut.mutate(v)}
-                                disabled={!connected} className="flex-1"
-                              />
-                            )}
+                            <CommitSlider
+                              min={0} max={255} step={1}
+                              value={brightnessQ.data ?? 128}
+                              onLiveChange={(v) => liveBrightness(v)}
+                              onCommit={(v) => brightnessMut.mutate(v)}
+                              disabled={!connected || brightnessQ.data == null}
+                              className="flex-1"
+                            />
                           </div>
                         </FormRow>
                       </div>
@@ -908,30 +937,26 @@ export default function Lighting() {
                       title="Effect Mode"
                       description={EFFECT_DESCRIPTIONS[currentEffect]}
                     >
-                      {effectQ.isLoading ? (
-                        <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-6 w-48" />)}</div>
-                      ) : (
-                        <RadioGroup
-                          value={String(effectQ.data ?? 0)}
-                          onValueChange={(v: string) => effectMut.mutate(Number(v))}
-                          disabled={!connected}
-                          className="flex flex-col gap-4"
-                        >
-                          {EFFECT_GROUPS.map((group) => (
-                            <div key={group.category}>
-                              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{group.category}</p>
-                              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                                {group.effects.map((eff) => (
-                                  <div key={eff.id} className="flex items-center gap-2">
-                                    <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
-                                    <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
-                                  </div>
-                                ))}
-                              </div>
+                      <RadioGroup
+                        value={String(effectQ.data ?? currentEffect)}
+                        onValueChange={(v: string) => effectMut.mutate(Number(v))}
+                        disabled={!connected || effectQ.data == null}
+                        className="flex flex-col gap-4"
+                      >
+                        {EFFECT_GROUPS.map((group) => (
+                          <div key={group.category}>
+                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{group.category}</p>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                              {group.effects.map((eff) => (
+                                <div key={eff.id} className="flex items-center gap-2">
+                                  <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
+                                  <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </RadioGroup>
-                      )}
+                          </div>
+                        ))}
+                      </RadioGroup>
                     </SectionCard>
                   </div>
 
@@ -941,26 +966,19 @@ export default function Lighting() {
                       title="Effect Tuning"
                       description={effectName(currentEffect)}
                     >
-                      {paramsQ.isLoading ? (
-                        <div className="space-y-3">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
-                      ) : (
-                        renderEffectParams()
-                      )}
+                      {renderEffectParams()}
                     </SectionCard>
 
                     <SectionCard title="Effect Speed">
                       <div className="flex items-center gap-3">
-                        {speedQ.data == null ? (
-                          <Skeleton className="h-5 w-full" />
-                        ) : (
-                          <CommitSlider
-                            min={1} max={255} step={1}
-                            value={speedQ.data}
-                            onLiveChange={(v) => liveSpeed(v)}
-                            onCommit={(v) => speedMut.mutate(v)}
-                            disabled={!connected} className="flex-1"
-                          />
-                        )}
+                        <CommitSlider
+                          min={1} max={255} step={1}
+                          value={speedQ.data ?? 128}
+                          onLiveChange={(v) => liveSpeed(v)}
+                          onCommit={(v) => speedMut.mutate(v)}
+                          disabled={!connected || speedQ.data == null}
+                          className="flex-1"
+                        />
                       </div>
                     </SectionCard>
 
@@ -992,17 +1010,14 @@ export default function Lighting() {
 
                     <SectionCard title="FPS Limit">
                       <div className="flex items-center gap-3">
-                        {fpsQ.data == null ? (
-                          <Skeleton className="h-5 w-full" />
-                        ) : (
-                          <CommitSlider
-                            min={0} max={120} step={1}
-                            value={fpsQ.data}
-                            onLiveChange={(v) => liveFps(v)}
-                            onCommit={(v) => fpsMut.mutate(v)}
-                            disabled={!connected} className="flex-1"
-                          />
-                        )}
+                        <CommitSlider
+                          min={0} max={120} step={1}
+                          value={fpsQ.data ?? 0}
+                          onLiveChange={(v) => liveFps(v)}
+                          onCommit={(v) => fpsMut.mutate(v)}
+                          disabled={!connected || fpsQ.data == null}
+                          className="flex-1"
+                        />
                       </div>
                     </SectionCard>
 

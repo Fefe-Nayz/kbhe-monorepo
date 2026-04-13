@@ -86,20 +86,50 @@ function buildUpdaterPacket(
   return packet;
 }
 
-function parseUpdaterResponse(response: Uint8Array): UpdaterResponse {
-  if (!response || response.length < PACKET_SIZE) {
+function parseUpdaterResponse(response: Uint8Array, expectedCommand?: number): UpdaterResponse {
+  if (!response || response.length < 8) {
     throw new Error("short or empty response from updater");
   }
 
-  const length = response[3];
-  return {
-    command: response[0],
-    sequence: response[1],
-    status: response[2],
-    length,
-    offset: bytesToUint32(response, 4),
-    payload: response.slice(8, 8 + length),
-  };
+  const candidates: UpdaterResponse[] = [];
+  for (const baseOffset of [0, 1]) {
+    if (response.length < baseOffset + 8) {
+      continue;
+    }
+
+    const length = response[baseOffset + 3];
+    if (length > DATA_CHUNK_SIZE) {
+      continue;
+    }
+
+    const payloadStart = baseOffset + 8;
+    const payloadEnd = payloadStart + length;
+    if (payloadEnd > response.length) {
+      continue;
+    }
+
+    candidates.push({
+      command: response[baseOffset],
+      sequence: response[baseOffset + 1],
+      status: response[baseOffset + 2],
+      length,
+      offset: bytesToUint32(response, baseOffset + 4),
+      payload: response.slice(payloadStart, payloadEnd),
+    });
+  }
+
+  if (candidates.length === 0) {
+    throw new Error("invalid updater response header");
+  }
+
+  if (expectedCommand !== undefined) {
+    const matched = candidates.find((candidate) => candidate.command === expectedCommand);
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return candidates[0]!;
 }
 
 function requireUpdaterOk(response: UpdaterResponse, expectedCommand: number): void {
@@ -238,6 +268,27 @@ export class KBHEFirmware {
     private readonly commander: KbheCommander = kbheCommander,
   ) {}
 
+  private async requestBootloaderTransition(
+    runtimePath: string,
+    timeoutMs: number,
+    log: (message: string) => void,
+  ): Promise<void> {
+    await this.transport.connect(runtimePath);
+    try {
+      // Some boards disconnect before replying to ENTER_BOOTLOADER.
+      await this.commander.sendCommand(APP_CMD_ENTER_BOOTLOADER, [], timeoutMs);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log(`No ENTER_BOOTLOADER ACK (${message}); waiting for USB re-enumeration...`);
+    } finally {
+      try {
+        await this.transport.disconnect();
+      } catch {
+        // Ignore disconnect errors while transitioning to updater mode.
+      }
+    }
+  }
+
   private async findRuntimeDevice(): Promise<KbheTransportDeviceInfo | null> {
     const devices = await this.transport.listDevices();
     return devices.find((device) => device.kind === "runtime") ?? null;
@@ -253,18 +304,58 @@ export class KBHEFirmware {
     timeoutMs: number,
     retries: number,
     log: (message: string) => void,
+    expectedCommand: number,
+    expectedSequence?: number,
   ): Promise<UpdaterResponse> {
     let lastError: Error | null = null;
     for (let attempt = 1; attempt <= retries; attempt += 1) {
+      let unexpectedCommand: number | null = null;
+      let unexpectedSequence: number | null = null;
       try {
+        try {
+          await this.transport.flushInput();
+        } catch {
+          // Ignore flush failures and continue with the transaction.
+        }
+
         await this.transport.writeReport(report);
-        const response = await this.transport.readReport(timeoutMs);
-        if (response.length > 0) {
-          return parseUpdaterResponse(response);
+
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+          const remaining = Math.max(1, deadline - Date.now());
+          const rawResponse = await this.transport.readReport(remaining);
+          if (rawResponse.length === 0) {
+            continue;
+          }
+
+          const response = parseUpdaterResponse(rawResponse, expectedCommand);
+          if (response.command !== expectedCommand) {
+            unexpectedCommand = response.command;
+            continue;
+          }
+
+          if (expectedSequence !== undefined && response.sequence !== expectedSequence) {
+            unexpectedSequence = response.sequence;
+            continue;
+          }
+
+          return response;
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
       }
+
+      if (unexpectedCommand !== null) {
+        log(
+          `Ignoring response command 0x${unexpectedCommand.toString(16)} while waiting for 0x${expectedCommand.toString(16)}`,
+        );
+      }
+      if (unexpectedSequence !== null) {
+        log(
+          `Ignoring response sequence 0x${unexpectedSequence.toString(16)} while waiting for 0x${(expectedSequence ?? 0).toString(16)}`,
+        );
+      }
+
       log(`Retry ${attempt}/${retries} after timeout...`);
     }
     throw lastError ?? new Error("device did not respond after retries");
@@ -283,6 +374,7 @@ export class KBHEFirmware {
     const timeoutMs = options.timeoutMs ?? 5000;
     const retries = options.retries ?? 5;
     const log = options.onLog ?? (() => undefined);
+    const transitionTimeoutMs = Math.max(timeoutMs, 12000);
 
     log(`Flashing image with firmware version ${formatFirmwareVersion(firmwareVersion)} (0x${firmwareVersion.toString(16).padStart(4, "0")})`);
     if (source !== "manual") {
@@ -297,16 +389,34 @@ export class KBHEFirmware {
     const runtime = await this.findRuntimeDevice();
     const updater = await this.findUpdaterDevice();
     if (!updater && runtime) {
-      await this.transport.connect(runtime.path);
-      await this.commander.sendCommand(APP_CMD_ENTER_BOOTLOADER, [], Math.min(timeoutMs, 500));
-      await this.transport.disconnect();
-      await this.transport.waitForDisconnect("runtime", timeoutMs);
+      await this.requestBootloaderTransition(runtime.path, Math.min(transitionTimeoutMs, 1200), log);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      let runtimeDisconnected = await this.transport.waitForDisconnect("runtime", transitionTimeoutMs);
+      if (!runtimeDisconnected) {
+        log("Runtime device still present; retrying ENTER_BOOTLOADER once...");
+        const retryRuntime = await this.findRuntimeDevice();
+        if (retryRuntime) {
+          await this.requestBootloaderTransition(
+            retryRuntime.path,
+            Math.min(transitionTimeoutMs, 1200),
+            log,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          runtimeDisconnected = await this.transport.waitForDisconnect("runtime", transitionTimeoutMs);
+        }
+      }
+
+      if (!runtimeDisconnected) {
+        throw new Error("runtime device did not enter bootloader mode in time");
+      }
     }
 
     const updaterDevice =
-      (await this.transport.waitForDevice("updater", timeoutMs)) ?? (await this.findUpdaterDevice());
+      (await this.transport.waitForDevice("updater", transitionTimeoutMs))
+      ?? (await this.findUpdaterDevice());
     if (!updaterDevice) {
-      throw new Error("updater device not found");
+      throw new Error(`updater device not found after ${transitionTimeoutMs}ms`);
     }
 
     await this.transport.connect(updaterDevice.path);
@@ -319,6 +429,8 @@ export class KBHEFirmware {
         timeoutMs,
         retries,
         log,
+        UPDATER_CMD_HELLO,
+        sequence,
       );
       requireUpdaterOk(hello, UPDATER_CMD_HELLO);
       const helloPayload = parseHelloPayload(hello.payload);
@@ -360,6 +472,8 @@ export class KBHEFirmware {
         timeoutMs,
         retries,
         log,
+        UPDATER_CMD_BEGIN,
+        sequence,
       );
       requireUpdaterOk(begin, UPDATER_CMD_BEGIN);
 
@@ -372,6 +486,8 @@ export class KBHEFirmware {
           timeoutMs,
           retries,
           log,
+          UPDATER_CMD_DATA,
+          sequence,
         );
         requireUpdaterOk(response, UPDATER_CMD_DATA);
 
@@ -395,6 +511,8 @@ export class KBHEFirmware {
         timeoutMs,
         retries,
         log,
+        UPDATER_CMD_FINISH,
+        sequence,
       );
       requireUpdaterOk(finish, UPDATER_CMD_FINISH);
 
@@ -404,6 +522,8 @@ export class KBHEFirmware {
         timeoutMs,
         retries,
         log,
+        UPDATER_CMD_BOOT,
+        sequence,
       );
       requireUpdaterOk(boot, UPDATER_CMD_BOOT);
     } catch (error) {

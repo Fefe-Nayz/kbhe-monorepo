@@ -1,16 +1,56 @@
 mod commands;
+mod startup;
 mod volume;
 
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager, WindowEvent,
+    AppHandle, Manager, WebviewWindow, WindowEvent,
 };
+use tauri_plugin_autostart::MacosLauncher;
+
+fn apply_startup_window_mode(window: &WebviewWindow) {
+    let prefs = startup::load_startup_preferences_from_app_handle(&window.app_handle());
+
+    match prefs.startup_mode {
+        startup::StartupWindowMode::Tray => {
+            let _ = window.set_fullscreen(false);
+            let _ = window.hide();
+        }
+        startup::StartupWindowMode::Fullscreen => {
+            let _ = window.show();
+            let _ = window.set_fullscreen(true);
+            let _ = window.set_focus();
+        }
+        startup::StartupWindowMode::Normal => {
+            let _ = window.set_fullscreen(false);
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+#[tauri::command]
+fn kbhe_frontend_ready(app: AppHandle) -> Result<(), String> {
+    if let Some(splashscreen) = app.get_webview_window("splashscreen") {
+        let _ = splashscreen.close();
+    }
+
+    if let Some(main) = app.get_webview_window("main") {
+        apply_startup_window_mode(&main);
+    }
+
+    Ok(())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(commands::KbheTransportState::default())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None::<Vec<&'static str>>,
+        ))
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -56,9 +96,26 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(15));
+
+                if let Some(splashscreen) = app_handle.get_webview_window("splashscreen") {
+                    let _ = splashscreen.close();
+                }
+
+                if let Some(main) = app_handle.get_webview_window("main") {
+                    apply_startup_window_mode(&main);
+                }
+            });
+
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
@@ -76,6 +133,9 @@ pub fn run() {
             commands::kbhe_wait_for_device,
             commands::kbhe_wait_for_disconnect,
             commands::kbhe_get_os_key_variants,
+            kbhe_frontend_ready,
+            startup::kbhe_get_startup_preferences,
+            startup::kbhe_set_startup_preferences,
             volume::kbhe_get_system_volume,
         ])
         .run(tauri::generate_context!())
