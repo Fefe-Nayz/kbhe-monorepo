@@ -133,6 +133,7 @@ pub fn run() {
             commands::kbhe_get_key_states,
             commands::kbhe_wait_for_device,
             commands::kbhe_wait_for_disconnect,
+            commands::kbhe_detect_bootloader_presence,
             commands::kbhe_get_os_key_variants,
             kbhe_frontend_ready,
             startup::kbhe_get_startup_preferences,

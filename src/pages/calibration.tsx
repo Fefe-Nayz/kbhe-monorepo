@@ -2,26 +2,15 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
-import { KeyTester } from "@/components/key-tester";
-import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { useAutosave } from "@/components/AutosaveStatus";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CommitSlider } from "@/components/ui/commit-slider";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/components/theme-provider";
 import { previewKeys } from "@/constants/defaultLayout";
 import { useKeyboardStore } from "@/stores/keyboard-store";
@@ -41,12 +30,13 @@ import {
 } from "@tabler/icons-react";
 
 const MAX_TRAVEL_MM = 4.0;
-const MAX_ADC_VALUE = 255;
 const KEY_STATES_POLL_INTERVAL_MS = 20;
 const KEYBOARD_PREVIEW_FRAME_MS = 33;
+const MIN_CALIBRATION_VALUE = -32768;
+const MAX_CALIBRATION_VALUE = 32767;
 
-type CalibrationPreviewMode = "live" | "heatmap";
-type CalibrationValueMode = "mm" | "adc";
+type GuidedState = "idle" | "running" | "success" | "error";
+type CalibrationPreviewMode = "distance" | "offset";
 
 function heatmapColor(t: number, isDark: boolean): string {
   const clamped = Math.min(1, Math.max(0, t));
@@ -60,35 +50,34 @@ function heatmapColor(t: number, isDark: boolean): string {
 
 function calibrationDeltaColor(delta: number, maxDelta: number, isDark: boolean): string {
   const magnitude = Math.min(1, Math.max(0, Math.abs(delta) / Math.max(1, maxDelta)));
-  const hue = delta >= 0 ? 212 : 152;
-  const saturation = isDark ? 70 : 66;
+  const hue = delta >= 0 ? 8 : 216;
+  const saturation = isDark ? 74 : 68;
   const lightness = isDark
-    ? 24 + magnitude * 34
-    : 90 - magnitude * 40;
+    ? 26 + magnitude * 30
+    : 90 - magnitude * 42;
   return `hsl(${hue} ${saturation}% ${lightness}%)`;
 }
-
-type GuidedState = "idle" | "running" | "success" | "error";
 
 export default function Calibration() {
   const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
   const { resolvedTheme } = useTheme();
-  const { status }   = useDeviceSession();
-  const connected    = status === "connected";
-  const visible      = usePageVisible();
-  const qc           = useQueryClient();
+  const { status } = useDeviceSession();
+  const connected = status === "connected";
+  const visible = usePageVisible();
+  const qc = useQueryClient();
   const { markSaving, markSaved, markError } = useAutosave();
 
-  const [activeTab, setActiveTab] = useState("status");
-  const [previewMode, setPreviewMode] = useState<CalibrationPreviewMode>("live");
-  const [valueMode, setValueMode] = useState<CalibrationValueMode>("mm");
   const [guidedState, setGuidedState] = useState<GuidedState>("idle");
   const [guidedProgress, setGuidedProgress] = useState(0);
   const [guidedStatus, setGuidedStatus] = useState<GuidedCalibrationStatus | null>(null);
   const [guidedBlinkOn, setGuidedBlinkOn] = useState(true);
   const [guidedSuccessBlinkActive, setGuidedSuccessBlinkActive] = useState(false);
-  const [liveKeyStates, setLiveKeyStates] = useState<KeyStatesSnapshot | null>(null);
+  const [previewMode, setPreviewMode] = useState<CalibrationPreviewMode>("distance");
   const [previewKeyStates, setPreviewKeyStates] = useState<KeyStatesSnapshot | null>(null);
+  const [manualZeroInput, setManualZeroInput] = useState("");
+  const [manualMaxInput, setManualMaxInput] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
+
   const prevStatesRef = useRef<Uint8Array | null>(null);
   const prevDistanceTenthsRef = useRef<Int16Array | null>(null);
   const previewPendingRef = useRef<KeyStatesSnapshot | null>(null);
@@ -99,11 +88,13 @@ export default function Calibration() {
 
   const focusedKeyId = selectedKeys[0] ?? null;
   const keyIndex = focusedKeyId?.startsWith("key-")
-    ? parseInt(focusedKeyId.replace("key-", ""), 10) : null;
+    ? parseInt(focusedKeyId.replace("key-", ""), 10)
+    : null;
   const isDarkTheme = resolvedTheme === "dark";
+
   const focusedKeyLabel = useMemo(() => {
     if (keyIndex == null || keyIndex < 0 || keyIndex >= KEY_COUNT) {
-      return "—";
+      return "-";
     }
     return previewKeys[keyIndex]?.baseLabel?.trim() || `K${keyIndex + 1}`;
   }, [keyIndex]);
@@ -115,7 +106,7 @@ export default function Calibration() {
     staleTime: 30_000,
   });
 
-  const polling = connected && visible && activeTab === "status";
+  const polling = connected && visible;
 
   const flushPreviewSnapshot = useCallback(() => {
     previewFlushTimerRef.current = null;
@@ -147,7 +138,6 @@ export default function Calibration() {
 
   useEffect(() => {
     if (!polling) {
-      setLiveKeyStates(null);
       setPreviewKeyStates(null);
       prevStatesRef.current = null;
       prevDistanceTenthsRef.current = null;
@@ -181,12 +171,8 @@ export default function Calibration() {
         const nextStates = snapshot.states;
         const nextDistances = snapshot.distances_mm;
 
-        let statesChanged =
-          !prevStates ||
-          prevStates.length !== nextStates.length;
-        let distancesChanged =
-          !prevDistances ||
-          prevDistances.length !== nextDistances.length;
+        let statesChanged = !prevStates || prevStates.length !== nextStates.length;
+        let distancesChanged = !prevDistances || prevDistances.length !== nextDistances.length;
 
         const stateBuffer = new Uint8Array(nextStates.length);
         const distanceBuffer = new Int16Array(nextDistances.length);
@@ -211,12 +197,8 @@ export default function Calibration() {
           prevDistanceTenthsRef.current = distanceBuffer;
           enqueuePreviewSnapshot(snapshot);
         }
-
-        if (statesChanged) {
-          setLiveKeyStates(snapshot);
-        }
       } catch {
-        // ignore transient read errors while polling
+        // Ignore transient polling errors while the keyboard is connected.
       } finally {
         inFlight = false;
         if (!disposed) {
@@ -239,38 +221,13 @@ export default function Calibration() {
     };
   }, [enqueuePreviewSnapshot, polling]);
 
-  const autoCalibrateMutation = useMutation({
-    mutationFn: async (idx: number) => {
-      markSaving();
-      const updated = await kbheDevice.autoCalibrate(idx);
-      if (!updated) {
-        throw new Error("Auto calibration failed");
-      }
-      return updated;
-    },
-    onSuccess: (updated) => {
-      qc.setQueryData<CalibrationSettings>(["calibration", "all"], updated);
-      markSaved();
-    },
-    onError: markError,
-  });
-
-  const applyCalibrationForKey = useCallback(async (
-    field: "zero" | "max",
-    value: number,
+  const commitCalibrationArrays = useCallback(async (
+    zeros: number[],
+    maxs: number[],
     notify: boolean,
   ) => {
-    if (keyIndex == null || !calibrationQ.data) {
-      return;
-    }
-
-    const zeros = Array.from(calibrationQ.data.key_zero_values);
-    const maxs = Array.from(calibrationQ.data.key_max_values);
-
-    if (field === "zero") {
-      zeros[keyIndex] = value;
-    } else {
-      maxs[keyIndex] = value;
+    if (!calibrationQ.data) {
+      return false;
     }
 
     try {
@@ -297,26 +254,58 @@ export default function Calibration() {
       if (notify) {
         markSaved();
       }
+
+      return true;
     } catch (error) {
       if (notify) {
         markError(error);
       }
+      return false;
     }
-  }, [calibrationQ.data, keyIndex, markError, markSaved, markSaving, qc]);
+  }, [calibrationQ.data, markError, markSaved, markSaving, qc]);
 
-  const liveZeroUpdate = useThrottledCall<number>(async (value) => {
-    await applyCalibrationForKey("zero", value, false);
-  });
+  const commitCalibrationForSelectedKey = useCallback(async (
+    nextZero: number,
+    nextMax: number,
+    notify: boolean,
+  ) => {
+    if (keyIndex == null || !calibrationQ.data) {
+      return false;
+    }
 
-  const liveMaxUpdate = useThrottledCall<number>(async (value) => {
-    await applyCalibrationForKey("max", value, false);
+    const zeros = Array.from(calibrationQ.data.key_zero_values);
+    const maxs = Array.from(calibrationQ.data.key_max_values);
+    zeros[keyIndex] = Math.trunc(nextZero);
+    maxs[keyIndex] = Math.trunc(nextMax);
+
+    return commitCalibrationArrays(zeros, maxs, notify);
+  }, [calibrationQ.data, commitCalibrationArrays, keyIndex]);
+
+  const autoCalibrateMutation = useMutation({
+    mutationFn: async (idx: number) => {
+      markSaving();
+      const updated = await kbheDevice.autoCalibrate(idx);
+      if (!updated) {
+        throw new Error("Auto calibration failed");
+      }
+      return updated;
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData<CalibrationSettings>(["calibration", "all"], updated);
+      markSaved();
+    },
+    onError: markError,
   });
 
   const guidedStart = useCallback(async () => {
-    if (!connected) return;
+    if (!connected) {
+      return;
+    }
+
     setGuidedState("running");
     setGuidedProgress(0);
     setGuidedSuccessBlinkActive(false);
+
     try {
       const status = await kbheDevice.guidedCalibrationStart();
       if (!status) {
@@ -338,7 +327,10 @@ export default function Calibration() {
         setGuidedProgress(status.progress_percent ?? 0);
         lastGuidedPhaseRef.current = status.phase;
       }
-    } catch { /* ignore */ }
+    } catch {
+      // Ignore transient abort errors.
+    }
+
     setGuidedState("idle");
     setGuidedProgress(0);
     setGuidedSuccessBlinkActive(false);
@@ -352,7 +344,36 @@ export default function Calibration() {
     };
   }, []);
 
-  const guidedStatusPolling = connected && visible && (activeTab === "guided" || guidedState === "running");
+  useEffect(() => {
+    if (!connected || !visible) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void kbheDevice.guidedCalibrationStatus()
+      .then((status) => {
+        if (cancelled || !status) {
+          return;
+        }
+
+        setGuidedStatus(status);
+        setGuidedProgress(status.progress_percent ?? 0);
+        lastGuidedPhaseRef.current = status.phase;
+        if (status.active) {
+          setGuidedState("running");
+        }
+      })
+      .catch(() => {
+        // Ignore status warm-up errors.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, visible]);
+
+  const guidedStatusPolling = connected && visible && (guidedState === "running" || Boolean(guidedStatus?.active));
 
   useEffect(() => {
     if (!guidedStatusPolling) {
@@ -414,11 +435,9 @@ export default function Calibration() {
         clearTimeout(timer);
       }
     };
-  }, [guidedState, guidedStatusPolling, qc]);
+  }, [guidedStatusPolling, qc]);
 
-  const guidedNeedsBlink =
-    activeTab === "guided" &&
-    (guidedSuccessBlinkActive || Boolean(guidedStatus?.active && guidedStatus.phase === 1));
+  const guidedNeedsBlink = guidedSuccessBlinkActive || Boolean(guidedStatus?.active && guidedStatus.phase === 1);
 
   useEffect(() => {
     if (!guidedNeedsBlink) {
@@ -436,10 +455,22 @@ export default function Calibration() {
     };
   }, [guidedNeedsBlink]);
 
+  useEffect(() => {
+    if (keyIndex == null || !calibrationQ.data) {
+      setManualZeroInput("");
+      setManualMaxInput("");
+      setManualError(null);
+      return;
+    }
+
+    const nextZero = calibrationQ.data.key_zero_values[keyIndex] ?? 0;
+    const nextMax = calibrationQ.data.key_max_values[keyIndex] ?? 0;
+    setManualZeroInput(String(nextZero));
+    setManualMaxInput(String(nextMax));
+    setManualError(null);
+  }, [calibrationQ.data, keyIndex]);
+
   const previewDistancesMm = previewKeyStates?.distances_mm;
-  const previewAdcValues = previewKeyStates?.distances;
-  const isStatusTab = activeTab === "status";
-  const isGuidedTab = activeTab === "guided";
   const guidedTargetLabel =
     guidedStatus && guidedStatus.current_key >= 0 && guidedStatus.current_key < KEY_COUNT
       ? (previewKeys[guidedStatus.current_key]?.baseLabel?.trim() || `K${guidedStatus.current_key + 1}`)
@@ -447,7 +478,9 @@ export default function Calibration() {
 
   const calibrationHeatmapData = useMemo(() => {
     const calibration = calibrationQ.data;
-    if (!calibration) return null;
+    if (!calibration) {
+      return null;
+    }
 
     const lutZero = Math.trunc(calibration.lut_zero_value ?? 0);
     const zeros = calibration.key_zero_values ?? [];
@@ -460,33 +493,60 @@ export default function Calibration() {
     return { deltas, maxDelta };
   }, [calibrationQ.data]);
 
-  const statusKeyColorMap = useMemo(() => {
-    if (previewMode === "heatmap") {
-      if (!calibrationHeatmapData) return undefined;
-      const map: Record<string, string> = {};
-      for (let i = 0; i < KEY_COUNT; i++) {
-        const delta = calibrationHeatmapData.deltas[i] ?? 0;
-        map[`key-${i}`] = calibrationDeltaColor(delta, calibrationHeatmapData.maxDelta, isDarkTheme);
-      }
-      return map;
+  const distanceKeyColorMap = useMemo(() => {
+    if (!previewDistancesMm) {
+      return undefined;
     }
 
-    if (!previewDistancesMm && !previewAdcValues) return undefined;
     const map: Record<string, string> = {};
     for (let i = 0; i < KEY_COUNT; i++) {
-      const value = valueMode === "mm"
-        ? (previewDistancesMm?.[i] ?? 0)
-        : (previewAdcValues?.[i] ?? 0);
-      const normalized = valueMode === "mm"
-        ? value / MAX_TRAVEL_MM
-        : value / MAX_ADC_VALUE;
+      const distMm = previewDistancesMm[i] ?? 0;
+      const normalized = distMm / MAX_TRAVEL_MM;
       map[`key-${i}`] = heatmapColor(normalized, isDarkTheme);
     }
     return map;
-  }, [calibrationHeatmapData, isDarkTheme, previewAdcValues, previewDistancesMm, previewMode, valueMode]);
+  }, [isDarkTheme, previewDistancesMm]);
+
+  const distanceLegendMap = useMemo(() => {
+    if (!previewDistancesMm) {
+      return undefined;
+    }
+
+    const map: Record<string, string> = {};
+    for (let i = 0; i < KEY_COUNT; i++) {
+      map[`key-${i}`] = (previewDistancesMm[i] ?? 0).toFixed(1);
+    }
+    return map;
+  }, [previewDistancesMm]);
+
+  const heatmapKeyColorMap = useMemo(() => {
+    if (!calibrationHeatmapData) {
+      return undefined;
+    }
+
+    const map: Record<string, string> = {};
+    for (let i = 0; i < KEY_COUNT; i++) {
+      const delta = calibrationHeatmapData.deltas[i] ?? 0;
+      map[`key-${i}`] = calibrationDeltaColor(delta, calibrationHeatmapData.maxDelta, isDarkTheme);
+    }
+    return map;
+  }, [calibrationHeatmapData, isDarkTheme]);
+
+  const heatmapLegendMap = useMemo(() => {
+    if (!calibrationHeatmapData) {
+      return undefined;
+    }
+
+    const map: Record<string, string> = {};
+    for (let i = 0; i < KEY_COUNT; i++) {
+      const delta = calibrationHeatmapData.deltas[i] ?? 0;
+      map[`key-${i}`] = delta > 0 ? `+${delta}` : String(delta);
+    }
+    return map;
+  }, [calibrationHeatmapData]);
 
   const guidedKeyColorMap = useMemo(() => {
-    if (!isGuidedTab) {
+    if (!guidedStatus?.active && !guidedSuccessBlinkActive) {
       return undefined;
     }
 
@@ -528,7 +588,7 @@ export default function Calibration() {
     }
 
     return undefined;
-  }, [guidedBlinkOn, guidedStatus, guidedSuccessBlinkActive, isDarkTheme, isGuidedTab]);
+  }, [guidedBlinkOn, guidedStatus, guidedSuccessBlinkActive, isDarkTheme]);
 
   const keyLegendSlotsMap = useMemo(() => {
     const map: Record<string, Array<string | undefined>> = {};
@@ -539,71 +599,32 @@ export default function Calibration() {
     return map;
   }, []);
 
-  const keyValueLegendMap = useMemo(() => {
-    const map: Record<string, string> = {};
+  const distanceLegendClassName = isDarkTheme
+    ? "text-[8px] font-mono font-semibold text-white drop-shadow-[0_0_2px_rgba(0,0,0,.8)]"
+    : "text-[8px] font-mono font-semibold text-slate-900";
 
-    if (previewMode === "heatmap") {
-      if (!calibrationHeatmapData) return undefined;
-      for (let i = 0; i < KEY_COUNT; i++) {
-        const delta = calibrationHeatmapData.deltas[i] ?? 0;
-        map[`key-${i}`] = delta > 0 ? `+${delta}` : `${delta}`;
-      }
-      return map;
-    }
+  const heatmapLegendClassName = isDarkTheme
+    ? "text-[8px] font-mono font-semibold text-slate-100 drop-shadow-[0_0_2px_rgba(0,0,0,.7)]"
+    : "text-[8px] font-mono font-semibold text-slate-900";
 
-    if (!previewDistancesMm && !previewAdcValues) return undefined;
-    for (let i = 0; i < KEY_COUNT; i++) {
-      if (valueMode === "mm") {
-        const distMm = previewDistancesMm?.[i] ?? 0;
-        map[`key-${i}`] = distMm.toFixed(1);
-      } else {
-        const adc = Math.round(previewAdcValues?.[i] ?? 0);
-        map[`key-${i}`] = String(adc);
-      }
-    }
-
-    return map;
-  }, [calibrationHeatmapData, previewAdcValues, previewDistancesMm, previewMode, valueMode]);
-
-  const statusLegendClassName = useMemo(
-    () =>
-      previewMode === "heatmap"
-        ? isDarkTheme
-          ? "text-[8px] font-mono font-semibold text-slate-100 drop-shadow-[0_0_2px_rgba(0,0,0,.7)]"
-          : "text-[8px] font-mono font-semibold text-slate-900"
-        : "text-[8px] font-mono font-semibold text-white drop-shadow-[0_0_2px_rgba(0,0,0,.8)]",
-    [isDarkTheme, previewMode],
-  );
-
-  const previewKeyColorMap = isGuidedTab
+  const guidedOverlayActive = Boolean(guidedKeyColorMap);
+  const previewKeyColorMap = guidedOverlayActive
     ? guidedKeyColorMap
-    : isStatusTab
-      ? statusKeyColorMap
-      : undefined;
+    : previewMode === "distance"
+      ? distanceKeyColorMap
+      : heatmapKeyColorMap;
+  const previewKeyLegendMap = guidedOverlayActive
+    ? undefined
+    : previewMode === "distance"
+      ? distanceLegendMap
+      : heatmapLegendMap;
+  const previewLegendClassName = guidedOverlayActive
+    ? undefined
+    : previewMode === "distance"
+      ? distanceLegendClassName
+      : heatmapLegendClassName;
 
-  const previewKeyLegendMap = isStatusTab && connected ? keyValueLegendMap : undefined;
-  const previewKeyLegendClassName = isStatusTab ? statusLegendClassName : undefined;
-
-  const formatCalibrationKeyValue = useCallback(
-    ({ keyIndex, snapshot }: { keyIndex: number; snapshot: KeyStatesSnapshot | null; state: "pressed" | "released" }) => {
-      if (valueMode === "adc") {
-        const adcValue = snapshot?.distances?.[keyIndex];
-        if (typeof adcValue !== "number" || Number.isNaN(adcValue)) {
-          return "";
-        }
-        return `${Math.round(adcValue)}`;
-      }
-
-      const dist = snapshot?.distances_mm?.[keyIndex];
-      if (typeof dist !== "number" || Number.isNaN(dist)) {
-        return "";
-      }
-      return `${dist.toFixed(1)} mm`;
-    },
-    [valueMode],
-  );
-
-  const keyboardPreview = useMemo(() => (
+  const selectionKeyboard = useMemo(() => (
     <BaseKeyboard
       mode="single"
       onButtonClick={() => {}}
@@ -613,71 +634,89 @@ export default function Calibration() {
       keyColorMap={previewKeyColorMap}
       keyLegendMap={previewKeyLegendMap}
       keyLegendSlotsMap={keyLegendSlotsMap}
-      keyLegendClassName={previewKeyLegendClassName}
+      keyLegendClassName={previewLegendClassName}
     />
-  ), [keyLegendSlotsMap, previewKeyColorMap, previewKeyLegendClassName, previewKeyLegendMap]);
+  ), [keyLegendSlotsMap, previewKeyColorMap, previewKeyLegendMap, previewLegendClassName]);
+
+  const applyManualValues = useCallback(async () => {
+    if (keyIndex == null || !calibrationQ.data) {
+      return;
+    }
+
+    const parsedZero = Number.parseInt(manualZeroInput, 10);
+    const parsedMax = Number.parseInt(manualMaxInput, 10);
+
+    if (Number.isNaN(parsedZero) || Number.isNaN(parsedMax)) {
+      setManualError("Zero and Max must be valid integers.");
+      return;
+    }
+
+    if (parsedZero < MIN_CALIBRATION_VALUE || parsedZero > MAX_CALIBRATION_VALUE) {
+      setManualError(`Zero must be between ${MIN_CALIBRATION_VALUE} and ${MAX_CALIBRATION_VALUE}.`);
+      return;
+    }
+
+    if (parsedMax < MIN_CALIBRATION_VALUE || parsedMax > MAX_CALIBRATION_VALUE) {
+      setManualError(`Max must be between ${MIN_CALIBRATION_VALUE} and ${MAX_CALIBRATION_VALUE}.`);
+      return;
+    }
+
+    if (parsedMax <= parsedZero) {
+      setManualError("Max must be greater than Zero.");
+      return;
+    }
+
+    setManualError(null);
+    await commitCalibrationForSelectedKey(parsedZero, parsedMax, true);
+  }, [calibrationQ.data, commitCalibrationForSelectedKey, keyIndex, manualMaxInput, manualZeroInput]);
+
+  const resetSelectedKeyCalibration = useCallback(async () => {
+    if (keyIndex == null || !calibrationQ.data) {
+      return;
+    }
+
+    const resetZero = Math.trunc(calibrationQ.data.lut_zero_value ?? 0);
+    const nextMax = calibrationQ.data.key_max_values[keyIndex] ?? 0;
+    setManualZeroInput(String(resetZero));
+    setManualMaxInput(String(nextMax));
+    setManualError(null);
+    await commitCalibrationForSelectedKey(resetZero, nextMax, true);
+  }, [calibrationQ.data, commitCalibrationForSelectedKey, keyIndex]);
+
+  const restoreAllCalibration = useCallback(async () => {
+    if (!calibrationQ.data) {
+      return;
+    }
+
+    const resetZero = Math.trunc(calibrationQ.data.lut_zero_value ?? 0);
+    const zeros = Array.from({ length: KEY_COUNT }, () => resetZero);
+    const maxs = Array.from(calibrationQ.data.key_max_values);
+    await commitCalibrationArrays(zeros, maxs, true);
+  }, [calibrationQ.data, commitCalibrationArrays]);
 
   const menubar = (
     <>
       <div className="flex items-center gap-2">
-        {isStatusTab ? (
-          <>
-            {polling && (
-              <Badge variant="secondary" className="gap-1 text-xs">
-                Live
-              </Badge>
-            )}
-            <Badge variant="outline" className="text-xs">
-              {previewMode === "live" ? "Position View" : "Calibration Heatmap"}
-            </Badge>
-          </>
-        ) : isGuidedTab ? (
-          <>
-            <Badge variant={guidedState === "running" ? "secondary" : "outline"} className="text-xs">
-              {guidedState === "running" ? "Guided Running" : guidedState === "success" ? "Guided Complete" : "Guided"}
-            </Badge>
-            {guidedTargetLabel && (guidedStatus?.phase === 2 || guidedStatus?.phase === 3) && (
-              <Badge variant="outline" className="text-xs">
-                Press: {guidedTargetLabel}
-              </Badge>
-            )}
-          </>
-        ) : (
-          <Badge variant="outline" className="text-xs">Manual</Badge>
-        )}
+        <Badge variant={connected ? "secondary" : "outline"} className="text-xs">
+          {connected ? "Device Connected" : "Device Disconnected"}
+        </Badge>
+        <Badge variant="outline" className="text-xs">
+          Selected: {keyIndex == null ? "None" : focusedKeyLabel}
+        </Badge>
       </div>
       <div className="flex items-center gap-2">
-        {isStatusTab && (
-          <div className="flex items-center gap-2 px-1">
-            <Select
-              value={valueMode}
-              onValueChange={(value: string | null) => {
-                if (value === "adc" || value === "mm") {
-                  setValueMode(value);
-                }
-              }}
-            >
-              <SelectTrigger size="sm" className="h-8 w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="mm">Distance (mm)</SelectItem>
-                  <SelectItem value="adc">ADC</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-
-            <span className="text-xs text-muted-foreground">Position</span>
-            <Switch
-              checked={previewMode === "heatmap"}
-              onCheckedChange={(checked) => setPreviewMode(checked ? "heatmap" : "live")}
-            />
-            <span className="text-xs text-muted-foreground">Heatmap ΔZero</span>
-          </div>
-        )}
-        <Button variant="outline" size="sm" className="h-8"
-          onClick={() => void qc.invalidateQueries({ queryKey: ["calibration"] })}>
+        <span className="text-xs text-muted-foreground">Distance (mm)</span>
+        <Switch
+          checked={previewMode === "offset"}
+          onCheckedChange={(checked) => setPreviewMode(checked ? "offset" : "distance")}
+        />
+        <span className="text-xs text-muted-foreground">Calibration (ADC)</span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => void qc.invalidateQueries({ queryKey: ["calibration"] })}
+        >
           <IconRefresh className="size-4" />
           Reload
         </Button>
@@ -686,127 +725,33 @@ export default function Calibration() {
   );
 
   return (
-    <KeyboardEditor
-      keyboard={keyboardPreview}
-      menubar={menubar}
-    >
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="status">Status</TabsTrigger>
-          <TabsTrigger value="manual">Manual</TabsTrigger>
-          <TabsTrigger value="guided">Guided</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="status" className="mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SectionCard title="Calibration Data">
-              {calibrationQ.isLoading ? (
-                <div className="space-y-2">{[0,1,2].map(i => <Skeleton key={i} className="h-6 w-full" />)}</div>
-              ) : calibrationQ.data ? (
-                <div className="flex flex-col gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Keys calibrated</span>
-                    <span className="font-mono">{KEY_COUNT}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">LUT Reference</span>
-                    <span className="font-mono">{calibrationQ.data.lut_zero_value}</span>
-                  </div>
-                  {keyIndex != null && calibrationQ.data.key_zero_values[keyIndex] !== undefined && (
-                    <>
-                      <div className="flex justify-between border-t pt-2">
-                        <span className="text-muted-foreground">Key {focusedKeyLabel} Zero</span>
-                        <span className="font-mono">{calibrationQ.data.key_zero_values[keyIndex]}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Key {focusedKeyLabel} Max</span>
-                        <span className="font-mono">{calibrationQ.data.key_max_values[keyIndex]}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Connect device to view calibration.</p>
-              )}
-            </SectionCard>
-
-            <SectionCard title="Key Tester">
-              <KeyTester
-                pressHeight="h-16"
-                releaseHeight="h-20"
-                snapshot={liveKeyStates}
-                labelFormatter={formatCalibrationKeyValue}
-                valueLabel={valueMode === "mm" ? "Distance" : "ADC"}
-              />
-            </SectionCard>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="manual" className="mt-4">
-          <SectionCard title="Manual Calibration">
-            <div className="flex flex-col gap-4">
-              <div className="flex gap-2">
-                <Button size="sm" disabled={!connected || keyIndex == null}
-                  onClick={() => keyIndex != null && autoCalibrateMutation.mutate(keyIndex)}>
-                  Auto Zero Key {focusedKeyLabel}
-                </Button>
-                <Button size="sm" variant="outline" disabled={!connected}
-                  onClick={() => autoCalibrateMutation.mutate(0xff)}>
-                  Auto Zero All
-                </Button>
-              </div>
-
-              {keyIndex != null && calibrationQ.data && (
-                <div className="flex flex-col gap-4 border-t pt-4">
-                  <div className="grid gap-2">
-                    <Label className="text-sm">Key {focusedKeyLabel} Zero</Label>
-                    <CommitSlider
-                      min={-32768} max={32767} step={1}
-                      value={calibrationQ.data.key_zero_values[keyIndex] ?? 0}
-                      onLiveChange={(v) => liveZeroUpdate(v)}
-                      onCommit={(v) => {
-                        void applyCalibrationForKey("zero", v, true);
-                      }}
-                      disabled={!connected}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label className="text-sm">Key {focusedKeyLabel} Max</Label>
-                    <CommitSlider
-                      min={-32768} max={32767} step={1}
-                      value={calibrationQ.data.key_max_values[keyIndex] ?? 0}
-                      onLiveChange={(v) => liveMaxUpdate(v)}
-                      onCommit={(v) => {
-                        void applyCalibrationForKey("max", v, true);
-                      }}
-                      disabled={!connected}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </SectionCard>
-        </TabsContent>
-
-        <TabsContent value="guided" className="mt-4">
-          <SectionCard title="Guided Calibration">
+    <KeyboardEditor keyboard={selectionKeyboard} menubar={menubar}>
+      <div className="flex flex-col gap-4">
+        {(keyIndex == null || guidedState === "running") && (
+          <SectionCard title="Calibration Procedure">
             <div className="flex flex-col gap-4">
               <p className="text-sm text-muted-foreground">
-                Guided calibration will systematically calibrate all keys. Follow the on-screen instructions.
-                The keyboard LEDs will indicate which key to press.
+                Guided calibration removes the current calibration for all keys, then recomputes zero and max values key by key.
+                Start it only when no key is selected, and follow LED prompts until completion.
               </p>
-              <div className="flex gap-2">
+
+              <div className="flex flex-wrap items-center gap-2">
                 {guidedState === "running" ? (
                   <Button variant="destructive" size="sm" onClick={() => void guidedAbort()}>
                     <IconPlayerStop className="size-4" />
-                    Abort
+                    Abort Guided Calibration
                   </Button>
                 ) : (
-                  <Button size="sm" disabled={!connected} onClick={() => void guidedStart()}>
+                  <Button size="sm" disabled={!connected || keyIndex != null} onClick={() => void guidedStart()}>
                     <IconPlayerPlay className="size-4" />
                     Start Guided Calibration
                   </Button>
+                )}
+
+                {guidedTargetLabel && (guidedStatus?.phase === 2 || guidedStatus?.phase === 3) && (
+                  <Badge variant="outline" className="text-xs">
+                    Press: {guidedTargetLabel}
+                  </Badge>
                 )}
               </div>
 
@@ -815,15 +760,128 @@ export default function Calibration() {
                   <Progress value={guidedProgress} className="h-2" />
                   <span className="text-xs text-muted-foreground">
                     {guidedState === "running" && `Calibrating... ${guidedProgress}%`}
-                    {guidedState === "success" && "Calibration complete!"}
+                    {guidedState === "success" && "Calibration complete."}
                     {guidedState === "error" && "Calibration failed."}
                   </span>
                 </div>
               )}
             </div>
           </SectionCard>
-        </TabsContent>
-      </Tabs>
+        )}
+
+        {keyIndex != null ? (
+          <SectionCard title={`Key ${focusedKeyLabel} Calibration`}>
+            <div className="flex flex-col gap-4">
+              {calibrationQ.isLoading ? (
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-9 w-40" />
+                </div>
+              ) : calibrationQ.data ? (
+                <>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-sm" htmlFor="manual-zero-input">
+                        Key {focusedKeyLabel} Zero (ADC)
+                      </Label>
+                      <Input
+                        id="manual-zero-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={MIN_CALIBRATION_VALUE}
+                        max={MAX_CALIBRATION_VALUE}
+                        step={1}
+                        disabled={!connected}
+                        value={manualZeroInput}
+                        onChange={(event) => setManualZeroInput(event.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-sm" htmlFor="manual-max-input">
+                        Key {focusedKeyLabel} Max (ADC)
+                      </Label>
+                      <Input
+                        id="manual-max-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={MIN_CALIBRATION_VALUE}
+                        max={MAX_CALIBRATION_VALUE}
+                        step={1}
+                        disabled={!connected}
+                        value={manualMaxInput}
+                        onChange={(event) => setManualMaxInput(event.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {manualError && (
+                    <p className="text-sm text-destructive">{manualError}</p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!connected || autoCalibrateMutation.isPending}
+                      onClick={() => autoCalibrateMutation.mutate(keyIndex)}
+                    >
+                      Auto Calibrate Zero
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!connected || autoCalibrateMutation.isPending}
+                      onClick={() => void applyManualValues()}
+                    >
+                      Apply Manual Values
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="w-fit"
+                      disabled={!connected || autoCalibrateMutation.isPending}
+                      onClick={() => void resetSelectedKeyCalibration()}
+                    >
+                      Reset Key Calibration
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Connect device to edit key calibration.</p>
+              )}
+            </div>
+          </SectionCard>
+        ) : (
+          <SectionCard title="Restore Calibration">
+            {calibrationQ.isLoading ? (
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-9 w-56" />
+              </div>
+            ) : calibrationQ.data ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">
+                  This will delete all calibration parameters (zero and max) for every key and restore keyboard-wide reference values.
+                </p>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="w-fit"
+                  disabled={!connected || autoCalibrateMutation.isPending}
+                  onClick={() => void restoreAllCalibration()}
+                >
+                  Restore Calibration (All Keys)
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Connect device to restore calibration.</p>
+            )}
+          </SectionCard>
+        )}
+      </div>
     </KeyboardEditor>
   );
 }

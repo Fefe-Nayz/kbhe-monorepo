@@ -119,6 +119,31 @@ fn classify_device(info: &DeviceInfo) -> Option<KbheDeviceKind> {
     }
 }
 
+fn is_bootloader_candidate(info: &DeviceInfo) -> bool {
+    if info.vendor_id() != KBHE_VID {
+        return false;
+    }
+
+    if info.product_id() == KBHE_UPDATER_PID {
+        return true;
+    }
+
+    let product = info
+        .product_string()
+        .map(|value| value.to_ascii_lowercase())
+        .unwrap_or_default();
+    let manufacturer = info
+        .manufacturer_string()
+        .map(|value| value.to_ascii_lowercase())
+        .unwrap_or_default();
+
+    let looks_like_update_mode = product.contains("bootloader")
+        || product.contains("updater")
+        || product.contains("dfu");
+
+    looks_like_update_mode && (manufacturer.contains("kbhe") || manufacturer.contains("keyboard"))
+}
+
 fn device_info_from(info: &DeviceInfo) -> Option<KbheHidDeviceInfo> {
     let kind = classify_device(info)?;
     Some(KbheHidDeviceInfo {
@@ -236,6 +261,21 @@ fn send_command_on_active(
 #[tauri::command]
 pub fn kbhe_list_devices() -> Result<Vec<KbheHidDeviceInfo>, String> {
     enumerate_kbhe_devices()
+}
+
+#[tauri::command]
+pub fn kbhe_detect_bootloader_presence() -> Result<bool, String> {
+    let api = HidApi::new().map_err(|error| error.to_string())?;
+
+    let mut present = false;
+    for info in api.device_list() {
+        if is_bootloader_candidate(info) {
+            present = true;
+            break;
+        }
+    }
+
+    Ok(present)
 }
 
 #[tauri::command]

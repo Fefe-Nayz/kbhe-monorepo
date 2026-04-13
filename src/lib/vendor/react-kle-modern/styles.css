@@ -99,8 +99,8 @@
 
 .kle-key-ring {
   fill: none;
-  stroke: var(--ring, oklch(0.708 0 0));
-  stroke-opacity: 0.45;
+  stroke: oklch(0.62 0.19 255);
+  stroke-opacity: 0.95;
   stroke-width: 4;
   vector-effect: non-scaling-stroke;
 }

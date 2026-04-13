@@ -27,6 +27,10 @@ export class KbheTransport {
     return invoke<KbheTransportDeviceInfo[]>("kbhe_list_devices");
   }
 
+  async detectBootloaderPresence(): Promise<boolean> {
+    return invoke<boolean>("kbhe_detect_bootloader_presence");
+  }
+
   async connect(path: string): Promise<KbheTransportConnectionState> {
     return invoke<KbheTransportConnectionState>("kbhe_connect", { path });
   }

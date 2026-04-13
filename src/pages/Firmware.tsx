@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as tauriOpen } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheFirmware, resolveFirmwareVersion, type FirmwareResolveResult } from "@/lib/kbhe/firmware";
+import { kbheTransport } from "@/lib/kbhe/transport";
 import { formatFirmwareVersion } from "@/lib/kbhe/protocol";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -38,6 +40,18 @@ type FlashState = "idle" | "flashing" | "success" | "error";
 export default function Firmware() {
   const { status, firmwareVersion, developerMode } = useDeviceSession();
   const connected = status === "connected" || status === "updater";
+
+  const bootloaderPresenceQ = useQuery({
+    queryKey: ["firmware", "bootloaderPresence"],
+    queryFn: () => kbheTransport.detectBootloaderPresence(),
+    enabled: isTauri() && !connected,
+    refetchInterval: 2000,
+    staleTime: 1000,
+  });
+
+  const bootloaderDetected = !connected && Boolean(bootloaderPresenceQ.data);
+  const connectedForStatus = connected || bootloaderDetected;
+  const updateModeDetected = status === "updater" || bootloaderDetected;
 
   const [firmwareBytes, setFirmwareBytes] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -389,20 +403,22 @@ export default function Firmware() {
         <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
           <div className={cn(
             "flex size-10 items-center justify-center rounded-full",
-            connected ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-muted text-muted-foreground",
+            connectedForStatus ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-muted text-muted-foreground",
           )}>
-            {connected
+            {connectedForStatus
               ? <IconPlugConnected className="size-5" />
               : <IconPlugConnectedX className="size-5" />}
           </div>
           <div className="flex flex-col gap-0.5 flex-1 min-w-0">
             <span className="text-sm font-medium">
-              {status === "updater" ? "Updater Mode" : connected ? "Device Connected" : "No Device"}
+              {updateModeDetected ? "Device Connected (Update Mode)" : connectedForStatus ? "Device Connected" : "No Device"}
             </span>
             <span className="text-xs text-muted-foreground truncate">
-              {firmwareVersion
+              {updateModeDetected
+                ? "Keyboard detected in bootloader mode. Ready for firmware update."
+                : firmwareVersion
                 ? `Installed firmware: ${firmwareVersion}`
-                : connected
+                : connectedForStatus
                   ? "Firmware version unknown"
                   : "Connect your keyboard to flash firmware"}
             </span>

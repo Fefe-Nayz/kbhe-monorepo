@@ -1,5 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
+import { isTauri } from "@tauri-apps/api/core";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { DeviceSessionManager } from "@/lib/kbhe/session";
+import { kbheTransport } from "@/lib/kbhe/transport";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +65,17 @@ export function DeviceStatusChip() {
 export function DeviceBanner() {
   const { status, error, firmwareVersion } = useDeviceSession();
 
-  if (status === "connected" || status === "updater") return null;
+  const bootloaderPresenceQ = useQuery({
+    queryKey: ["firmware", "bootloaderPresence"],
+    queryFn: () => kbheTransport.detectBootloaderPresence(),
+    enabled: isTauri() && status !== "connected" && status !== "updater",
+    refetchInterval: 2000,
+    staleTime: 1000,
+  });
+
+  const bootloaderDetected = status !== "connected" && status !== "updater" && Boolean(bootloaderPresenceQ.data);
+
+  if (status === "connected" || status === "updater" || bootloaderDetected) return null;
 
   const isError = status === "error";
 
