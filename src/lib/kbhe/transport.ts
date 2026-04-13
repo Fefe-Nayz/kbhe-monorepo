@@ -56,6 +56,20 @@ export class KbheTransport {
     return Uint8Array.from(response);
   }
 
+  async sendCommand(
+    command: number,
+    data: ArrayLike<number> = [],
+    timeoutMs = 100,
+  ): Promise<Uint8Array | null> {
+    const response = await invoke<number[] | null>("kbhe_send_command", {
+      command: Math.trunc(command) & 0xff,
+      data: Array.from(data, (value) => value & 0xff),
+      timeoutMs: Math.max(0, Math.trunc(timeoutMs)),
+    });
+
+    return response ? Uint8Array.from(response) : null;
+  }
+
   async waitForDevice(
     kind: KbheDeviceKind,
     timeoutMs: number,
