@@ -77,6 +77,7 @@ typedef enum {
   CMD_SET_ROTARY_ENCODER_SETTINGS = 0x55,
   CMD_GET_LAYER_KEYCODE = 0x56,
   CMD_SET_LAYER_KEYCODE = 0x57,
+  CMD_RESET_KEY_TRIGGER_SETTINGS = 0x58,
 
   // LED Matrix commands (0x60 - 0x7F)
   CMD_GET_LED_ENABLED = 0x60,
@@ -204,6 +205,13 @@ typedef struct __attribute__((packed)) {
   uint8_t value;
   uint8_t reserved[61];
 } hid_packet_bool_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t key_index;
+  uint8_t reserved[61];
+} hid_packet_key_index_t;
 
 typedef struct __attribute__((packed)) {
   uint8_t command_id;

@@ -817,6 +817,14 @@ const settings_key_t *settings_get_key(uint8_t key_index);
 bool settings_set_key(uint8_t key_index, const settings_key_t *key);
 
 /**
+ * @brief Reset per-key actuation and rapid-trigger settings to firmware defaults.
+ * This keeps non-trigger fields (keycode, SOCD, mapping, advanced behavior, etc.) unchanged.
+ * @param key_index Key index
+ * @return true if successful
+ */
+bool settings_reset_key_trigger_settings(uint8_t key_index);
+
+/**
  * @brief Get the keycode assigned to one logical layer/key slot.
  * Layer 0 is the base layer stored in settings_key_t.hid_keycode.
  * Layers 1..N are additional overlay layers.

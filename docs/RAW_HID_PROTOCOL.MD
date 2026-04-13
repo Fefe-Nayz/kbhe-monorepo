@@ -156,7 +156,7 @@ Serial number details:
 - encodage: base62 sur 12 octets UID
 - format: prefixe `KBHE-F7-` + base62 UID (17 chars)
 
-### 3.3 Configuration touches, layers, calibration, gamepad (0x40..0x57)
+### 3.3 Configuration touches, layers, calibration, gamepad (0x40..0x58)
 
 #### 3.3.1 Key settings detaillees
 
@@ -397,6 +397,26 @@ Notes:
 
 - SETTINGS_LAYER_COUNT = 4
 - Les layer keycodes sont utilises pour les overlays (hors base)
+
+#### 3.3.10 Reset actuation + rapid trigger d'une touche
+
+RESET_KEY_TRIGGER_SETTINGS (0x58)
+
+- Requete:
+  - key_index
+- Effet:
+  - remet uniquement les champs trigger de la touche aux valeurs par defaut firmware:
+    - actuation_point_mm
+    - release_point_mm
+    - rapid_trigger_activation
+    - rapid_trigger_press
+    - rapid_trigger_release
+    - rapid_trigger_enabled
+    - continuous_rapid_trigger
+  - conserve les autres champs de la touche (hid_keycode, SOCD, behavior_mode, zones dynamiques, mappings gamepad, etc.)
+- Reponse:
+  - status
+  - echo complet du key settings (meme format que GET_KEY_SETTINGS)
 
 ### 3.4 LED matrix et effets (0x60..0x7C)
 
@@ -642,7 +662,7 @@ Le bootloader memorise la derniere requete complete.
 
 - Systeme: 0x00..0x04
 - Settings: 0x20..0x2D
-- Keys/Calibration/Gamepad/Rotary/Layer: 0x40..0x57
+- Keys/Calibration/Gamepad/Rotary/Layer: 0x40..0x58
 - LED: 0x60..0x7C
 - Filter: 0x80..0x83
 - Debug: 0xE0..0xE9

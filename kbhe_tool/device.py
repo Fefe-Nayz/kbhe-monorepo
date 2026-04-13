@@ -610,6 +610,14 @@ class KBHEDevice:
         data = [0, layer_index, key_index, hid_keycode & 0xFF, (hid_keycode >> 8) & 0xFF]
         resp = self.send_command(Command.SET_LAYER_KEYCODE, data, timeout_ms=150)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def reset_key_trigger_settings(self, key_index):
+        """Reset actuation and rapid-trigger fields for one key to firmware defaults."""
+        key_index = max(0, min(int(KEY_COUNT) - 1, int(key_index)))
+        resp = self.send_command(
+            Command.RESET_KEY_TRIGGER_SETTINGS, [0, key_index], timeout_ms=200
+        )
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def set_key_settings(self, key_index, hid_keycode, actuation_mm, release_mm, rapid_trigger_mm, socd_pair=None, socd_resolution=0):
         """Set settings for a specific key (legacy format for backwards compatibility)."""

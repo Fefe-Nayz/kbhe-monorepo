@@ -95,6 +95,30 @@ static inline void hid_fill_key_settings_chunk_entry(
   entry->flags = hid_key_flags_from_settings(key);
 }
 
+static inline void hid_fill_key_settings_packet(hid_packet_key_settings_t *resp,
+                                                uint8_t key_index,
+                                                const settings_key_t *key) {
+  resp->key_index = key_index;
+  resp->hid_keycode = key->hid_keycode;
+  resp->actuation_point_mm = key->actuation_point_mm;
+  resp->release_point_mm = key->release_point_mm;
+  resp->rapid_trigger_activation = key->rapid_trigger_activation;
+  resp->rapid_trigger_press = key->rapid_trigger_press;
+  resp->rapid_trigger_release = key->rapid_trigger_release;
+  resp->socd_pair = key->socd_pair;
+  resp->socd_resolution = (uint8_t)settings_key_get_socd_resolution(key);
+  resp->rapid_trigger_enabled = key->rapid_trigger_enabled;
+  resp->disable_kb_on_gamepad = key->disable_kb_on_gamepad;
+  resp->continuous_rapid_trigger =
+      settings_key_is_continuous_rapid_trigger_enabled(key) ? 1u : 0u;
+  resp->behavior_mode = key->advanced.behavior_mode;
+  resp->hold_threshold_10ms = key->advanced.hold_threshold_10ms;
+  resp->dynamic_zone_count = key->advanced.dynamic_zone_count;
+  resp->secondary_hid_keycode = key->advanced.secondary_hid_keycode;
+  memcpy(resp->dynamic_zones, key->advanced.dynamic_zones,
+         sizeof(resp->dynamic_zones));
+}
+
 #define HID_DEVICE_SERIAL_PREFIX "75HE-NF-"
 #define HID_DEVICE_UID_BYTES 12u
 #define HID_DEVICE_UID_B62_CHARS 17u
@@ -379,25 +403,7 @@ static void cmd_get_key_settings(const uint8_t *in, uint8_t *out) {
   const settings_key_t *key = &s->keys[req->key_index];
 
   resp->status = HID_RESP_OK;
-  resp->key_index = req->key_index;
-  resp->hid_keycode = key->hid_keycode;
-  resp->actuation_point_mm = key->actuation_point_mm;
-  resp->release_point_mm = key->release_point_mm;
-  resp->rapid_trigger_activation = key->rapid_trigger_activation;
-  resp->rapid_trigger_press = key->rapid_trigger_press;
-  resp->rapid_trigger_release = key->rapid_trigger_release;
-  resp->socd_pair = key->socd_pair;
-  resp->socd_resolution = (uint8_t)settings_key_get_socd_resolution(key);
-  resp->rapid_trigger_enabled = key->rapid_trigger_enabled;
-  resp->disable_kb_on_gamepad = key->disable_kb_on_gamepad;
-  resp->continuous_rapid_trigger =
-      settings_key_is_continuous_rapid_trigger_enabled(key) ? 1u : 0u;
-  resp->behavior_mode = key->advanced.behavior_mode;
-  resp->hold_threshold_10ms = key->advanced.hold_threshold_10ms;
-  resp->dynamic_zone_count = key->advanced.dynamic_zone_count;
-  resp->secondary_hid_keycode = key->advanced.secondary_hid_keycode;
-  memcpy(resp->dynamic_zones, key->advanced.dynamic_zones,
-         sizeof(resp->dynamic_zones));
+  hid_fill_key_settings_packet(resp, req->key_index, key);
 }
 
 static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
@@ -448,25 +454,33 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   bool success = settings_set_key(req->key_index, &key);
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
-  resp->key_index = req->key_index;
-  resp->hid_keycode = key.hid_keycode;
-  resp->actuation_point_mm = key.actuation_point_mm;
-  resp->release_point_mm = key.release_point_mm;
-  resp->rapid_trigger_activation = key.rapid_trigger_activation;
-  resp->rapid_trigger_press = key.rapid_trigger_press;
-  resp->rapid_trigger_release = key.rapid_trigger_release;
-  resp->socd_pair = key.socd_pair;
-  resp->socd_resolution = (uint8_t)settings_key_get_socd_resolution(&key);
-  resp->rapid_trigger_enabled = key.rapid_trigger_enabled;
-  resp->disable_kb_on_gamepad = key.disable_kb_on_gamepad;
-  resp->continuous_rapid_trigger =
-      settings_key_is_continuous_rapid_trigger_enabled(&key) ? 1u : 0u;
-  resp->behavior_mode = key.advanced.behavior_mode;
-  resp->hold_threshold_10ms = key.advanced.hold_threshold_10ms;
-  resp->dynamic_zone_count = key.advanced.dynamic_zone_count;
-  resp->secondary_hid_keycode = key.advanced.secondary_hid_keycode;
-  memcpy(resp->dynamic_zones, key.advanced.dynamic_zones,
-         sizeof(resp->dynamic_zones));
+  hid_fill_key_settings_packet(resp, req->key_index, &key);
+}
+
+static void cmd_reset_key_trigger_settings(const uint8_t *in, uint8_t *out) {
+  const hid_packet_key_index_t *req = (const hid_packet_key_index_t *)in;
+  hid_packet_key_settings_t *resp = (hid_packet_key_settings_t *)out;
+
+  resp->command_id = CMD_RESET_KEY_TRIGGER_SETTINGS;
+
+  if (req->key_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  if (!settings_reset_key_trigger_settings(req->key_index)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  const settings_key_t *key = settings_get_key(req->key_index);
+  if (key == NULL) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  resp->status = HID_RESP_OK;
+  hid_fill_key_settings_packet(resp, req->key_index, key);
 }
 
 static void cmd_get_all_key_settings(const uint8_t *in, uint8_t *out) {
@@ -2051,6 +2065,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_LAYER_KEYCODE:
     cmd_set_layer_keycode(in_packet, out_packet);
+    break;
+
+  case CMD_RESET_KEY_TRIGGER_SETTINGS:
+    cmd_reset_key_trigger_settings(in_packet, out_packet);
     break;
 
   // LED Matrix commands

@@ -1854,6 +1854,35 @@ bool settings_set_key(uint8_t key_index, const settings_key_t *key) {
   return true;
 }
 
+bool settings_reset_key_trigger_settings(uint8_t key_index) {
+  const settings_key_t *current_key = NULL;
+  settings_key_t key = {0};
+  settings_key_t defaults = {0};
+
+  if (key_index >= NUM_KEYS) {
+    return false;
+  }
+
+  current_key = settings_get_key(key_index);
+  if (current_key == NULL) {
+    return false;
+  }
+
+  key = *current_key;
+  defaults = settings_default_key(key_index);
+
+  key.actuation_point_mm = defaults.actuation_point_mm;
+  key.release_point_mm = defaults.release_point_mm;
+  key.rapid_trigger_activation = defaults.rapid_trigger_activation;
+  key.rapid_trigger_press = defaults.rapid_trigger_press;
+  key.rapid_trigger_release = defaults.rapid_trigger_release;
+  key.rapid_trigger_enabled = defaults.rapid_trigger_enabled;
+  settings_key_set_continuous_rapid_trigger(
+      &key, settings_key_is_continuous_rapid_trigger_enabled(&defaults));
+
+  return settings_set_key(key_index, &key);
+}
+
 uint16_t settings_get_layer_keycode(uint8_t layer_index, uint8_t key_index) {
   if (key_index >= NUM_KEYS || layer_index >= SETTINGS_LAYER_COUNT) {
     return KC_NO;
