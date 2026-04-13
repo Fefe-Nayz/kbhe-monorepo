@@ -99,6 +99,56 @@ GET/SET_KEYBOARD_NAME:
 - les caracteres non imprimables sont ignores/sanitizes cote firmware
 - si nom vide, fallback sur le nom par defaut firmware
 
+Semantique NKRO (0x27/0x28):
+
+- value=1: mode Auto NKRO (essaie NKRO apres enumeration USB, puis fallback runtime 6KRO si NKRO n'est pas pret sous ~1000 ms)
+- value=0: mode 6KRO only (n'essaie jamais NKRO)
+- le fallback runtime est re-evalue a chaque nouvelle enumeration USB
+- garde-fou runtime: si NKRO devient actif mais reste bloque sans progression (endpoint NKRO non pret) pendant ~100 ms, fallback automatique vers 6KRO
+
+Matrice de mode clavier effectif:
+
+| keyboard_enabled (0x22/0x23) | nkro_enabled (0x27/0x28) | Boot protocol USB | Resultat effectif |
+|---:|---:|---:|---|
+| 0 | 0/1 | 0/1 | Aucun envoi clavier |
+| 1 | 0 | 0/1 | 6KRO uniquement |
+| 1 | 1 | 1 | 6KRO force (mode Boot) |
+| 1 | 1 | 0 + NKRO pret < 1000 ms | NKRO |
+| 1 | 1 | 0 + NKRO non pret >= 1000 ms | Fallback runtime 6KRO jusqu'a deconnexion USB |
+
+Notes importantes:
+
+- Le Boot protocol est pilote par la requete USB standard SET_PROTOCOL cote host (pas par une commande RAW HID dediee).
+- La bascule de route clavier 6KRO/NKRO est protegee: si une touche est tenue, la transition est differee jusqu'a ce que plus aucune touche ne soit active, pour eviter les artefacts.
+- Lors d'une transition de route autorisee, le firmware flush les etats 6KRO+NKRO avant d'activer la nouvelle route.
+
+Valeurs par defaut usine (profil courant):
+
+- Options globales:
+  - keyboard_enabled=1
+  - gamepad_enabled=0
+  - raw_hid_echo=0
+  - nkro_enabled=1 (Auto NKRO avec fallback runtime 6KRO)
+- Clavier par touche (defaults):
+  - actuation_point_mm=12 (1.2 mm)
+  - release_point_mm=12 (1.2 mm)
+  - rapid_trigger_activation=4 (0.4 mm)
+- Gamepad global:
+  - keyboard_routing=2 (Unmapped only)
+  - api_mode=1 (XInput)
+- LED:
+  - led_effect_mode=1 (RAINBOW)
+  - led_brightness=50
+  - led_effect_color=(255,0,0)
+  - led_fps_limit=60
+- Filtre ADC:
+  - filter_enabled=1
+  - noise_band=8
+  - alpha_min_denom=1
+  - alpha_max_denom=8
+- Keyboard name runtime:
+  - "75HE Keyboard"
+
 Serial number details:
 
 - calcule une seule fois au demarrage (cache RAM)

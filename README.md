@@ -46,7 +46,9 @@ Le clavier expose une interface RAW HID qui sert de canal de controle entre le f
 
 ### 2. Sorties USB HID et mode gamepad
 
-- Clavier HID standard + mode NKRO.
+- Deux interfaces clavier HID :
+	- 6KRO (boot-compatible)
+	- NKRO (mode auto avec fallback runtime vers 6KRO si NKRO indisponible au demarrage USB)
 - Consumer/media controls et fonctions systeme.
 - Mode gamepad activable, avec options de routage clavier/gamepad.
 - Mapping par touche vers axe/direction/bouton gamepad.

@@ -154,7 +154,7 @@ typedef struct __attribute__((packed)) {
   uint8_t gamepad_enabled : 1;       // Enable gamepad HID output
   uint8_t raw_hid_echo : 1;          // Enable RAW HID echo mode
   uint8_t led_enabled : 1;           // Enable LED matrix
-  uint8_t nkro_enabled : 1;          // Use NKRO instead of 6KRO keyboard
+  uint8_t nkro_enabled : 1;          // Auto mode: try NKRO, fallback to 6KRO
   uint8_t gamepad_with_keyboard : 1; // Send keyboard along with gamepad
   uint8_t reserved : 2;              // Reserved for future use
 } settings_options_t;
@@ -390,8 +390,8 @@ typedef struct __attribute__((packed)) {
 #endif
 
 #define SETTINGS_DEFAULT_OPTIONS                                               \
-  {.keyboard_enabled = 0,                                                      \
-   .gamepad_enabled = 1,                                                       \
+  {.keyboard_enabled = 1,                                                      \
+   .gamepad_enabled = 0,                                                       \
    .raw_hid_echo = 0,                                                          \
    .led_enabled = 1,                                                           \
    .reserved = 0}
@@ -415,9 +415,9 @@ typedef struct __attribute__((packed)) {
 // derived from the physical keyboard layout in layout.c.
 #define SETTINGS_DEFAULT_KEY_0                                                 \
   {.hid_keycode = HID_KEY_Q_CODE,                                              \
-   .actuation_point_mm = 20,                                                   \
-   .release_point_mm = 18,                                                     \
-   .rapid_trigger_activation = 5,                                              \
+  .actuation_point_mm = 12,                                                   \
+  .release_point_mm = 12,                                                     \
+  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -427,9 +427,9 @@ typedef struct __attribute__((packed)) {
    .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_1                                                 \
   {.hid_keycode = HID_KEY_W_CODE,                                              \
-   .actuation_point_mm = 20,                                                   \
-   .release_point_mm = 18,                                                     \
-   .rapid_trigger_activation = 5,                                              \
+  .actuation_point_mm = 12,                                                   \
+  .release_point_mm = 12,                                                     \
+  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -439,9 +439,9 @@ typedef struct __attribute__((packed)) {
    .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_2                                                 \
   {.hid_keycode = HID_KEY_E_CODE,                                              \
-   .actuation_point_mm = 20,                                                   \
-   .release_point_mm = 18,                                                     \
-   .rapid_trigger_activation = 5,                                              \
+  .actuation_point_mm = 12,                                                   \
+  .release_point_mm = 12,                                                     \
+  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -451,9 +451,9 @@ typedef struct __attribute__((packed)) {
    .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_3                                                 \
   {.hid_keycode = HID_KEY_A_CODE,                                              \
-   .actuation_point_mm = 20,                                                   \
-   .release_point_mm = 18,                                                     \
-   .rapid_trigger_activation = 5,                                              \
+  .actuation_point_mm = 12,                                                   \
+  .release_point_mm = 12,                                                     \
+  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 5,                                                             \
@@ -463,9 +463,9 @@ typedef struct __attribute__((packed)) {
    .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_4                                                 \
   {.hid_keycode = HID_KEY_S_CODE,                                              \
-   .actuation_point_mm = 20,                                                   \
-   .release_point_mm = 18,                                                     \
-   .rapid_trigger_activation = 5,                                              \
+  .actuation_point_mm = 12,                                                   \
+  .release_point_mm = 12,                                                     \
+  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 255,                                                           \
@@ -475,9 +475,9 @@ typedef struct __attribute__((packed)) {
    .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
 #define SETTINGS_DEFAULT_KEY_5                                                 \
   {.hid_keycode = HID_KEY_D_CODE,                                              \
-   .actuation_point_mm = 20,                                                   \
-   .release_point_mm = 18,                                                     \
-   .rapid_trigger_activation = 5,                                              \
+  .actuation_point_mm = 12,                                                   \
+  .release_point_mm = 12,                                                     \
+  .rapid_trigger_activation = 4,                                              \
    .rapid_trigger_press = 30,                                                  \
    .rapid_trigger_release = 30,                                                \
    .socd_pair = 3,                                                             \
@@ -488,10 +488,10 @@ typedef struct __attribute__((packed)) {
 
 #define SETTINGS_DEFAULT_GAMEPAD                                               \
   {.radial_deadzone = 0,                                                       \
-   .keyboard_routing = GAMEPAD_KEYBOARD_ROUTING_ALL_KEYS,                      \
+   .keyboard_routing = GAMEPAD_KEYBOARD_ROUTING_UNMAPPED_ONLY,                 \
    .square_mode = 0,                                                           \
    .reactive_stick = 0,                                                        \
-  .api_mode = GAMEPAD_API_HID,                                                \
+  .api_mode = GAMEPAD_API_XINPUT,                                             \
    .curve = {{0u, 0u}, {133u, 85u}, {266u, 170u}, {GAMEPAD_CURVE_MAX_DISTANCE_01MM, 255u}}}
 
 // Default calibration values (from offset.c)

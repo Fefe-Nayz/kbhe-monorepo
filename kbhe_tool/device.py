@@ -343,14 +343,14 @@ class KBHEDevice:
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def get_nkro_enabled(self):
-        """Get NKRO mode enabled state."""
+        """Get keyboard mode flag (True=Auto NKRO, False=6KRO only)."""
         resp = self.send_command(Command.GET_NKRO_ENABLED)
         if resp and len(resp) >= 3 and resp[1] == Status.OK:
             return bool(resp[2])
         return None
     
     def set_nkro_enabled(self, enabled):
-        """Set NKRO mode enabled state."""
+        """Set keyboard mode flag (True=Auto NKRO, False=6KRO only)."""
         data = [0, 1 if enabled else 0]  # 0 = placeholder for status byte
         resp = self.send_command(Command.SET_NKRO_ENABLED, data, timeout_ms=3000)
         return resp and len(resp) >= 2 and resp[1] == Status.OK

@@ -761,7 +761,7 @@ static void settings_mark_dirty(void) {
 
 static void settings_set_default_keyboard_name(char *dst,
                                                uint8_t dst_size) {
-  static const char default_name[] = "KBHE Keyboard";
+  static const char default_name[] = "75HE Keyboard";
   uint8_t i = 0u;
 
   if (dst == NULL || dst_size == 0u) {
@@ -865,9 +865,9 @@ _Static_assert(sizeof(settings_v11_t) <= FLASH_STORAGE_SIZE,
 static settings_key_t settings_default_key(uint8_t key_index) {
   settings_key_t key = {
       .hid_keycode = layout_get_default_keycode(key_index),
-      .actuation_point_mm = 20,
-      .release_point_mm = 18,
-      .rapid_trigger_activation = 5,
+  .actuation_point_mm = 12,
+  .release_point_mm = 12,
+  .rapid_trigger_activation = 4,
       .rapid_trigger_press = 30,
       .rapid_trigger_release = 30,
       .socd_pair = 255,
@@ -909,10 +909,11 @@ static void settings_set_defaults(void) {
   current_settings.version = SETTINGS_VERSION;
 
   // Default options
-  current_settings.options.keyboard_enabled = 0;
-  current_settings.options.gamepad_enabled = 1;
+  current_settings.options.keyboard_enabled = 1;
+  current_settings.options.gamepad_enabled = 0;
   current_settings.options.raw_hid_echo = 0;
   current_settings.options.led_enabled = 1;
+  current_settings.options.nkro_enabled = 1;
 
   // Default per-key settings follow the physical keyboard layout.
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
@@ -937,12 +938,12 @@ static void settings_set_defaults(void) {
   current_settings.led.brightness = 50; // Medium brightness
 
   // Default LED effect settings
-  current_settings.led_effect_mode = 0; // None / static matrix
+  current_settings.led_effect_mode = LED_EFFECT_RAINBOW;
   current_settings.led_effect_speed = 50;
   current_settings.led_effect_color_r = 255;
   current_settings.led_effect_color_g = 0;
   current_settings.led_effect_color_b = 0;
-  current_settings.led_fps_limit = 0; // Unlimited by default
+  current_settings.led_fps_limit = 60;
   for (uint8_t effect = 0; effect < LED_EFFECT_MAX; effect++) {
     settings_default_effect_params(effect,
                                    current_settings.led_effect_params[effect]);
@@ -1504,7 +1505,8 @@ bool settings_is_nkro_enabled(void) {
 
 bool settings_set_nkro_enabled(bool enabled) {
   current_settings.options.nkro_enabled = enabled ? 1 : 0;
-  // Note: changing NKRO mode requires USB re-enumeration to take effect
+  // Auto mode state is runtime-based; re-enumeration may be required to retry
+  // NKRO after a runtime fallback has already been selected.
   settings_mark_dirty();
   return true;
 }

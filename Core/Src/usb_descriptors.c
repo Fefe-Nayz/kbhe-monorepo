@@ -255,12 +255,13 @@ static void generate_desc_configuration(uint8_t *dst) {
       TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL_MAX, 0, 0,
                             TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
-      // Interface 0: Keyboard HID (6KRO)
-      TUD_HID_DESCRIPTOR(ITF_NUM_HID, 0, HID_ITF_PROTOCOL_KEYBOARD,
+      // Interface 0: Keyboard HID (Boot-compatible 6KRO)
+      TUD_HID_DESCRIPTOR(ITF_NUM_HID, STRID_KEYBOARD_BOOT,
+             HID_ITF_PROTOCOL_KEYBOARD,
                          sizeof(desc_hid_report), EPNUM_HID, HID_EP_SIZE,
                          HID_POLL_INTERVAL_8KHZ),
 
-      // Interface 1: Raw HID IN/OUT
+      // Interface 1: Raw HID IN/OUT control channel
       TUD_HID_INOUT_DESCRIPTOR(ITF_NUM_RAW_HID, STRID_RAW_HID,
                                HID_ITF_PROTOCOL_NONE,
                                sizeof(desc_raw_hid_report), EPNUM_RAW_HID_OUT,
@@ -443,15 +444,16 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
 // L'ordre DOIT correspondre à votre enum (0, 1, 2, 3...)
 static char const *string_desc_arr[] = {
     (const char[]){0x09, 0x04}, // 0: LangID (English US)
-    "KBHE",                     // 1: Manufacturer
-    "8kHz Keyboard",            // 2: Product
+  "KBHE",                     // 1: Manufacturer
+  "75HE Keyboard",            // 2: Product
     NULL,                       // 3: Serial (Géré dynamiquement)
-    "Raw HID",                  // 4: Interface Raw HID
-    "HE Gamepad",               // 5: Interface Gamepad (Hall Effect)
-    "NKRO Keyboard",            // 6: Interface NKRO Keyboard
-    "Consumer Control",         // 7: Consumer Control interface
-    "Mouse",                    // 8: Mouse interface
-    "XInput Compatible Gamepad" // 9: XInput-compatible interface
+  "75HE Keyboard (Boot)",     // 4: Interface Boot keyboard (6KRO)
+  "75HE Control",             // 5: Interface Raw HID
+  "75HE Gamepad",             // 6: Interface Gamepad (Hall Effect)
+  "75HE Keyboard",            // 7: Interface NKRO Keyboard
+  "75HE Consumer Control",    // 8: Consumer Control interface
+  "75HE Mouse",               // 9: Mouse interface
+  "75HE Gamepad"              // 10: XInput-compatible interface
 };
 
 static uint16_t _desc_str[32 + 1];

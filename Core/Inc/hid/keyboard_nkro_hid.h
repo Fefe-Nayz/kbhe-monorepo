@@ -21,6 +21,8 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define NKRO_REPORT_SIZE 17
 #define NKRO_KEY_BITMAP_SIZE 16
+#define NKRO_ENUMERATION_TIMEOUT_MS 1000u
+#define NKRO_ACTIVE_STALL_TIMEOUT_MS 100u
 
 typedef struct __attribute__((packed)) {
   uint8_t modifier;                   // Modifier keys
@@ -54,6 +56,20 @@ void keyboard_nkro_hid_key_release(uint8_t keycode);
  * @return true if report was sent
  */
 bool keyboard_nkro_hid_send_report_if_changed(void);
+
+/**
+ * @brief Returns true when NKRO should be used for key routing
+ *
+ * In Auto mode, this becomes true once NKRO is ready after USB enumeration.
+ * If NKRO is not ready within NKRO_ENUMERATION_TIMEOUT_MS, runtime fallback
+ * stays on 6KRO until USB disconnect.
+ */
+bool keyboard_nkro_hid_can_route_keycodes(void);
+
+/**
+ * @brief Returns true when runtime fallback has switched to 6KRO
+ */
+bool keyboard_nkro_hid_is_runtime_fallback_active(void);
 
 /**
  * @brief NKRO task - call in main loop

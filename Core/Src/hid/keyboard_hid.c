@@ -7,6 +7,7 @@
 #include "hid/keyboard_hid.h"
 #include "hid/consumer_hid.h"
 #include "hid/mouse_hid.h"
+#include "hid/keyboard_nkro_hid.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "hid/raw_hid.h"
@@ -41,6 +42,14 @@ static inline bool keyboard_hid_is_modifier(uint8_t keycode) {
 
 bool keyboard_hid_is_ready(void) {
   return tud_hid_n_ready(HID_ITF_KEYBOARD);
+}
+
+bool keyboard_hid_is_boot_protocol_active(void) {
+  if (!tud_mounted()) {
+    return false;
+  }
+
+  return tud_hid_n_get_protocol(HID_ITF_KEYBOARD) == HID_PROTOCOL_BOOT;
 }
 
 bool keyboard_hid_send_report(uint8_t modifier, const uint8_t keycodes[6]) {
@@ -218,6 +227,13 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
   default:
     // Other instances if needed
     break;
+  }
+}
+
+void tud_hid_set_protocol_cb(uint8_t instance, uint8_t protocol) {
+  if ((instance == HID_ITF_KEYBOARD) && (protocol == HID_PROTOCOL_BOOT)) {
+    // Ensure NKRO state is flushed when host requests legacy boot protocol.
+    keyboard_nkro_hid_release_all();
   }
 }
 

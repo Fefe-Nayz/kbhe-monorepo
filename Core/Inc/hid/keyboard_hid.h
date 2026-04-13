@@ -98,6 +98,11 @@ extern "C" {
 bool keyboard_hid_is_ready(void);
 
 /**
+ * @brief Returns true when the keyboard interface is in HID Boot protocol mode
+ */
+bool keyboard_hid_is_boot_protocol_active(void);
+
+/**
  * @brief Send a keyboard report with specified modifier and keycodes
  * @param modifier Modifier keys (KEYBOARD_MODIFIER_*)
  * @param keycodes Array of 6 keycodes (HID_KEY_*)

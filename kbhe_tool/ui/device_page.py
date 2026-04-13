@@ -59,7 +59,7 @@ class DevicePageMixin:
         interfaces_frame.pack(fill=tk.X, pady=(0, 10))
         ttk.Label(
             interfaces_frame,
-            text="Keyboard, gamepad, and NKRO toggles are saved immediately in firmware. LED enable stays live-only until you save.",
+            text="Keyboard, gamepad, and keyboard mode changes are saved immediately in firmware. LED enable stays live-only until you save.",
             style="SurfaceSubtle.TLabel",
             wraplength=980,
             justify=tk.LEFT,
@@ -95,13 +95,13 @@ class DevicePageMixin:
         self.nkro_enabled_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             interfaces_frame,
-            text="🔠 NKRO mode (N-Key Rollover instead of 6KRO)",
+            text="🔠 Auto NKRO (fallback to 6KRO if NKRO is unavailable at startup)",
             variable=self.nkro_enabled_var,
             command=self.on_nkro_enabled_change,
         ).pack(anchor=tk.W, pady=2)
         ttk.Label(
             interfaces_frame,
-            text="Uses an independent HID interface for unlimited simultaneous keys.",
+            text="Enabled = Auto NKRO. Disabled = 6KRO only.",
             style="SurfaceSubtle.TLabel",
             wraplength=980,
             justify=tk.LEFT,
@@ -111,7 +111,7 @@ class DevicePageMixin:
         save_frame.pack(fill=tk.X, pady=(0, 10))
         ttk.Label(
             save_frame,
-            text="Saving writes the current LED matrix contents, brightness, and LED enable state into flash memory. Keyboard, gamepad, and NKRO toggles already persist when changed.",
+            text="Saving writes the current LED matrix contents, brightness, and LED enable state into flash memory. Keyboard, gamepad, and keyboard mode changes already persist when changed.",
             style="SurfaceSubtle.TLabel",
             wraplength=980,
             justify=tk.LEFT,
@@ -339,7 +339,7 @@ class DevicePageMixin:
         self._set_device_status(f"🎮 Gamepad {'enabled' if enabled else 'disabled'} - saved immediately")
 
     def on_nkro_enabled_change(self):
-        """Handle NKRO mode checkbox change."""
+        """Handle keyboard mode checkbox change (Auto NKRO vs 6KRO only)."""
         enabled = self.nkro_enabled_var.get()
         try:
             if not self.device.set_nkro_enabled(enabled):
@@ -350,7 +350,7 @@ class DevicePageMixin:
             return
 
         self._set_device_status(
-            f"🔠 NKRO {'enabled' if enabled else 'disabled'} - saved immediately (USB re-enumeration may be required)"
+            "🔠 Keyboard mode: Auto NKRO" if enabled else "🔠 Keyboard mode: 6KRO only"
         )
 
     def factory_reset(self):

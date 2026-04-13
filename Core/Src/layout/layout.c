@@ -36,6 +36,8 @@ static uint8_t layer_hold_counts[SETTINGS_LAYER_COUNT] = {0};
 static uint8_t layer_toggle_mask = 0u;
 static uint16_t pressed_keycodes[NUM_KEYS] = {0};
 static bool pressed_host_output[NUM_KEYS] = {0};
+static bool keyboard_route_initialized = false;
+static bool keyboard_route_use_nkro = false;
 
 static uint16_t layout_default_overlay_keycode(uint8_t layer, uint8_t key) {
   if (key >= NUM_KEYS) {
@@ -107,8 +109,49 @@ static bool layout_is_keyboard_page_keycode(uint16_t keycode) {
   return (keycode >= KC_A) && (keycode <= KC_EXSEL);
 }
 
-static bool layout_should_use_nkro_keycode(uint16_t keycode) {
+static bool layout_should_enable_nkro_route(void) {
   if (!settings_is_nkro_enabled()) {
+    return false;
+  }
+
+  if (keyboard_hid_is_boot_protocol_active()) {
+    return false;
+  }
+
+  return keyboard_nkro_hid_can_route_keycodes();
+}
+
+static void layout_sync_keyboard_route(void) {
+  bool use_nkro = layout_should_enable_nkro_route();
+
+  if (!keyboard_route_initialized) {
+    keyboard_route_initialized = true;
+    keyboard_route_use_nkro = use_nkro;
+    return;
+  }
+
+  if (keyboard_route_use_nkro == use_nkro) {
+    return;
+  }
+
+  for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+    if (pressed_keycodes[key] != KC_NO) {
+      return;
+    }
+  }
+
+  // On route transition, clear both interfaces so one logical keyboard path
+  // remains active and no stale pressed key stays latched.
+  (void)keyboard_hid_release_all();
+  keyboard_hid_reset_state();
+  keyboard_nkro_hid_release_all();
+  keyboard_route_use_nkro = use_nkro;
+}
+
+static bool layout_should_use_nkro_keycode(uint16_t keycode) {
+  layout_sync_keyboard_route();
+
+  if (!keyboard_route_use_nkro) {
     return false;
   }
 
@@ -794,6 +837,9 @@ void layout_reset_state(void) {
     pressed_keycodes[key] = KC_NO;
     pressed_host_output[key] = false;
   }
+
+  keyboard_route_initialized = false;
+  keyboard_route_use_nkro = false;
 
   gamepad_hid_custom_clear();
 }
