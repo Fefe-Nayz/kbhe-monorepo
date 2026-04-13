@@ -379,7 +379,7 @@ export default function BaseKeyboard({
         )}
 
         {ready && (
-          <div className="flex min-h-0 flex-1 items-start justify-center gap-6 overflow-hidden">
+          <div className="flex min-h-0 flex-1 items-center justify-center gap-6 overflow-hidden">
             <div
               className="shrink-0"
               style={{
