@@ -19,6 +19,7 @@ export interface KeyboardState {
   setMode: (mode: KeyMode) => void;
   setDisplayedInfo: (displayedInfo: displayedInfo) => void;
   setCurrentLayer: (layer: number) => void;
+  setSelectedKeys: (keyIds: string[]) => void;
   toggleKeySelection: (keyId: string) => void;
   clearSelection: () => void;
   selectAll: () => void;
@@ -44,6 +45,7 @@ export const useKeyboardStore = create<KeyboardState>()((set, get) => ({
   setMode: (mode) => set({ mode }),
   setDisplayedInfo: (displayedInfo) => set({ displayedInfo }),
   setCurrentLayer: (layer) => set({ currentLayer: Math.max(0, Math.min(3, Math.trunc(layer))) }),
+  setSelectedKeys: (keyIds) => set({ selectedKeys: [...keyIds] }),
 
   toggleKeySelection: (keyId) => {
     const { mode, selectedKeys } = get();

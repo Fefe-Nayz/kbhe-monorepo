@@ -19,6 +19,7 @@ interface KeyboardKeyProps {
   showTooltip?: boolean;
   showLegendSlots?: boolean;
   onClick?: (key: KeyboardKeyModel) => void;
+  onHoverChange?: (key: KeyboardKeyModel | null) => void;
   renderLegend?: (args: {
     key: KeyboardKeyModel;
     label: string;
@@ -95,6 +96,7 @@ function KeyboardKeyComponent({
   showTooltip = true,
   showLegendSlots,
   onClick,
+  onHoverChange,
   renderLegend,
   overrideColor,
   primaryLegend,
@@ -134,6 +136,14 @@ function KeyboardKeyComponent({
     if (!interactive || !onClick) return;
     event.preventDefault();
     onClick(keyData);
+  };
+
+  const handleMouseEnter = () => {
+    onHoverChange?.(keyData);
+  };
+
+  const handleMouseLeave = () => {
+    onHoverChange?.(null);
   };
 
   const commonKeyClasses = cn(
@@ -277,6 +287,10 @@ function KeyboardKeyComponent({
       className={commonKeyClasses}
       style={appearanceStyle}
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleMouseEnter}
+      onBlur={handleMouseLeave}
       type="button"
       aria-label={label}
       aria-pressed={selected || undefined}
@@ -289,6 +303,8 @@ function KeyboardKeyComponent({
       className={commonKeyClasses}
       style={appearanceStyle}
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       role="img"
       aria-label={label}
     >
@@ -323,6 +339,7 @@ export const KeyboardKey = memo(KeyboardKeyComponent, (prev, next) => (
   prev.showTooltip === next.showTooltip &&
   prev.showLegendSlots === next.showLegendSlots &&
   prev.onClick === next.onClick &&
+  prev.onHoverChange === next.onHoverChange &&
   prev.renderLegend === next.renderLegend &&
   prev.overrideColor === next.overrideColor &&
   prev.primaryLegend === next.primaryLegend &&

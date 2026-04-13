@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface BaseKeyboardProps {
   mode: "single" | "multi";
   onButtonClick: (ids: string[] | string) => void;
+  onKeyHoverChange?: (id: string | null) => void;
   showLayerSelector?: boolean;
   showRotary?: boolean;
   interactive?: boolean;
@@ -158,6 +159,7 @@ function useAutoScale(
 export default function BaseKeyboard({
   mode = "single",
   onButtonClick,
+  onKeyHoverChange,
   showLayerSelector = true,
   showRotary = true,
   interactive = true,
@@ -220,6 +222,10 @@ export default function BaseKeyboard({
     (key: { id: string }) => handleSelection(key.id),
     [handleSelection],
   );
+
+  const handleKeyHover = useCallback((key: { id: string } | null) => {
+    onKeyHoverChange?.(key?.id ?? null);
+  }, [onKeyHoverChange]);
 
   useEffect(() => {
     setMode(mode);
@@ -401,6 +407,7 @@ export default function BaseKeyboard({
                   gap={BASE_GAP}
                   selectedKeyIds={keyboardSelectedIds}
                   onKeyClick={handleKeyClick}
+                  onKeyHoverChange={handleKeyHover}
                   keyColorMap={keyColorMap}
                   keyLegendMap={resolvedKeyLegendMap}
                   keyLegendSlotsMap={keyLegendSlotsMap}

@@ -92,6 +92,7 @@ export interface KeyboardLayoutProps {
   selectedKeyIds?: string[];
   theme?: KeyboardRenderTheme;
   onKeyClick?: (key: KeyboardKey) => void;
+  onKeyHoverChange?: (key: KeyboardKey | null) => void;
   renderLegend?: (args: {
     key: KeyboardKey;
     label: string;
