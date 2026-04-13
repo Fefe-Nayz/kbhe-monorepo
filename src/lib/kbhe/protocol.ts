@@ -25,6 +25,8 @@ export const LAYER_COUNT = 4;
 export const ADVANCED_TICK_RATE_MIN = 1;
 export const ADVANCED_TICK_RATE_MAX = 100;
 export const ADVANCED_TICK_RATE_DEFAULT = 1;
+export const DEVICE_SERIAL_MAX_LENGTH = 26;
+export const KEYBOARD_NAME_LENGTH = 32;
 
 export enum Command {
   GET_FIRMWARE_VERSION = 0x00,
@@ -44,6 +46,9 @@ export enum Command {
   SET_NKRO_ENABLED = 0x28,
   GET_ADVANCED_TICK_RATE = 0x29,
   SET_ADVANCED_TICK_RATE = 0x2a,
+  GET_DEVICE_INFO = 0x2b,
+  GET_KEYBOARD_NAME = 0x2c,
+  SET_KEYBOARD_NAME = 0x2d,
 
   GET_KEY_SETTINGS = 0x40,
   SET_KEY_SETTINGS = 0x41,

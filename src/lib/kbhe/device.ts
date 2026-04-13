@@ -4,6 +4,8 @@ import {
   ADVANCED_TICK_RATE_MIN,
   CALIBRATION_VALUES_PER_CHUNK,
   Command,
+  DEVICE_SERIAL_MAX_LENGTH,
+  formatFirmwareVersion,
   GAMEPAD_API_MODES,
   GAMEPAD_AXES,
   GAMEPAD_BUTTONS,
@@ -13,6 +15,7 @@ import {
   GAMEPAD_KEYBOARD_ROUTING,
   i16le,
   KEY_BEHAVIORS,
+  KEYBOARD_NAME_LENGTH,
   KEY_COUNT,
   KEY_SETTINGS_PER_CHUNK,
   KEY_STATES_PER_CHUNK,
@@ -195,6 +198,13 @@ export interface LockStates {
   scroll_lock: boolean;
 }
 
+export interface DeviceIdentity {
+  version: number;
+  firmware_version: string;
+  serial_number: string;
+  keyboard_name: string;
+}
+
 type DevicePathLogger = ((message: string) => void) | undefined;
 
 export class KBHEDevice {
@@ -261,6 +271,27 @@ export class KBHEDevice {
 
   private unpackU16(data: ArrayLike<number>, offset: number): number {
     return u16le(data, offset);
+  }
+
+  private decodeCString(data: ArrayLike<number>, offset: number, maxLength: number): string {
+    const bytes = Array.from({ length: maxLength }, (_, index) => Number(data[offset + index] ?? 0) & 0xff);
+    const nul = bytes.indexOf(0);
+    const raw = nul >= 0 ? bytes.slice(0, nul) : bytes;
+    return String.fromCharCode(...raw).trim();
+  }
+
+  private encodeKeyboardName(name: string): number[] {
+    const chars = Array.from(name)
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        return code >= 0x20 && code <= 0x7e;
+      })
+      .slice(0, KEYBOARD_NAME_LENGTH);
+    const bytes = Array.from({ length: KEYBOARD_NAME_LENGTH }, () => 0);
+    chars.forEach((char, index) => {
+      bytes[index] = char.charCodeAt(0);
+    });
+    return bytes;
   }
 
   private chunkCount(totalCount: number, startIndex: number, chunkSize: number): number {
@@ -400,6 +431,41 @@ export class KBHEDevice {
       const major = (version >> 8) & 0xff;
       const minor = version & 0xff;
       return `${major}.${minor}`;
+    }
+    return null;
+  }
+
+  async getDeviceInfo(): Promise<DeviceIdentity | null> {
+    const response = await this.sendCommand(Command.GET_DEVICE_INFO);
+    if (response && response.length >= 62 && response[1] === Status.OK) {
+      const version = this.unpackU16(response, 2);
+      return {
+        version,
+        firmware_version: formatFirmwareVersion(version),
+        serial_number: this.decodeCString(response, 4, DEVICE_SERIAL_MAX_LENGTH),
+        keyboard_name: this.decodeCString(
+          response,
+          4 + DEVICE_SERIAL_MAX_LENGTH,
+          KEYBOARD_NAME_LENGTH,
+        ),
+      };
+    }
+    return null;
+  }
+
+  async getKeyboardName(): Promise<string | null> {
+    const response = await this.sendCommand(Command.GET_KEYBOARD_NAME);
+    if (response && response.length >= 34 && response[1] === Status.OK) {
+      return this.decodeCString(response, 2, KEYBOARD_NAME_LENGTH);
+    }
+    return null;
+  }
+
+  async setKeyboardName(name: string): Promise<string | null> {
+    const payload = [0, ...this.encodeKeyboardName(name)];
+    const response = await this.sendCommand(Command.SET_KEYBOARD_NAME, payload, 500);
+    if (response && response.length >= 34 && response[1] === Status.OK) {
+      return this.decodeCString(response, 2, KEYBOARD_NAME_LENGTH);
     }
     return null;
   }

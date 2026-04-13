@@ -5,6 +5,7 @@
 
 export const queryKeys = {
   device: {
+    identity: () => ["device", "identity"] as const,
     options: () => ["device", "options"] as const,
     keyboardEnabled: () => ["device", "keyboardEnabled"] as const,
     gamepadEnabled: () => ["device", "gamepadEnabled"] as const,

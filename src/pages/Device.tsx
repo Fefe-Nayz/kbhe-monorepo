@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,20 @@ import {
   IconAlertTriangle,
   IconRotateClockwise2,
 } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
+const KEYBOARD_NAME_LENGTH = 32;
+
+function sanitizeKeyboardName(value: string): string {
+  return Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return code >= 0x20 && code <= 0x7e;
+    })
+    .join("")
+    .slice(0, KEYBOARD_NAME_LENGTH);
+}
 
 export default function Device() {
   const { status, deviceInfo, firmwareVersion, setDeveloperMode, developerMode } = useDeviceSession();
@@ -33,6 +47,14 @@ export default function Device() {
 
   const [resetOpen, setResetOpen] = useState(false);
   const [bootloaderOpen, setBootloaderOpen] = useState(false);
+  const [keyboardNameInput, setKeyboardNameInput] = useState("");
+  const [keyboardNameDirty, setKeyboardNameDirty] = useState(false);
+
+  const deviceIdentityQ = useQuery({
+    queryKey: queryKeys.device.identity(),
+    queryFn: () => kbheDevice.getDeviceInfo(),
+    enabled: connected,
+  });
 
   const optionsQ = useQuery({
     queryKey: queryKeys.device.options(),
@@ -92,6 +114,49 @@ export default function Device() {
     },
   });
 
+  const setKeyboardNameMutation = useMutation({
+    mutationFn: async (nextName: string) => {
+      const applied = await kbheDevice.setKeyboardName(nextName);
+      if (applied === null) {
+        throw new Error("Failed to update keyboard name on device.");
+      }
+      return applied;
+    },
+    onSuccess: (appliedName) => {
+      setKeyboardNameInput(appliedName);
+      setKeyboardNameDirty(false);
+      void qc.invalidateQueries({ queryKey: queryKeys.device.identity() });
+      toast.success("Keyboard name updated.");
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Failed to update keyboard name.";
+      toast.error(message);
+    },
+  });
+
+  const deviceKeyboardName = deviceIdentityQ.data?.keyboard_name ?? "";
+  const serialNumber = deviceIdentityQ.data?.serial_number || deviceInfo?.serialNumber || "";
+
+  useEffect(() => {
+    if (!connected) {
+      setKeyboardNameInput("");
+      setKeyboardNameDirty(false);
+      return;
+    }
+    if (!keyboardNameDirty) {
+      setKeyboardNameInput(deviceKeyboardName);
+    }
+  }, [connected, deviceKeyboardName, keyboardNameDirty]);
+
+  const identitySupported = connected && deviceIdentityQ.data !== null;
+  const keyboardNameDisabled = !identitySupported || setKeyboardNameMutation.isPending;
+
+  const handleKeyboardNameChange = (value: string) => {
+    const sanitized = sanitizeKeyboardName(value);
+    setKeyboardNameInput(sanitized);
+    setKeyboardNameDirty(sanitized !== deviceKeyboardName);
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <PageContent>
@@ -111,6 +176,16 @@ export default function Device() {
                 </div>
               )}
               <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Serial:</span>
+                {serialNumber ? (
+                  <Badge variant="secondary" className="font-mono text-xs">{serialNumber}</Badge>
+                ) : connected && deviceIdentityQ.isLoading ? (
+                  <Skeleton className="h-5 w-40" />
+                ) : (
+                  <span className="text-sm text-muted-foreground">Unavailable</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">Firmware:</span>
                 {firmwareVersion ? (
                   <Badge variant="secondary" className="font-mono">{firmwareVersion}</Badge>
@@ -121,6 +196,50 @@ export default function Device() {
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">Status:</span>
                 <Badge variant={connected ? "default" : "secondary"}>{status}</Badge>
+              </div>
+              <div className="flex flex-col gap-2 pt-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-muted-foreground">Keyboard Name:</span>
+                  <span className="text-xs text-muted-foreground">
+                    {keyboardNameInput.length}/{KEYBOARD_NAME_LENGTH}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Input
+                    value={keyboardNameInput}
+                    maxLength={KEYBOARD_NAME_LENGTH}
+                    disabled={keyboardNameDisabled}
+                    placeholder="Custom keyboard name"
+                    onChange={(event) => handleKeyboardNameChange(event.target.value)}
+                    className="font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={keyboardNameDisabled || !keyboardNameDirty}
+                      onClick={() => setKeyboardNameMutation.mutate(keyboardNameInput)}
+                    >
+                      Apply Name
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={keyboardNameDisabled || !keyboardNameDirty}
+                      onClick={() => {
+                        setKeyboardNameInput(deviceKeyboardName);
+                        setKeyboardNameDirty(false);
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+                {connected && !identitySupported && !deviceIdentityQ.isLoading && (
+                  <p className="text-xs text-muted-foreground">
+                    This firmware does not expose device identity commands (0x2B/0x2C/0x2D).
+                  </p>
+                )}
               </div>
               <Button variant="outline" size="sm" className="w-fit gap-1.5"
                 onClick={() => void DeviceSessionManager.reconnect()}>
