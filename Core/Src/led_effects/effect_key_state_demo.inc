@@ -1,7 +1,5 @@
 static void effect_key_state_demo(void) {
   bool invert = effect_param_flag(0, false);
-  uint8_t pressed_value = effect_param(1, 255u);
-  uint8_t released_value = effect_param(2, 96u);
   uint8_t pressed_r = 0u;
   uint8_t pressed_g = 255u;
   uint8_t pressed_b = 0u;
@@ -23,13 +21,13 @@ static void effect_key_state_demo(void) {
     }
 
     if (pressed) {
-      r = scale_u8(pressed_r, pressed_value);
-      g = scale_u8(pressed_g, pressed_value);
-      b = scale_u8(pressed_b, pressed_value);
+      r = pressed_r;
+      g = pressed_g;
+      b = pressed_b;
     } else {
-      r = scale_u8(released_r, released_value);
-      g = scale_u8(released_g, released_value);
-      b = scale_u8(released_b, released_value);
+      r = released_r;
+      g = released_g;
+      b = released_b;
     }
 
     led_matrix_set_pixel_idx(key, r, g, b);

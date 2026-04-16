@@ -19,6 +19,7 @@ def print_status(device):
     if options:
         print(f"Keyboard Enabled: {'Yes' if options['keyboard_enabled'] else 'No'}")
         print(f"Gamepad Enabled:  {'Yes' if options['gamepad_enabled'] else 'No'}")
+        print(f"LED Thermal Guard:{' Yes' if options.get('led_thermal_protection_enabled', False) else ' No'}")
 
     led_enabled = device.led_get_enabled()
     brightness = device.led_get_brightness()

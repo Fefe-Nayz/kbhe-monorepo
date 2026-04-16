@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x001C         // Phase-4A: default_profile_index, RAM-only mode support
+#define SETTINGS_VERSION 0x001D         // Phase-4B: LED thermal protection option
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -188,7 +188,8 @@ typedef struct __attribute__((packed)) {
   uint8_t raw_hid_echo : 1;          // Enable RAW HID echo mode
   uint8_t led_enabled : 1;           // Enable LED matrix
   uint8_t nkro_enabled : 1;          // Auto mode: try NKRO, fallback to 6KRO
-  uint8_t reserved : 3;              // Reserved for future use
+  uint8_t led_thermal_protection_enabled : 1; // Clamp brightness above temp threshold
+  uint8_t reserved : 2;              // Reserved for future use
 } settings_options_t;
 
 /**
@@ -544,6 +545,8 @@ typedef struct __attribute__((packed)) {
    .gamepad_enabled = 0,                                                       \
    .raw_hid_echo = 0,                                                          \
    .led_enabled = 1,                                                           \
+  .nkro_enabled = 1,                                                          \
+  .led_thermal_protection_enabled = 1,                                        \
    .reserved = 0}
 
 // Default curve: linear (control points at 1/3 and 2/3 of the line)
@@ -622,6 +625,18 @@ bool settings_is_nkro_enabled(void);
  * @return true if save was successful
  */
 bool settings_set_nkro_enabled(bool enabled);
+
+/**
+ * @brief Check if LED thermal protection is enabled.
+ */
+bool settings_is_led_thermal_protection_enabled(void);
+
+/**
+ * @brief Enable/disable LED thermal protection.
+ * @param enabled true to enforce thermal brightness cap
+ * @return true if save was successful
+ */
+bool settings_set_led_thermal_protection_enabled(bool enabled);
 
 /**
  * @brief Set all options at once

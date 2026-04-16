@@ -1,17 +1,21 @@
 static void effect_gradient_up_down(void) {
-  uint8_t v_scale = effect_param(0, 160u);  // Vertical hue spread (160=original ~25-unit sweep)
-  uint8_t sat     = effect_param(1, 144u);  // Saturation
-  uint8_t val     = effect_param(2, 255u);  // Value / brightness
+  uint8_t v_scale = effect_param(0, 224u);  // Vertical hue spread
+  uint8_t angle = effect_param(1, 64u);     // Gradient axis angle
   led_hsv_t base_hsv = effect_primary_hsv(255u, 0u, 0u);
+  int16_t dir_x = (int16_t)mxfx_cos8(angle) - 128;
+  int16_t dir_y = (int16_t)mxfx_sin8(angle) - 128;
 
   for (uint8_t i = 0u; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t y = mxfx_led_coord_y(i);
+    int16_t x = (int16_t)mxfx_led_coord_x(i) - (int16_t)mxfx_CENTER_X;
+    int16_t y = (int16_t)mxfx_led_coord_y(i) - (int16_t)mxfx_CENTER_Y;
+    uint8_t axis = mxfx_project_axis_u8(x, y, dir_x, dir_y);
     uint8_t r = 0u;
     uint8_t g = 0u;
     uint8_t b = 0u;
-    uint8_t hue = (uint8_t)(base_hsv.h + (uint8_t)(((uint16_t)y * v_scale) >> 8u));
+    uint16_t span = ((uint16_t)axis * v_scale) >> 7u;
+    uint8_t hue = (uint8_t)(base_hsv.h + (uint8_t)span);
 
-    led_matrix_hsv_to_rgb(hue, sat, val, &r, &g, &b);
+    led_matrix_hsv_to_rgb(hue, base_hsv.s, base_hsv.v, &r, &g, &b);
     led_matrix_set_pixel_idx(i, r, g, b);
   }
 }

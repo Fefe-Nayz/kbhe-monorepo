@@ -7,8 +7,6 @@ static void effect_pixel_fractal(void) {
 
   static bool led[mxfx_PIXEL_FRACTAL_ROWS][mxfx_PIXEL_FRACTAL_HALF_COLS];
   static uint32_t wait_until_ms = 0u;
-  uint8_t sat = effect_param(0, 255u);
-  uint8_t val = effect_param(1, 255u);
   led_hsv_t base_hsv = effect_primary_hsv(255u, 0u, 0u);
   uint32_t now_ms = HAL_GetTick();
   uint32_t interval =
@@ -33,9 +31,6 @@ static void effect_pixel_fractal(void) {
 
     wait_until_ms = now_ms + interval;
   }
-
-  base_hsv.s = sat;
-  base_hsv.v = val;
 
   for (uint8_t i = 0u; i < LED_MATRIX_NUM_LEDS; i++) {
     uint8_t x = mxfx_led_coord_x(i);

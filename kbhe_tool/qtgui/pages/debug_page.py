@@ -708,6 +708,7 @@ class DebugPage(QWidget):
                 f"Keyboard Enabled: {bool(options.get('keyboard_enabled'))}",
                 f"Gamepad Enabled: {bool(options.get('gamepad_enabled'))}",
                 f"Raw HID Echo: {bool(options.get('raw_hid_echo'))}",
+                f"LED Thermal Guard: {bool(options.get('led_thermal_protection_enabled'))}",
                 f"NKRO Enabled: {bool(nkro)}",
                 "",
                 "MCU:",

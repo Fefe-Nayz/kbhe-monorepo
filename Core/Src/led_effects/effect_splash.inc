@@ -12,6 +12,8 @@
  *   4  gain           – overall brightness scale (224=original)
  *   5  palette        – false=custom hue, true=rainbow angle
  *   6  mode           – 0=QMK, 1=physics (default 0)
+ *   7  random_per_click – random hue for each press (QMK + physics)
+ *   15 multi_hit      – process all active hits/waves instead of latest only
  *   LED_EFFECT_PARAM_COLOR_R/G/B – color (default green #00FF60)
  */
 
@@ -25,12 +27,33 @@ static void effect_splash_math_qmk(const led_hsv_t *base, led_hsv_t *hsv,
   uint8_t base_glow  = effect_param(2, 8u);
   bool    white_core = effect_param_flag(3, true);
   uint8_t gain       = effect_param(4, 224u);
-  bool    palette    = effect_param_flag(5, false);
-  (void)base;
+  uint8_t palette    = effect_param(5, 0u);
+
+  if (palette > 2u) {
+    palette = 0u;
+  }
 
   uint16_t eff_dist = (spread == 0u) ? 255u
                     : (uint16_t)(((uint32_t)dist * 128u) / spread);
   if (eff_dist > 255u) { eff_dist = 255u; }
+
+  if (palette == 2u) {
+    /* Exact legacy QMK splash wave: hue follows (tick - dist), value uses 255 - effect. */
+    uint16_t effect_val = 255u;
+    if (tick > (uint16_t)eff_dist) {
+      effect_val = tick - (uint16_t)eff_dist;
+      if (effect_val > 255u) {
+        effect_val = 255u;
+      }
+    }
+
+    hsv->h = (uint8_t)(base->h + (uint8_t)effect_val);
+    hsv->v = mxfx_qadd8(hsv->v, (uint8_t)(255u - (uint8_t)effect_val));
+    if (base_glow > 0u) {
+      hsv->v = mxfx_qadd8(hsv->v, base_glow);
+    }
+    return;
+  }
 
   if (tick <= (uint16_t)eff_dist) {
     hsv->v = mxfx_qadd8(hsv->v, base_glow);
@@ -55,14 +78,48 @@ static void effect_splash_math_qmk(const led_hsv_t *base, led_hsv_t *hsv,
     brightness = mxfx_qadd8(brightness, (uint8_t)(255u - (uint8_t)(age * 8u)));
   }
 
-  if (palette) {
-    hsv->h = (uint8_t)(hsv->h + pseudo_angle_u8(dx, dy));
+  if (palette == 1u) {
+    hsv->h = (uint8_t)(base->h + pseudo_angle_u8(dx, dy) + (uint8_t)(age >> 1u));
   } else {
-    uint8_t hue_shift = (age > 255u) ? 255u : (uint8_t)age;
-    hsv->h = (uint8_t)(hsv->h + hue_shift);
+    hsv->h = base->h;
   }
 
   hsv->v = mxfx_qadd8(hsv->v, brightness);
+}
+
+static uint8_t splash_resolve_qmk_hit_hue(uint8_t hit_index, uint8_t anchor_hue) {
+  if (hit_index >= mxfx_last_hit_tracker.count) {
+    return anchor_hue;
+  }
+
+  uint8_t key_index = mxfx_last_hit_tracker.index[hit_index];
+  uint16_t hit_tick = mxfx_last_hit_tracker.tick[hit_index];
+  uint16_t best_delta = 0xFFFFu;
+  uint8_t best_hue = anchor_hue;
+  bool found = false;
+
+  for (uint8_t wi = 0u; wi < REACTIVE_WAVE_POOL_SIZE; wi++) {
+    reactive_wave_t *wave = &reactive_waves[wi];
+    if (!wave->active || wave->source_key != key_index) {
+      continue;
+    }
+
+    uint16_t wave_age = wave->age_ms;
+    uint16_t delta = (wave_age > hit_tick)
+                         ? (uint16_t)(wave_age - hit_tick)
+                         : (uint16_t)(hit_tick - wave_age);
+    if (!found || delta < best_delta) {
+      found = true;
+      best_delta = delta;
+      best_hue = wave->hue;
+    }
+  }
+
+  if (found) {
+    return best_hue;
+  }
+
+  return (uint8_t)(anchor_hue + key_index * 29u + (uint8_t)hit_tick);
 }
 
 static void effect_splash_qmk(uint8_t start_index) {
@@ -70,6 +127,14 @@ static void effect_splash_qmk(uint8_t start_index) {
   uint8_t begin = (start_index < count) ? start_index : count;
   led_hsv_t base_hsv = effect_primary_hsv(0u, 255u, 96u);
   uint8_t speed_scale = mxfx_qadd8(effect_animation_speed(), 1u);
+  bool random_per_click = effect_param_flag(7, false);
+  uint8_t hit_hues[mxfx_LED_HITS_TO_REMEMBER] = {0u};
+
+  if (random_per_click) {
+    for (uint8_t j = begin; j < count; j++) {
+      hit_hues[j] = splash_resolve_qmk_hit_hue(j, base_hsv.h);
+    }
+  }
 
   for (uint8_t i = 0u; i < LED_MATRIX_NUM_LEDS; i++) {
     led_hsv_t hsv = base_hsv;
@@ -82,7 +147,11 @@ static void effect_splash_qmk(uint8_t start_index) {
       int16_t dy = (int16_t)(y - mxfx_last_hit_tracker.y[j]);
       uint8_t dist = mxfx_distance_u8(dx, dy);
       uint16_t tick = mxfx_scale16by8(mxfx_last_hit_tracker.tick[j], speed_scale);
-      effect_splash_math_qmk(&base_hsv, &hsv, dx, dy, dist, tick);
+      led_hsv_t wave_base = base_hsv;
+      if (random_per_click) {
+        wave_base.h = hit_hues[j];
+      }
+      effect_splash_math_qmk(&wave_base, &hsv, dx, dy, dist, tick);
     }
 
     hsv.v = mxfx_scale8(hsv.v, base_hsv.v);
@@ -106,7 +175,9 @@ static void effect_splash_physics(bool multi) {
   uint8_t  base_glow    = effect_param(2, 8u);
   bool     white_core   = effect_param_flag(3, true);
   uint8_t  gain_param   = effect_param(4, 224u);
-  bool     rainbow      = effect_param_flag(5, false);
+  uint8_t  palette_mode = effect_param(5, 0u);
+  bool     rainbow      = (palette_mode == 1u);
+  bool     random_per_click = effect_param_flag(7, false);
 
   uint16_t lifetime_ms = (uint16_t)(320u +
       (((uint32_t)(255u - decay_param) * 930u) / 255u));
@@ -164,10 +235,13 @@ static void effect_splash_physics(bool multi) {
 
     for (uint8_t li = 0u; li < NUM_KEYS; li++) {
       uint8_t ring_hue;
-      if (rainbow) {
+      if (random_per_click) {
+        ring_hue = wave->hue;
+      } else if (rainbow) {
         int16_t dx = (int16_t)led_pos_x[li] - (int16_t)led_pos_x[src];
         int16_t dy = (int16_t)led_pos_y[li] - (int16_t)led_pos_y[src];
-        ring_hue = (uint8_t)(pseudo_angle_u8(dx, dy) + effect_offset);
+        ring_hue =
+            (uint8_t)(anchor_hue + pseudo_angle_u8(dx, dy) + effect_offset);
       } else {
         ring_hue = anchor_hue;
       }
@@ -228,22 +302,23 @@ static void effect_splash_physics(bool multi) {
 
 /* ─── Entry points ─────────────────────────────────────────────────────────── */
 
-static void effect_splash(void) {
+static void effect_splash_render(bool default_multi) {
   bool physics = effect_param_flag(6, false);
+  bool multi = effect_param_flag(15, default_multi);
+
   if (physics) {
-    effect_splash_physics(false);
+    effect_splash_physics(multi);
   } else {
     uint8_t count = mxfx_last_hit_tracker.count;
-    uint8_t start = (count > 0u) ? (uint8_t)(count - 1u) : 0u;
+    uint8_t start = (multi || count == 0u) ? 0u : (uint8_t)(count - 1u);
     effect_splash_qmk(start);
   }
 }
 
+static void effect_splash(void) {
+  effect_splash_render(false);
+}
+
 static void effect_multi_splash(void) {
-  bool physics = effect_param_flag(6, false);
-  if (physics) {
-    effect_splash_physics(true);
-  } else {
-    effect_splash_qmk(0u);
-  }
+  effect_splash_render(true);
 }

@@ -602,7 +602,7 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   key.disable_kb_on_gamepad = req->disable_kb_on_gamepad ? 1 : 0;
   settings_key_set_continuous_rapid_trigger(
       &key, req->continuous_rapid_trigger != 0u);
-  settings_key_set_socd_fully_pressed_enabled(
+    settings_key_set_socd_fully_pressed_enabled(
       &key, req->socd_fully_pressed_enabled != 0u);
   key.advanced.behavior_mode = req->behavior_mode;
   key.advanced.hold_threshold_10ms = req->hold_threshold_10ms;
@@ -611,13 +611,13 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
         hid_sanitize_dks_bottom_out_point(req->dks_bottom_out_point);
   }
   key.advanced.secondary_hid_keycode = req->secondary_hid_keycode;
-  settings_key_set_tap_hold_hold_on_other_key_press(
+    settings_key_set_tap_hold_hold_on_other_key_press(
       &key, (req->tap_hold_options &
-             SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK) != 0u);
-  settings_key_set_tap_hold_uppercase_hold(
+         SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK) != 0u);
+    settings_key_set_tap_hold_uppercase_hold(
       &key, (req->tap_hold_options &
-             SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK) != 0u);
-  key.advanced.socd_fully_pressed_point_tenths =
+         SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK) != 0u);
+    key.advanced.socd_fully_pressed_point_tenths =
       hid_sanitize_socd_fully_pressed_point(req->socd_fully_pressed_point);
   memcpy(key.advanced.dynamic_zones, req->dynamic_zones,
          sizeof(key.advanced.dynamic_zones));
@@ -1624,7 +1624,7 @@ static void cmd_set_led_pixel(const uint8_t *in, uint8_t *out) {
   if (third_party_mode) {
     led_matrix_set_pixel_idx(req->index, req->r, req->g, req->b);
   } else {
-    settings_set_led_pixel(req->index, req->r, req->g, req->b);
+  settings_set_led_pixel(req->index, req->r, req->g, req->b);
   }
 
   resp->status = HID_RESP_OK;
@@ -1669,11 +1669,11 @@ static void cmd_set_led_row(const uint8_t *in, uint8_t *out) {
   if (third_party_mode) {
     // Third-party streaming must stay runtime-only and avoid dirty autosaves.
     led_matrix_begin_pixel_batch();
-    for (int x = 0; x < LED_MATRIX_WIDTH; x++) {
-      uint8_t idx = req->row * LED_MATRIX_WIDTH + x;
+  for (int x = 0; x < LED_MATRIX_WIDTH; x++) {
+    uint8_t idx = req->row * LED_MATRIX_WIDTH + x;
       led_matrix_set_pixel_idx(idx, req->pixels[x * 3], req->pixels[x * 3 + 1],
-                               req->pixels[x * 3 + 2]);
-    }
+                           req->pixels[x * 3 + 2]);
+  }
     led_matrix_end_pixel_batch();
   } else {
     uint8_t pixels[LED_MATRIX_DATA_BYTES];
@@ -1744,13 +1744,13 @@ static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
   if (third_party_mode) {
     // Third-party live chunks should not mutate persisted matrix storage.
     led_matrix_begin_pixel_batch();
-    for (uint16_t i = 0; i + 2 < req->chunk_size; i += 3) {
+  for (uint16_t i = 0; i + 2 < req->chunk_size; i += 3) {
       uint8_t idx = (offset + i) / 3u;
-      if (idx < LED_MATRIX_SIZE) {
+    if (idx < LED_MATRIX_SIZE) {
         led_matrix_set_pixel_idx(idx, req->data[i], req->data[i + 1],
-                                 req->data[i + 2]);
-      }
+                             req->data[i + 2]);
     }
+  }
     led_matrix_end_pixel_batch();
   } else {
     uint8_t pixels[LED_MATRIX_DATA_BYTES];

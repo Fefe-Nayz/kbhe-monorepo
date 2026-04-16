@@ -94,14 +94,6 @@ Note option `raw_hid_echo`:
 - Le champ est bien persiste/expose via GET/SET_OPTIONS.
 - Dans l'implementation actuelle, il n'active/desactive pas un comportement runtime distinct (commande ECHO 0xFE toujours disponible).
 
-Note SAVE_SETTINGS (0x26):
-
-- La commande est non bloquante: elle programme une sauvegarde differee au lieu
-  d'ecrire le flash dans le handler HID.
-- Le flush reel est execute dans la boucle principale via `settings_task()`.
-- Le firmware applique une courte fenetre d'inactivite avant ecriture afin
-  d'eviter un spike pendant un burst de changements host.
-
 GET_DEVICE_INFO (0x2B) payload reponse:
 
 - version u16
@@ -606,12 +598,6 @@ Notes generales LED:
 - Tous les effets exposent PCOLOR (couleur de base). Par defaut rouge (255,0,0) = QMK default.
 - `GET_LED_EFFECT_SCHEMA` retourne des descriptors chunks de 6 octets:
   `id`, `type`, `min`, `max`, `default`, `step`.
-- En mode `LED_EFFECT_THIRD_PARTY` (7), les commandes d'ecriture live
-  `SET_LED_PIXEL` / `SET_LED_ROW` / `SET_LED_ALL_CHUNK` / `LED_CLEAR` /
-  `LED_FILL` mettent a jour uniquement la frame runtime (non persistante):
-  elles ne marquent pas les settings dirty et ne declenchent pas d'autosave.
-- Les ecritures bulk LED utilisent un flush WS2812 groupe (batch) pour limiter
-  les spikes de latence pendant le streaming live.
 
 Params effets par categorie:
 

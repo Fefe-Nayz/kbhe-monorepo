@@ -60,6 +60,8 @@ typedef enum {
   LED_PARAM_TYPE_COLOR = 4, // First byte of an RGB triplet; host groups
                              // COLOR slots at ids n, n+1, n+2 as one
                              // color picker.  min/max/step unused.
+  LED_PARAM_TYPE_ENUM  = 5, // Discrete option list (uses min/max as
+                             // inclusive enum value range, step=1)
 } led_param_type_t;
 
 // Descriptor for a single parameter slot.
@@ -159,6 +161,7 @@ typedef enum {
   LED_EFFECT_SOLID_REACTIVE_MULTI_NEXUS = 60, // Solid reactive multi nexus
   LED_EFFECT_MULTI_SPLASH = 61,           // Multi splash
   LED_EFFECT_SOLID_MULTI_SPLASH = 62,     // Solid multi splash
+  LED_EFFECT_BASS_RIPPLE = 63,            // Bass-triggered expanding ripple rings
   LED_EFFECT_MAX
 } led_effect_mode_t;
 
@@ -487,6 +490,20 @@ void led_matrix_set_audio_spectrum(const uint8_t *bands, uint8_t band_count,
  * @brief Clear host audio spectrum state immediately.
  */
 void led_matrix_clear_audio_spectrum(void);
+
+/**
+ * @brief Set the alpha-key mask used by the Alpha Mods effect.
+ *
+ * Each bit i in @p mask (LSB-first within each byte) marks key i as an
+ * "alpha" key (typically letter keys).  The mask is used instead of the
+ * HID-keycode range check so layouts other than QWERTY are supported.
+ *
+ * Pass NULL or mask_len == 0 to revert to the default keycode-range heuristic.
+ *
+ * @param mask     Bitmask, (NUM_KEYS+7)/8 bytes.
+ * @param mask_len Number of valid bytes in @p mask.
+ */
+void led_matrix_set_alpha_mask(const uint8_t *mask, uint8_t mask_len);
 
 #ifdef __cplusplus
 }

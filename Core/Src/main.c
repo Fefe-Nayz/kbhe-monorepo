@@ -68,6 +68,9 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define KBHE_TIMING_PROFILE_DECIMATION 32u
+#define MCU_LED_THERMAL_LIMIT_C 70
+#define MCU_LED_THERMAL_HYSTERESIS_C 3
+#define MCU_LED_THERMAL_BRIGHTNESS_MAX 96u
 
 /* USER CODE END PD */
 
@@ -177,6 +180,8 @@ uint16_t mcu_vref_mv_live = 0;
 uint8_t mcu_temperature_valid_live = 0;
 static uint8_t timing_profile_counter = 0u;
 static uint32_t mcu_metrics_next_sample_ms = 0u;
+static bool mcu_led_thermal_limit_active = false;
+static uint8_t mcu_led_last_applied_brightness = 0xFFu;
 
 //--------------------------------------------------------------------+
 // Filter Management Functions
@@ -350,7 +355,8 @@ static void mcu_init_injected_sensors(void) {
 }
 
 static void mcu_sample_internal_sensors(uint32_t now_ms) {
-  if (!diagnostics_is_perf_active()) {
+  if (!diagnostics_is_perf_active() &&
+      !settings_is_led_thermal_protection_enabled()) {
     return;
   }
   if (now_ms < mcu_metrics_next_sample_ms) {
@@ -386,6 +392,37 @@ static void mcu_sample_internal_sensors(uint32_t now_ms) {
   mcu_vref_mv_live = (uint16_t)vref_mv;
   mcu_temperature_c_live = (int16_t)temperature_c;
   mcu_temperature_valid_live = 1u;
+}
+
+static void mcu_apply_led_thermal_protection(void) {
+  uint8_t target_brightness = settings_get_led_brightness();
+  bool protection_enabled = settings_is_led_thermal_protection_enabled();
+  int16_t clear_threshold =
+      (int16_t)(MCU_LED_THERMAL_LIMIT_C - MCU_LED_THERMAL_HYSTERESIS_C);
+
+  if (!protection_enabled) {
+    mcu_led_thermal_limit_active = false;
+  } else if (mcu_temperature_valid_live != 0u) {
+    if (mcu_led_thermal_limit_active) {
+      if (mcu_temperature_c_live <= clear_threshold) {
+        mcu_led_thermal_limit_active = false;
+      }
+    } else if (mcu_temperature_c_live > MCU_LED_THERMAL_LIMIT_C) {
+      mcu_led_thermal_limit_active = true;
+    }
+  }
+
+  if (mcu_led_thermal_limit_active &&
+      target_brightness > MCU_LED_THERMAL_BRIGHTNESS_MAX) {
+    target_brightness = MCU_LED_THERMAL_BRIGHTNESS_MAX;
+  }
+
+  if (target_brightness == mcu_led_last_applied_brightness) {
+    return;
+  }
+
+  led_matrix_set_brightness(target_brightness);
+  mcu_led_last_applied_brightness = target_brightness;
 }
 
 static void TIM4_StartOneShot_TRGO(void) {
@@ -716,6 +753,7 @@ int main(void) {
     led_matrix_effect_tick(now_ms);
     led_indicator_tick(now_ms);
     settings_task(now_ms);
+    mcu_apply_led_thermal_protection();
     if (profile_timing) {
       task_led_us = cycles_to_us(DWT->CYCCNT - led_start_cycles);
     }

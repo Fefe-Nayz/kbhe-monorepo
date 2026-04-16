@@ -6,10 +6,17 @@ static void effect_audio_spectrum(void) {
   uint8_t release = effect_param(4, 104u);
   uint8_t visualizer_mode = effect_param(5, 0u);
   uint8_t contrast = effect_param(6, 236u);
+  uint8_t ripple_width = effect_param(7, 96u);
   uint8_t base_r = 64u;
   uint8_t base_g = 255u;
   uint8_t base_b = 160u;
+  uint8_t kick_r = 255u;
+  uint8_t kick_g = 200u;
+  uint8_t kick_b = 96u;
   uint8_t base_hue = 0u;
+  uint8_t kick_hue = 0u;
+  uint8_t kick_sat = 0u;
+  uint8_t kick_val = 0u;
   uint8_t tmp = 0u;
   uint8_t spectrum[LED_AUDIO_SPECTRUM_BAND_COUNT];
   uint8_t glow_floor = 0u;
@@ -18,22 +25,38 @@ static void effect_audio_spectrum(void) {
   uint16_t band_energy_sum = 0u;
   uint8_t band_energy_max = 0u;
   uint16_t bass_energy = 0u;
+  uint8_t bass_drive = 0u;
   static uint8_t band_level[LED_AUDIO_SPECTRUM_BAND_COUNT];
   static uint8_t band_peak[LED_AUDIO_SPECTRUM_BAND_COUNT];
   static uint8_t band_peak_hold[LED_AUDIO_SPECTRUM_BAND_COUNT];
   static uint8_t glow_pulse = 0u;
+  static uint8_t bass_env = 0u;
+  static uint8_t kick_pulse = 0u;
+  static uint16_t ripple_front = 0u;
+  static bool ripple_active = false;
   static bool initialized = false;
+
+  if (visualizer_mode > 3u) {
+    visualizer_mode = 0u;
+  }
 
   if (!initialized || effect_offset == 0u) {
     memset(band_level, 0, sizeof(band_level));
     memset(band_peak, 0, sizeof(band_peak));
     memset(band_peak_hold, 0, sizeof(band_peak_hold));
     glow_pulse = 0u;
+    bass_env = 0u;
+    kick_pulse = 0u;
+    ripple_front = 0u;
+    ripple_active = false;
     initialized = true;
   }
 
   effect_primary_color(64u, 255u, 160u, &base_r, &base_g, &base_b);
+  effect_secondary_color(255u, 200u, 96u, &kick_r, &kick_g, &kick_b);
   led_matrix_rgb_to_hsv(base_r, base_g, base_b, &base_hue, &tmp, &tmp);
+  led_matrix_rgb_to_hsv(kick_r, kick_g, kick_b, &kick_hue, &kick_sat,
+                        &kick_val);
 
   memcpy(spectrum, audio_spectrum_levels, sizeof(spectrum));
   if (!audio_spectrum_valid) {
@@ -93,6 +116,66 @@ static void effect_audio_spectrum(void) {
     }
   }
 
+  bass_drive = (uint8_t)(bass_energy / 9u);
+  {
+    uint8_t prev_bass = bass_env;
+    uint8_t bass_delta;
+    uint8_t kick_gate;
+    bool bass_trigger;
+    bool kick_trigger;
+
+    if (bass_drive > bass_env) {
+      uint8_t rise =
+          (uint8_t)(3u + ((uint16_t)(bass_drive - bass_env) * 96u) / 255u);
+      uint16_t next = (uint16_t)bass_env + rise;
+      bass_env = (next > bass_drive) ? bass_drive : (uint8_t)next;
+    } else {
+      uint8_t fall = (uint8_t)(2u + ((uint16_t)(255u - release) / 20u));
+      bass_env = (bass_env > fall) ? (uint8_t)(bass_env - fall) : 0u;
+    }
+
+    bass_delta = (bass_drive > prev_bass) ? (uint8_t)(bass_drive - prev_bass) : 0u;
+    kick_gate = (uint8_t)(16u + ((uint16_t)(255u - contrast) / 14u));
+    bass_trigger = (bass_delta > (uint8_t)(kick_gate / 2u)) && bass_drive > 24u;
+    kick_trigger = (audio_impact_level > 96u) ||
+                   (bass_delta > kick_gate && bass_drive > 36u);
+
+    if (kick_trigger) {
+      uint8_t trigger_level = audio_impact_level;
+      uint8_t transient = (uint8_t)(96u + mxfx_scale8(bass_delta, 159u));
+      if (transient > trigger_level) {
+        trigger_level = transient;
+      }
+      if (trigger_level > kick_pulse) {
+        kick_pulse = trigger_level;
+      }
+    } else {
+      uint8_t kick_decay =
+          (uint8_t)(10u + ((uint16_t)(255u - release) / 16u));
+      kick_pulse =
+          (kick_pulse > kick_decay) ? (uint8_t)(kick_pulse - kick_decay) : 0u;
+    }
+
+    if (visualizer_mode == 4u) {
+      if (bass_trigger || kick_trigger) {
+        ripple_active = true;
+        ripple_front = 0u;
+      }
+
+      if (ripple_active) {
+        uint8_t ripple_speed =
+            (uint8_t)(4u + ((uint16_t)effect_animation_speed() * 24u) / 255u);
+        ripple_front = (uint16_t)(ripple_front + ripple_speed);
+        if (ripple_front > (uint16_t)(255u + ripple_width + 24u)) {
+          ripple_active = false;
+        }
+      }
+    } else {
+      ripple_front = 0u;
+      ripple_active = false;
+    }
+  }
+
   if (background_glow == 0u) {
     glow_pulse = 0u;
     glow_floor = 0u;
@@ -100,7 +183,6 @@ static void effect_audio_spectrum(void) {
   } else {
     uint8_t band_energy_avg =
         (uint8_t)(band_energy_sum / LED_AUDIO_SPECTRUM_BAND_COUNT);
-    uint8_t bass_drive = (uint8_t)(bass_energy / 9u);
     uint8_t pulse_target =
         (uint8_t)((((uint16_t)bass_drive * 3u) +
                    ((uint16_t)band_energy_max * 2u) +
@@ -171,7 +253,9 @@ static void effect_audio_spectrum(void) {
     uint8_t r = 0u;
     uint8_t g = 0u;
     uint8_t b = 0u;
-    uint8_t mode = (uint8_t)(visualizer_mode & 0x03u);
+    uint8_t mode = visualizer_mode;
+    uint8_t ripple_level = 0u;
+    uint8_t ripple_dist = distance_to_center; /* overridden in case 4 with 2D distance */
 
     if (mirror && axis_norm >= 128u) {
       axis_warp = (uint16_t)(255u - axis_warp);
@@ -224,6 +308,32 @@ static void effect_audio_spectrum(void) {
       }
       peak_marker = (peak > 0u && row_bin_from_bottom == peak_rows);
       break;
+    case 4u:
+    {
+      /* Compute true 2-D circular distance from keyboard centre.
+       * mxfx_distance_u8 takes centred [-128,127] coordinates and returns
+       * the Euclidean distance (0-255 clamped).  The maximum distance at the
+       * corner of a 256×256 normalised grid is 128·√2 ≈ 181, so scale to
+       * the full 0-255 range so ripple_front parameters remain intuitive. */
+      int16_t rpx = (int16_t)x_norm - 128;
+      int16_t rpy = (int16_t)y_norm - 128;
+      uint16_t raw_d = mxfx_distance_u8(rpx, rpy);
+      ripple_dist = (raw_d >= 181u) ? 255u : (uint8_t)((raw_d * 255u) / 181u);
+
+      if (ripple_active) {
+        uint8_t ripple_pos =
+            (ripple_front > 255u) ? 255u : (uint8_t)ripple_front;
+        uint8_t delta = abs_u8_diff(ripple_dist, ripple_pos);
+        if (delta <= ripple_width) {
+          uint8_t safe_width = (ripple_width == 0u) ? 1u : ripple_width;
+          ripple_level =
+              (uint8_t)(((uint16_t)(safe_width - delta) * 255u) / safe_width);
+          lit = true;
+        }
+      }
+      peak_marker = false;
+      break;
+    }
     default:
       lit = (row_bin_from_bottom <= level_rows);
       peak_marker = (peak > 0u && row_bin_from_bottom == peak_rows);
@@ -234,22 +344,29 @@ static void effect_audio_spectrum(void) {
       value = 255u;
       sat = 255u;
     } else if (lit) {
-      uint8_t gradient_axis;
-      uint8_t vivid_curve;
-
-      if (mode == 2u) {
-        gradient_axis =
-            (uint8_t)(((uint16_t)col_bin_from_left * 255u) /
-                      (horizontal_bins - 1u));
+      if (mode == 4u) {
+        value = (uint8_t)(24u +
+                          scale_u8(ripple_level,
+                                    (uint8_t)(160u +
+                                              scale_u8(bass_drive, 95u))));
       } else {
-        uint8_t row_norm =
-            (uint8_t)(((uint16_t)row_bin_from_bottom * 255u) /
-                      (vertical_bins - 1u));
-        gradient_axis = (uint8_t)(255u - row_norm);
-      }
+        uint8_t gradient_axis;
+        uint8_t vivid_curve;
 
-      vivid_curve = scale_u8(gradient_axis, 220u);
-      value = (uint8_t)(40u + scale_u8(vivid_curve, 215u));
+        if (mode == 2u) {
+          gradient_axis =
+              (uint8_t)(((uint16_t)col_bin_from_left * 255u) /
+                        (horizontal_bins - 1u));
+        } else {
+          uint8_t row_norm =
+              (uint8_t)(((uint16_t)row_bin_from_bottom * 255u) /
+                        (vertical_bins - 1u));
+          gradient_axis = (uint8_t)(255u - row_norm);
+        }
+
+        vivid_curve = scale_u8(gradient_axis, 220u);
+        value = (uint8_t)(40u + scale_u8(vivid_curve, 215u));
+      }
 
       if (glow_boost > 0u) {
         uint16_t boosted = (uint16_t)value + glow_boost;
@@ -259,7 +376,14 @@ static void effect_audio_spectrum(void) {
       value = (mode == 3u) ? scale_u8(glow_floor, 132u) : glow_floor;
     }
 
-    if (mode == 2u) {
+    if (mode == 4u) {
+      hue =
+          (uint8_t)(base_hue + ((uint16_t)ripple_dist * hue_span) / 255u);
+      if (kick_pulse > 28u) {
+        hue = kick_hue;
+        sat = (kick_sat == 0u) ? 255u : kick_sat;
+      }
+    } else if (mode == 2u) {
       hue =
           (uint8_t)(base_hue + ((uint16_t)(255u - y_norm) * hue_span) / 255u);
     } else {
@@ -284,6 +408,25 @@ static void effect_audio_spectrum(void) {
     }
 
     led_matrix_hsv_to_rgb(hue, sat, value, &r, &g, &b);
+
+    if (mode == 4u && lit && kick_pulse > 0u) {
+      uint8_t kick_mix = mxfx_scale8(kick_pulse, 180u);
+      r = (uint8_t)((((uint16_t)r * (255u - kick_mix)) +
+                     ((uint16_t)kick_r * kick_mix)) /
+                    255u);
+      g = (uint8_t)((((uint16_t)g * (255u - kick_mix)) +
+                     ((uint16_t)kick_g * kick_mix)) /
+                    255u);
+      b = (uint8_t)((((uint16_t)b * (255u - kick_mix)) +
+                     ((uint16_t)kick_b * kick_mix)) /
+                    255u);
+
+      if (kick_pulse > 160u) {
+        mix_rgb_towards_white(
+            &r, &g, &b,
+            scale_u8((uint8_t)(kick_pulse - 160u), 200u));
+      }
+    }
 
     led_matrix_set_pixel_idx(i, r, g, b);
   }

@@ -614,6 +614,7 @@ class DebugPage(QWidget):
             f"  - Keyboard: {'Enabled' if options.get('keyboard_enabled') else 'Disabled'}",
             f"  - Gamepad:  {'Enabled' if options.get('gamepad_enabled') else 'Disabled'}",
             f"  - Raw HID:  {'Enabled' if options.get('raw_hid_echo', True) else 'Disabled'}",
+            f"  - LED Thermal Guard: {'Enabled' if options.get('led_thermal_protection_enabled') else 'Disabled'}",
             "",
             "LED Matrix:",
             f"  - Enabled:    {'Yes' if led_enabled else 'No'}",

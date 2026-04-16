@@ -71,6 +71,7 @@ static settings_key_t settings_default_key(uint8_t key_index);
 static void settings_default_effect_params(uint8_t effect_mode,
                                            uint8_t *params);
 static uint8_t settings_sanitize_effect_speed(uint8_t speed);
+static void settings_sanitize_options(settings_options_t *options);
 
 static void settings_default_rotary_binding(settings_rotary_binding_t *binding) {
   if (binding == NULL) {
@@ -321,6 +322,28 @@ static uint8_t settings_sanitize_advanced_tick_rate(uint8_t tick_rate) {
   }
 
   return tick_rate;
+}
+
+static void settings_sanitize_options(settings_options_t *options) {
+  settings_options_t defaults = SETTINGS_DEFAULT_OPTIONS;
+
+  if (options == NULL) {
+    return;
+  }
+
+  options->keyboard_enabled = options->keyboard_enabled ? 1u : 0u;
+  options->gamepad_enabled = options->gamepad_enabled ? 1u : 0u;
+  options->raw_hid_echo = options->raw_hid_echo ? 1u : 0u;
+  options->led_enabled = options->led_enabled ? 1u : 0u;
+  options->nkro_enabled = options->nkro_enabled ? 1u : 0u;
+
+  if (options->led_thermal_protection_enabled != 0u) {
+    options->led_thermal_protection_enabled = 1u;
+  }
+
+  if (options->reserved != 0u) {
+    options->reserved = defaults.reserved;
+  }
 }
 
 static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) {
@@ -854,7 +877,7 @@ static void settings_apply_runtime_from_current_profile(void) {
   led_matrix_set_raw_data(current_settings.led.pixels);
   led_matrix_set_enabled(current_settings.options.led_enabled != 0u);
 
-  led_matrix_set_effect((led_effect_mode_t)effect_mode);
+    led_matrix_set_effect((led_effect_mode_t)effect_mode);
   led_matrix_set_effect_params(
       current_settings.led_effect_params[effect_mode]);
   settings_sync_led_effect_speed_cache();
@@ -1179,6 +1202,8 @@ static void settings_set_defaults(void) {
   current_settings.options.raw_hid_echo = 0;
   current_settings.options.led_enabled = 1;
   current_settings.options.nkro_enabled = 1;
+  current_settings.options.led_thermal_protection_enabled = 1;
+  current_settings.options.reserved = 0u;
 
   // Default per-key settings follow the physical keyboard layout.
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
@@ -1234,7 +1259,7 @@ static void settings_set_defaults(void) {
   settings_sanitize_profile_advanced_layers(&current_settings.profiles[0u]);
   memset(current_settings.profile_names, 0, sizeof(current_settings.profile_names));
   settings_set_default_profile_name(0u, current_settings.profile_names[0u],
-                                    SETTINGS_PROFILE_NAME_LENGTH);
+                                      SETTINGS_PROFILE_NAME_LENGTH);
   settings_keyboard_name_cache_refresh();
   settings_profile_name_cache_refresh();
   settings_reset_led_effect_restore_state();
@@ -1268,6 +1293,7 @@ static bool settings_validate_current(const settings_t *s) {
 
 static bool settings_load_from_flash(void) {
   settings_t temp;
+  uint16_t source_version = 0u;
   uint8_t original_used_mask = 0u;
   bool needs_resave = false;
 
@@ -1275,6 +1301,8 @@ static bool settings_load_from_flash(void) {
   if (!flash_storage_read(0, &temp, sizeof(settings_t))) {
     return false;
   }
+
+  source_version = temp.version;
 
   if (!settings_validate_current(&temp)) {
     /* Full validation failed.  If the magic bytes are intact but the version or
@@ -1285,7 +1313,7 @@ static bool settings_load_from_flash(void) {
      * below; out-of-range values are clamped to defaults.  The migrated image
      * is re-saved immediately so future boots do not repeat the migration. */
     if (temp.magic_start != SETTINGS_MAGIC_START ||
-        temp.magic_end   != SETTINGS_MAGIC_END) {
+        temp.magic_end != SETTINGS_MAGIC_END) {
       return false;
     }
     temp.version = SETTINGS_VERSION;
@@ -1293,10 +1321,14 @@ static bool settings_load_from_flash(void) {
      * silently force boot-to-profile-0.  Reset it to NONE so behaviour is
      * identical to pre-migration firmware. */
     temp.default_profile_index = SETTINGS_DEFAULT_PROFILE_NONE;
+    if (source_version < SETTINGS_VERSION) {
+      temp.options.led_thermal_protection_enabled = 1u;
+    }
     needs_resave = true;
   }
 
   memcpy(&current_settings, &temp, sizeof(settings_t));
+  settings_sanitize_options(&current_settings.options);
   original_used_mask =
       (uint8_t)(current_settings.profile_used_mask & SETTINGS_PROFILE_MASK_ALL);
 
@@ -1439,8 +1471,19 @@ bool settings_set_nkro_enabled(bool enabled) {
   return true;
 }
 
+bool settings_is_led_thermal_protection_enabled(void) {
+  return current_settings.options.led_thermal_protection_enabled != 0u;
+}
+
+bool settings_set_led_thermal_protection_enabled(bool enabled) {
+  current_settings.options.led_thermal_protection_enabled = enabled ? 1u : 0u;
+  settings_mark_dirty();
+  return true;
+}
+
 bool settings_set_options(settings_options_t options) {
   bool was_enabled = current_settings.options.keyboard_enabled != 0u;
+  settings_sanitize_options(&options);
   current_settings.options = options;
 
   if (was_enabled && current_settings.options.keyboard_enabled == 0u) {
@@ -1449,7 +1492,7 @@ bool settings_set_options(settings_options_t options) {
     keyboard_nkro_hid_release_all();
   }
 
-  gamepad_hid_set_enabled(options.gamepad_enabled);
+  gamepad_hid_set_enabled(current_settings.options.gamepad_enabled != 0u);
   gamepad_hid_reload_settings();
   settings_mark_dirty();
   return true;

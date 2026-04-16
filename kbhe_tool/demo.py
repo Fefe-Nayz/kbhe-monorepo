@@ -56,6 +56,7 @@ class DemoDevice:
             "keyboard_enabled": True,
             "gamepad_enabled": True,
             "raw_hid_echo": False,
+            "led_thermal_protection_enabled": True,
         }
         self._nkro_enabled = True
         self._advanced_tick_rate = int(ADVANCED_TICK_RATE_DEFAULT)

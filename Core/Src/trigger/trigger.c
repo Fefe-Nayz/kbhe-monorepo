@@ -668,40 +668,40 @@ void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings) {
            sizeof(runtime->dynamic_zones));
 }
 
-static uint8_t trigger_runtime_active_layer(void) {
-    uint8_t layer = layout_get_active_layer_top();
-    if (layer >= SETTINGS_LAYER_COUNT) {
-        return 0u;
-    }
-
-    return layer;
-}
-
-static void trigger_reload_settings_for_layer(uint8_t layer) {
-    settings_key_t settings = {0};
-
-    for (uint8_t i = 0; i < NUM_KEYS; i++) {
-        if (settings_get_key_for_layer(i, layer, &settings)) {
-            trigger_apply_key_settings(i, &settings);
+    static uint8_t trigger_runtime_active_layer(void) {
+        uint8_t layer = layout_get_active_layer_top();
+        if (layer >= SETTINGS_LAYER_COUNT) {
+            return 0u;
         }
+
+        return layer;
     }
 
-    socd_load_settings();
-}
+    static void trigger_reload_settings_for_layer(uint8_t layer) {
+        settings_key_t settings = {0};
+
+        for (uint8_t i = 0; i < NUM_KEYS; i++) {
+            if (settings_get_key_for_layer(i, layer, &settings)) {
+                trigger_apply_key_settings(i, &settings);
+            }
+        }
+
+        socd_load_settings();
+    }
 
 void trigger_reload_settings(void) {
-    trigger_active_layer_cache = trigger_runtime_active_layer();
-    trigger_reload_settings_for_layer(trigger_active_layer_cache);
-}
-
-static void trigger_refresh_layer_runtime_settings(void) {
-    uint8_t layer = trigger_runtime_active_layer();
-    if (layer == trigger_active_layer_cache) {
-        return;
+        trigger_active_layer_cache = trigger_runtime_active_layer();
+        trigger_reload_settings_for_layer(trigger_active_layer_cache);
     }
 
-    trigger_active_layer_cache = layer;
-    trigger_reload_settings_for_layer(layer);
+    static void trigger_refresh_layer_runtime_settings(void) {
+        uint8_t layer = trigger_runtime_active_layer();
+        if (layer == trigger_active_layer_cache) {
+            return;
+        }
+
+        trigger_active_layer_cache = layer;
+        trigger_reload_settings_for_layer(layer);
 }
 
 uint16_t trigger_get_distance_01mm(uint8_t key) {
@@ -719,7 +719,7 @@ uint16_t trigger_get_distance_01mm(uint8_t key) {
 
 void trigger_init() {
     trigger_deferred_clear();
-    trigger_active_layer_cache = 0xFFu;
+        trigger_active_layer_cache = 0xFFu;
 
     for (int i = 0; i < NUM_KEYS; i++) {
         key_trigger_settings[i].primary_keycode = KC_NO;
