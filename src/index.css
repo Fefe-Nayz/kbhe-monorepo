@@ -171,6 +171,6 @@ html.windows-mica [data-slot="sidebar-container"].app-mica-sidebar [data-slot="s
     border-radius: calc(var(--radius) + 2px);
     overflow: clip;
     box-shadow: none;
-    backdrop-filter: saturate(140%) blur(24px);
+    /* backdrop-filter: saturate(140%) blur(24px); */
     -webkit-backdrop-filter: saturate(140%) blur(24px);
 }

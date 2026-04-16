@@ -3,6 +3,17 @@ import { useState } from "react";
 import { PageContent } from "@/components/shared/PageLayout";
 import { FormRow, SectionCard } from "@/components/shared/SectionCard";
 import { useTheme } from "@/components/theme-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -24,6 +35,7 @@ import {
   type StartupWindowMode,
 } from "@/lib/app-startup";
 import { useDeviceSession } from "@/lib/kbhe/session";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { toast } from "sonner";
 
 type ThemeMode = "light" | "dark" | "system";
@@ -32,6 +44,29 @@ const APP_QUERY_KEYS = {
   startupPreferences: ["app", "startup-preferences"] as const,
   launchOnStartup: ["app", "launch-on-startup"] as const,
 };
+
+const RESETTABLE_LOCAL_STORAGE_KEYS = new Set([
+  "keyboard-active-app-profile",
+  "keyboard-active-profile",
+]);
+
+const RESETTABLE_LOCAL_STORAGE_PREFIXES = [
+  "kbhe-",
+  "keyboard-profile:",
+];
+
+function shouldResetLocalStorageKey(key: string): boolean {
+  return RESETTABLE_LOCAL_STORAGE_KEYS.has(key)
+    || RESETTABLE_LOCAL_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+function resetAppLocalStorage(): void {
+  for (const key of Object.keys(localStorage)) {
+    if (shouldResetLocalStorageKey(key)) {
+      localStorage.removeItem(key);
+    }
+  }
+}
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: "system", label: "System" },
@@ -46,6 +81,7 @@ export default function AppSettings() {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const micaSupported = isWindowsMicaSupported();
   const [micaEnabled, setMicaEnabled] = useState<boolean>(() => getWindowsMicaEnabled());
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const startupPrefsQ = useQuery({
     queryKey: APP_QUERY_KEYS.startupPreferences,
@@ -86,6 +122,36 @@ export default function AppSettings() {
   });
 
   const startupMode = startupPrefsQ.data?.startupMode ?? "normal";
+
+  const resetAppMutation = useMutation({
+    mutationFn: async () => {
+      // Best effort: restore startup behavior before wiping local UI state.
+      try {
+        await setLaunchOnStartupEnabled(false);
+      } catch {
+        // Ignore autostart reset failures and continue with local reset.
+      }
+
+      try {
+        await setStartupPreferences({ startupMode: "normal" });
+      } catch {
+        // Ignore startup-mode reset failures and continue with local reset.
+      }
+
+      resetAppLocalStorage();
+    },
+    onSuccess: () => {
+      qc.clear();
+      toast.success("Application reset. Reloading...");
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 180);
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Failed to reset app data.";
+      toast.error(message);
+    },
+  });
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -182,6 +248,49 @@ export default function AppSettings() {
             <Switch checked={developerMode} onCheckedChange={(value) => setDeveloperMode(value)} />
           </FormRow>
         </SectionCard>
+
+        <SectionCard
+          title="Danger Zone"
+          description="Erase local app data and return settings to defaults."
+        >
+          <FormRow
+            label="Reset Application"
+            description="Clears local profiles, appearance settings, and developer preferences."
+          >
+            <Button
+              variant="destructive"
+              onClick={() => setResetDialogOpen(true)}
+              disabled={resetAppMutation.isPending}
+            >
+              Reset App
+            </Button>
+          </FormRow>
+        </SectionCard>
+
+        <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="mb-2 inline-flex size-10 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+                <IconAlertTriangle className="size-5" />
+              </div>
+              <AlertDialogTitle>Reset application data?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will remove local profiles and app preferences, reset startup options, and reload the app.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={resetAppMutation.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={resetAppMutation.isPending}
+                onClick={() => resetAppMutation.mutate()}
+              >
+                {resetAppMutation.isPending ? "Resetting..." : "Reset App"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </PageContent>
     </div>
   );

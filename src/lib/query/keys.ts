@@ -17,11 +17,27 @@ export const queryKeys = {
     lockStates: () => ["device", "lockStates"] as const,
   },
 
+  profile: {
+    active: () => ["profile", "active"] as const,
+    default: () => ["profile", "default"] as const,
+    names: () => ["profile", "names"] as const,
+    usedMask: () => ["profile", "usedMask"] as const,
+    ramOnly: () => ["profile", "ramOnly"] as const,
+  },
+
   keymap: {
-    allSettings: () => ["keymap", "allSettings"] as const,
-    keySettings: (index: number) => ["keymap", "keySettings", index] as const,
-    layerKeycode: (layer: number, key: number) => ["keymap", "layerKeycode", layer, key] as const,
-    allLayerKeycodes: (layer: number) => ["keymap", "layerKeycodes", layer] as const,
+    allSettings: (layer: number, profileIndex: number, runtimeSource: "device" | "app") =>
+      ["keymap", "allSettings", layer, profileIndex, runtimeSource] as const,
+    keySettings: (
+      index: number,
+      layer: number,
+      profileIndex: number,
+      runtimeSource: "device" | "app",
+    ) => ["keymap", "keySettings", index, layer, profileIndex, runtimeSource] as const,
+    layerKeycode: (layer: number, key: number, profileIndex: number) =>
+      ["keymap", "layerKeycode", layer, key, profileIndex] as const,
+    allLayerKeycodes: (layer: number, profileIndex: number) =>
+      ["keymap", "layerKeycodes", layer, profileIndex] as const,
   },
 
   gamepad: {

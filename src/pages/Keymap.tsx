@@ -42,20 +42,21 @@ export default function Keymap() {
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
   const updateKeyConfig = useKeyboardStore((s) => s.updateKeyConfig);
   const clearSelection = useKeyboardStore((s) => s.clearSelection);
-  const { status } = useDeviceSession();
+  const { status, activeProfileIndex } = useDeviceSession();
   const connected = status === "connected";
+  const profileContext = activeProfileIndex ?? -1;
   const { saveState, markSaving, markSaved } = useAutosave();
   const resolveKeycapLegend = useOSKeycapLegend();
 
   const layerKeycodes = useQuery({
-    queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer),
+    queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer, profileContext),
     queryFn: () => fetchAllLayerKeycodes(currentLayer),
     enabled: connected,
     staleTime: 30_000,
   });
 
   const setKeycodeMutation = useOptimisticMutation({
-    queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer),
+    queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer, profileContext),
     mutationFn: async ({ keyIndex, keycode }: { keyIndex: number; keycode: number }) => {
       markSaving();
       await kbheDevice.setLayerKeycode(currentLayer, keyIndex, keycode);

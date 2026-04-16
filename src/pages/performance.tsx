@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { CommitSlider } from "@/components/ui/commit-slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
+import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
 import { KEY_COUNT } from "@/lib/kbhe/protocol";
@@ -52,13 +53,14 @@ function isRapidTriggerPatch(patch: Partial<KeySettings>): boolean {
   );
 }
 
-async function fetchAllDetailedKeySettings(): Promise<KeySettings[]> {
+async function fetchAllDetailedKeySettings(profileIndex: number, layerIndex: number): Promise<KeySettings[]> {
   const settings: KeySettings[] = [];
   const batchSize = 8;
 
   for (let start = 0; start < KEY_COUNT; start += batchSize) {
     const end = Math.min(start + batchSize, KEY_COUNT);
-    const requests = Array.from({ length: end - start }, (_, i) => kbheDevice.getKeySettings(start + i));
+    const requests = Array.from({ length: end - start }, (_, i) =>
+      kbheDevice.getKeySettings(start + i, profileIndex, layerIndex));
     const results = await Promise.all(requests);
     for (const item of results) {
       if (item) settings.push(item);
@@ -71,9 +73,13 @@ async function fetchAllDetailedKeySettings(): Promise<KeySettings[]> {
 export default function Performance() {
   const queryClient = useQueryClient();
   const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
+  const currentLayer = useKeyboardStore((s) => s.currentLayer);
   const selectAll = useKeyboardStore((s) => s.selectAll);
   const clearSelection = useKeyboardStore((s) => s.clearSelection);
-  const { status } = useDeviceSession();
+  const runtimeSource = useProfileStore((s) => s.runtimeSource);
+  const status = useDeviceSession((s) => s.status);
+  const activeProfileIndex = useDeviceSession((s) => s.activeProfileIndex);
+  const profileContext = activeProfileIndex ?? 0;
   const connected = status === "connected";
   const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
@@ -96,14 +102,21 @@ export default function Performance() {
   // ── Queries ──
 
   const keySettingsQ = useQuery({
-    queryKey: queryKeys.keymap.keySettings(keyIndex ?? -1),
-    queryFn: () => keyIndex != null ? kbheDevice.getKeySettings(keyIndex) : null,
+    queryKey: queryKeys.keymap.keySettings(
+      keyIndex ?? -1,
+      currentLayer,
+      profileContext,
+      runtimeSource,
+    ),
+    queryFn: () => keyIndex != null
+      ? kbheDevice.getKeySettings(keyIndex, profileContext, currentLayer)
+      : null,
     enabled: connected && keyIndex != null,
   });
 
   const allSettingsQ = useQuery({
-    queryKey: queryKeys.keymap.allSettings(),
-    queryFn: fetchAllDetailedKeySettings,
+    queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+    queryFn: () => fetchAllDetailedKeySettings(profileContext, currentLayer),
     enabled: connected && selectedKeyIndexes.length > 1,
     staleTime: 15_000,
   });
@@ -212,7 +225,12 @@ export default function Performance() {
         }
       : patch;
 
-    await kbheDevice.setKeySettingsExtended(keyIndex, { ...settings, ...effectivePatch });
+    await kbheDevice.setKeySettingsExtended(keyIndex, {
+      ...settings,
+      ...effectivePatch,
+      profile_index: profileContext,
+      layer_index: currentLayer,
+    });
   });
 
   const liveFilterParams = useThrottledCall(async (params: FilterParams) => {
@@ -228,7 +246,12 @@ export default function Performance() {
   // Always send FULL settings to avoid firmware defaults overwriting unchanged fields.
 
   const keyMutation = useOptimisticMutation<KeySettings | null, KeyUpdateVars, void>({
-    queryKey: queryKeys.keymap.keySettings(keyIndex ?? -1),
+    queryKey: queryKeys.keymap.keySettings(
+      keyIndex ?? -1,
+      currentLayer,
+      profileContext,
+      runtimeSource,
+    ),
     mutationFn: async ({ patch, keyIndexes, enforceLinkedRapidSensitivity = false }) => {
       if (keyIndexes.length === 0) return;
       markSaving();
@@ -237,7 +260,7 @@ export default function Performance() {
           const base =
             targetKeyIndex === keyIndex && settings
               ? settings
-              : await kbheDevice.getKeySettings(targetKeyIndex);
+              : await kbheDevice.getKeySettings(targetKeyIndex, profileContext, currentLayer);
 
           if (!base) {
             throw new Error(`Unable to load key settings for key ${targetKeyIndex}`);
@@ -250,7 +273,12 @@ export default function Performance() {
               }
             : patch;
 
-          await kbheDevice.setKeySettingsExtended(targetKeyIndex, { ...base, ...effectivePatch });
+          await kbheDevice.setKeySettingsExtended(targetKeyIndex, {
+            ...base,
+            ...effectivePatch,
+            profile_index: profileContext,
+            layer_index: currentLayer,
+          });
         }),
       );
     },
@@ -270,8 +298,17 @@ export default function Performance() {
       await Promise.all(
         [
           ...vars.keyIndexes.map((targetKeyIndex) =>
-            queryClient.invalidateQueries({ queryKey: queryKeys.keymap.keySettings(targetKeyIndex) })),
-          queryClient.invalidateQueries({ queryKey: queryKeys.keymap.allSettings() }),
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.keymap.keySettings(
+                targetKeyIndex,
+                currentLayer,
+                profileContext,
+                runtimeSource,
+              ),
+            })),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+          }),
         ],
       );
       markSaved();
@@ -332,8 +369,17 @@ export default function Performance() {
 
       await Promise.all([
         ...selectedKeyIndexes.map((targetKeyIndex) =>
-          queryClient.invalidateQueries({ queryKey: queryKeys.keymap.keySettings(targetKeyIndex) })),
-        queryClient.invalidateQueries({ queryKey: queryKeys.keymap.allSettings() }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.keymap.keySettings(
+              targetKeyIndex,
+              currentLayer,
+              profileContext,
+              runtimeSource,
+            ),
+          })),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+        }),
       ]);
 
       markSaved();

@@ -480,6 +480,11 @@ export class KBHEDevice {
     return null;
   }
 
+  async ping(timeoutMs = 200): Promise<boolean> {
+    const response = await this.sendCommand(Command.GET_FIRMWARE_VERSION, [], timeoutMs);
+    return !!response && response.length >= 4;
+  }
+
   async getDeviceInfo(): Promise<DeviceIdentity | null> {
     const response = await this.sendCommand(Command.GET_DEVICE_INFO);
     if (response && response.length >= 62 && response[1] === Status.OK) {

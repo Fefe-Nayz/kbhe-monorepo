@@ -22,6 +22,7 @@ import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useKeyboardStore } from "@/stores/keyboard-store";
+import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
 import { KEY_BEHAVIORS, HID_KEYCODE_NAMES, SOCD_RESOLUTIONS, KEY_COUNT } from "@/lib/kbhe/protocol";
@@ -114,13 +115,14 @@ function menuFromBehavior(behavior: number): Exclude<AdvancedMenu, "socd"> | nul
   return null;
 }
 
-async function fetchAllDetailedKeySettings(): Promise<KeySettings[]> {
+async function fetchAllDetailedKeySettings(profileIndex: number, layerIndex: number): Promise<KeySettings[]> {
   const settings: KeySettings[] = [];
   const batchSize = 8;
 
   for (let start = 0; start < KEY_COUNT; start += batchSize) {
     const end = Math.min(start + batchSize, KEY_COUNT);
-    const requests = Array.from({ length: end - start }, (_, i) => kbheDevice.getKeySettings(start + i));
+    const requests = Array.from({ length: end - start }, (_, i) =>
+      kbheDevice.getKeySettings(start + i, profileIndex, layerIndex));
     const results = await Promise.all(requests);
     for (const item of results) {
       if (item) settings.push(item);
@@ -135,7 +137,10 @@ export default function AdvancedKeys() {
   const setSelectedKeys = useKeyboardStore((s) => s.setSelectedKeys);
   const currentLayer = useKeyboardStore((s) => s.currentLayer);
   const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
-  const { status } = useDeviceSession();
+  const runtimeSource = useProfileStore((s) => s.runtimeSource);
+  const status = useDeviceSession((s) => s.status);
+  const activeProfileIndex = useDeviceSession((s) => s.activeProfileIndex);
+  const profileContext = activeProfileIndex ?? 0;
   const connected = status === "connected";
   const resolveKeycapLegend = useOSKeycapLegend();
   const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
@@ -154,15 +159,22 @@ export default function AdvancedKeys() {
   const [selectedDynamicZone, setSelectedDynamicZone] = useState(0);
 
   const allSettingsQ = useQuery({
-    queryKey: queryKeys.keymap.allSettings(),
-    queryFn: fetchAllDetailedKeySettings,
+    queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+    queryFn: () => fetchAllDetailedKeySettings(profileContext, currentLayer),
     enabled: connected,
     staleTime: 15_000,
   });
 
   const activeSettingsQ = useQuery({
-    queryKey: queryKeys.keymap.keySettings(activeKeyIndex ?? -1),
-    queryFn: () => activeKeyIndex != null ? kbheDevice.getKeySettings(activeKeyIndex) : null,
+    queryKey: queryKeys.keymap.keySettings(
+      activeKeyIndex ?? -1,
+      currentLayer,
+      profileContext,
+      runtimeSource,
+    ),
+    queryFn: () => activeKeyIndex != null
+      ? kbheDevice.getKeySettings(activeKeyIndex, profileContext, currentLayer)
+      : null,
     enabled: connected && activeKeyIndex != null,
   });
 
@@ -208,19 +220,30 @@ export default function AdvancedKeys() {
     if (activeKeyIndex === keyIndex && settings) {
       return settings;
     }
-    return settingsByIndex.get(keyIndex) ?? await kbheDevice.getKeySettings(keyIndex);
-  }, [activeKeyIndex, settings, settingsByIndex]);
+    return settingsByIndex.get(keyIndex)
+      ?? await kbheDevice.getKeySettings(keyIndex, profileContext, currentLayer);
+  }, [activeKeyIndex, currentLayer, profileContext, settings, settingsByIndex]);
 
   const writeKeyPatch = useCallback(async (keyIndex: number, patch: Partial<KeySettings>) => {
     const base = await getBaseSettingsForKey(keyIndex);
     if (!base) {
       throw new Error(`Unable to load key settings for key ${keyIndex}`);
     }
-    await kbheDevice.setKeySettingsExtended(keyIndex, { ...base, ...patch });
-  }, [getBaseSettingsForKey]);
+    await kbheDevice.setKeySettingsExtended(keyIndex, {
+      ...base,
+      ...patch,
+      profile_index: profileContext,
+      layer_index: currentLayer,
+    });
+  }, [currentLayer, getBaseSettingsForKey, profileContext]);
 
   const keyMutation = useOptimisticMutation<KeySettings | null, Partial<KeySettings>>({
-    queryKey: queryKeys.keymap.keySettings(activeKeyIndex ?? -1),
+    queryKey: queryKeys.keymap.keySettings(
+      activeKeyIndex ?? -1,
+      currentLayer,
+      profileContext,
+      runtimeSource,
+    ),
     mutationFn: async (patch) => {
       if (activeKeyIndex == null) return;
       markSaving();
@@ -228,7 +251,9 @@ export default function AdvancedKeys() {
     },
     optimisticUpdate: (cur, patch) => cur ? { ...cur, ...patch } : cur ?? null,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.keymap.allSettings() });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+      });
       markSaved();
     },
     onError: markError,
@@ -239,14 +264,32 @@ export default function AdvancedKeys() {
       markSaving();
       await writeKeyPatch(keyIndex, patch);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.keymap.keySettings(keyIndex) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.keymap.allSettings() }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.keymap.keySettings(
+            keyIndex,
+            currentLayer,
+            profileContext,
+            runtimeSource,
+          ),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+        }),
       ]);
       markSaved();
     } catch (error) {
       markError(error);
     }
-  }, [markError, markSaved, markSaving, queryClient, writeKeyPatch]);
+  }, [
+    currentLayer,
+    markError,
+    markSaved,
+    markSaving,
+    profileContext,
+    queryClient,
+    runtimeSource,
+    writeKeyPatch,
+  ]);
 
   const assignBehaviorToKey = useCallback(async (
     keyIndex: number,
@@ -292,9 +335,25 @@ export default function AdvancedKeys() {
       ]);
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.keymap.keySettings(touch1) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.keymap.keySettings(touch2) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.keymap.allSettings() }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.keymap.keySettings(
+            touch1,
+            currentLayer,
+            profileContext,
+            runtimeSource,
+          ),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.keymap.keySettings(
+            touch2,
+            currentLayer,
+            profileContext,
+            runtimeSource,
+          ),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+        }),
       ]);
 
       markSaved();
@@ -327,8 +386,17 @@ export default function AdvancedKeys() {
 
       await Promise.all([
         ...Array.from(targets).map((index) =>
-          queryClient.invalidateQueries({ queryKey: queryKeys.keymap.keySettings(index) })),
-        queryClient.invalidateQueries({ queryKey: queryKeys.keymap.allSettings() }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.keymap.keySettings(
+              index,
+              currentLayer,
+              profileContext,
+              runtimeSource,
+            ),
+          })),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.keymap.allSettings(currentLayer, profileContext, runtimeSource),
+        }),
       ]);
 
       markSaved();

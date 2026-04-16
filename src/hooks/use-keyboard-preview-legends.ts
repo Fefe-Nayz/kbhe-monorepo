@@ -35,12 +35,13 @@ async function fetchAllLayerKeycodes(layer: number): Promise<Record<number, numb
 
 export function useKeyboardPreviewLegends() {
     const currentLayer = useKeyboardStore((s) => s.currentLayer);
-    const { status } = useDeviceSession();
+    const { status, activeProfileIndex } = useDeviceSession();
     const connected = status === "connected";
+    const profileContext = activeProfileIndex ?? -1;
     const resolveKeycapLegend = useOSKeycapLegend();
 
     const layerKeycodes = useQuery({
-        queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer),
+        queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer, profileContext),
         queryFn: () => fetchAllLayerKeycodes(currentLayer),
         enabled: connected,
         staleTime: 30_000,
