@@ -84,6 +84,9 @@ export default function Device() {
         case "gamepad": await kbheDevice.setGamepadEnabled(value); break;
         case "nkro": await kbheDevice.setNkroEnabled(value); break;
         case "led": await kbheDevice.ledSetEnabled(value); break;
+        case "led_thermal_protection":
+          await kbheDevice.setLedThermalProtectionEnabled(value);
+          break;
       }
     },
     onSuccess: () => void qc.invalidateQueries(),
@@ -287,6 +290,18 @@ export default function Device() {
               <FormRow label="LED Enabled">
                 <Switch checked={ledEnabledQ.data ?? false} disabled={!connected}
                   onCheckedChange={(v) => toggleMutation.mutate({ key: "led", value: v })} />
+              </FormRow>
+              <FormRow
+                label="LED Thermal Protection"
+                description="Limit LED brightness automatically when MCU temperature is high"
+              >
+                <Switch
+                  checked={optionsQ.data?.led_thermal_protection_enabled ?? true}
+                  disabled={!connected || !optionsQ.data}
+                  onCheckedChange={(v) =>
+                    toggleMutation.mutate({ key: "led_thermal_protection", value: v })
+                  }
+                />
               </FormRow>
             </div>
           </SectionCard>

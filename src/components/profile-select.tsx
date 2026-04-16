@@ -52,10 +52,6 @@ export function ProfileSelect() {
     used: Boolean(profileUsedMask & (1 << slot)),
   }));
 
-  const selectedValue = runtimeSource === "app" && activeAppProfileName
-    ? `app:${activeAppProfileName}`
-    : `device:${activeDeviceSlot ?? activeProfileIndex ?? -1}`;
-
   const items = [
     ...deviceProfiles.map((profile) => ({
       value: `device:${profile.slot}`,
@@ -67,7 +63,21 @@ export function ProfileSelect() {
     })),
   ];
 
-  const handleValueChange = (value: string) => {
+  const selectedCandidate = runtimeSource === "app" && activeAppProfileName
+    ? `app:${activeAppProfileName}`
+    : (activeDeviceSlot ?? activeProfileIndex) != null
+      ? `device:${activeDeviceSlot ?? activeProfileIndex}`
+      : null;
+
+  const selectedValue = selectedCandidate && items.some((item) => item.value === selectedCandidate)
+    ? selectedCandidate
+    : undefined;
+
+  const handleValueChange = (value: string | null) => {
+    if (typeof value !== "string" || value.length === 0) {
+      return;
+    }
+
     if (value.startsWith("device:")) {
       const slot = Number.parseInt(value.replace("device:", ""), 10);
       if (!Number.isFinite(slot)) return;
@@ -90,7 +100,7 @@ export function ProfileSelect() {
     <Select
       value={selectedValue}
       items={items}
-      onValueChange={(v) => handleValueChange(v as string)}
+      onValueChange={handleValueChange}
     >
       <SelectTrigger className="gap-1.5 text-xs font-medium">
         <IconLayoutGrid className="size-3.5 text-muted-foreground" />

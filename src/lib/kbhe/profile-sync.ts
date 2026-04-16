@@ -20,6 +20,7 @@ export interface FirmwareProfileSnapshot {
     keyboard_enabled: boolean
     gamepad_enabled: boolean
     raw_hid_echo: boolean
+    led_thermal_protection_enabled?: boolean
   } | null
   nkroEnabled: boolean | null
   advancedTickRate: number | null
@@ -173,13 +174,14 @@ export async function applyFirmwareProfileSnapshot(
     }
 
     if (snapshot.options) {
-      const keyboardOk = await kbheDevice.setKeyboardEnabled(snapshot.options.keyboard_enabled)
-      if (!keyboardOk) {
-        return false
-      }
-
-      const gamepadOk = await kbheDevice.setGamepadEnabled(snapshot.options.gamepad_enabled)
-      if (!gamepadOk) {
+      const optionsOk = await kbheDevice.setOptions({
+        keyboard_enabled: snapshot.options.keyboard_enabled,
+        gamepad_enabled: snapshot.options.gamepad_enabled,
+        raw_hid_echo: snapshot.options.raw_hid_echo,
+        led_thermal_protection_enabled:
+          snapshot.options.led_thermal_protection_enabled ?? true,
+      })
+      if (!optionsOk) {
         return false
       }
     }

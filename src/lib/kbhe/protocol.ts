@@ -124,6 +124,7 @@ export enum Command {
   GET_LED_EFFECT_SCHEMA = 0x77,
   SET_LED_AUDIO_SPECTRUM = 0x78,
   CLEAR_LED_AUDIO_SPECTRUM = 0x79,
+  SET_LED_ALPHA_MASK = 0x7a,
 
   GET_FILTER_ENABLED = 0x80,
   SET_FILTER_ENABLED = 0x81,
@@ -215,6 +216,7 @@ export enum LEDEffect {
   SOLID_REACTIVE_MULTI_NEXUS = 60,
   MULTI_SPLASH = 61,
   SOLID_MULTI_SPLASH = 62,
+  BASS_RIPPLE = 63,
   MATRIX = LEDEffect.NONE,
 }
 
@@ -282,6 +284,7 @@ export const LED_EFFECT_NAMES: Record<number, string> = {
   [LEDEffect.SOLID_REACTIVE_MULTI_NEXUS]: "Solid Reactive Multi Nexus",
   [LEDEffect.MULTI_SPLASH]: "Multi Splash",
   [LEDEffect.SOLID_MULTI_SPLASH]: "Solid Multi Splash",
+  [LEDEffect.BASS_RIPPLE]: "Bass Ripple",
 };
 
 export const GAMEPAD_AXES = {
@@ -670,6 +673,7 @@ export const LED_PARAM_TYPES = {
   BOOL: 2,
   HUE: 3,
   COLOR: 4,
+  ENUM: 5,
 } as const;
 
 export function invertMap(record: Record<string, number>): Record<number, string> {

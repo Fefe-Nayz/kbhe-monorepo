@@ -250,6 +250,13 @@ export interface DeviceIdentity {
   keyboard_name: string;
 }
 
+export interface DeviceOptions {
+  keyboard_enabled: boolean;
+  gamepad_enabled: boolean;
+  raw_hid_echo: boolean;
+  led_thermal_protection_enabled: boolean;
+}
+
 type DevicePathLogger = ((message: string) => void) | undefined;
 
 export class KBHEDevice {
@@ -530,20 +537,32 @@ export class KBHEDevice {
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
-  async getOptions(): Promise<{
-    keyboard_enabled: boolean;
-    gamepad_enabled: boolean;
-    raw_hid_echo: boolean;
-  } | null> {
+  async getOptions(): Promise<DeviceOptions | null> {
     const response = await this.sendCommand(Command.GET_OPTIONS);
     if (response && response.length >= 5 && response[1] === Status.OK) {
       return {
         keyboard_enabled: Boolean(response[2]),
         gamepad_enabled: Boolean(response[3]),
         raw_hid_echo: Boolean(response[4]),
+        led_thermal_protection_enabled: response.length >= 6 ? Boolean(response[5]) : true,
       };
     }
     return null;
+  }
+
+  async setOptions(options: DeviceOptions): Promise<boolean> {
+    const response = await this.sendCommand(
+      Command.SET_OPTIONS,
+      [
+        0,
+        options.keyboard_enabled ? 1 : 0,
+        options.gamepad_enabled ? 1 : 0,
+        options.raw_hid_echo ? 1 : 0,
+        options.led_thermal_protection_enabled ? 1 : 0,
+      ],
+      3000,
+    );
+    return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
   async setKeyboardEnabled(enabled: boolean): Promise<boolean> {
@@ -554,6 +573,18 @@ export class KBHEDevice {
   async setGamepadEnabled(enabled: boolean): Promise<boolean> {
     const response = await this.sendCommand(Command.SET_GAMEPAD_ENABLED, [0, enabled ? 1 : 0], 3000);
     return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  async setLedThermalProtectionEnabled(enabled: boolean): Promise<boolean> {
+    const current = await this.getOptions();
+    if (!current) {
+      return false;
+    }
+
+    return this.setOptions({
+      ...current,
+      led_thermal_protection_enabled: enabled,
+    });
   }
 
   async getNkroEnabled(): Promise<boolean | null> {
@@ -1517,6 +1548,16 @@ export class KBHEDevice {
 
   async clearAudioSpectrum(): Promise<boolean> {
     const response = await this.sendCommand(Command.CLEAR_LED_AUDIO_SPECTRUM);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  async setAlphaMask(maskBytes: number[]): Promise<boolean> {
+    const len = maskBytes.length & 0xff;
+    const response = await this.sendCommand(Command.SET_LED_ALPHA_MASK, [
+      0,
+      len,
+      ...maskBytes,
+    ]);
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 

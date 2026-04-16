@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
  * Maps DOM KeyboardEvent.code → HID keycode (subset for printable keys).
  * Reversed: HID keycode → DOM code, so we can look up the OS label.
  */
-const HID_TO_DOM_CODE: Record<number, string> = {
+export const HID_TO_DOM_CODE: Record<number, string> = {
   0x04: "KeyA", 0x05: "KeyB", 0x06: "KeyC", 0x07: "KeyD",
   0x08: "KeyE", 0x09: "KeyF", 0x0a: "KeyG", 0x0b: "KeyH",
   0x0c: "KeyI", 0x0d: "KeyJ", 0x0e: "KeyK", 0x0f: "KeyL",
@@ -52,14 +52,14 @@ const ALIGN4_LINE_TO_SLOT = [0, 6, 2, 8] as const;
 
 type LayoutMap = Map<string, string>;
 
-interface OsKeyVariantEntry {
+export interface OsKeyVariantEntry {
   base?: string;
   shift?: string;
   altGr?: string;
   shiftAltGr?: string;
 }
 
-type OsKeyVariantMap = Record<string, OsKeyVariantEntry>;
+export type OsKeyVariantMap = Record<string, OsKeyVariantEntry>;
 
 interface OsLegendCacheState {
   layoutMap: LayoutMap | null;
@@ -179,7 +179,7 @@ async function getOSLayoutMap(): Promise<LayoutMap | null> {
   return null;
 }
 
-async function getOsKeyVariantsFromSystem(): Promise<OsKeyVariantMap | null> {
+export async function getOsKeyVariantsFromSystem(): Promise<OsKeyVariantMap | null> {
   try {
     return await invoke<OsKeyVariantMap>("kbhe_get_os_key_variants");
   } catch {

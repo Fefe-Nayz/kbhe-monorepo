@@ -10,6 +10,7 @@ import { ThemeButton } from "@/components/nav-components/themeButton";
 import { ProfileSelect } from "@/components/profile-select";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { useAudioSpectrumService } from "@/lib/kbhe/useAudioSpectrumService";
+import { useAlphaMaskService } from "@/lib/kbhe/useAlphaMaskService";
 import Dashboard from "@/pages/Dashboard";
 import Profiles from "@/pages/Profiles";
 import Keymap from "@/pages/Keymap";
@@ -82,6 +83,7 @@ export function AppShell() {
   const developerMode = useDeviceSession((s) => s.developerMode);
   const pageTitle = getPageTitle(location.pathname);
   useAudioSpectrumService();
+  useAlphaMaskService();
 
   useEffect(() => {
     const handler = () => {

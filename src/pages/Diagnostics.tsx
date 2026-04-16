@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Sparkline } from "@/components/ui/sparkline";
 import {
   Select,
   SelectContent,
@@ -75,6 +76,15 @@ const Y_DEFAULTS: Record<DataType, [number, number]> = {
 
 const CHART_W = 800;
 const CHART_H = 280;
+const MCU_TREND_POINTS = 40;
+
+function pushTrend(history: number[], value: number, maxPoints = MCU_TREND_POINTS): number[] {
+  const next = [...history, value];
+  if (next.length > maxPoints) {
+    next.splice(0, next.length - maxPoints);
+  }
+  return next;
+}
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
@@ -728,6 +738,38 @@ function DebugTab({ connected, active }: { connected: boolean; active: boolean }
     refetchInterval: connected && active ? 500 : false,
   });
 
+  const [mcuTrends, setMcuTrends] = useState({
+    temperature: [] as number[],
+    vref: [] as number[],
+    coreClock: [] as number[],
+    scanRate: [] as number[],
+    loadPercent: [] as number[],
+    scanCycle: [] as number[],
+    work: [] as number[],
+    loadPermille: [] as number[],
+  });
+
+  useEffect(() => {
+    const metrics = mcuQ.data;
+    if (!metrics) {
+      return;
+    }
+
+    setMcuTrends((prev) => ({
+      temperature:
+        metrics.temperature_valid && metrics.temperature_c != null
+          ? pushTrend(prev.temperature, metrics.temperature_c)
+          : prev.temperature,
+      vref: pushTrend(prev.vref, metrics.vref_mv),
+      coreClock: pushTrend(prev.coreClock, metrics.core_clock_hz),
+      scanRate: pushTrend(prev.scanRate, metrics.scan_rate_hz),
+      loadPercent: pushTrend(prev.loadPercent, metrics.load_percent),
+      scanCycle: pushTrend(prev.scanCycle, metrics.scan_cycle_us),
+      work: pushTrend(prev.work, metrics.work_us),
+      loadPermille: pushTrend(prev.loadPermille, metrics.load_permille),
+    }));
+  }, [mcuQ.data]);
+
   // Lock states
   const lockQ = useQuery({
     queryKey: queryKeys.device.lockStates(),
@@ -929,26 +971,53 @@ function DebugTab({ connected, active }: { connected: boolean; active: boolean }
               label="Temperature"
               value={
                 mcu.temperature_valid && mcu.temperature_c != null
-                  ? `${mcu.temperature_c}`
+                  ? mcu.temperature_c.toFixed(1)
                   : "—"
               }
-              unit={mcu.temperature_valid ? "°C" : ""}
+              unit={mcu.temperature_valid ? "deg C" : ""}
+              trendValues={mcuTrends.temperature}
             />
-            <MetricTile label="Vref" value={`${mcu.vref_mv}`} unit="mV" />
+            <MetricTile
+              label="Vref"
+              value={`${mcu.vref_mv}`}
+              unit="mV"
+              trendValues={mcuTrends.vref}
+            />
             <MetricTile
               label="Core Clock"
               value={`${(mcu.core_clock_hz / 1e6).toFixed(0)}`}
               unit="MHz"
+              trendValues={mcuTrends.coreClock}
             />
-            <MetricTile label="Scan Rate" value={`${mcu.scan_rate_hz}`} unit="Hz" />
+            <MetricTile
+              label="Scan Rate"
+              value={`${mcu.scan_rate_hz}`}
+              unit="Hz"
+              trendValues={mcuTrends.scanRate}
+            />
             <MetricTile
               label="CPU Load"
               value={mcu.load_percent.toFixed(1)}
               unit="%"
+              trendValues={mcuTrends.loadPercent}
             />
-            <MetricTile label="Scan Cycle" value={`${mcu.scan_cycle_us}`} unit="µs" />
-            <MetricTile label="Work" value={`${mcu.work_us}`} unit="µs" />
-            <MetricTile label="Load (‰)" value={`${mcu.load_permille}`} />
+            <MetricTile
+              label="Scan Cycle"
+              value={`${mcu.scan_cycle_us}`}
+              unit="us"
+              trendValues={mcuTrends.scanCycle}
+            />
+            <MetricTile
+              label="Work"
+              value={`${mcu.work_us}`}
+              unit="us"
+              trendValues={mcuTrends.work}
+            />
+            <MetricTile
+              label="Load (permille)"
+              value={`${mcu.load_permille}`}
+              trendValues={mcuTrends.loadPermille}
+            />
           </div>
         )}
       </SectionCard>
@@ -989,6 +1058,10 @@ function DebugTab({ connected, active }: { connected: boolean; active: boolean }
             on={nkroQ.data == null ? undefined : nkroQ.data}
           />
           <ConfigRow label="Raw HID Echo" on={opts?.raw_hid_echo} />
+          <ConfigRow
+            label="LED Thermal Protection"
+            on={opts?.led_thermal_protection_enabled}
+          />
           {gamepadQ.data && (
             <ConfigRow
               label="Gamepad API"
@@ -1208,11 +1281,13 @@ function MetricTile({
   value,
   unit,
   badge,
+  trendValues,
 }: {
   label: string;
   value?: string;
   unit?: string;
   badge?: string;
+  trendValues?: number[];
 }) {
   return (
     <div className="rounded-lg border p-2">
@@ -1222,10 +1297,13 @@ function MetricTile({
           {badge}
         </Badge>
       ) : (
-        <p className="text-lg font-semibold tabular-nums">
-          {value}{" "}
-          {unit && <span className="text-xs font-normal text-muted-foreground">{unit}</span>}
-        </p>
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <p className="text-lg font-semibold tabular-nums">
+            {value}{" "}
+            {unit && <span className="text-xs font-normal text-muted-foreground">{unit}</span>}
+          </p>
+          <Sparkline values={trendValues ?? []} className="w-16" />
+        </div>
       )}
     </div>
   );

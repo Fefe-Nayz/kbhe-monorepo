@@ -38,6 +38,10 @@ import { PageContent } from "@/components/shared/PageLayout";
 
 type FlashState = "idle" | "flashing" | "success" | "error";
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export default function Firmware() {
   const { status, firmwareVersion, developerMode } = useDeviceSession();
   const connected = status === "connected" || status === "updater";
@@ -364,10 +368,23 @@ export default function Firmware() {
     setFlashProgress(0);
     setFlashLog([]);
 
+    const reconnectSession = async () => {
+      appendLog("Reconnecting device session...");
+      await delay(1200);
+      try {
+        await DeviceSessionManager.connect();
+        appendLog("Reconnected successfully.");
+      } catch (reconnectError) {
+        const reconnectMsg = reconnectError instanceof Error ? reconnectError.message : String(reconnectError);
+        appendLog(`Reconnect failed: ${reconnectMsg}`);
+      }
+    };
+
     try {
+      await delay(0);
       appendLog("Preparing flash session...");
       await DeviceSessionManager.disconnect();
-      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+      await delay(250);
 
       let finalVersion: number;
 
@@ -433,15 +450,7 @@ export default function Firmware() {
       appendLog(`Error: ${msg}`);
       setFlashState("error");
     } finally {
-      appendLog("Reconnecting device session…");
-      await new Promise<void>((resolve) => setTimeout(resolve, 1200));
-      try {
-        await DeviceSessionManager.connect();
-        appendLog("Reconnected successfully.");
-      } catch (reconnectError) {
-        const reconnectMsg = reconnectError instanceof Error ? reconnectError.message : String(reconnectError);
-        appendLog(`Reconnect failed: ${reconnectMsg}`);
-      }
+      void reconnectSession();
     }
   }, [firmwareBytes, filePath, fileVersion, timeoutSec, retries, appendLog]);
 

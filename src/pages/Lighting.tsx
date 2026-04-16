@@ -7,9 +7,9 @@ import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import {
   LEDEffect, KEY_COUNT, LED_EFFECT_NAMES, LED_PARAM_TYPES,
-  LED_EFFECT_PARAM_SPEED,
+  LED_EFFECT_PARAM_SPEED, LED_EFFECT_PARAM_COUNT,
 } from "@/lib/kbhe/protocol";
-import { EFFECT_PARAM_NAMES } from "@/lib/kbhe/effectParamNames";
+import { EFFECT_PARAM_ENUM_OPTIONS, EFFECT_PARAM_NAMES } from "@/lib/kbhe/effectParamNames";
 import BaseKeyboard from "@/components/baseKeyboard";
 
 import { queryKeys } from "@/lib/query/keys";
@@ -19,9 +19,18 @@ import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { ColorPicker, type RGBColor } from "@/components/color-picker";
 import { Switch } from "@/components/ui/switch";
 import { CommitSlider } from "@/components/ui/commit-slider";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   IconBrush,
   IconTrash,
@@ -29,6 +38,7 @@ import {
   IconDownload,
   IconFileImport,
   IconFileExport,
+  IconRestore,
 } from "@tabler/icons-react";
 
 // ---------------------------------------------------------------------------
@@ -182,7 +192,21 @@ export default function Lighting() {
   const qc = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
   const [paintColor, setPaintColor] = useState<RGBColor>({ r: 255, g: 0, b: 0 });
+  const [effectSearch, setEffectSearch] = useState("");
+  const [liveKeyboardPreviewEnabled, setLiveKeyboardPreviewEnabled] = useState(true);
+  const [liveParamValues, setLiveParamValues] = useState<Record<number, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredEffects = useMemo(() => {
+    const query = effectSearch.trim().toLowerCase();
+    if (!query) {
+      return ALL_EFFECTS;
+    }
+
+    return ALL_EFFECTS.filter((effect) =>
+      effect.name.toLowerCase().includes(query) || String(effect.id).includes(query),
+    );
+  }, [effectSearch]);
 
   // ---- Queries ----
 
@@ -216,6 +240,10 @@ export default function Lighting() {
 
   const currentEffect = effectQ.data ?? LEDEffect.NONE;
 
+  useEffect(() => {
+    setLiveParamValues({});
+  }, [currentEffect]);
+
   const paramsQ = useQuery({
     queryKey: queryKeys.led.effectParams(currentEffect),
     queryFn: () => kbheDevice.getLedEffectParams(currentEffect),
@@ -232,7 +260,7 @@ export default function Lighting() {
   });
 
   const isMatrixMode = currentEffect === LEDEffect.MATRIX;
-  const liveMatrixPolling = connected && !isMatrixMode && pageVisible;
+  const liveMatrixPolling = connected && !isMatrixMode && pageVisible && liveKeyboardPreviewEnabled;
 
   const allPixelsQ = useQuery({
     queryKey: queryKeys.led.allPixels(),
@@ -413,6 +441,35 @@ export default function Lighting() {
     onSuccess: markSaved,
     onError: markError,
   });
+
+  const canResetEffectParams =
+    connected && !!schemaQ.data && !!paramsQ.data && !paramsMut.isPending;
+
+  const handleResetEffectParams = useCallback(() => {
+    if (!schemaQ.data || !paramsQ.data) {
+      return;
+    }
+
+    const next = [...paramsQ.data];
+    const descriptors = schemaQ.data.descriptors ?? [];
+
+    for (const descriptor of descriptors) {
+      if (descriptor.type === LED_PARAM_TYPES.NONE) {
+        continue;
+      }
+      if (descriptor.id < 0 || descriptor.id >= LED_EFFECT_PARAM_COUNT) {
+        continue;
+      }
+      next[descriptor.id] = descriptor.default_val & 0xff;
+    }
+
+    while (next.length < LED_EFFECT_PARAM_COUNT) {
+      next.push(0);
+    }
+
+    setLiveParamValues({});
+    paramsMut.mutate(next);
+  }, [paramsQ.data, schemaQ.data, paramsMut]);
 
   const fillMut = useMutation({
     mutationFn: async (c: RGBColor) => { markSaving(); await kbheDevice.ledFill(c.r, c.g, c.b); },
@@ -599,6 +656,9 @@ export default function Lighting() {
     let i = 0;
     while (i < activeDescriptors.length) {
       const desc = activeDescriptors[i];
+      const label = desc.id === LED_EFFECT_PARAM_SPEED
+        ? "Speed"
+        : (EFFECT_PARAM_NAMES[currentEffect]?.[desc.id] ?? `Param ${desc.id}`);
 
       if (desc.type === LED_PARAM_TYPES.COLOR) {
         // Collect R, G, B triplet
@@ -641,7 +701,7 @@ export default function Lighting() {
         const checked = (params[desc.id] ?? desc.default_val) > 0;
         rendered.push(
           <div key={desc.id} className="flex items-center justify-between">
-            <Label className="text-sm">Param {desc.id}</Label>
+            <Label className="text-sm">{label}</Label>
             <Switch
               checked={checked}
               disabled={!connected || !paramsLoaded}
@@ -657,29 +717,100 @@ export default function Lighting() {
         continue;
       }
 
+      {
+        const explicitEnumOptions = EFFECT_PARAM_ENUM_OPTIONS[currentEffect]?.[desc.id];
+        const fallbackEnumOptions =
+          desc.type === LED_PARAM_TYPES.ENUM &&
+          desc.max >= desc.min &&
+          desc.max - desc.min <= 16
+            ? Array.from({ length: desc.max - desc.min + 1 }, (_, idx) => {
+              const value = desc.min + idx;
+              return { value, label: `Option ${value}` };
+            })
+            : undefined;
+        const enumOptions = explicitEnumOptions ?? fallbackEnumOptions;
+
+        if (enumOptions && enumOptions.length > 0) {
+          const rawValue = params[desc.id] ?? desc.default_val;
+          const selectedValue = enumOptions.some((opt) => opt.value === rawValue)
+            ? rawValue
+            : enumOptions[0].value;
+          const selectedOptionLabel =
+            enumOptions.find((opt) => opt.value === selectedValue)?.label ?? `Option ${selectedValue}`;
+
+          rendered.push(
+            <div key={desc.id} className="flex items-center justify-between gap-3">
+              <Label className="text-sm">{label}</Label>
+              <Select
+                value={String(selectedValue)}
+                disabled={!connected || !paramsLoaded}
+                onValueChange={(value) => {
+                  const parsed = Number(value);
+                  if (!Number.isFinite(parsed)) {
+                    return;
+                  }
+                  const next = [...params];
+                  next[desc.id] = parsed & 0xff;
+                  paramsMut.mutate(next);
+                }}
+              >
+                <SelectTrigger className="h-8 w-56 text-sm">
+                  <SelectValue>{selectedOptionLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {enumOptions.map((option) => (
+                      <SelectItem key={`${desc.id}-${option.value}`} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>,
+          );
+          i++;
+          continue;
+        }
+      }
+
       // U8 and HUE both render as sliders
       const val = params[desc.id] ?? desc.default_val;
+      const displayVal = liveParamValues[desc.id] ?? val;
       const sMin = desc.min;
       const sMax = desc.type === LED_PARAM_TYPES.HUE ? 255 : desc.max;
-      const label = desc.id === LED_EFFECT_PARAM_SPEED
-        ? "Speed"
-        : (EFFECT_PARAM_NAMES[currentEffect]?.[desc.id] ?? `Param ${desc.id}`);
       rendered.push(
-        <div key={desc.id} className="grid gap-1.5">
+        <div key={desc.id} className="grid gap-1">
           <div className="flex items-center justify-between">
             <Label className="text-sm">{label}</Label>
+            <span className="text-xs font-mono tabular-nums text-muted-foreground">{displayVal}</span>
           </div>
           <CommitSlider
             min={sMin}
             max={sMax}
             step={desc.step || 1}
-            value={val}
+            value={displayVal}
+            hideValue
             onLiveChange={(v) => {
+              setLiveParamValues((prev) => {
+                if (prev[desc.id] === v) {
+                  return prev;
+                }
+                return { ...prev, [desc.id]: v };
+              });
               const next = [...params];
               next[desc.id] = v;
               liveParams(next);
             }}
             onCommit={(v) => {
+              setLiveParamValues((prev) => {
+                if (!(desc.id in prev)) {
+                  return prev;
+                }
+                const next = { ...prev };
+                delete next[desc.id];
+                return next;
+              });
               const next = [...params];
               next[desc.id] = v;
               paramsMut.mutate(next);
@@ -691,7 +822,7 @@ export default function Lighting() {
       i++;
     }
 
-    return <div className="flex flex-col gap-3">{rendered}</div>;
+    return <div className="flex flex-col gap-4">{rendered}</div>;
   }
 
   const previewKeyColorMap = useMemo(() => {
@@ -738,7 +869,7 @@ export default function Lighting() {
         <span className="block truncate text-xs text-muted-foreground">
           {matrixToolsVisible
             ? "Matrix mode actif - peins directement sur le clavier"
-            : `Apercu live (lecture seule) - ${effectName(currentEffect)}`}
+            : `${liveKeyboardPreviewEnabled ? "Apercu live" : "Apercu statique"} (lecture seule) - ${effectName(currentEffect)}`}
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -787,6 +918,29 @@ export default function Lighting() {
                   />
                 </div>
               </FormRow>
+              <FormRow label="FPS Limit">
+                <div className="flex items-center gap-3 w-44">
+                  <CommitSlider
+                    min={0} max={120} step={1}
+                    value={fpsQ.data ?? 0}
+                    onLiveChange={(v) => liveFps(v)}
+                    onCommit={(v) => fpsMut.mutate(v)}
+                    disabled={!connected || fpsQ.data == null}
+                    className="flex-1"
+                  />
+                </div>
+              </FormRow>
+              {!isMatrixMode && (
+                <FormRow
+                  label="Live Keyboard"
+                  description="Toggle real-time keyboard preview updates outside Matrix mode"
+                >
+                  <Switch
+                    checked={liveKeyboardPreviewEnabled}
+                    onCheckedChange={setLiveKeyboardPreviewEnabled}
+                  />
+                </FormRow>
+              )}
             </div>
           </SectionCard>
 
@@ -794,19 +948,31 @@ export default function Lighting() {
             title="Effect Mode"
             description={effectName(currentEffect)}
           >
-            <RadioGroup
-              value={String(effectQ.data ?? currentEffect)}
-              onValueChange={(v: string) => effectMut.mutate(Number(v))}
-              disabled={!connected || effectQ.data == null}
-              className="grid grid-cols-2 gap-x-6 gap-y-1.5"
-            >
-              {ALL_EFFECTS.map((eff) => (
-                <div key={eff.id} className="flex items-center gap-2">
-                  <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
-                  <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
-                </div>
-              ))}
-            </RadioGroup>
+            <div className="mb-3">
+              <Input
+                value={effectSearch}
+                onChange={(event) => setEffectSearch(event.target.value)}
+                placeholder="Search effects..."
+                className="h-8"
+              />
+            </div>
+            {filteredEffects.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No effect matches your search.</p>
+            ) : (
+              <RadioGroup
+                value={String(effectQ.data ?? currentEffect)}
+                onValueChange={(v: string) => effectMut.mutate(Number(v))}
+                disabled={!connected || effectQ.data == null}
+                className="grid grid-cols-2 gap-x-6 gap-y-1.5"
+              >
+                {filteredEffects.map((eff) => (
+                  <div key={eff.id} className="flex items-center gap-2">
+                    <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
+                    <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            )}
             {currentEffect === LEDEffect.AUDIO_SPECTRUM && (
               <p className={`mt-3 text-xs border-t pt-3 ${connected && pageVisible ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                 {connected && pageVisible
@@ -816,53 +982,52 @@ export default function Lighting() {
             )}
           </SectionCard>
 
-          <SectionCard title="Matrix Transfer">
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" disabled={!connected || !pixelColors} onClick={() => {
-                if (pixelColors) {
-                  uploadMut.mutate(rgbArrayToPixels(pixelColors));
-                }
-              }}>
-                <IconUpload className="size-3.5 mr-1" />Upload All
-              </Button>
-              <Button variant="outline" size="sm" disabled={!connected} onClick={() => downloadMut.mutate()}>
-                <IconDownload className="size-3.5 mr-1" />Download All
-              </Button>
-              <div className="w-px bg-border mx-1 self-stretch" />
-              <Button variant="outline" size="sm" onClick={handleExport} disabled={!connected || (!matrixPixels && !allPixelsQ.data)}>
-                <IconFileExport className="size-3.5 mr-1" />Export .led
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!connected}>
-                <IconFileImport className="size-3.5 mr-1" />Import .led
-              </Button>
-              <input ref={fileInputRef} type="file" accept=".led" className="hidden" aria-label="Import .led file" onChange={handleImport} />
-            </div>
-          </SectionCard>
+          {isMatrixMode && (
+            <SectionCard title="Matrix Transfer">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" disabled={!connected || !pixelColors} onClick={() => {
+                  if (pixelColors) {
+                    uploadMut.mutate(rgbArrayToPixels(pixelColors));
+                  }
+                }}>
+                  <IconUpload className="size-3.5 mr-1" />Upload All
+                </Button>
+                <Button variant="outline" size="sm" disabled={!connected} onClick={() => downloadMut.mutate()}>
+                  <IconDownload className="size-3.5 mr-1" />Download All
+                </Button>
+                <div className="w-px bg-border mx-1 self-stretch" />
+                <Button variant="outline" size="sm" onClick={handleExport} disabled={!connected || (!matrixPixels && !allPixelsQ.data)}>
+                  <IconFileExport className="size-3.5 mr-1" />Export .led
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!connected}>
+                  <IconFileImport className="size-3.5 mr-1" />Import .led
+                </Button>
+                <input ref={fileInputRef} type="file" accept=".led" className="hidden" aria-label="Import .led file" onChange={handleImport} />
+              </div>
+            </SectionCard>
+          )}
         </div>
 
         {/* Right column */}
-        <div className="flex flex-col gap-4">
+        <div className="flex h-fit self-start flex-col gap-4 lg:sticky lg:top-4">
           <SectionCard
             title="Effect Tuning"
             description={effectName(currentEffect)}
           >
             {renderEffectParams()}
-          </SectionCard>
-
-          <SectionCard title="FPS Limit">
-            <div className="flex items-center gap-3">
-              <CommitSlider
-                min={0} max={120} step={1}
-                value={fpsQ.data ?? 0}
-                onLiveChange={(v) => liveFps(v)}
-                onCommit={(v) => fpsMut.mutate(v)}
-                disabled={!connected || fpsQ.data == null}
-                className="flex-1"
-              />
+            <div className="mt-4 border-t pt-3">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleResetEffectParams}
+                disabled={!canResetEffectParams}
+                className="w-full"
+              >
+                <IconRestore className="mr-1 size-4" />
+                Reset Effect Params
+              </Button>
             </div>
           </SectionCard>
-
-
         </div>
       </div>
     </KeyboardEditor>

@@ -858,11 +858,28 @@ fn wait_for_device_absent(
 }
 
 #[tauri::command]
-pub fn kbhe_flash_firmware(
+pub async fn kbhe_flash_firmware(
     firmware_path: String,
     firmware_version: Option<u16>,
     app: AppHandle,
     state: State<'_, KbheTransportState>,
+) -> Result<(), String> {
+    {
+        let mut active = lock_active(&state)?;
+        *active = None;
+    }
+
+    tauri::async_runtime::spawn_blocking(move || {
+        kbhe_flash_firmware_blocking(firmware_path, firmware_version, app)
+    })
+    .await
+    .map_err(|error| format!("firmware flash worker failed: {error}"))?
+}
+
+fn kbhe_flash_firmware_blocking(
+    firmware_path: String,
+    firmware_version: Option<u16>,
+    app: AppHandle,
 ) -> Result<(), String> {
     let firmware =
         std::fs::read(&firmware_path).map_err(|e| format!("failed to read firmware: {e}"))?;
@@ -882,12 +899,6 @@ pub fn kbhe_flash_firmware(
 
     // Request bootloader from runtime device if not already in updater mode
     if find_updater_device()?.is_none() {
-        // Drop any existing state connection first
-        {
-            let mut active = lock_active(&state)?;
-            *active = None;
-        }
-
         // Open a fresh connection to the runtime device and send ENTER_BOOTLOADER.
         // This works whether or not the TypeScript side already disconnected — we
         // always enumerate from scratch so we're not relying on state.active.

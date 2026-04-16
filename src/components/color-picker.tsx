@@ -9,6 +9,7 @@ import {
   ColorPickerFormat,
   type ColorArray,
 } from "@/components/ui/color-picker"
+import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 
 export interface RGBColor {
@@ -77,21 +78,114 @@ function rgbaArrayToRgb(values: ColorArray): RGBColor {
   }
 }
 
+interface HSVColor {
+  h: number
+  s: number
+  v: number
+}
+
+function normalizeHue(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0
+  }
+  const wrapped = ((value % 360) + 360) % 360
+  return wrapped
+}
+
+function rgbToHsv(color: RGBColor): HSVColor {
+  const r = clampByte(color.r) / 255
+  const g = clampByte(color.g) / 255
+  const b = clampByte(color.b) / 255
+
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const delta = max - min
+
+  let hue = 0
+  if (delta > 0) {
+    if (max === r) {
+      hue = ((g - b) / delta) % 6
+    } else if (max === g) {
+      hue = (b - r) / delta + 2
+    } else {
+      hue = (r - g) / delta + 4
+    }
+    hue *= 60
+  }
+
+  const saturation = max === 0 ? 0 : (delta / max) * 100
+  const value = max * 100
+
+  return {
+    h: normalizeHue(hue),
+    s: clamp(saturation, 0, 100),
+    v: clamp(value, 0, 100),
+  }
+}
+
+function hsvToRgb(hsv: HSVColor): RGBColor {
+  const h = normalizeHue(hsv.h)
+  const s = clamp(hsv.s, 0, 100) / 100
+  const v = clamp(hsv.v, 0, 100) / 100
+
+  const c = v * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = v - c
+
+  let rPrime = 0
+  let gPrime = 0
+  let bPrime = 0
+
+  if (h < 60) {
+    rPrime = c
+    gPrime = x
+  } else if (h < 120) {
+    rPrime = x
+    gPrime = c
+  } else if (h < 180) {
+    gPrime = c
+    bPrime = x
+  } else if (h < 240) {
+    gPrime = x
+    bPrime = c
+  } else if (h < 300) {
+    rPrime = x
+    bPrime = c
+  } else {
+    rPrime = c
+    bPrime = x
+  }
+
+  return {
+    r: clampByte((rPrime + m) * 255),
+    g: clampByte((gPrime + m) * 255),
+    b: clampByte((bPrime + m) * 255),
+  }
+}
+
 export function ColorPicker({ color, onChange, onLiveChange, className }: ColorPickerProps) {
   const [open, setOpen] = useState(false)
   const [draftColor, setDraftColor] = useState<RGBColor | null>(null)
   const displayColor = draftColor ?? color
+  const displayHsv = rgbToHsv(displayColor)
 
   const draftColorRef = useRef<RGBColor>(color)
   const pendingCommitRef = useRef<RGBColor | null>(null)
   const clearDraftTimerRef = useRef<number | null>(null)
   const pointerInteractionRef = useRef(false)
+  const lastHueRef = useRef<number>(displayHsv.h)
 
   useEffect(() => {
     if (!draftColor) {
       draftColorRef.current = color
     }
   }, [color, draftColor])
+
+  useEffect(() => {
+    if (displayHsv.s > 0) {
+      lastHueRef.current = displayHsv.h
+    }
+  }, [displayHsv.h, displayHsv.s])
 
   useEffect(() => {
     const pending = pendingCommitRef.current
@@ -178,6 +272,54 @@ export function ColorPicker({ color, onChange, onLiveChange, className }: ColorP
     [pushLiveColor, commitColor],
   )
 
+  const handleSaturationChange = useCallback(
+    (value: number | readonly number[]) => {
+      const nextSaturation = typeof value === "number" ? value : value[0]
+      if (!Number.isFinite(nextSaturation)) {
+        return
+      }
+
+      const currentHsv = rgbToHsv(draftColorRef.current)
+      const hue = currentHsv.s > 0 ? currentHsv.h : lastHueRef.current
+      if (nextSaturation > 0) {
+        lastHueRef.current = hue
+      }
+
+      pushLiveColor(
+        hsvToRgb({
+          h: hue,
+          s: nextSaturation,
+          v: currentHsv.v,
+        }),
+      )
+    },
+    [pushLiveColor],
+  )
+
+  const handleBrightnessChange = useCallback(
+    (value: number | readonly number[]) => {
+      const nextBrightness = typeof value === "number" ? value : value[0]
+      if (!Number.isFinite(nextBrightness)) {
+        return
+      }
+
+      const currentHsv = rgbToHsv(draftColorRef.current)
+      const hue = currentHsv.s > 0 ? currentHsv.h : lastHueRef.current
+      if (currentHsv.s > 0) {
+        lastHueRef.current = hue
+      }
+
+      pushLiveColor(
+        hsvToRgb({
+          h: hue,
+          s: currentHsv.s,
+          v: nextBrightness,
+        }),
+      )
+    },
+    [pushLiveColor],
+  )
+
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
@@ -235,6 +377,34 @@ export function ColorPicker({ color, onChange, onLiveChange, className }: ColorP
               <ColorPickerSelection className="h-32 rounded-[calc(var(--radius)-3px)]" />
             </div>
             <ColorPickerHue />
+            <div className="grid gap-2">
+              <div className="grid gap-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Saturation</span>
+                  <span className="font-mono tabular-nums">{Math.round(displayHsv.s)}%</span>
+                </div>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={[Math.round(displayHsv.s)]}
+                  onValueChange={handleSaturationChange}
+                />
+              </div>
+              <div className="grid gap-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Brightness</span>
+                  <span className="font-mono tabular-nums">{Math.round(displayHsv.v)}%</span>
+                </div>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={[Math.round(displayHsv.v)]}
+                  onValueChange={handleBrightnessChange}
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <ColorPickerOutput />
               <ColorPickerFormat className="min-w-0 flex-1" />
