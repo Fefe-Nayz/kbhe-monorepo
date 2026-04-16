@@ -119,6 +119,7 @@ typedef enum {
   CMD_GET_LED_EFFECT_SCHEMA = 0x77, // Read param schema chunk for one effect
   CMD_SET_LED_AUDIO_SPECTRUM = 0x78, // Push host audio spectrum payload
   CMD_CLEAR_LED_AUDIO_SPECTRUM = 0x79, // Clear host audio spectrum state
+  CMD_SET_LED_ALPHA_MASK = 0x7A, // Set/clear alpha mask (len + bitmask bytes)
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
@@ -203,7 +204,8 @@ typedef struct __attribute__((packed)) {
   uint8_t keyboard_enabled;
   uint8_t gamepad_enabled;
   uint8_t raw_hid_echo;
-  uint8_t reserved[59];
+  uint8_t led_thermal_protection_enabled;
+  uint8_t reserved[58];
 } hid_packet_options_t;
 
 /**

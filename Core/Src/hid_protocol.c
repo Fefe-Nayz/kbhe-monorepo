@@ -24,6 +24,8 @@
 // External declarations for debug data
 //--------------------------------------------------------------------+
 
+#define HID_ALPHA_MASK_MAX_BYTES ((NUM_KEYS + 7u) / 8u)
+
 static inline bool is_valid_adc_calibration_value(int16_t value) {
   return value >= 0 && value <= 4095;
 }
@@ -286,6 +288,8 @@ static void cmd_get_options(const uint8_t *in, uint8_t *out) {
   resp->keyboard_enabled = opts.keyboard_enabled;
   resp->gamepad_enabled = opts.gamepad_enabled;
   resp->raw_hid_echo = opts.raw_hid_echo;
+  resp->led_thermal_protection_enabled =
+      opts.led_thermal_protection_enabled;
 }
 
 static void cmd_set_options(const uint8_t *in, uint8_t *out) {
@@ -296,6 +300,8 @@ static void cmd_set_options(const uint8_t *in, uint8_t *out) {
   opts.keyboard_enabled = req->keyboard_enabled ? 1 : 0;
   opts.gamepad_enabled = req->gamepad_enabled ? 1 : 0;
   opts.raw_hid_echo = req->raw_hid_echo ? 1 : 0;
+  opts.led_thermal_protection_enabled =
+      req->led_thermal_protection_enabled ? 1 : 0;
 
   bool success = settings_set_options(opts);
 
@@ -304,6 +310,8 @@ static void cmd_set_options(const uint8_t *in, uint8_t *out) {
   resp->keyboard_enabled = opts.keyboard_enabled;
   resp->gamepad_enabled = opts.gamepad_enabled;
   resp->raw_hid_echo = opts.raw_hid_echo;
+  resp->led_thermal_protection_enabled =
+      opts.led_thermal_protection_enabled;
 }
 
 static void cmd_get_keyboard_enabled(const uint8_t *in, uint8_t *out) {
@@ -2052,6 +2060,37 @@ static void cmd_clear_led_audio_spectrum(const uint8_t *in, uint8_t *out) {
   resp->status_or_len = HID_RESP_OK;
 }
 
+static void cmd_set_led_alpha_mask(const uint8_t *in, uint8_t *out) {
+  const hid_packet_t *req = (const hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  uint8_t mask_len = req->payload[0];
+  uint8_t mask_offset = 1u;
+
+  resp->command_id = CMD_SET_LED_ALPHA_MASK;
+
+  // Compatibility path for clients that keep a reserved byte at payload[0].
+  if (mask_len == 0u && req->payload[1] != 0u) {
+    mask_len = req->payload[1];
+    mask_offset = 2u;
+  }
+
+  if (mask_len > HID_ALPHA_MASK_MAX_BYTES) {
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  if (mask_len > (uint8_t)(sizeof(req->payload) - mask_offset)) {
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  led_matrix_set_alpha_mask(mask_len == 0u ? NULL : &req->payload[mask_offset],
+                            mask_len);
+
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = mask_len;
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Filter Commands
 //--------------------------------------------------------------------+
@@ -2733,6 +2772,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_CLEAR_LED_AUDIO_SPECTRUM:
     cmd_clear_led_audio_spectrum(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_ALPHA_MASK:
+    cmd_set_led_alpha_mask(in_packet, out_packet);
     break;
 
   // Filter commands

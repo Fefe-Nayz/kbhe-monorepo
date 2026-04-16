@@ -519,7 +519,8 @@ class KBHEDevice:
             return {
                 'keyboard_enabled': bool(resp[2]),
                 'gamepad_enabled': bool(resp[3]),
-                'raw_hid_echo': bool(resp[4])
+                'raw_hid_echo': bool(resp[4]),
+                'led_thermal_protection_enabled': bool(resp[5]) if len(resp) >= 6 else False,
             }
         return None
     

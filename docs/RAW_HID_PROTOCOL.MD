@@ -72,8 +72,8 @@ Codes status updater:
 
 | Commande | ID | Parametres requete | Reponse |
 |---|---:|---|---|
-| GET_OPTIONS | 0x20 | aucun | status, keyboard_enabled, gamepad_enabled, raw_hid_echo |
-| SET_OPTIONS | 0x21 | keyboard_enabled, gamepad_enabled, raw_hid_echo | status + echo des valeurs appliquees |
+| GET_OPTIONS | 0x20 | aucun | status, keyboard_enabled, gamepad_enabled, raw_hid_echo, led_thermal_protection_enabled |
+| SET_OPTIONS | 0x21 | keyboard_enabled, gamepad_enabled, raw_hid_echo, led_thermal_protection_enabled | status + echo des valeurs appliquees |
 | GET_KEYBOARD_ENABLED | 0x22 | aucun | status + value (0/1) |
 | SET_KEYBOARD_ENABLED | 0x23 | value (0/1) | status + value courant |
 | GET_GAMEPAD_ENABLED | 0x24 | aucun | status + value (0/1) |
@@ -93,6 +93,11 @@ Note option `raw_hid_echo`:
 
 - Le champ est bien persiste/expose via GET/SET_OPTIONS.
 - Dans l'implementation actuelle, il n'active/desactive pas un comportement runtime distinct (commande ECHO 0xFE toujours disponible).
+
+Note option `led_thermal_protection_enabled`:
+
+- Si activee, le firmware limite la luminosite LED a 96/255 quand la temperature MCU depasse 70 deg C.
+- Une hysteresis de 3 deg C est appliquee (retour a la luminosite normale en dessous de 67 deg C) pour eviter les oscillations.
 
 GET_DEVICE_INFO (0x2B) payload reponse:
 
@@ -589,6 +594,7 @@ RESET_KEY_TRIGGER_SETTINGS (0x58)
 | GET_LED_EFFECT_SCHEMA | 0x77 | effect_mode + chunk_index | status + effect_mode + chunk_index + total_chunks + total_active + descriptors |
 | SET_LED_AUDIO_SPECTRUM | 0x78 | band_count + bands + impact_level | status + echo payload |
 | CLEAR_LED_AUDIO_SPECTRUM | 0x79 | aucun | status |
+| SET_LED_ALPHA_MASK | 0x7A | mask_len + mask_bytes (len=0 pour clear) | status + mask_len applique |
 
 Notes generales LED:
 - La vitesse et les couleurs des effets sont uniquement transportees via
