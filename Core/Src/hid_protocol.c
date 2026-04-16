@@ -145,7 +145,7 @@ static inline void hid_fill_key_settings_packet(hid_packet_key_settings_t *resp,
   if (settings_key_is_tap_hold_uppercase_hold(key)) {
     resp->tap_hold_options |= SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK;
   }
-  resp->dks_bottom_out_point = key->advanced.dynamic_zone_count;
+  resp->dks_bottom_out_point = key->advanced.dks_bottom_out_point_tenths;
   resp->socd_fully_pressed_enabled =
       settings_key_is_socd_fully_pressed_enabled(key) ? 1u : 0u;
   resp->socd_fully_pressed_point =
@@ -466,6 +466,72 @@ static void cmd_reset_profile_slot(const uint8_t *in, uint8_t *out) {
   resp->profile_used_mask = settings_get_profile_used_mask();
 }
 
+static void cmd_get_default_profile(const uint8_t *in, uint8_t *out) {
+  (void)in;
+  hid_packet_profile_index_t *resp = (hid_packet_profile_index_t *)out;
+  resp->command_id     = CMD_GET_DEFAULT_PROFILE;
+  resp->status         = HID_RESP_OK;
+  resp->profile_index  = settings_get_default_profile_index();
+  resp->profile_used_mask = settings_get_profile_used_mask();
+}
+
+static void cmd_set_default_profile(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_index_t *req = (const hid_packet_profile_index_t *)in;
+  hid_packet_profile_index_t       *resp = (hid_packet_profile_index_t *)out;
+  resp->command_id = CMD_SET_DEFAULT_PROFILE;
+
+  uint8_t idx = req->profile_index;
+  if (idx != SETTINGS_DEFAULT_PROFILE_NONE &&
+      (idx >= SETTINGS_PROFILE_COUNT || !settings_is_profile_slot_used(idx))) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    resp->profile_index = settings_get_default_profile_index();
+    resp->profile_used_mask = settings_get_profile_used_mask();
+    return;
+  }
+
+  resp->status = settings_set_default_profile_index(idx)
+                     ? HID_RESP_OK
+                     : HID_RESP_ERROR;
+  resp->profile_index  = settings_get_default_profile_index();
+  resp->profile_used_mask = settings_get_profile_used_mask();
+}
+
+static void cmd_get_ram_only_mode(const uint8_t *in, uint8_t *out) {
+  (void)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id     = CMD_GET_RAM_ONLY_MODE;
+  resp->status_or_len  = HID_RESP_OK;
+  resp->payload[0]     = settings_is_ram_only_mode() ? 1u : 0u;
+}
+
+static void cmd_set_ram_only_mode(const uint8_t *in, uint8_t *out) {
+  const hid_packet_t *req  = (const hid_packet_t *)in;
+  hid_packet_t       *resp = (hid_packet_t *)out;
+  resp->command_id = CMD_SET_RAM_ONLY_MODE;
+
+  if (req->payload[0]) {
+    settings_enter_ram_only_mode();
+    resp->status_or_len = HID_RESP_OK;
+  } else {
+    /* enable=0 exits RAM-only mode and reloads the last-saved flash state,
+     * identical to CMD_RELOAD_SETTINGS_FROM_FLASH. */
+    bool ok = settings_exit_ram_only_mode();
+    resp->status_or_len = ok ? HID_RESP_OK : HID_RESP_ERROR;
+  }
+
+  resp->payload[0] = settings_is_ram_only_mode() ? 1u : 0u;
+}
+
+static void cmd_reload_settings_from_flash(const uint8_t *in, uint8_t *out) {
+  (void)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  resp->command_id    = CMD_RELOAD_SETTINGS_FROM_FLASH;
+
+  bool ok = settings_exit_ram_only_mode();
+  resp->status_or_len = ok ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->payload[0]    = settings_is_ram_only_mode() ? 1u : 0u;
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Key Settings Commands
 //--------------------------------------------------------------------+
@@ -535,22 +601,22 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   key.disable_kb_on_gamepad = req->disable_kb_on_gamepad ? 1 : 0;
   settings_key_set_continuous_rapid_trigger(
       &key, req->continuous_rapid_trigger != 0u);
-    settings_key_set_socd_fully_pressed_enabled(
+  settings_key_set_socd_fully_pressed_enabled(
       &key, req->socd_fully_pressed_enabled != 0u);
   key.advanced.behavior_mode = req->behavior_mode;
   key.advanced.hold_threshold_10ms = req->hold_threshold_10ms;
-    key.advanced.dynamic_zone_count =
-      hid_sanitize_dks_bottom_out_point(req->dks_bottom_out_point != 0u
-                        ? req->dks_bottom_out_point
-                        : key.advanced.dynamic_zone_count);
+  if (req->dks_bottom_out_point != 0u) {
+    key.advanced.dks_bottom_out_point_tenths =
+        hid_sanitize_dks_bottom_out_point(req->dks_bottom_out_point);
+  }
   key.advanced.secondary_hid_keycode = req->secondary_hid_keycode;
-    settings_key_set_tap_hold_hold_on_other_key_press(
+  settings_key_set_tap_hold_hold_on_other_key_press(
       &key, (req->tap_hold_options &
-         SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK) != 0u);
-    settings_key_set_tap_hold_uppercase_hold(
+             SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK) != 0u);
+  settings_key_set_tap_hold_uppercase_hold(
       &key, (req->tap_hold_options &
-         SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK) != 0u);
-    key.advanced.socd_fully_pressed_point_tenths =
+             SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK) != 0u);
+  key.advanced.socd_fully_pressed_point_tenths =
       hid_sanitize_socd_fully_pressed_point(req->socd_fully_pressed_point);
   memcpy(key.advanced.dynamic_zones, req->dynamic_zones,
          sizeof(key.advanced.dynamic_zones));
@@ -1827,6 +1893,7 @@ static void cmd_get_led_effect_schema(const uint8_t *in, uint8_t *out) {
   resp->payload[3] = total_active;
 
   // Serialise chunk entries starting at payload[4].
+  // Each entry: [id, type, min, max, default_val, step] = 6 bytes.
   uint8_t *dst = &resp->payload[4];
   for (uint8_t i = 0u; i < chunk_count; i++) {
     const led_param_desc_t *d = &active[chunk_start + i];
@@ -1838,6 +1905,7 @@ static void cmd_get_led_effect_schema(const uint8_t *in, uint8_t *out) {
     *dst++ = d->step;
   }
 }
+
 
 static void cmd_get_led_fps_limit(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
@@ -2359,6 +2427,26 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_RESET_PROFILE_SLOT:
     cmd_reset_profile_slot(in_packet, out_packet);
+    break;
+
+  case CMD_GET_DEFAULT_PROFILE:
+    cmd_get_default_profile(in_packet, out_packet);
+    break;
+
+  case CMD_SET_DEFAULT_PROFILE:
+    cmd_set_default_profile(in_packet, out_packet);
+    break;
+
+  case CMD_GET_RAM_ONLY_MODE:
+    cmd_get_ram_only_mode(in_packet, out_packet);
+    break;
+
+  case CMD_SET_RAM_ONLY_MODE:
+    cmd_set_ram_only_mode(in_packet, out_packet);
+    break;
+
+  case CMD_RELOAD_SETTINGS_FROM_FLASH:
+    cmd_reload_settings_from_flash(in_packet, out_packet);
     break;
 
   // Key settings commands

@@ -46,6 +46,8 @@ static settings_t current_settings;
 
 // Flag indicating if settings have been modified
 static bool settings_dirty = false;
+// When true, settings_save() is a no-op (inactive/RAM-only profile active)
+static bool settings_ram_only_mode = false;
 static uint32_t settings_change_counter = 0u;
 static uint32_t settings_last_seen_change_counter = 0u;
 static uint32_t settings_last_change_ms = 0u;
@@ -185,7 +187,7 @@ static void settings_default_key_advanced(settings_key_advanced_t *advanced,
   memset(advanced, 0, sizeof(*advanced));
   advanced->behavior_mode = (uint8_t)KEY_BEHAVIOR_NORMAL;
   advanced->hold_threshold_10ms = 20u;
-  advanced->dynamic_zone_count = SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS;
+  advanced->dks_bottom_out_point_tenths = SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS;
   advanced->secondary_hid_keycode = KC_NO;
   advanced->dynamic_zones[0].end_mm_tenths = 0x81u;
   advanced->dynamic_zones[0].hid_keycode = primary_hid_keycode;
@@ -217,11 +219,11 @@ static void settings_sanitize_key_advanced(uint16_t primary_hid_keycode,
     key->advanced.hold_threshold_10ms = defaults.hold_threshold_10ms;
   }
 
-  if (key->advanced.dynamic_zone_count <
+  if (key->advanced.dks_bottom_out_point_tenths <
           SETTINGS_DKS_BOTTOM_OUT_POINT_MIN_TENTHS ||
-      key->advanced.dynamic_zone_count >
+      key->advanced.dks_bottom_out_point_tenths >
           SETTINGS_DKS_BOTTOM_OUT_POINT_MAX_TENTHS) {
-    key->advanced.dynamic_zone_count = defaults.dynamic_zone_count;
+    key->advanced.dks_bottom_out_point_tenths = defaults.dks_bottom_out_point_tenths;
   }
 
   key->advanced.reserved &=
@@ -518,12 +520,12 @@ static void settings_default_effect_params(uint8_t effect_mode,
     params[1] = 255u; // Value
     break;
   case LED_EFFECT_CYCLE_LEFT_RIGHT:
-    params[0] = 160u; // Horizontal scale
-    params[1] = 96u;  // Vertical scale
-    params[2] = 160u; // Drift
+    params[0] = 160u; // Horizontal hue spread
+    params[1] = 96u;  // Vertical hue contribution
+    // params[2]: removed (was drift multiplier — caused jump on uint8 time wrap)
     params[3] = 255u; // Saturation
-    params[4] = 0u;   // Angle
-    params[5] = 0u;   // Curvature
+    params[4] = 0u;   // Gradient tilt angle
+    params[5] = 0u;   // Sinusoidal warp
     break;
   case LED_EFFECT_DIGITAL_RAIN:
     params[0] = 64u;  // Trail length
@@ -846,7 +848,7 @@ static void settings_apply_runtime_from_current_profile(void) {
   led_matrix_set_raw_data(current_settings.led.pixels);
   led_matrix_set_enabled(current_settings.options.led_enabled != 0u);
 
-    led_matrix_set_effect((led_effect_mode_t)effect_mode);
+  led_matrix_set_effect((led_effect_mode_t)effect_mode);
   led_matrix_set_effect_params(
       current_settings.led_effect_params[effect_mode]);
   settings_sync_led_effect_speed_cache();
@@ -1162,6 +1164,8 @@ static void settings_set_defaults(void) {
   // Header
   current_settings.magic_start = SETTINGS_MAGIC_START;
   current_settings.version = SETTINGS_VERSION;
+  current_settings.default_profile_index = SETTINGS_DEFAULT_PROFILE_NONE;
+  current_settings.reserved_pad = 0u;
 
   // Default options
   current_settings.options.keyboard_enabled = 1;
@@ -1264,6 +1268,7 @@ static bool settings_validate_current(const settings_t *s) {
 static bool settings_load_from_flash(void) {
   settings_t temp;
   uint8_t original_used_mask = 0u;
+  bool needs_resave = false;
 
   // Read settings from flash
   if (!flash_storage_read(0, &temp, sizeof(settings_t))) {
@@ -1271,7 +1276,23 @@ static bool settings_load_from_flash(void) {
   }
 
   if (!settings_validate_current(&temp)) {
-    return false;
+    /* Full validation failed.  If the magic bytes are intact but the version or
+     * CRC has changed (e.g. after a firmware update), accept the raw data and
+     * sanitise it rather than resetting everything to defaults.
+     * A version mismatch means the struct layout may have changed, but any
+     * byte that falls inside a still-valid field will be sanitised by the loop
+     * below; out-of-range values are clamped to defaults.  The migrated image
+     * is re-saved immediately so future boots do not repeat the migration. */
+    if (temp.magic_start != SETTINGS_MAGIC_START ||
+        temp.magic_end   != SETTINGS_MAGIC_END) {
+      return false;
+    }
+    temp.version = SETTINGS_VERSION;
+    /* Old reserved byte (now default_profile_index) was always 0, which would
+     * silently force boot-to-profile-0.  Reset it to NONE so behaviour is
+     * identical to pre-migration firmware. */
+    temp.default_profile_index = SETTINGS_DEFAULT_PROFILE_NONE;
+    needs_resave = true;
   }
 
   memcpy(&current_settings, &temp, sizeof(settings_t));
@@ -1282,6 +1303,10 @@ static bool settings_load_from_flash(void) {
   settings_sanitize_profile_names();
 
   if (original_used_mask == 0u) {
+    /* Flash was written with no used-profile bits.  Treat the stored top-level
+     * settings as profile 0 so the load loop can process it normally. */
+    current_settings.profile_used_mask = 0x01u;
+    current_settings.active_profile_index = 0u;
     settings_profile_capture_current_slot(0u);
   }
 
@@ -1314,6 +1339,10 @@ static bool settings_load_from_flash(void) {
   settings_profile_apply_slot(current_settings.active_profile_index);
   settings_reset_led_effect_restore_state();
 
+  if (needs_resave) {
+    (void)settings_save();
+  }
+
   return true;
 }
 
@@ -1337,11 +1366,23 @@ void settings_init(void) {
   }
 #endif
 
+  // If a default boot profile is configured and that slot is used, switch to it
+  // now so the device always starts on the designated profile regardless of what
+  // was last active before the previous power-off.
+  uint8_t boot_default = current_settings.default_profile_index;
+  if (boot_default != SETTINGS_DEFAULT_PROFILE_NONE &&
+      boot_default < SETTINGS_PROFILE_COUNT &&
+      settings_is_profile_slot_used(boot_default) &&
+      boot_default != current_settings.active_profile_index) {
+    (void)settings_set_active_profile_index(boot_default);
+  }
+
   calibration_load_settings();
   settings_apply_runtime_from_current_profile();
   settings_sanitize_keyboard_name();
   settings_sanitize_profile_names();
 
+  settings_ram_only_mode = false;
   settings_dirty = false;
   settings_change_counter = 0u;
   settings_last_seen_change_counter = 0u;
@@ -1425,6 +1466,11 @@ bool settings_reset(void) {
 }
 
 bool settings_save(void) {
+  // RAM-only mode: writes stay in RAM and are never persisted to flash.
+  if (settings_ram_only_mode) {
+    return true;
+  }
+
   settings_profile_sync_active_slot();
 
   // Compute CRC before saving
@@ -1530,6 +1576,46 @@ bool settings_set_active_profile_index(uint8_t profile_index) {
   return true;
 }
 
+uint8_t settings_get_default_profile_index(void) {
+  return current_settings.default_profile_index;
+}
+
+bool settings_set_default_profile_index(uint8_t profile_index) {
+  if (profile_index != SETTINGS_DEFAULT_PROFILE_NONE &&
+      profile_index >= SETTINGS_PROFILE_COUNT) {
+    return false;
+  }
+  current_settings.default_profile_index = profile_index;
+  settings_mark_dirty();
+  return true;
+}
+
+bool settings_is_ram_only_mode(void) {
+  return settings_ram_only_mode;
+}
+
+void settings_enter_ram_only_mode(void) {
+  settings_ram_only_mode = true;
+}
+
+bool settings_exit_ram_only_mode(void) {
+  settings_ram_only_mode = false;
+  if (!settings_load_from_flash()) {
+    settings_set_defaults();
+    settings_save();
+    settings_dirty = false;
+    settings_last_seen_change_counter = settings_change_counter;
+    return false;
+  }
+  calibration_load_settings();
+  settings_apply_runtime_from_current_profile();
+  // Discard any dirty state accumulated during the RAM-only session; the RAM
+  // contents now match flash so there is nothing new to save.
+  settings_dirty = false;
+  settings_last_seen_change_counter = settings_change_counter;
+  return true;
+}
+
 uint8_t settings_get_profile_used_mask(void) {
   return (uint8_t)(current_settings.profile_used_mask & SETTINGS_PROFILE_MASK_ALL);
 }
@@ -1606,6 +1692,12 @@ bool settings_delete_profile(uint8_t profile_index) {
         settings_profile_first_used_slot(used_mask);
     settings_profile_apply_slot(current_settings.active_profile_index);
     settings_apply_runtime_from_current_profile();
+  }
+
+  // If the deleted slot was the designated boot default, clear the preference
+  // so the keyboard falls back to last-used behaviour.
+  if (current_settings.default_profile_index == profile_index) {
+    current_settings.default_profile_index = SETTINGS_DEFAULT_PROFILE_NONE;
   }
 
   settings_mark_dirty();

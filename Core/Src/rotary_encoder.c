@@ -399,8 +399,11 @@ static uint16_t rotary_binding_resolve_keycode(
     return KC_NO;
   }
 
+  /* modifier_mask_exact == 0 means "match any modifier state"; non-zero
+   * requires an exact match so modifier-specific overrides work correctly. */
   if (rotary_binding_layer_matches(binding, active_layer) &&
-      active_modifiers == binding->modifier_mask_exact &&
+      (binding->modifier_mask_exact == 0u ||
+       active_modifiers == binding->modifier_mask_exact) &&
       binding->keycode != KC_NO && binding->keycode != KC_TRANSPARENT) {
     return binding->keycode;
   }
@@ -561,6 +564,7 @@ uint32_t rotary_encoder_get_step_counter(void) { return rotation_step_counter; }
 
 void rotary_encoder_task(uint32_t now_ms) {
   settings_rotary_encoder_t rotary = {0};
+
   settings_get_rotary_encoder(&rotary);
   uint8_t ab_state = read_ab_state();
   if (ab_state != last_ab_state) {

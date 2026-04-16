@@ -112,13 +112,12 @@ inline void socd_on_release(uint8_t key) {
         settings->resolution_mode == SETTINGS_SOCD_RESOLUTION_ABSOLUTE_PRIORITY_KEY1 ||
         settings->resolution_mode == SETTINGS_SOCD_RESOLUTION_ABSOLUTE_PRIORITY_KEY2 ||
         settings->resolution_mode == SETTINGS_SOCD_RESOLUTION_NEUTRAL) {
-        key_state_e key_state = trigger_get_key_state(key);
         key_state_e linked_key_state = trigger_get_key_state(linked_key);
 
-        if (key_state == PRESSED && socd_override_states[key]) {
-            layout_press(key);
-            socd_override_states[key] = false;
-        }
+        /* The releasing key is no longer physical-pressed, so its override
+         * state must always be cleared.  Leaving it set would be a stale
+         * truth that prevents correct re-evaluation on the next press. */
+        socd_override_states[key] = false;
 
         if (linked_key_state == PRESSED && socd_override_states[linked_key]) {
             layout_press(linked_key);
@@ -163,8 +162,13 @@ void socd_load_settings() {
             (socd_resolution_e)settings_key_get_socd_resolution(key_settings);
         socd_key_settings[i].fully_pressed_enabled =
             settings_key_is_socd_fully_pressed_enabled(key_settings);
-        socd_key_settings[i].fully_pressed_point_um =
-            (uint16_t)key_settings->advanced.socd_fully_pressed_point_tenths * 100u;
+        /* Only override the reset-to-default value when a valid threshold is
+         * stored.  A stored zero would make distance>=0 always true, which
+         * would permanently disable SOCD resolution. */
+        if (key_settings->advanced.socd_fully_pressed_point_tenths != 0u) {
+            socd_key_settings[i].fully_pressed_point_um =
+                (uint16_t)key_settings->advanced.socd_fully_pressed_point_tenths * 100u;
+        }
         socd_key_settings[i].is_socd_enabled = true;
         socd_key_settings[i].linked_key = linked_key;
     }

@@ -53,6 +53,11 @@ typedef enum {
   CMD_SET_KEYBOARD_NAME = 0x2D,
   CMD_COPY_PROFILE_SLOT = 0x2E,
   CMD_RESET_PROFILE_SLOT = 0x2F,
+  CMD_GET_DEFAULT_PROFILE = 0x30,       // Get default boot profile index
+  CMD_SET_DEFAULT_PROFILE = 0x31,       // Set default boot profile index
+  CMD_GET_RAM_ONLY_MODE = 0x32,         // Get RAM-only mode state
+  CMD_SET_RAM_ONLY_MODE = 0x33,         // Enter/exit RAM-only mode (suppress flash saves)
+  CMD_RELOAD_SETTINGS_FROM_FLASH = 0x34, // Exit RAM-only and reload last-saved settings
 
   // Key settings commands (0x40 - 0x5F)
   CMD_GET_KEY_SETTINGS = 0x40,

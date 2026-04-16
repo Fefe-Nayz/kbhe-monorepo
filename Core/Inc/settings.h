@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x001B         // Phase-3B: compact gamepad struct (removed reserved_deadzone)
+#define SETTINGS_VERSION 0x001C         // Phase-4A: default_profile_index, RAM-only mode support
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -38,6 +38,7 @@ extern "C" {
 #define SETTINGS_LAYER_COUNT 4u
 #define SETTINGS_PROFILE_COUNT 4u
 #define SETTINGS_PROFILE_NAME_LENGTH 16u
+#define SETTINGS_DEFAULT_PROFILE_NONE 0xFFu // Sentinel: no fixed boot profile (use last active)
 #define SETTINGS_DYNAMIC_ZONE_COUNT 4u
 #define SETTINGS_ADVANCED_TICK_RATE_MIN 1u
 #define SETTINGS_ADVANCED_TICK_RATE_MAX 100u
@@ -247,7 +248,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t behavior_mode;            // key_behavior_mode_t
   uint8_t hold_threshold_10ms;      // Tap-hold / toggle hold threshold
-  uint8_t dynamic_zone_count;       // DKS bottom-out point in 0.1 mm
+  uint8_t dks_bottom_out_point_tenths; // DKS bottom-out point in 0.1 mm
   uint8_t reserved;                 // Tap-hold option flags
   uint16_t secondary_hid_keycode;   // Hold / alternate action
   settings_dynamic_zone_t dynamic_zones[SETTINGS_DYNAMIC_ZONE_COUNT];
@@ -475,9 +476,10 @@ typedef struct __attribute__((packed)) {
  */
 typedef struct __attribute__((packed)) {
   // Header
-  uint32_t magic_start; // Magic number to identify valid settings
-  uint16_t version;     // Settings version for migration
-  uint16_t reserved;    // Padding
+  uint32_t magic_start;          // Magic number to identify valid settings
+  uint16_t version;              // Settings version for migration
+  uint8_t default_profile_index; // Profile applied on boot; SETTINGS_DEFAULT_PROFILE_NONE = last active
+  uint8_t reserved_pad;          // Padding (was upper byte of uint16_t reserved)
 
   // Global options
   settings_options_t options;
@@ -701,6 +703,43 @@ bool settings_set_advanced_tick_rate(uint8_t tick_rate);
  * @return Profile index (0..SETTINGS_PROFILE_COUNT-1)
  */
 uint8_t settings_get_active_profile_index(void);
+
+/**
+ * @brief Get the default boot profile index.
+ * @return Profile index, or SETTINGS_DEFAULT_PROFILE_NONE if none is set.
+ */
+uint8_t settings_get_default_profile_index(void);
+
+/**
+ * @brief Set the default boot profile index.
+ * @param profile_index Profile index (0..SETTINGS_PROFILE_COUNT-1),
+ *                      or SETTINGS_DEFAULT_PROFILE_NONE to clear.
+ * @return true if the value was accepted and stored.
+ */
+bool settings_set_default_profile_index(uint8_t profile_index);
+
+/**
+ * @brief Whether the keyboard is currently in RAM-only mode.
+ *
+ * In RAM-only mode every settings write goes to RAM only; calls to
+ * settings_save() are silently suppressed.  The mode is cleared on reboot
+ * or by calling settings_exit_ram_only_mode().
+ */
+bool settings_is_ram_only_mode(void);
+
+/**
+ * @brief Enter RAM-only mode (suppresses all flash saves).
+ */
+void settings_enter_ram_only_mode(void);
+
+/**
+ * @brief Exit RAM-only mode and reload the last persisted settings from flash.
+ *
+ * After this call the in-RAM state reflects what was last saved to flash,
+ * discarding any RAM-only changes.  Returns false if the flash reload fails
+ * (in which case RAM-only mode is still cleared and defaults are applied).
+ */
+bool settings_exit_ram_only_mode(void);
 
 /**
  * @brief Set currently active persistent profile slot.
