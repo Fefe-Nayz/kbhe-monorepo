@@ -29,28 +29,136 @@ extern "C" {
 #define LED_BRIGHTNESS_MAX 255
 #define LED_BRIGHTNESS_DEFAULT 50
 // Maximum number of persisted tuning bytes available per effect.
-#define LED_EFFECT_PARAM_COUNT 6
+#define LED_EFFECT_PARAM_COUNT 16
+
+// Shared parameter slots used by multiple effects for per-effect colors.
+#define LED_EFFECT_PARAM_COLOR_R 8
+#define LED_EFFECT_PARAM_COLOR_G 9
+#define LED_EFFECT_PARAM_COLOR_B 10
+#define LED_EFFECT_PARAM_COLOR2_R 11
+#define LED_EFFECT_PARAM_COLOR2_G 12
+#define LED_EFFECT_PARAM_COLOR2_B 13
+// Shared parameter slot for per-effect animation speed.
+#define LED_EFFECT_PARAM_SPEED 14
+
+#define LED_AUDIO_SPECTRUM_BAND_COUNT 16
+
+//--------------------------------------------------------------------+
+// Per-effect parameter schema (Phase-2A)
+// Each effect exposes up to LED_EFFECT_PARAM_COUNT descriptors that
+// describe how the host should interpret and edit each byte slot.
+// The schema is read-only ROM data; values are stored separately in
+// settings as raw LED_EFFECT_PARAM_COUNT-byte blocks.
+//--------------------------------------------------------------------+
+
+// Parameter value types (1 byte, fits in a HID packet field).
+typedef enum {
+  LED_PARAM_TYPE_NONE  = 0, // Slot not used by this effect
+  LED_PARAM_TYPE_U8    = 1, // Generic 0-255 integer (uses min/max/step)
+  LED_PARAM_TYPE_BOOL  = 2, // Boolean flag (min=0, max=1, step=1)
+  LED_PARAM_TYPE_HUE   = 3, // Hue wheel 0-255 (full rotation)
+  LED_PARAM_TYPE_COLOR = 4, // First byte of an RGB triplet; host groups
+                             // COLOR slots at ids n, n+1, n+2 as one
+                             // color picker.  min/max/step unused.
+} led_param_type_t;
+
+// Descriptor for a single parameter slot.
+typedef struct __attribute__((packed)) {
+  uint8_t id;          // Slot index within the 16-byte param block (0-15)
+  uint8_t type;        // led_param_type_t
+  uint8_t min;         // Minimum value (inclusive)
+  uint8_t max;         // Maximum value (inclusive)
+  uint8_t default_val; // Factory default for this slot
+  uint8_t step;        // Suggested UI step size (0 = continuous)
+} led_param_desc_t;
+
+// Maximum descriptors returned per schema chunk over HID.
+// 6 bytes/desc × 9 = 54 bytes; leaves 8 bytes for chunk header in 64-byte packet.
+#define LED_SCHEMA_PARAMS_PER_CHUNK 9u
+
+/**
+ * @brief Return the schema (param descriptors) for one effect.
+ *
+ * Writes up to LED_EFFECT_PARAM_COUNT descriptors into @p out.
+ * Returns the number of active (non-NONE) descriptors written.
+ *
+ * @param effect_mode  Effect ID (0 .. LED_EFFECT_MAX-1)
+ * @param out          Output array; caller must provide at least
+ *                     LED_EFFECT_PARAM_COUNT entries.
+ * @return             Number of active descriptors (type != NONE).
+ */
+uint8_t led_matrix_get_effect_schema(uint8_t effect_mode,
+                                     led_param_desc_t *out);
 
 //--------------------------------------------------------------------+
 // LED Effect Modes
+// Compact numbering after Phase-1B fusion (breaking change, v0x0017+).
+// Old pre-fusion IDs are documented in docs/LED_EFFECTS_CANONICAL_PHASE0.md.
 //--------------------------------------------------------------------+
 typedef enum {
-  LED_EFFECT_NONE = 0,               // Matrix (software static pattern)
-  LED_EFFECT_RAINBOW = 1,            // Rainbow wave (diagonal)
-  LED_EFFECT_BREATHING = 2,          // Breathing (fade in/out)
-  LED_EFFECT_STATIC_RAINBOW = 3,     // Static rainbow pattern
-  LED_EFFECT_SOLID = 4,              // Solid color
-  LED_EFFECT_PLASMA = 5,             // Plasma (psychedelic waves)
-  LED_EFFECT_FIRE = 6,               // Fire effect
-  LED_EFFECT_OCEAN = 7,              // Ocean waves (horizontal)
-  LED_EFFECT_MATRIX = 8,             // Matrix rain (digital rain)
-  LED_EFFECT_SPARKLE = 9,            // Sparkle/Twinkle
-  LED_EFFECT_BREATHING_RAINBOW = 10, // Breathing rainbow
-  LED_EFFECT_SPIRAL = 11,            // Spiral
-  LED_EFFECT_COLOR_CYCLE = 12,       // Solid color cycle
-  LED_EFFECT_REACTIVE = 13,          // React to key presses
-  LED_EFFECT_THIRD_PARTY = 14,       // External/third-party live control
-  LED_EFFECT_DISTANCE_SENSOR = 15,   // Per-key color from sensor distance
+  LED_EFFECT_NONE = 0,                    // Static matrix (software pattern)
+  LED_EFFECT_PLASMA = 1,                  // Plasma (psychedelic waves)
+  LED_EFFECT_FIRE = 2,                    // Fire effect
+  LED_EFFECT_OCEAN = 3,                   // Ocean waves (horizontal)
+  LED_EFFECT_SPARKLE = 4,                 // Sparkle/Twinkle
+  LED_EFFECT_BREATHING_RAINBOW = 5,       // Breathing rainbow
+  LED_EFFECT_COLOR_CYCLE = 6,             // Solid color cycle
+  LED_EFFECT_THIRD_PARTY = 7,             // External/third-party live control
+  LED_EFFECT_DISTANCE_SENSOR = 8,         // Per-key color from sensor distance
+  LED_EFFECT_IMPACT_RAINBOW = 9,          // Rainbow with key/audio impacts
+  LED_EFFECT_REACTIVE_GHOST = 10,         // Keypress ghost trails
+  LED_EFFECT_AUDIO_SPECTRUM = 11,         // Host audio spectrum bars
+  LED_EFFECT_KEY_STATE_DEMO = 12,         // Digital key-state demo (red/green)
+  LED_EFFECT_CYCLE_PINWHEEL = 13,         // Rotating pinwheel
+  LED_EFFECT_CYCLE_SPIRAL = 14,           // Spiral cycle (fused: old SPIRAL)
+  LED_EFFECT_CYCLE_OUT_IN_DUAL = 15,      // Dual-center out-in (fused: DUAL_SPHERE)
+  LED_EFFECT_RAINBOW_BEACON = 16,         // Rotating rainbow stripe (fused: STRIP_SPIN_ZOOM)
+  LED_EFFECT_RAINBOW_PINWHEELS = 17,      // Rainbow pinwheels
+  LED_EFFECT_RAINBOW_MOVING_CHEVRON = 18, // Moving chevron
+  LED_EFFECT_HUE_BREATHING = 19,          // Hue breathing
+  LED_EFFECT_HUE_PENDULUM = 20,           // Hue pendulum
+  LED_EFFECT_HUE_WAVE = 21,               // Hue wave
+  LED_EFFECT_RIVERFLOW = 22,              // Riverflow
+  LED_EFFECT_SOLID_COLOR = 23,            // Solid color (fused: old SOLID)
+  LED_EFFECT_ALPHA_MODS = 24,             // Alpha mods highlight
+  LED_EFFECT_GRADIENT_UP_DOWN = 25,       // Vertical gradient
+  LED_EFFECT_GRADIENT_LEFT_RIGHT = 26,    // Horizontal gradient (fused: STATIC_RAINBOW)
+  LED_EFFECT_BREATHING = 27,              // Breathing (fused: old BREATHING)
+  LED_EFFECT_COLORBAND_SAT = 28,          // Colorband saturation
+  LED_EFFECT_COLORBAND_VAL = 29,          // Colorband value
+  LED_EFFECT_COLORBAND_PINWHEEL_SAT = 30, // Colorband pinwheel saturation
+  LED_EFFECT_COLORBAND_PINWHEEL_VAL = 31, // Colorband pinwheel value
+  LED_EFFECT_COLORBAND_SPIRAL_SAT = 32,   // Colorband spiral saturation
+  LED_EFFECT_COLORBAND_SPIRAL_VAL = 33,   // Colorband spiral value
+  LED_EFFECT_CYCLE_ALL = 34,              // Cycle all
+  LED_EFFECT_CYCLE_LEFT_RIGHT = 35,       // Cycle left-right (fused: old RAINBOW)
+  LED_EFFECT_CYCLE_UP_DOWN = 36,          // Cycle up-down
+  LED_EFFECT_CYCLE_OUT_IN = 37,           // Cycle out-in (fused: SPHERE)
+  LED_EFFECT_DUAL_BEACON = 38,            // Dual beacon
+  LED_EFFECT_FLOWER_BLOOMING = 39,        // Flower blooming
+  LED_EFFECT_RAINDROPS = 40,              // Raindrops
+  LED_EFFECT_JELLYBEAN_RAINDROPS = 41,    // Jellybean raindrops
+  LED_EFFECT_PIXEL_RAIN = 42,             // Pixel rain
+  LED_EFFECT_PIXEL_FLOW = 43,             // Pixel flow
+  LED_EFFECT_PIXEL_FRACTAL = 44,          // Pixel fractal
+  LED_EFFECT_TYPING_HEATMAP = 45,         // Typing heatmap (fused: REACTIVE_HEATMAP)
+  LED_EFFECT_DIGITAL_RAIN = 46,           // Digital rain (fused: old MATRIX)
+  LED_EFFECT_SOLID_REACTIVE_SIMPLE = 47,  // Solid reactive simple
+  LED_EFFECT_SOLID_REACTIVE = 48,         // Solid reactive
+  LED_EFFECT_SOLID_REACTIVE_WIDE = 49,    // Solid reactive wide
+  LED_EFFECT_SOLID_REACTIVE_CROSS = 50,   // Solid reactive cross
+  LED_EFFECT_SOLID_REACTIVE_NEXUS = 51,   // Solid reactive nexus
+  LED_EFFECT_SPLASH = 52,                 // Splash (fused: old REACTIVE)
+  LED_EFFECT_SOLID_SPLASH = 53,           // Solid splash
+  LED_EFFECT_STARLIGHT_SMOOTH = 54,       // Starlight smooth
+  LED_EFFECT_STARLIGHT = 55,              // Starlight
+  LED_EFFECT_STARLIGHT_DUAL_SAT = 56,     // Starlight dual saturation
+  LED_EFFECT_STARLIGHT_DUAL_HUE = 57,     // Starlight dual hue
+  LED_EFFECT_SOLID_REACTIVE_MULTI_WIDE = 58,  // Solid reactive multi wide
+  LED_EFFECT_SOLID_REACTIVE_MULTI_CROSS = 59, // Solid reactive multi cross
+  LED_EFFECT_SOLID_REACTIVE_MULTI_NEXUS = 60, // Solid reactive multi nexus
+  LED_EFFECT_MULTI_SPLASH = 61,           // Multi splash
+  LED_EFFECT_SOLID_MULTI_SPLASH = 62,     // Solid multi splash
   LED_EFFECT_MAX
 } led_effect_mode_t;
 
@@ -211,7 +319,10 @@ void led_matrix_set_effect(led_effect_mode_t mode);
 led_effect_mode_t led_matrix_get_effect(void);
 
 /**
- * @brief Set effect color (for single-color effects)
+ * @brief Compatibility setter for the active effect color.
+ *
+ * The RGB value maps to the active effect parameter block
+ * (`LED_EFFECT_PARAM_COLOR_*`).
  * @param r Red value
  * @param g Green value
  * @param b Blue value
@@ -346,6 +457,20 @@ void led_matrix_set_output_override_frame(const uint8_t *data);
  * @brief Clear the temporary output override frame.
  */
 void led_matrix_clear_output_override_frame(void);
+
+/**
+ * @brief Push host audio spectrum data for audio-reactive effects.
+ * @param bands Spectrum levels in 0-255.
+ * @param band_count Number of entries in @p bands.
+ * @param impact_level Optional transient impact level (0-255).
+ */
+void led_matrix_set_audio_spectrum(const uint8_t *bands, uint8_t band_count,
+                                   uint8_t impact_level);
+
+/**
+ * @brief Clear host audio spectrum state immediately.
+ */
+void led_matrix_clear_audio_spectrum(void);
 
 #ifdef __cplusplus
 }

@@ -51,6 +51,8 @@ typedef enum {
   CMD_GET_DEVICE_INFO = 0x2B,
   CMD_GET_KEYBOARD_NAME = 0x2C,
   CMD_SET_KEYBOARD_NAME = 0x2D,
+  CMD_COPY_PROFILE_SLOT = 0x2E,
+  CMD_RESET_PROFILE_SLOT = 0x2F,
 
   // Key settings commands (0x40 - 0x5F)
   CMD_GET_KEY_SETTINGS = 0x40,
@@ -66,8 +68,7 @@ typedef enum {
   CMD_SET_KEY_CURVE = 0x4A,  // Set per-key analog curve
   CMD_GET_KEY_GAMEPAD_MAP = 0x4B, // Get per-key gamepad mapping
   CMD_SET_KEY_GAMEPAD_MAP = 0x4C, // Set per-key gamepad mapping
-  CMD_GET_GAMEPAD_WITH_KB = 0x4D, // Get gamepad+keyboard mode
-  CMD_SET_GAMEPAD_WITH_KB = 0x4E, // Set gamepad+keyboard mode
+  // 0x4D, 0x4E: reserved (previously legacy gamepad-with-kb commands, removed)
   CMD_GET_CALIBRATION_MAX = 0x4F, // Get per-key max ADC calibration values
   CMD_SET_CALIBRATION_MAX = 0x50, // Set per-key max ADC calibration values
   CMD_GUIDED_CALIBRATION_START = 0x51,
@@ -78,6 +79,13 @@ typedef enum {
   CMD_GET_LAYER_KEYCODE = 0x56,
   CMD_SET_LAYER_KEYCODE = 0x57,
   CMD_RESET_KEY_TRIGGER_SETTINGS = 0x58,
+  CMD_GET_ROTARY_STATE = 0x59,
+  CMD_GET_ACTIVE_PROFILE = 0x5A,
+  CMD_SET_ACTIVE_PROFILE = 0x5B,
+  CMD_GET_PROFILE_NAME = 0x5C,
+  CMD_SET_PROFILE_NAME = 0x5D,
+  CMD_CREATE_PROFILE = 0x5E,
+  CMD_DELETE_PROFILE = 0x5F,
 
   // LED Matrix commands (0x60 - 0x7F)
   CMD_GET_LED_ENABLED = 0x60,
@@ -96,19 +104,16 @@ typedef enum {
   CMD_LED_TEST_RAINBOW = 0x6D,
   CMD_GET_LED_EFFECT = 0x6E,       // Get current LED effect mode
   CMD_SET_LED_EFFECT = 0x6F,       // Set LED effect mode
-  CMD_GET_LED_EFFECT_SPEED = 0x70, // Get effect speed
-  CMD_SET_LED_EFFECT_SPEED = 0x71, // Set effect speed
-  CMD_SET_LED_EFFECT_COLOR = 0x72, // Set effect color
-  CMD_GET_LED_FPS_LIMIT = 0x73,    // Get LED FPS limit
-  CMD_SET_LED_FPS_LIMIT = 0x74,    // Set LED FPS limit
-  CMD_GET_LED_DIAGNOSTIC = 0x75,   // Get LED diagnostic mode
-  CMD_SET_LED_DIAGNOSTIC = 0x76,   // Set LED diagnostic mode
-  CMD_GET_LED_EFFECT_PARAMS = 0x77, // Get persisted params for one effect
-  CMD_SET_LED_EFFECT_PARAMS = 0x78, // Set persisted params for one effect
-  CMD_SET_LED_VOLUME_OVERLAY = 0x79, // Host-driven volume overlay
-  CMD_CLEAR_LED_VOLUME_OVERLAY = 0x7A, // Clear host-driven volume overlay
-  CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x7B, // Restore effect active before third-party live override
-  CMD_GET_LED_EFFECT_COLOR = 0x7C, // Get persisted effect color
+  CMD_GET_LED_FPS_LIMIT = 0x70,    // Get LED FPS limit
+  CMD_SET_LED_FPS_LIMIT = 0x71,    // Set LED FPS limit
+  CMD_GET_LED_EFFECT_PARAMS = 0x72, // Get persisted params for one effect
+  CMD_SET_LED_EFFECT_PARAMS = 0x73, // Set persisted params for one effect
+  CMD_SET_LED_VOLUME_OVERLAY = 0x74, // Host-driven volume overlay
+  CMD_CLEAR_LED_VOLUME_OVERLAY = 0x75, // Clear host-driven volume overlay
+  CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x76, // Restore effect active before third-party live override
+  CMD_GET_LED_EFFECT_SCHEMA = 0x77, // Read param schema chunk for one effect
+  CMD_SET_LED_AUDIO_SPECTRUM = 0x78, // Push host audio spectrum payload
+  CMD_CLEAR_LED_AUDIO_SPECTRUM = 0x79, // Clear host audio spectrum state
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
@@ -228,6 +233,8 @@ typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
   uint8_t key_index;
+  uint8_t profile_index;
+  uint8_t layer_index;
   uint16_t hid_keycode; // HID/custom keycode for this key
   uint8_t actuation_point_mm;   // Actuation point in 0.1mm
   uint8_t release_point_mm;     // Release point in 0.1mm
@@ -240,13 +247,16 @@ typedef struct __attribute__((packed)) {
   uint8_t continuous_rapid_trigger; // Continue RT until full release
   uint8_t behavior_mode;            // key_behavior_mode_t
   uint8_t hold_threshold_10ms;      // Tap-hold / toggle threshold
-  uint8_t dynamic_zone_count;       // 1..4 for dynamic mapping
   uint16_t secondary_hid_keycode;   // Hold / alternate action
   struct __attribute__((packed)) {
-    uint8_t end_mm_tenths;
-    uint16_t hid_keycode;
+    uint8_t end_mm_tenths; // DKS action bitmap
+    uint16_t hid_keycode;  // DKS binding keycode
   } dynamic_zones[SETTINGS_DYNAMIC_ZONE_COUNT];
-  uint8_t reserved[33];
+  uint8_t tap_hold_options;         // bit0=hold on other key press, bit1=uppercase hold
+  uint8_t dks_bottom_out_point;     // DKS bottom-out point in 0.1mm
+  uint8_t socd_fully_pressed_enabled;
+  uint8_t socd_fully_pressed_point; // 0.1mm
+  uint8_t reserved[28];
 } hid_packet_key_settings_t;
 
 /**
@@ -259,7 +269,7 @@ typedef struct __attribute__((packed)) {
   uint8_t rapid_trigger_press;
   uint8_t rapid_trigger_release;
   uint8_t socd_pair;
-  uint8_t flags; // bit0=rapid trigger, bit1=disable kb on gamepad, bit2-3=SOCD resolution
+  uint8_t flags; // bit0=rapid trigger, bit1=disable kb on gamepad, bit2-4=SOCD resolution
 } hid_key_settings_chunk_entry_t;
 
 /**
@@ -280,7 +290,6 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint8_t radial_deadzone;
   uint8_t keyboard_routing;
   uint8_t square_mode;
   uint8_t reactive_stick;
@@ -289,7 +298,7 @@ typedef struct __attribute__((packed)) {
     uint16_t x_01mm;
     uint8_t y;
   } curve[GAMEPAD_CURVE_POINT_COUNT];
-  uint8_t reserved[45];
+  uint8_t reserved[46];
 } hid_packet_gamepad_settings_t;
 
 typedef struct __attribute__((packed)) {
@@ -307,8 +316,61 @@ typedef struct __attribute__((packed)) {
   uint8_t progress_color_r;
   uint8_t progress_color_g;
   uint8_t progress_color_b;
-  uint8_t reserved[50];
+  uint8_t cw_mode;
+  uint16_t cw_keycode;
+  uint8_t cw_modifier_mask_exact;
+  uint16_t cw_fallback_no_mod_keycode;
+  uint8_t cw_layer_mode;
+  uint8_t cw_layer_index;
+  uint8_t ccw_mode;
+  uint16_t ccw_keycode;
+  uint8_t ccw_modifier_mask_exact;
+  uint16_t ccw_fallback_no_mod_keycode;
+  uint8_t ccw_layer_mode;
+  uint8_t ccw_layer_index;
+  uint8_t click_mode;
+  uint16_t click_keycode;
+  uint8_t click_modifier_mask_exact;
+  uint16_t click_fallback_no_mod_keycode;
+  uint8_t click_layer_mode;
+  uint8_t click_layer_index;
+  uint8_t reserved[26];
 } hid_packet_rotary_encoder_settings_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t button_pressed;
+  int8_t last_direction;
+  uint32_t step_counter;
+  uint8_t reserved[56];
+} hid_packet_rotary_state_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t profile_index;
+  uint8_t profile_used_mask;
+  uint8_t reserved[60];
+} hid_packet_profile_index_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t source_profile_index;
+  uint8_t target_profile_index;
+  uint8_t profile_used_mask;
+  uint8_t reserved[59];
+} hid_packet_profile_copy_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t profile_index;
+  uint8_t profile_used_mask;
+  char profile_name[SETTINGS_PROFILE_NAME_LENGTH];
+  uint8_t reserved[60 - SETTINGS_PROFILE_NAME_LENGTH];
+} hid_packet_profile_name_t;
 
 typedef struct __attribute__((packed)) {
   uint8_t command_id;

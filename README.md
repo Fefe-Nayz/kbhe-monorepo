@@ -38,11 +38,14 @@ Le clavier expose une interface RAW HID qui sert de canal de controle entre le f
 - Rapid Trigger configurable : sensibilite appui, sensibilite relache (en surcouche des memes seuils actuation/release).
 - Modes de comportement avances par touche :
 	- Normal
-	- Tap-Hold
+	- Tap-Hold (hold on other key press + option uppercase en appui long)
 	- Toggle
-	- Dynamic Mapping (zones de course 1 a 4)
-- Gestion SOCD (liaison de paires + strategie de resolution).
+	- Dynamic Keystroke (4 phases: press, fully pressed, release from fully pressed, release)
+- Scope avancé profile+layer+touche : chaque profil et chaque layer peuvent porter leur propre comportement avance.
+- Gestion SOCD (liaison de paires + strategies Last / Most Pressed / Absolute Priority Key 1 / Absolute Priority Key 2 / Neutral + bypass fully-pressed configurable).
 - Support de couches (layers) : base + overlays avec keycodes par couche.
+- Profils persistants sur MCU : 1 profil par defaut, creation/suppression/renommage dynamiques jusqu'a 4 slots, avec snapshot complet des reglages par profil (incluant le rotary encoder).
+- Rotary first-class : bindings CW/CCW/click en mode action interne ou keycode arbitraire, avec exact-match modifiers + fallback no-mod.
 
 ### 2. Sorties USB HID et mode gamepad
 
@@ -113,7 +116,7 @@ Options principales :
 Le configurateur offre des pages dediees :
 
 - Overview / etat global
-- Keyboard (mapping, comportements avances, layers, SOCD)
+- Keyboard (mapping, comportements avances, layers, profils, SOCD)
 - Calibration (manuel + guide)
 - Travel / Graph / Raw ADC / Debug sensors
 - Gamepad

@@ -14,10 +14,14 @@ from PySide6.QtWidgets import (
 )
 
 from ...protocol import (
+    HID_KEYCODES,
     LED_EFFECT_NAMES,
     LEDEffect,
     ROTARY_ACTIONS,
     ROTARY_ACTION_NAMES,
+    ROTARY_BINDING_LAYER_MODES,
+    ROTARY_BINDING_MODE_NAMES,
+    ROTARY_BINDING_MODES,
     ROTARY_BUTTON_ACTIONS,
     ROTARY_BUTTON_ACTION_NAMES,
     ROTARY_PROGRESS_STYLES,
@@ -110,6 +114,13 @@ class RotaryEncoderPage(QWidget):
         self.invert_toggle.toggled.connect(self._on_value_changed)
         card.body_layout.addWidget(self.invert_toggle)
 
+        self.cw_binding_widgets = self._build_binding_editor(
+            card.body_layout, "CW Binding"
+        )
+        self.ccw_binding_widgets = self._build_binding_editor(
+            card.body_layout, "CCW Binding"
+        )
+
         note = QLabel(
             "Volume uses distinct media key pulses. High step sizes can be very aggressive. LED-related modes show a temporary progress bar on the top row."
         )
@@ -129,7 +140,111 @@ class RotaryEncoderPage(QWidget):
             self.button_action_combo.addItem(label, value)
         self.button_action_combo.currentIndexChanged.connect(self._on_value_changed)
         card.body_layout.addWidget(FormRow("Button Action", self.button_action_combo))
+
+        self.click_binding_widgets = self._build_binding_editor(
+            card.body_layout, "Click Binding"
+        )
         return card
+
+    def _build_binding_editor(self, body_layout, title: str):
+        title_label = QLabel(title)
+        title_label.setObjectName("Muted")
+        body_layout.addWidget(title_label)
+
+        mode_combo = QComboBox()
+        for label, value in ROTARY_BINDING_MODES.items():
+            mode_combo.addItem(label, value)
+        mode_combo.currentIndexChanged.connect(self._on_value_changed)
+        body_layout.addWidget(FormRow("Mode", mode_combo))
+
+        keycode_combo = QComboBox()
+        for label, value in HID_KEYCODES.items():
+            keycode_combo.addItem(label, int(value))
+        keycode_combo.currentIndexChanged.connect(self._on_value_changed)
+        body_layout.addWidget(FormRow("Keycode", keycode_combo))
+
+        modifier_spin = QSpinBox()
+        modifier_spin.setRange(0, 255)
+        modifier_spin.valueChanged.connect(self._on_value_changed)
+        body_layout.addWidget(FormRow("Exact Mod Mask", modifier_spin))
+
+        fallback_combo = QComboBox()
+        for label, value in HID_KEYCODES.items():
+            fallback_combo.addItem(label, int(value))
+        fallback_combo.currentIndexChanged.connect(self._on_value_changed)
+        body_layout.addWidget(FormRow("Fallback (No Match)", fallback_combo))
+
+        layer_mode_combo = QComboBox()
+        for label, value in ROTARY_BINDING_LAYER_MODES.items():
+            layer_mode_combo.addItem(label, value)
+        layer_mode_combo.currentIndexChanged.connect(self._on_value_changed)
+        body_layout.addWidget(FormRow("Layer Target", layer_mode_combo))
+
+        fixed_layer_spin = QSpinBox()
+        fixed_layer_spin.setRange(0, 3)
+        fixed_layer_spin.valueChanged.connect(self._on_value_changed)
+        body_layout.addWidget(FormRow("Fixed Layer", fixed_layer_spin))
+
+        return {
+            "mode": mode_combo,
+            "keycode": keycode_combo,
+            "modifier_mask_exact": modifier_spin,
+            "fallback_no_mod_keycode": fallback_combo,
+            "layer_mode": layer_mode_combo,
+            "layer_index": fixed_layer_spin,
+        }
+
+    def _binding_from_widgets(self, widgets) -> dict:
+        return {
+            "mode": int(widgets["mode"].currentData()),
+            "keycode": int(widgets["keycode"].currentData()),
+            "modifier_mask_exact": int(widgets["modifier_mask_exact"].value()),
+            "fallback_no_mod_keycode": int(
+                widgets["fallback_no_mod_keycode"].currentData()
+            ),
+            "layer_mode": int(widgets["layer_mode"].currentData()),
+            "layer_index": int(widgets["layer_index"].value()),
+        }
+
+    def _set_widgets_from_binding(self, widgets, binding: dict) -> None:
+        mode = int(binding.get("mode", 0))
+        keycode = int(binding.get("keycode", 0))
+        modifiers = int(binding.get("modifier_mask_exact", 0))
+        fallback = int(binding.get("fallback_no_mod_keycode", 0))
+        layer_mode = int(binding.get("layer_mode", 0))
+        layer_index = int(binding.get("layer_index", 0))
+
+        with QSignalBlocker(widgets["mode"]):
+            widgets["mode"].setCurrentIndex(max(0, widgets["mode"].findData(mode)))
+        with QSignalBlocker(widgets["keycode"]):
+            widgets["keycode"].setCurrentIndex(
+                max(0, widgets["keycode"].findData(keycode))
+            )
+        with QSignalBlocker(widgets["modifier_mask_exact"]):
+            widgets["modifier_mask_exact"].setValue(max(0, min(255, modifiers)))
+        with QSignalBlocker(widgets["fallback_no_mod_keycode"]):
+            widgets["fallback_no_mod_keycode"].setCurrentIndex(
+                max(0, widgets["fallback_no_mod_keycode"].findData(fallback))
+            )
+        with QSignalBlocker(widgets["layer_mode"]):
+            widgets["layer_mode"].setCurrentIndex(
+                max(0, widgets["layer_mode"].findData(layer_mode))
+            )
+        with QSignalBlocker(widgets["layer_index"]):
+            widgets["layer_index"].setValue(max(0, min(3, layer_index)))
+
+    def _update_binding_editor_enabled_state(self, widgets) -> None:
+        mode = int(widgets["mode"].currentData())
+        is_keycode = mode == int(ROTARY_BINDING_MODES["Keycode"])
+        widgets["keycode"].setEnabled(is_keycode)
+        widgets["modifier_mask_exact"].setEnabled(is_keycode)
+        widgets["fallback_no_mod_keycode"].setEnabled(is_keycode)
+        widgets["layer_mode"].setEnabled(is_keycode)
+        widgets["layer_index"].setEnabled(
+            is_keycode
+            and int(widgets["layer_mode"].currentData())
+            == int(ROTARY_BINDING_LAYER_MODES["Fixed Layer"])
+        )
 
     def _build_rgb_card(self) -> SectionCard:
         card = SectionCard(
@@ -250,6 +365,9 @@ class RotaryEncoderPage(QWidget):
             "progress_style": int(self.progress_style_combo.currentData()),
             "progress_effect_mode": int(self.progress_effect_combo.currentData()),
             "progress_color": self.progress_color[:],
+            "cw_binding": self._binding_from_widgets(self.cw_binding_widgets),
+            "ccw_binding": self._binding_from_widgets(self.ccw_binding_widgets),
+            "click_binding": self._binding_from_widgets(self.click_binding_widgets),
         }
 
     def _sync_hints(self) -> None:
@@ -264,6 +382,15 @@ class RotaryEncoderPage(QWidget):
             int(self.progress_style_combo.currentData()), "Unknown"
         )
         palette_name = self.progress_effect_combo.currentText()
+        cw_mode_name = ROTARY_BINDING_MODE_NAMES.get(
+            int(self.cw_binding_widgets["mode"].currentData()), "Unknown"
+        )
+        ccw_mode_name = ROTARY_BINDING_MODE_NAMES.get(
+            int(self.ccw_binding_widgets["mode"].currentData()), "Unknown"
+        )
+        click_mode_name = ROTARY_BINDING_MODE_NAMES.get(
+            int(self.click_binding_widgets["mode"].currentData()), "Unknown"
+        )
 
         if rotation_name == "RGB Customizer":
             self.rgb_hint.setText(
@@ -289,6 +416,14 @@ class RotaryEncoderPage(QWidget):
             self.progress_hint.setText(
                 f"The top-row progress bar uses the {palette_name} palette so the overlay keeps an RGB look while still overriding the row."
             )
+
+        self._update_binding_editor_enabled_state(self.cw_binding_widgets)
+        self._update_binding_editor_enabled_state(self.ccw_binding_widgets)
+        self._update_binding_editor_enabled_state(self.click_binding_widgets)
+        self._set_status(
+            f"Bindings: CW={cw_mode_name}, CCW={ccw_mode_name}, Click={click_mode_name}.",
+            "info",
+        )
 
     def _apply_settings(self) -> None:
         try:
@@ -316,10 +451,13 @@ class RotaryEncoderPage(QWidget):
             "step_size": 1,
             "invert_direction": False,
             "rgb_behavior": int(ROTARY_RGB_BEHAVIORS["Hue"]),
-            "rgb_effect_mode": int(LEDEffect.SOLID),
+            "rgb_effect_mode": int(LEDEffect.SOLID_COLOR),
             "progress_style": int(ROTARY_PROGRESS_STYLES["Solid Color"]),
-            "progress_effect_mode": int(LEDEffect.RAINBOW),
+            "progress_effect_mode": int(LEDEffect.CYCLE_LEFT_RIGHT),
             "progress_color": [40, 210, 64],
+            "cw_binding": {"mode": int(ROTARY_BINDING_MODES["Internal Action"]), "keycode": 0, "modifier_mask_exact": 0, "fallback_no_mod_keycode": 0, "layer_mode": int(ROTARY_BINDING_LAYER_MODES["Active Layer"]), "layer_index": 0},
+            "ccw_binding": {"mode": int(ROTARY_BINDING_MODES["Internal Action"]), "keycode": 0, "modifier_mask_exact": 0, "fallback_no_mod_keycode": 0, "layer_mode": int(ROTARY_BINDING_LAYER_MODES["Active Layer"]), "layer_index": 0},
+            "click_binding": {"mode": int(ROTARY_BINDING_MODES["Internal Action"]), "keycode": 0, "modifier_mask_exact": 0, "fallback_no_mod_keycode": 0, "layer_mode": int(ROTARY_BINDING_LAYER_MODES["Active Layer"]), "layer_index": 0},
         }
         try:
             device_settings = self.device.get_rotary_encoder_settings() or {}
@@ -364,6 +502,16 @@ class RotaryEncoderPage(QWidget):
                 self.progress_effect_combo.setCurrentIndex(
                     max(0, self.progress_effect_combo.findData(int(settings["progress_effect_mode"])))
                 )
+            self._set_widgets_from_binding(
+                self.cw_binding_widgets, settings.get("cw_binding", defaults["cw_binding"])
+            )
+            self._set_widgets_from_binding(
+                self.ccw_binding_widgets, settings.get("ccw_binding", defaults["ccw_binding"])
+            )
+            self._set_widgets_from_binding(
+                self.click_binding_widgets,
+                settings.get("click_binding", defaults["click_binding"]),
+            )
             self._set_progress_color(progress_color)
             self._sync_hints()
         finally:

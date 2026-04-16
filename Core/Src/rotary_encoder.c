@@ -4,6 +4,8 @@
 
 #include "hid/consumer_hid.h"
 #include "led_matrix.h"
+#include "layout/keycodes.h"
+#include "layout/layout.h"
 #include "main.h"
 #include "settings.h"
 #include "stm32f7xx_hal_gpio.h"
@@ -29,23 +31,72 @@ static bool button_stable_pressed = false;
 static bool button_raw_pressed = false;
 static uint32_t button_last_change_ms = 0u;
 static uint32_t last_quad_transition_ms = 0u;
+static int8_t last_rotation_direction = 0;
+static uint32_t rotation_step_counter = 0u;
 
 static const uint8_t ROTARY_CYCLABLE_LED_EFFECTS[] = {
-    LED_EFFECT_STATIC_MATRIX,
-    LED_EFFECT_RAINBOW,
-    LED_EFFECT_BREATHING,
-    LED_EFFECT_STATIC_RAINBOW,
-    LED_EFFECT_SOLID,
+    LED_EFFECT_NONE,
     LED_EFFECT_PLASMA,
     LED_EFFECT_FIRE,
     LED_EFFECT_OCEAN,
-    LED_EFFECT_MATRIX,
     LED_EFFECT_SPARKLE,
     LED_EFFECT_BREATHING_RAINBOW,
-    LED_EFFECT_SPIRAL,
     LED_EFFECT_COLOR_CYCLE,
-    LED_EFFECT_REACTIVE,
+    LED_EFFECT_IMPACT_RAINBOW,
+    LED_EFFECT_REACTIVE_GHOST,
+    LED_EFFECT_AUDIO_SPECTRUM,
     LED_EFFECT_DISTANCE_SENSOR,
+    LED_EFFECT_KEY_STATE_DEMO,
+    LED_EFFECT_CYCLE_PINWHEEL,
+    LED_EFFECT_CYCLE_SPIRAL,
+    LED_EFFECT_CYCLE_OUT_IN_DUAL,
+    LED_EFFECT_RAINBOW_BEACON,
+    LED_EFFECT_RAINBOW_PINWHEELS,
+    LED_EFFECT_RAINBOW_MOVING_CHEVRON,
+    LED_EFFECT_HUE_BREATHING,
+    LED_EFFECT_HUE_PENDULUM,
+    LED_EFFECT_HUE_WAVE,
+    LED_EFFECT_RIVERFLOW,
+    LED_EFFECT_SOLID_COLOR,
+    LED_EFFECT_ALPHA_MODS,
+    LED_EFFECT_GRADIENT_UP_DOWN,
+    LED_EFFECT_GRADIENT_LEFT_RIGHT,
+    LED_EFFECT_BREATHING,
+    LED_EFFECT_COLORBAND_SAT,
+    LED_EFFECT_COLORBAND_VAL,
+    LED_EFFECT_COLORBAND_PINWHEEL_SAT,
+    LED_EFFECT_COLORBAND_PINWHEEL_VAL,
+    LED_EFFECT_COLORBAND_SPIRAL_SAT,
+    LED_EFFECT_COLORBAND_SPIRAL_VAL,
+    LED_EFFECT_CYCLE_ALL,
+    LED_EFFECT_CYCLE_LEFT_RIGHT,
+    LED_EFFECT_CYCLE_UP_DOWN,
+    LED_EFFECT_CYCLE_OUT_IN,
+    LED_EFFECT_DUAL_BEACON,
+    LED_EFFECT_FLOWER_BLOOMING,
+    LED_EFFECT_RAINDROPS,
+    LED_EFFECT_JELLYBEAN_RAINDROPS,
+    LED_EFFECT_PIXEL_RAIN,
+    LED_EFFECT_PIXEL_FLOW,
+    LED_EFFECT_PIXEL_FRACTAL,
+    LED_EFFECT_TYPING_HEATMAP,
+    LED_EFFECT_DIGITAL_RAIN,
+    LED_EFFECT_SOLID_REACTIVE_SIMPLE,
+    LED_EFFECT_SOLID_REACTIVE,
+    LED_EFFECT_SOLID_REACTIVE_WIDE,
+    LED_EFFECT_SOLID_REACTIVE_MULTI_WIDE,
+    LED_EFFECT_SOLID_REACTIVE_CROSS,
+    LED_EFFECT_SOLID_REACTIVE_MULTI_CROSS,
+    LED_EFFECT_SOLID_REACTIVE_NEXUS,
+    LED_EFFECT_SOLID_REACTIVE_MULTI_NEXUS,
+    LED_EFFECT_SPLASH,
+    LED_EFFECT_MULTI_SPLASH,
+    LED_EFFECT_SOLID_SPLASH,
+    LED_EFFECT_SOLID_MULTI_SPLASH,
+    LED_EFFECT_STARLIGHT_SMOOTH,
+    LED_EFFECT_STARLIGHT,
+    LED_EFFECT_STARLIGHT_DUAL_SAT,
+    LED_EFFECT_STARLIGHT_DUAL_HUE,
 };
 
 static inline uint8_t clamp_u8_from_i16(int16_t value) {
@@ -327,9 +378,67 @@ static void rotary_apply_rgb_customizer(
   }
 }
 
+static bool rotary_binding_layer_matches(const settings_rotary_binding_t *binding,
+                                         uint8_t active_layer) {
+  if (binding == NULL) {
+    return false;
+  }
+
+  if (binding->layer_mode == (uint8_t)ROTARY_BINDING_LAYER_FIXED) {
+    return active_layer == binding->layer_index;
+  }
+
+  return true;
+}
+
+static uint16_t rotary_binding_resolve_keycode(
+    const settings_rotary_binding_t *binding, uint8_t active_modifiers,
+    uint8_t active_layer) {
+  if (binding == NULL ||
+      binding->mode != (uint8_t)ROTARY_BINDING_MODE_KEYCODE) {
+    return KC_NO;
+  }
+
+  if (rotary_binding_layer_matches(binding, active_layer) &&
+      active_modifiers == binding->modifier_mask_exact &&
+      binding->keycode != KC_NO && binding->keycode != KC_TRANSPARENT) {
+    return binding->keycode;
+  }
+
+  if (binding->fallback_no_mod_keycode != KC_NO &&
+      binding->fallback_no_mod_keycode != KC_TRANSPARENT) {
+    return binding->fallback_no_mod_keycode;
+  }
+
+  return KC_NO;
+}
+
+static bool rotary_binding_tap(const settings_rotary_binding_t *binding,
+                               uint8_t active_modifiers,
+                               uint8_t active_layer) {
+  uint16_t keycode =
+      rotary_binding_resolve_keycode(binding, active_modifiers, active_layer);
+
+  if (keycode == KC_NO) {
+    return false;
+  }
+
+  layout_tap_action(keycode);
+  return true;
+}
+
 static void rotary_handle_button_action(void) {
   settings_rotary_encoder_t rotary = {0};
+  uint8_t active_modifiers = layout_get_active_modifier_mask();
+  uint8_t active_layer = layout_get_active_layer_top();
   settings_get_rotary_encoder(&rotary);
+
+  if (rotary.click_binding.mode == (uint8_t)ROTARY_BINDING_MODE_KEYCODE) {
+    if (rotary_binding_tap(&rotary.click_binding, active_modifiers,
+                           active_layer)) {
+      return;
+    }
+  }
 
   switch ((rotary_button_action_t)rotary.button_action) {
   case ROTARY_BUTTON_ACTION_PLAY_PAUSE:
@@ -360,6 +469,9 @@ static void rotary_handle_button_action(void) {
 static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
                                int8_t direction) {
   settings_rotary_encoder_t rotary = {0};
+  const settings_rotary_binding_t *binding = NULL;
+  uint8_t active_modifiers = 0u;
+  uint8_t active_layer = 0u;
   if (rotary_cfg == NULL) {
     settings_get_rotary_encoder(&rotary);
   } else {
@@ -368,6 +480,22 @@ static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
 
   if (rotary.invert_direction) {
     direction = (int8_t)-direction;
+  }
+
+  last_rotation_direction = direction;
+  rotation_step_counter++;
+
+  binding = (direction > 0) ? &rotary.cw_binding : &rotary.ccw_binding;
+  active_modifiers = layout_get_active_modifier_mask();
+  active_layer = layout_get_active_layer_top();
+
+  if (binding->mode == (uint8_t)ROTARY_BINDING_MODE_KEYCODE) {
+    uint8_t steps = rotary_step_size(&rotary);
+    for (uint8_t i = 0u; i < steps; i++) {
+      (void)rotary_binding_tap(binding, active_modifiers, active_layer);
+    }
+    rotary_show_action_overlay(&rotary);
+    return;
   }
 
   switch ((rotary_action_t)rotary.rotation_action) {
@@ -419,7 +547,17 @@ void rotary_encoder_init(void) {
   button_stable_pressed = button_raw_pressed;
   button_last_change_ms = HAL_GetTick();
   last_quad_transition_ms = button_last_change_ms;
+  last_rotation_direction = 0;
+  rotation_step_counter = 0u;
 }
+
+bool rotary_encoder_is_button_pressed(void) { return button_stable_pressed; }
+
+int8_t rotary_encoder_get_last_direction(void) {
+  return last_rotation_direction;
+}
+
+uint32_t rotary_encoder_get_step_counter(void) { return rotation_step_counter; }
 
 void rotary_encoder_task(uint32_t now_ms) {
   settings_rotary_encoder_t rotary = {0};

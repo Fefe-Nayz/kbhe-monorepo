@@ -16,6 +16,10 @@ class EffectsPageMixin:
             "Ambient Motion",
             [
                 (1, "Rainbow Wave"),
+                (16, "Rainbow Dome"),
+                (17, "Sphere"),
+                (18, "Dual Sphere"),
+                (19, "Strip Spin + Zoom"),
                 (2, "Breathing"),
                 (3, "Static Rainbow"),
                 (5, "Plasma"),
@@ -29,10 +33,75 @@ class EffectsPageMixin:
             ],
         ),
         (
-            "Reactive",
+            "Reactive + Audio",
             [
-                (13, "Reactive (Key Press)"),
+                (13, "Reactive (Wave)"),
+                (20, "Impact Rainbow"),
+                (21, "Reactive Heatmap"),
+                (22, "Reactive Ghost"),
+                (23, "Audio Spectrum"),
                 (15, "Sensor Distance"),
+                (24, "Key State Demo"),
+            ],
+        ),
+        (
+            "Core",
+            [
+                (25, "Cycle Pinwheel"),
+                (26, "Cycle Spiral"),
+                (27, "Cycle Out-In Dual"),
+                (28, "Rainbow Beacon"),
+                (29, "Rainbow Pinwheels"),
+                (30, "Rainbow Moving Chevron"),
+                (31, "Hue Breathing"),
+                (32, "Hue Pendulum"),
+                (33, "Hue Wave"),
+                (34, "Riverflow"),
+            ],
+        ),
+        (
+            "RGB Matrix",
+            [
+                (35, "Solid Color"),
+                (36, "Alpha Mods"),
+                (37, "Gradient Up Down"),
+                (38, "Gradient Left Right"),
+                (39, "Breathing"),
+                (40, "Colorband Sat"),
+                (41, "Colorband Val"),
+                (42, "Colorband Pinwheel Sat"),
+                (43, "Colorband Pinwheel Val"),
+                (44, "Colorband Spiral Sat"),
+                (45, "Colorband Spiral Val"),
+                (46, "Cycle All"),
+                (47, "Cycle Left Right"),
+                (48, "Cycle Up Down"),
+                (49, "Cycle Out In"),
+                (50, "Dual Beacon"),
+                (51, "Flower Blooming"),
+                (52, "Raindrops"),
+                (53, "Jellybean Raindrops"),
+                (54, "Pixel Rain"),
+                (55, "Pixel Flow"),
+                (56, "Pixel Fractal"),
+                (57, "Typing Heatmap"),
+                (58, "Digital Rain"),
+                (59, "Solid Reactive Simple"),
+                (60, "Solid Reactive"),
+                (61, "Solid Reactive Wide"),
+                (70, "Solid Reactive Multi Wide"),
+                (62, "Solid Reactive Cross"),
+                (71, "Solid Reactive Multi Cross"),
+                (63, "Solid Reactive Nexus"),
+                (72, "Solid Reactive Multi Nexus"),
+                (64, "Splash"),
+                (73, "Multi Splash"),
+                (65, "Solid Splash"),
+                (74, "Solid Multi Splash"),
+                (66, "Starlight Smooth"),
+                (67, "Starlight"),
+                (68, "Starlight Dual Sat"),
+                (69, "Starlight Dual Hue"),
             ],
         ),
     ]
@@ -51,9 +120,68 @@ class EffectsPageMixin:
         10: ("Breathing Rainbow", "Breathing animation that cycles through rainbow colors."),
         11: ("Spiral", "Spinning spiral motion pattern."),
         12: ("Color Cycle", "Continuous cycling through the selected effect color palette."),
-        13: ("Reactive (Key Press)", "Launches expanding color ripples from each key press."),
+        13: ("Reactive (Wave)", "Launches expanding color ripples from each key press."),
         14: ("Third-Party Live", "Matrix is read-only in this app; live frame is displayed from device state."),
         15: ("Sensor Distance", "Each key LED color changes live according to its sensor travel distance."),
+        16: ("Rainbow Dome", "Curved dome-style rainbow centered on the keyboard."),
+        17: ("Sphere", "Spherical pulse from a configurable center point."),
+        18: ("Dual Sphere", "Two spherical emitters with independent centers and blend."),
+        19: ("Strip Spin + Zoom", "Rotating color strips with zoom and twist."),
+        20: ("Impact Rainbow", "Rainbow wave with transient key or audio impact boosts."),
+        21: ("Reactive Heatmap", "Presses accumulate and fade as a heatmap."),
+        22: ("Reactive Ghost", "Soft ghost trails from key presses."),
+        23: ("Audio Spectrum", "Host audio-driven spectrum bars with impact accents."),
+        24: ("Key State Demo", "Digital key-state colors for pressed versus released keys."),
+        25: ("Cycle Pinwheel", "angular hue pinwheel around center."),
+        26: ("Cycle Spiral", "radial spiral hue sweep."),
+        27: ("Cycle Out-In Dual", "dual out-in hue cycle."),
+        28: ("Rainbow Beacon", "rotating rainbow beacon."),
+        29: ("Rainbow Pinwheels", "multi-pinwheel rainbow rotation."),
+        30: ("Rainbow Moving Chevron", "moving chevron rainbow bands."),
+        31: ("Hue Breathing", "hue breathing modulation."),
+        32: ("Hue Pendulum", "pendulum hue wave."),
+        33: ("Hue Wave", "horizontal hue wave."),
+        34: ("Riverflow", "per-key phase riverflow."),
+        35: ("Solid Color", "solid color fill."),
+        36: ("Alpha Mods", "alpha/modifier split brightness look."),
+        37: ("Gradient Up Down", "vertical hue gradient."),
+        38: ("Gradient Left Right", "horizontal hue gradient."),
+        39: ("Breathing", "color breathing pulse."),
+        40: ("Colorband Sat", "moving saturation colorband."),
+        41: ("Colorband Val", "moving brightness colorband."),
+        42: ("Colorband Pinwheel Sat", "pinwheel saturation band."),
+        43: ("Colorband Pinwheel Val", "pinwheel brightness band."),
+        44: ("Colorband Spiral Sat", "spiral saturation band."),
+        45: ("Colorband Spiral Val", "spiral brightness band."),
+        46: ("Cycle All", "global hue cycle."),
+        47: ("Cycle Left Right", "left-to-right hue cycle."),
+        48: ("Cycle Up Down", "up-down hue cycle."),
+        49: ("Cycle Out In", "center radial hue cycle."),
+        50: ("Dual Beacon", "dual rotating beacon."),
+        51: ("Flower Blooming", "blooming petal pattern."),
+        52: ("Raindrops", "ripple-style raindrops."),
+        53: ("Jellybean Raindrops", "raindrops with random hues."),
+        54: ("Pixel Rain", "falling pixel streaks."),
+        55: ("Pixel Flow", "flowing horizontal pixels."),
+        56: ("Pixel Fractal", "fractal-like pixel motion."),
+        57: ("Typing Heatmap", "typing heatmap."),
+        58: ("Digital Rain", "digital rain matrix pattern."),
+        59: ("Solid Reactive Simple", "simple solid reactive effect."),
+        60: ("Solid Reactive", "radial solid reactive effect."),
+        61: ("Solid Reactive Wide", "wide reactive spread."),
+        62: ("Solid Reactive Cross", "cross reactive spread."),
+        63: ("Solid Reactive Nexus", "nexus reactive blend."),
+        64: ("Splash", "colorful splash waves."),
+        65: ("Solid Splash", "single-color splash."),
+        66: ("Starlight Smooth", "smooth twinkling starlight."),
+        67: ("Starlight", "hard twinkling starlight."),
+        68: ("Starlight Dual Sat", "dual-color smooth starlight."),
+        69: ("Starlight Dual Hue", "dual-hue starlight flashes."),
+        70: ("Solid Reactive Multi Wide", "wide reactive spread using all remembered key hits."),
+        71: ("Solid Reactive Multi Cross", "cross reactive spread using all remembered key hits."),
+        72: ("Solid Reactive Multi Nexus", "nexus reactive blend using all remembered key hits."),
+        73: ("Multi Splash", "colorful splash waves from all remembered key hits."),
+        74: ("Solid Multi Splash", "single-color splash waves from all remembered key hits."),
     }
 
     def _set_effect_status(self, message):
@@ -103,7 +231,7 @@ class EffectsPageMixin:
         intro_frame.pack(fill=tk.X, pady=(0, 10))
         ttk.Label(
             intro_frame,
-            text="These controls adjust animation speed, frame rate, and effect color live on the keyboard.",
+            text="These controls adjust the selected effect, its speed, frame rate, and color live on the keyboard.",
             style="SurfaceSubtle.TLabel",
             wraplength=980,
             justify=tk.LEFT,
@@ -172,11 +300,11 @@ class EffectsPageMixin:
         timing_row.columnconfigure(0, weight=1)
         timing_row.columnconfigure(1, weight=1)
 
-        speed_card = ttk.LabelFrame(timing_row, text="Effect Speed", padding=10, style="Card.TLabelframe")
+        speed_card = ttk.LabelFrame(timing_row, text="Current Effect Speed", padding=10, style="Card.TLabelframe")
         speed_card.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
         ttk.Label(
             speed_card,
-            text="Controls how quickly animated effects advance.",
+            text="Controls only the currently selected effect mode.",
             style="SurfaceSubtle.TLabel",
             wraplength=320,
             justify=tk.LEFT,
@@ -195,7 +323,7 @@ class EffectsPageMixin:
 
         self.effect_speed_label = ttk.Label(speed_card, text="128", font=("Segoe UI Semibold", 14, "bold"))
         self.effect_speed_label.pack(anchor=tk.CENTER)
-        ttk.Label(speed_card, text="1 = slow, 255 = fast", style="SurfaceSubtle.TLabel").pack(anchor=tk.CENTER, pady=(2, 0))
+        ttk.Label(speed_card, text="1 = slow, 255 = fast (saved per mode)", style="SurfaceSubtle.TLabel").pack(anchor=tk.CENTER, pady=(2, 0))
 
         fps_card = ttk.LabelFrame(timing_row, text="FPS Limit", padding=10, style="Card.TLabelframe")
         fps_card.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
@@ -226,7 +354,7 @@ class EffectsPageMixin:
         color_card.pack(fill=tk.X)
         ttk.Label(
             color_card,
-            text="Used by Breathing, Color Cycle, and Reactive effects.",
+            text="Used by color-aware effects such as Breathing, Reactive, Sphere, and Audio Spectrum.",
             style="SurfaceSubtle.TLabel",
             wraplength=980,
             justify=tk.LEFT,
@@ -335,6 +463,17 @@ class EffectsPageMixin:
             return
 
         self._update_effect_summary(mode)
+
+        # Speed is stored in the active mode params, so refresh the slider after each mode switch.
+        try:
+            speed = self.device.get_led_effect_speed()
+            if speed is not None:
+                speed = self._clamp_channel(speed)
+                self.effect_speed_var.set(speed)
+                self.effect_speed_label.config(text=str(speed))
+        except Exception:
+            pass
+
         self._set_effect_status(f"🎨 Effect mode set to {label} - LIVE (not saved)")
 
     def on_effect_speed_change(self, value):

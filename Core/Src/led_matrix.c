@@ -8,9 +8,12 @@
 #include "led_indicator.h"
 #include "main.h"
 #include "settings.h"
+#include "trigger/trigger.h"
 // #include "trigger.h"
 #include "ws2812.h"
 #include <string.h>
+#include <math.h>
+#include <stdlib.h>
 
 
 //--------------------------------------------------------------------+
@@ -41,24 +44,69 @@ static bool initialized = false;
 
 // Effect state variables
 static led_effect_mode_t current_effect = LED_EFFECT_NONE;
-static uint8_t effect_color_r = 255;
-static uint8_t effect_color_g = 0;
-static uint8_t effect_color_b = 0;
-static uint8_t effect_speed = 50;
 static uint8_t fps_limit = 60; // Default 60 FPS
-static uint8_t effect_params[LED_EFFECT_PARAM_COUNT] = {128u, 128u};
+static uint8_t effect_params[LED_EFFECT_PARAM_COUNT] = {
+  [LED_EFFECT_PARAM_SPEED] = 128u,
+};
 static uint32_t last_effect_tick = 0;
 static uint32_t last_render_tick = 0; // Separate tick for FPS limiting
+static uint32_t last_sim_tick = 0;    // Simulation updates are FPS-independent
 static uint16_t effect_offset = 0;
 
 // Effect renderer context flag: when true, pixel writes target runtime frame only.
 static bool effect_render_context = false;
 
-// Reactive effect state
-static uint8_t key_wave_energy[NUM_KEYS] = {0};
-static uint16_t key_wave_age_ms[NUM_KEYS] = {0};
-static uint8_t key_wave_hue[NUM_KEYS] = {0};
-static uint16_t reactive_frame_delta_ms = 16u;
+typedef struct {
+  bool active;
+  uint8_t source_key;
+  uint8_t hue;
+  uint8_t energy;
+  uint16_t age_ms;
+} reactive_wave_t;
+
+#define REACTIVE_WAVE_POOL_SIZE 24u
+static reactive_wave_t reactive_waves[REACTIVE_WAVE_POOL_SIZE];
+static uint16_t reactive_heat_energy[NUM_KEYS] = {0};
+static uint16_t reactive_ghost_energy[NUM_KEYS] = {0};
+static uint8_t mxfx_typing_heat_energy[NUM_KEYS] = {0};
+static uint32_t mxfx_typing_heat_decay_timer_ms = 0u;
+static uint16_t impact_boost = 0u;
+
+#define mxfx_LED_HITS_TO_REMEMBER 8u
+#define mxfx_COORD_MAX_X 224u
+#define mxfx_COORD_MAX_Y 64u
+#define mxfx_CENTER_X (mxfx_COORD_MAX_X / 2u)
+#define mxfx_CENTER_Y (mxfx_COORD_MAX_Y / 2u)
+
+typedef struct {
+  uint8_t count;
+  uint8_t x[mxfx_LED_HITS_TO_REMEMBER];
+  uint8_t y[mxfx_LED_HITS_TO_REMEMBER];
+  uint8_t index[mxfx_LED_HITS_TO_REMEMBER];
+  uint16_t tick[mxfx_LED_HITS_TO_REMEMBER];
+} mxfx_last_hit_t;
+
+typedef struct {
+  uint8_t h;
+  uint8_t s;
+  uint8_t v;
+} led_hsv_t;
+
+typedef void (*mxfx_reactive_math_f)(const led_hsv_t *base, led_hsv_t *hsv,
+                                    uint16_t offset);
+typedef void (*mxfx_reactive_splash_math_f)(const led_hsv_t *base,
+                                           led_hsv_t *hsv, int16_t dx,
+                                           int16_t dy, uint8_t dist,
+                                           uint16_t tick);
+
+static mxfx_last_hit_t mxfx_last_hit_tracker = {0};
+
+static uint8_t audio_spectrum_levels[LED_AUDIO_SPECTRUM_BAND_COUNT] = {0};
+static uint8_t audio_impact_level = 0u;
+static bool audio_spectrum_valid = false;
+static uint32_t audio_spectrum_refresh_ms = 0u;
+
+#define AUDIO_SPECTRUM_STALE_MS 500u
 
 // Temporary volume overlay shown on the function row.
 static bool volume_overlay_active = false;
@@ -131,20 +179,71 @@ static const uint16_t led_pos_y[NUM_KEYS] = {
 #define LED_LAYOUT_CENTER_X (LED_LAYOUT_MAX_X / 2u)
 #define LED_LAYOUT_CENTER_Y (LED_LAYOUT_MAX_Y / 2u)
 
-static void effect_rainbow(void);
-static void effect_breathing(void);
-static void effect_static_rainbow(void);
-static void effect_solid(void);
 static void effect_plasma(void);
 static void effect_fire(void);
 static void effect_ocean(void);
-static void effect_matrix(void);
 static void effect_sparkle(void);
 static void effect_breathing_rainbow(void);
-static void effect_spiral(void);
 static void effect_color_cycle(void);
 static void effect_distance_sensor(void);
-static void effect_reactive(void);
+static void effect_impact_rainbow(void);
+static void effect_reactive_ghost(void);
+static void effect_audio_spectrum(void);
+static void effect_key_state_demo(void);
+static void effect_cycle_pinwheel(void);
+static void effect_cycle_spiral(void);
+static void effect_cycle_out_in_dual(void);
+static void effect_rainbow_beacon(void);
+static void effect_rainbow_pinwheels(void);
+static void effect_rainbow_moving_chevron(void);
+static void effect_hue_breathing(void);
+static void effect_hue_pendulum(void);
+static void effect_hue_wave(void);
+static void effect_riverflow(void);
+static void effect_solid_color(void);
+static void effect_alpha_mods(void);
+static void effect_gradient_up_down(void);
+static void effect_gradient_left_right(void);
+static void effect_breathing(void);
+static void effect_colorband_sat(void);
+static void effect_colorband_val(void);
+static void effect_colorband_pinwheel_sat(void);
+static void effect_colorband_pinwheel_val(void);
+static void effect_colorband_spiral_sat(void);
+static void effect_colorband_spiral_val(void);
+static void effect_cycle_all(void);
+static void effect_cycle_left_right(void);
+static void effect_cycle_up_down(void);
+static void effect_cycle_out_in(void);
+static void effect_dual_beacon(void);
+static void effect_flower_blooming(void);
+static void effect_raindrops(void);
+static void effect_jellybean_raindrops(void);
+static void effect_pixel_rain(void);
+static void effect_pixel_flow(void);
+static void effect_pixel_fractal(void);
+static void effect_typing_heatmap(void);
+static void effect_digital_rain(void);
+static void effect_solid_reactive_simple(void);
+static void effect_solid_reactive(void);
+static void effect_solid_reactive_wide(void);
+static void effect_solid_reactive_cross(void);
+static void effect_solid_reactive_nexus(void);
+static void effect_splash(void);
+static void effect_solid_splash(void);
+static void effect_starlight_smooth(void);
+static void effect_starlight(void);
+static void effect_starlight_dual_sat(void);
+static void effect_starlight_dual_hue(void);
+static void effect_solid_reactive_multi_wide(void);
+static void effect_solid_reactive_multi_cross(void);
+static void effect_solid_reactive_multi_nexus(void);
+static void effect_multi_splash(void);
+static void effect_solid_multi_splash(void);
+
+static void reactive_tick_simulation(uint16_t delta_ms);
+static void led_matrix_rgb_to_hsv(uint8_t r, uint8_t g, uint8_t b,
+                                  uint8_t *h, uint8_t *s, uint8_t *v);
 
 //--------------------------------------------------------------------+
 // Private Functions
@@ -197,8 +296,298 @@ static inline uint8_t effect_param(uint8_t index, uint8_t fallback) {
   return effect_params[index];
 }
 
+static inline uint8_t effect_animation_speed(void) {
+  uint8_t speed = effect_param(LED_EFFECT_PARAM_SPEED, 128u);
+  return speed > 0u ? speed : 1u;
+}
+
 static inline bool effect_param_flag(uint8_t index, bool fallback) {
   return effect_param(index, fallback ? 1u : 0u) != 0u;
+}
+
+static inline void effect_primary_color(uint8_t fallback_r, uint8_t fallback_g,
+                                        uint8_t fallback_b, uint8_t *r,
+                                        uint8_t *g, uint8_t *b) {
+  if (r != NULL) {
+    *r = effect_param(LED_EFFECT_PARAM_COLOR_R, fallback_r);
+  }
+  if (g != NULL) {
+    *g = effect_param(LED_EFFECT_PARAM_COLOR_G, fallback_g);
+  }
+  if (b != NULL) {
+    *b = effect_param(LED_EFFECT_PARAM_COLOR_B, fallback_b);
+  }
+}
+
+static inline void effect_secondary_color(uint8_t fallback_r,
+                                          uint8_t fallback_g,
+                                          uint8_t fallback_b, uint8_t *r,
+                                          uint8_t *g, uint8_t *b) {
+  if (r != NULL) {
+    *r = effect_param(LED_EFFECT_PARAM_COLOR2_R, fallback_r);
+  }
+  if (g != NULL) {
+    *g = effect_param(LED_EFFECT_PARAM_COLOR2_G, fallback_g);
+  }
+  if (b != NULL) {
+    *b = effect_param(LED_EFFECT_PARAM_COLOR2_B, fallback_b);
+  }
+}
+
+static inline uint16_t effect_param_coord(uint8_t index, uint16_t max_value,
+                                          uint8_t fallback) {
+  return (uint16_t)(((uint32_t)effect_param(index, fallback) * max_value) /
+                    255u);
+}
+
+static inline uint8_t mxfx_qadd8(uint8_t a, uint8_t b) {
+  uint16_t sum = (uint16_t)a + b;
+  return (uint8_t)((sum > 255u) ? 255u : sum);
+}
+
+static inline uint8_t mxfx_scale8(uint8_t value, uint8_t scale) {
+  return (uint8_t)(((uint16_t)value * scale) >> 8);
+}
+
+static inline uint16_t mxfx_scale16by8(uint16_t value, uint8_t scale) {
+  return (uint16_t)(((uint32_t)value * scale) >> 8);
+}
+
+static inline uint16_t mxfx_timer16(void) {
+  return (uint16_t)HAL_GetTick();
+}
+
+static inline uint8_t mxfx_runner_time_i(void) {
+  return (uint8_t)mxfx_scale16by8(mxfx_timer16(),
+                                 mxfx_qadd8((uint8_t)(effect_animation_speed() / 4u),
+                                           1u));
+}
+
+static inline uint8_t mxfx_runner_time_dx_dy(void) {
+  return (uint8_t)mxfx_scale16by8(mxfx_timer16(),
+                                 (uint8_t)(effect_animation_speed() / 2u));
+}
+
+static inline uint8_t mxfx_runner_time_sin_cos(void) {
+  return (uint8_t)mxfx_scale16by8(mxfx_timer16(),
+                                 (uint8_t)(effect_animation_speed() / 4u));
+}
+
+static uint8_t mxfx_sin8(uint8_t angle) {
+  float radians = ((float)angle / 256.0f) * (2.0f * 3.14159265358979323846f);
+  float value = sinf(radians);
+  int16_t scaled = (int16_t)(127.5f + (value * 127.5f));
+  if (scaled < 0) {
+    scaled = 0;
+  } else if (scaled > 255) {
+    scaled = 255;
+  }
+  return (uint8_t)scaled;
+}
+
+static uint8_t mxfx_cos8(uint8_t angle) {
+  float radians = ((float)angle / 256.0f) * (2.0f * 3.14159265358979323846f);
+  float value = cosf(radians);
+  int16_t scaled = (int16_t)(127.5f + (value * 127.5f));
+  if (scaled < 0) {
+    scaled = 0;
+  } else if (scaled > 255) {
+    scaled = 255;
+  }
+  return (uint8_t)scaled;
+}
+
+static inline uint8_t mxfx_random8(void) {
+  return (uint8_t)(rand() & 0xFFu);
+}
+
+static inline uint8_t mxfx_random8_max(uint8_t max) {
+  if (max == 0u) {
+    return 0u;
+  }
+  return (uint8_t)(mxfx_random8() % max);
+}
+
+static inline uint8_t mxfx_random8_min_max(uint8_t min, uint8_t max) {
+  if (max <= min) {
+    return min;
+  }
+  return (uint8_t)(min + (mxfx_random8() % (uint8_t)(max - min)));
+}
+
+static uint16_t mxfx_sqrt32(uint32_t value) {
+  uint32_t result = 0u;
+  uint32_t bit = 1uL << 30;
+
+  while (bit > value) {
+    bit >>= 2;
+  }
+
+  while (bit != 0u) {
+    if (value >= result + bit) {
+      value -= result + bit;
+      result = (result >> 1) + bit;
+    } else {
+      result >>= 1;
+    }
+    bit >>= 2;
+  }
+
+  return (uint16_t)result;
+}
+
+static inline uint8_t mxfx_led_coord_x(uint8_t index) {
+  return (uint8_t)(((uint32_t)led_pos_x[index] * mxfx_COORD_MAX_X) /
+                   LED_LAYOUT_MAX_X);
+}
+
+static inline uint8_t mxfx_led_coord_y(uint8_t index) {
+  return (uint8_t)(((uint32_t)led_pos_y[index] * mxfx_COORD_MAX_Y) /
+                   LED_LAYOUT_MAX_Y);
+}
+
+static inline uint8_t mxfx_distance_u8(int16_t dx, int16_t dy) {
+  uint16_t adx = (dx < 0) ? (uint16_t)(-dx) : (uint16_t)dx;
+  uint16_t ady = (dy < 0) ? (uint16_t)(-dy) : (uint16_t)dy;
+  uint16_t dist = mxfx_sqrt32((uint32_t)adx * adx + (uint32_t)ady * ady);
+  return (uint8_t)((dist > 255u) ? 255u : dist);
+}
+
+static led_hsv_t effect_primary_hsv(uint8_t fallback_r, uint8_t fallback_g,
+                                    uint8_t fallback_b) {
+  led_hsv_t hsv = {0u, 0u, 0u};
+  uint8_t r = effect_params[LED_EFFECT_PARAM_COLOR_R];
+  uint8_t g = effect_params[LED_EFFECT_PARAM_COLOR_G];
+  uint8_t b = effect_params[LED_EFFECT_PARAM_COLOR_B];
+
+  /* Treat stored (0,0,0) as "not configured" and fall back to the per-call
+   * default.  This preserves QMK pixel-perfect behavior for effects that do
+   * not have an explicit PCOLOR entry in their schema. */
+  if (r == 0u && g == 0u && b == 0u) {
+    r = fallback_r;
+    g = fallback_g;
+    b = fallback_b;
+  }
+
+  led_matrix_rgb_to_hsv(r, g, b, &hsv.h, &hsv.s, &hsv.v);
+  return hsv;
+}
+
+static void mxfx_reactive_record_hit(uint8_t key_index) {
+  uint8_t slot = mxfx_last_hit_tracker.count;
+
+  if (slot >= mxfx_LED_HITS_TO_REMEMBER) {
+    memmove(&mxfx_last_hit_tracker.x[0], &mxfx_last_hit_tracker.x[1],
+            mxfx_LED_HITS_TO_REMEMBER - 1u);
+    memmove(&mxfx_last_hit_tracker.y[0], &mxfx_last_hit_tracker.y[1],
+            mxfx_LED_HITS_TO_REMEMBER - 1u);
+    memmove(&mxfx_last_hit_tracker.index[0], &mxfx_last_hit_tracker.index[1],
+            mxfx_LED_HITS_TO_REMEMBER - 1u);
+    memmove(&mxfx_last_hit_tracker.tick[0], &mxfx_last_hit_tracker.tick[1],
+            (mxfx_LED_HITS_TO_REMEMBER - 1u) * sizeof(uint16_t));
+    slot = mxfx_LED_HITS_TO_REMEMBER - 1u;
+  }
+
+  mxfx_last_hit_tracker.x[slot] = mxfx_led_coord_x(key_index);
+  mxfx_last_hit_tracker.y[slot] = mxfx_led_coord_y(key_index);
+  mxfx_last_hit_tracker.index[slot] = key_index;
+  mxfx_last_hit_tracker.tick[slot] = 0u;
+  mxfx_last_hit_tracker.count = slot + 1u;
+}
+
+static void mxfx_reactive_tick_hits(uint16_t delta_ms) {
+  for (uint8_t i = 0u; i < mxfx_last_hit_tracker.count; i++) {
+    if (UINT16_MAX - delta_ms < mxfx_last_hit_tracker.tick[i]) {
+      mxfx_last_hit_tracker.tick[i] = UINT16_MAX;
+    } else {
+      mxfx_last_hit_tracker.tick[i] =
+          (uint16_t)(mxfx_last_hit_tracker.tick[i] + delta_ms);
+    }
+  }
+}
+
+static void mxfx_reactive_render(mxfx_reactive_math_f math_fn) {
+  led_hsv_t base_hsv = effect_primary_hsv(255u, 0u, 0u);
+  uint8_t speed_scale = mxfx_qadd8(effect_animation_speed(), 1u);
+  uint16_t max_tick = (uint16_t)(65535u / speed_scale);
+
+  for (uint8_t i = 0u; i < LED_MATRIX_NUM_LEDS; i++) {
+    uint16_t tick = max_tick;
+    led_hsv_t hsv = base_hsv;
+
+    for (int8_t j = (int8_t)mxfx_last_hit_tracker.count - 1; j >= 0; j--) {
+      if (mxfx_last_hit_tracker.index[(uint8_t)j] == i &&
+          mxfx_last_hit_tracker.tick[(uint8_t)j] < tick) {
+        tick = mxfx_last_hit_tracker.tick[(uint8_t)j];
+        break;
+      }
+    }
+
+    if (math_fn != NULL) {
+      uint16_t offset = mxfx_scale16by8(tick, speed_scale);
+      math_fn(&base_hsv, &hsv, offset);
+    }
+
+    {
+      uint8_t r = 0u;
+      uint8_t g = 0u;
+      uint8_t b = 0u;
+      led_matrix_hsv_to_rgb(hsv.h, hsv.s, hsv.v, &r, &g, &b);
+      led_matrix_set_pixel_idx(i, r, g, b);
+    }
+  }
+}
+
+static void mxfx_reactive_splash_render(uint8_t start,
+                                       mxfx_reactive_splash_math_f math_fn) {
+  led_hsv_t base_hsv = effect_primary_hsv(255u, 0u, 0u);
+  uint8_t speed_scale = mxfx_qadd8(effect_animation_speed(), 1u);
+  uint8_t count = mxfx_last_hit_tracker.count;
+  uint8_t begin = (start < count) ? start : count;
+
+  for (uint8_t i = 0u; i < LED_MATRIX_NUM_LEDS; i++) {
+    led_hsv_t hsv = base_hsv;
+    int16_t x = mxfx_led_coord_x(i);
+    int16_t y = mxfx_led_coord_y(i);
+    hsv.v = 0u;
+
+    for (uint8_t j = begin; j < count; j++) {
+      int16_t dx = (int16_t)(x - mxfx_last_hit_tracker.x[j]);
+      int16_t dy = (int16_t)(y - mxfx_last_hit_tracker.y[j]);
+      uint8_t dist = mxfx_distance_u8(dx, dy);
+      uint16_t tick = mxfx_scale16by8(mxfx_last_hit_tracker.tick[j], speed_scale);
+      math_fn(&base_hsv, &hsv, dx, dy, dist, tick);
+    }
+
+    hsv.v = mxfx_scale8(hsv.v, base_hsv.v);
+
+    {
+      uint8_t r = 0u;
+      uint8_t g = 0u;
+      uint8_t b = 0u;
+      led_matrix_hsv_to_rgb(hsv.h, hsv.s, hsv.v, &r, &g, &b);
+      led_matrix_set_pixel_idx(i, r, g, b);
+    }
+  }
+}
+
+static uint8_t pseudo_angle_u8(int16_t x, int16_t y) {
+  uint16_t ax = (x < 0) ? (uint16_t)(-x) : (uint16_t)x;
+  uint16_t ay = (y < 0) ? (uint16_t)(-y) : (uint16_t)y;
+  uint16_t sum = (uint16_t)(ax + ay);
+  uint8_t octant = (sum == 0u) ? 0u : (uint8_t)(((uint32_t)ay * 64u) / sum);
+
+  if (x >= 0 && y >= 0) {
+    return octant;
+  }
+  if (x < 0 && y >= 0) {
+    return (uint8_t)(128u - octant);
+  }
+  if (x < 0 && y < 0) {
+    return (uint8_t)(128u + octant);
+  }
+
+  return (uint8_t)(255u - octant);
 }
 
 static inline uint16_t led_layout_distance(uint8_t a, uint8_t b) {
@@ -274,6 +663,11 @@ static void volume_overlay_effect_palette_color(led_effect_mode_t effect_mode,
                                  : 1u));
   uint8_t anim_phase = (uint8_t)(phase + (uint8_t)(effect_offset * 3u));
   uint8_t wave = triangle_wave_u8((uint8_t)(effect_offset + phase));
+  uint8_t color_r = 255u;
+  uint8_t color_g = 0u;
+  uint8_t color_b = 0u;
+
+  effect_primary_color(255u, 0u, 0u, &color_r, &color_g, &color_b);
 
   switch (effect_mode) {
   case LED_EFFECT_STATIC_MATRIX: {
@@ -282,22 +676,22 @@ static void volume_overlay_effect_palette_color(led_effect_mode_t effect_mode,
     *g = pixels_static[key * 3u + 1u];
     *b = pixels_static[key * 3u + 2u];
     if (*r == 0u && *g == 0u && *b == 0u) {
-      *r = effect_color_r;
-      *g = effect_color_g;
-      *b = effect_color_b;
+      *r = color_r;
+      *g = color_g;
+      *b = color_b;
     }
     break;
   }
-  case LED_EFFECT_SOLID:
-    *r = effect_color_r;
-    *g = effect_color_g;
-    *b = effect_color_b;
+  case LED_EFFECT_SOLID_COLOR:
+    *r = color_r;
+    *g = color_g;
+    *b = color_b;
     break;
   case LED_EFFECT_BREATHING: {
     uint8_t scale = (uint8_t)(32u + (((uint16_t)wave * 223u) / 255u));
-    *r = scale_u8(effect_color_r, scale);
-    *g = scale_u8(effect_color_g, scale);
-    *b = scale_u8(effect_color_b, scale);
+    *r = scale_u8(color_r, scale);
+    *g = scale_u8(color_g, scale);
+    *b = scale_u8(color_b, scale);
     break;
   }
   case LED_EFFECT_FIRE:
@@ -308,7 +702,7 @@ static void volume_overlay_effect_palette_color(led_effect_mode_t effect_mode,
     led_matrix_hsv_to_rgb((uint8_t)(132u + (phase / 6u)), 220u,
                           (uint8_t)(150u + (wave / 2u)), r, g, b);
     break;
-  case LED_EFFECT_MATRIX:
+  case LED_EFFECT_DIGITAL_RAIN:
     if (((slot + (effect_offset / 8u)) % 5u) == 0u) {
       *r = 220u;
       *g = 255u;
@@ -326,15 +720,13 @@ static void volume_overlay_effect_palette_color(led_effect_mode_t effect_mode,
       led_matrix_hsv_to_rgb((uint8_t)(anim_phase + 24u), 170u, 180u, r, g, b);
     }
     break;
-  case LED_EFFECT_RAINBOW:
-  case LED_EFFECT_STATIC_RAINBOW:
+  case LED_EFFECT_CYCLE_LEFT_RIGHT:
+  case LED_EFFECT_GRADIENT_LEFT_RIGHT:
   case LED_EFFECT_BREATHING_RAINBOW:
   case LED_EFFECT_COLOR_CYCLE:
     led_matrix_hsv_to_rgb(anim_phase, 255u, 255u, r, g, b);
     break;
   case LED_EFFECT_PLASMA:
-  case LED_EFFECT_SPIRAL:
-  case LED_EFFECT_REACTIVE:
   case LED_EFFECT_DISTANCE_SENSOR:
   default:
     led_matrix_hsv_to_rgb((uint8_t)(anim_phase + (slot * 9u)), 220u,
@@ -452,18 +844,6 @@ static void sync_runtime_from_static(void) {
 static void render_current_effect_frame(void) {
   effect_render_context = true;
   switch (current_effect) {
-  case LED_EFFECT_RAINBOW:
-    effect_rainbow();
-    break;
-  case LED_EFFECT_BREATHING:
-    effect_breathing();
-    break;
-  case LED_EFFECT_STATIC_RAINBOW:
-    effect_static_rainbow();
-    break;
-  case LED_EFFECT_SOLID:
-    effect_solid();
-    break;
   case LED_EFFECT_PLASMA:
     effect_plasma();
     break;
@@ -473,26 +853,179 @@ static void render_current_effect_frame(void) {
   case LED_EFFECT_OCEAN:
     effect_ocean();
     break;
-  case LED_EFFECT_MATRIX:
-    effect_matrix();
-    break;
   case LED_EFFECT_SPARKLE:
     effect_sparkle();
     break;
   case LED_EFFECT_BREATHING_RAINBOW:
     effect_breathing_rainbow();
     break;
-  case LED_EFFECT_SPIRAL:
-    effect_spiral();
-    break;
   case LED_EFFECT_COLOR_CYCLE:
     effect_color_cycle();
     break;
-  case LED_EFFECT_REACTIVE:
-    effect_reactive();
-    break;
   case LED_EFFECT_DISTANCE_SENSOR:
     effect_distance_sensor();
+    break;
+  case LED_EFFECT_IMPACT_RAINBOW:
+    effect_impact_rainbow();
+    break;
+  case LED_EFFECT_REACTIVE_GHOST:
+    effect_reactive_ghost();
+    break;
+  case LED_EFFECT_AUDIO_SPECTRUM:
+    effect_audio_spectrum();
+    break;
+  case LED_EFFECT_KEY_STATE_DEMO:
+    effect_key_state_demo();
+    break;
+  case LED_EFFECT_CYCLE_PINWHEEL:
+    effect_cycle_pinwheel();
+    break;
+  case LED_EFFECT_CYCLE_SPIRAL:
+    effect_cycle_spiral();
+    break;
+  case LED_EFFECT_CYCLE_OUT_IN_DUAL:
+    effect_cycle_out_in_dual();
+    break;
+  case LED_EFFECT_RAINBOW_BEACON:
+    effect_rainbow_beacon();
+    break;
+  case LED_EFFECT_RAINBOW_PINWHEELS:
+    effect_rainbow_pinwheels();
+    break;
+  case LED_EFFECT_RAINBOW_MOVING_CHEVRON:
+    effect_rainbow_moving_chevron();
+    break;
+  case LED_EFFECT_HUE_BREATHING:
+    effect_hue_breathing();
+    break;
+  case LED_EFFECT_HUE_PENDULUM:
+    effect_hue_pendulum();
+    break;
+  case LED_EFFECT_HUE_WAVE:
+    effect_hue_wave();
+    break;
+  case LED_EFFECT_RIVERFLOW:
+    effect_riverflow();
+    break;
+  case LED_EFFECT_SOLID_COLOR:
+    effect_solid_color();
+    break;
+  case LED_EFFECT_ALPHA_MODS:
+    effect_alpha_mods();
+    break;
+  case LED_EFFECT_GRADIENT_UP_DOWN:
+    effect_gradient_up_down();
+    break;
+  case LED_EFFECT_GRADIENT_LEFT_RIGHT:
+    effect_gradient_left_right();
+    break;
+  case LED_EFFECT_BREATHING:
+    effect_breathing();
+    break;
+  case LED_EFFECT_COLORBAND_SAT:
+    effect_colorband_sat();
+    break;
+  case LED_EFFECT_COLORBAND_VAL:
+    effect_colorband_val();
+    break;
+  case LED_EFFECT_COLORBAND_PINWHEEL_SAT:
+    effect_colorband_pinwheel_sat();
+    break;
+  case LED_EFFECT_COLORBAND_PINWHEEL_VAL:
+    effect_colorband_pinwheel_val();
+    break;
+  case LED_EFFECT_COLORBAND_SPIRAL_SAT:
+    effect_colorband_spiral_sat();
+    break;
+  case LED_EFFECT_COLORBAND_SPIRAL_VAL:
+    effect_colorband_spiral_val();
+    break;
+  case LED_EFFECT_CYCLE_ALL:
+    effect_cycle_all();
+    break;
+  case LED_EFFECT_CYCLE_LEFT_RIGHT:
+    effect_cycle_left_right();
+    break;
+  case LED_EFFECT_CYCLE_UP_DOWN:
+    effect_cycle_up_down();
+    break;
+  case LED_EFFECT_CYCLE_OUT_IN:
+    effect_cycle_out_in();
+    break;
+  case LED_EFFECT_DUAL_BEACON:
+    effect_dual_beacon();
+    break;
+  case LED_EFFECT_FLOWER_BLOOMING:
+    effect_flower_blooming();
+    break;
+  case LED_EFFECT_RAINDROPS:
+    effect_raindrops();
+    break;
+  case LED_EFFECT_JELLYBEAN_RAINDROPS:
+    effect_jellybean_raindrops();
+    break;
+  case LED_EFFECT_PIXEL_RAIN:
+    effect_pixel_rain();
+    break;
+  case LED_EFFECT_PIXEL_FLOW:
+    effect_pixel_flow();
+    break;
+  case LED_EFFECT_PIXEL_FRACTAL:
+    effect_pixel_fractal();
+    break;
+  case LED_EFFECT_TYPING_HEATMAP:
+    effect_typing_heatmap();
+    break;
+  case LED_EFFECT_DIGITAL_RAIN:
+    effect_digital_rain();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE_SIMPLE:
+    effect_solid_reactive_simple();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE:
+    effect_solid_reactive();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE_WIDE:
+    effect_solid_reactive_wide();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE_MULTI_WIDE:
+    effect_solid_reactive_multi_wide();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE_CROSS:
+    effect_solid_reactive_cross();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE_MULTI_CROSS:
+    effect_solid_reactive_multi_cross();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE_NEXUS:
+    effect_solid_reactive_nexus();
+    break;
+  case LED_EFFECT_SOLID_REACTIVE_MULTI_NEXUS:
+    effect_solid_reactive_multi_nexus();
+    break;
+  case LED_EFFECT_SPLASH:
+    effect_splash();
+    break;
+  case LED_EFFECT_MULTI_SPLASH:
+    effect_multi_splash();
+    break;
+  case LED_EFFECT_SOLID_SPLASH:
+    effect_solid_splash();
+    break;
+  case LED_EFFECT_SOLID_MULTI_SPLASH:
+    effect_solid_multi_splash();
+    break;
+  case LED_EFFECT_STARLIGHT_SMOOTH:
+    effect_starlight_smooth();
+    break;
+  case LED_EFFECT_STARLIGHT:
+    effect_starlight();
+    break;
+  case LED_EFFECT_STARLIGHT_DUAL_SAT:
+    effect_starlight_dual_sat();
+    break;
+  case LED_EFFECT_STARLIGHT_DUAL_HUE:
+    effect_starlight_dual_hue();
     break;
   default:
     break;
@@ -527,6 +1060,7 @@ bool led_matrix_init(void *htim, uint32_t channel) {
   current_brightness = LED_BRIGHTNESS_DEFAULT;
   display_enabled = true;
   initialized = true;
+  last_sim_tick = 0;
 
   // Clear all LEDs
   zeroLedValues(&led_ws2812_handle);
@@ -834,10 +1368,14 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
   effect_offset = 0;
   last_effect_tick = 0;
   last_render_tick = 0;
-  memset(key_wave_energy, 0, sizeof(key_wave_energy));
-  memset(key_wave_age_ms, 0, sizeof(key_wave_age_ms));
-  memset(key_wave_hue, 0, sizeof(key_wave_hue));
-  reactive_frame_delta_ms = 16u;
+  last_sim_tick = 0;
+  memset(reactive_waves, 0, sizeof(reactive_waves));
+  memset(reactive_heat_energy, 0, sizeof(reactive_heat_energy));
+  memset(reactive_ghost_energy, 0, sizeof(reactive_ghost_energy));
+  memset(mxfx_typing_heat_energy, 0, sizeof(mxfx_typing_heat_energy));
+  mxfx_typing_heat_decay_timer_ms = 0u;
+  memset(&mxfx_last_hit_tracker, 0, sizeof(mxfx_last_hit_tracker));
+  impact_boost = 0u;
 
   // Restoring matrix mode must restore the exact saved pattern.
   if (mode == LED_EFFECT_STATIC_MATRIX && previous_effect != LED_EFFECT_STATIC_MATRIX) {
@@ -854,9 +1392,13 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
 led_effect_mode_t led_matrix_get_effect(void) { return current_effect; }
 
 void led_matrix_set_effect_color(uint8_t r, uint8_t g, uint8_t b) {
-  effect_color_r = r;
-  effect_color_g = g;
-  effect_color_b = b;
+  if (LED_EFFECT_PARAM_COUNT <= LED_EFFECT_PARAM_COLOR_B) {
+    return;
+  }
+
+  effect_params[LED_EFFECT_PARAM_COLOR_R] = r;
+  effect_params[LED_EFFECT_PARAM_COLOR_G] = g;
+  effect_params[LED_EFFECT_PARAM_COLOR_B] = b;
 }
 
 void led_matrix_set_effect_params(const uint8_t *params) {
@@ -876,10 +1418,12 @@ void led_matrix_get_effect_params(uint8_t *params) {
 }
 
 void led_matrix_set_effect_speed(uint8_t speed) {
-  effect_speed = speed > 0 ? speed : 1;
+  effect_params[LED_EFFECT_PARAM_SPEED] = speed > 0u ? speed : 1u;
 }
 
-uint8_t led_matrix_get_effect_speed(void) { return effect_speed; }
+uint8_t led_matrix_get_effect_speed(void) {
+  return effect_animation_speed();
+}
 
 void led_matrix_set_fps_limit(uint8_t fps) { fps_limit = fps; }
 
@@ -894,19 +1438,199 @@ uint8_t led_matrix_get_diagnostic_mode(void) { return 0u; }
 void led_matrix_key_event(uint8_t key_index, bool pressed) {
   if (key_index >= NUM_KEYS)
     return;
-  if (pressed) {
-    uint8_t anchor_hue = 0u;
-    uint8_t ignored_sat = 0u;
-    uint8_t ignored_value = 0u;
-    uint8_t x_bias = scale_coord_to_u8(led_pos_x[key_index], LED_LAYOUT_MAX_X);
-    uint8_t y_bias = scale_coord_to_u8(led_pos_y[key_index], LED_LAYOUT_MAX_Y);
+  if (!pressed) {
+    return;
+  }
 
-    led_matrix_rgb_to_hsv(effect_color_r, effect_color_g, effect_color_b,
-                          &anchor_hue, &ignored_sat, &ignored_value);
-    key_wave_energy[key_index] = 255;
-    key_wave_age_ms[key_index] = 0u;
-    key_wave_hue[key_index] =
-        (uint8_t)(anchor_hue + (x_bias / 7u) + (y_bias / 11u));
+  mxfx_reactive_record_hit(key_index);
+
+  uint8_t anchor_hue = 0u;
+  uint8_t ignored_sat = 0u;
+  uint8_t ignored_value = 0u;
+  uint8_t x_bias = scale_coord_to_u8(led_pos_x[key_index], LED_LAYOUT_MAX_X);
+  uint8_t y_bias = scale_coord_to_u8(led_pos_y[key_index], LED_LAYOUT_MAX_Y);
+  uint8_t color_r = 255u;
+  uint8_t color_g = 0u;
+  uint8_t color_b = 0u;
+  uint8_t slot = 0xFFu;
+
+  effect_primary_color(255u, 0u, 0u, &color_r, &color_g, &color_b);
+  led_matrix_rgb_to_hsv(color_r, color_g, color_b, &anchor_hue, &ignored_sat,
+                        &ignored_value);
+
+  for (uint8_t i = 0u; i < REACTIVE_WAVE_POOL_SIZE; i++) {
+    if (!reactive_waves[i].active) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot == 0xFFu) {
+    /* Pool is full.  Prefer evicting the oldest wave from the SAME source key
+     * so that spamming one key produces overlapping rings that all stay visible,
+     * rather than the latest press silently clobbering an unrelated wave. */
+    uint16_t oldest_same_age = 0u;
+    for (uint8_t i = 0u; i < REACTIVE_WAVE_POOL_SIZE; i++) {
+      if (reactive_waves[i].source_key == key_index &&
+          reactive_waves[i].age_ms >= oldest_same_age) {
+        oldest_same_age = reactive_waves[i].age_ms;
+        slot = i;
+      }
+    }
+    /* No same-key wave found — fall back to evicting the globally oldest. */
+    if (slot == 0xFFu) {
+      uint16_t oldest_age = 0u;
+      for (uint8_t i = 0u; i < REACTIVE_WAVE_POOL_SIZE; i++) {
+        if (reactive_waves[i].age_ms >= oldest_age) {
+          oldest_age = reactive_waves[i].age_ms;
+          slot = i;
+        }
+      }
+    }
+  }
+
+  reactive_waves[slot].active = true;
+  reactive_waves[slot].source_key = key_index;
+  reactive_waves[slot].hue =
+      (uint8_t)(anchor_hue + (x_bias / 7u) + (y_bias / 11u));
+  reactive_waves[slot].energy = 255u;
+  reactive_waves[slot].age_ms = 0u;
+
+  if (current_effect == LED_EFFECT_TYPING_HEATMAP) {
+    uint8_t origin_x = mxfx_led_coord_x(key_index);
+    uint8_t origin_y = mxfx_led_coord_y(key_index);
+
+    // param 0 (heat_gain=224): energy per keypress. 1+(gain>>3) -> at 224 ~=29 (near original 32).
+    uint8_t gain_energy = (uint8_t)(1u + (effect_param(0, 224u) >> 3u));
+    // param 2 (diffusion=88): max neighbor spread amount 0..16. At 255 -> 16 (original).
+    uint8_t max_spread = (uint8_t)(((uint16_t)effect_param(2, 88u) * 16u) / 255u);
+
+    mxfx_typing_heat_energy[key_index] =
+        mxfx_qadd8(mxfx_typing_heat_energy[key_index], gain_energy);
+
+    for (uint8_t j = 0u; j < NUM_KEYS; j++) {
+      if (j == key_index) {
+        continue;
+      }
+
+      {
+        int16_t dx = (int16_t)origin_x - (int16_t)mxfx_led_coord_x(j);
+        int16_t dy = (int16_t)origin_y - (int16_t)mxfx_led_coord_y(j);
+        uint8_t distance = mxfx_distance_u8(dx, dy);
+
+        if (distance <= 40u && max_spread > 0u) {
+          uint8_t amount = (uint8_t)(40u - distance);
+          if (amount > max_spread) {
+            amount = max_spread;
+          }
+          mxfx_typing_heat_energy[j] =
+              mxfx_qadd8(mxfx_typing_heat_energy[j], amount);
+        }
+      }
+    }
+  }
+
+  {
+    uint16_t heat = (uint16_t)(reactive_heat_energy[key_index] + 320u);
+    reactive_heat_energy[key_index] = (heat > 1024u) ? 1024u : heat;
+
+    /* Heatmap-style keypress spread: add proportional energy to nearby keys at
+     * press time rather than diffusing during rendering.  This gives the
+     * sharp, localised spread seen in typing_heatmap.
+     * HEATMAP_SPREAD_DIST: max spread radius in 0.1 mm units (~52 mm). */
+    if (current_effect == LED_EFFECT_TYPING_HEATMAP) {
+      /* Spread radius ~52 mm and max bleed energy at distance=0 */
+      const uint16_t spread_dist   = 520u;
+      const uint16_t spread_energy = 192u;
+      for (uint8_t j = 0u; j < NUM_KEYS; j++) {
+        if (j == key_index) {
+          continue;
+        }
+        uint16_t dist = led_layout_distance(key_index, j);
+        if (dist < spread_dist) {
+          uint16_t falloff = (uint16_t)(((uint32_t)spread_energy *
+                                         (spread_dist - dist)) /
+                                        spread_dist);
+          uint16_t new_heat = reactive_heat_energy[j] + falloff;
+          reactive_heat_energy[j] = (new_heat > 1024u) ? 1024u : new_heat;
+        }
+      }
+    }
+  }
+  {
+    uint16_t ghost = (uint16_t)(reactive_ghost_energy[key_index] + 420u);
+    reactive_ghost_energy[key_index] = (ghost > 1024u) ? 1024u : ghost;
+  }
+
+  impact_boost = (impact_boost > 820u) ? 1024u : (uint16_t)(impact_boost + 204u);
+}
+
+static void reactive_tick_simulation(uint16_t delta_ms) {
+  uint32_t now_ms = HAL_GetTick();
+
+  if (delta_ms == 0u) {
+    return;
+  }
+  if (delta_ms > 180u) {
+    delta_ms = 180u;
+  }
+
+  mxfx_reactive_tick_hits(delta_ms);
+
+  if (audio_spectrum_valid &&
+      (uint32_t)(now_ms - audio_spectrum_refresh_ms) > AUDIO_SPECTRUM_STALE_MS) {
+    audio_spectrum_valid = false;
+    memset(audio_spectrum_levels, 0, sizeof(audio_spectrum_levels));
+    audio_impact_level = 0u;
+  }
+
+  if (audio_spectrum_valid) {
+    uint16_t boosted = (uint16_t)audio_impact_level * 3u;
+    if (boosted > impact_boost) {
+      impact_boost = (uint16_t)((impact_boost + boosted) / 2u);
+    }
+  }
+
+  if (impact_boost > 0u) {
+    uint16_t decay = (uint16_t)(1u + (delta_ms * 3u) / 10u);
+    impact_boost = (impact_boost > decay) ? (uint16_t)(impact_boost - decay) : 0u;
+  }
+
+  for (uint8_t i = 0u; i < REACTIVE_WAVE_POOL_SIZE; i++) {
+    reactive_wave_t *wave = &reactive_waves[i];
+    uint32_t next_age;
+
+    if (!wave->active) {
+      continue;
+    }
+
+    next_age = (uint32_t)wave->age_ms + delta_ms;
+    if (next_age >= 1600u) {
+      wave->active = false;
+      wave->energy = 0u;
+      wave->age_ms = 0u;
+      continue;
+    }
+
+    wave->age_ms = (uint16_t)next_age;
+    wave->energy = (uint8_t)(((1600u - next_age) * 255u) / 1600u);
+  }
+
+  for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+    if (reactive_heat_energy[key] > 0u) {
+      uint16_t heat_decay = (uint16_t)(1u + (delta_ms * 5u) / 6u);
+      reactive_heat_energy[key] =
+          (reactive_heat_energy[key] > heat_decay)
+              ? (uint16_t)(reactive_heat_energy[key] - heat_decay)
+              : 0u;
+    }
+
+    if (reactive_ghost_energy[key] > 0u) {
+      uint16_t ghost_decay = (uint16_t)(1u + (delta_ms * 7u) / 8u);
+      reactive_ghost_energy[key] =
+          (reactive_ghost_energy[key] > ghost_decay)
+              ? (uint16_t)(reactive_ghost_energy[key] - ghost_decay)
+              : 0u;
+    }
   }
 }
 
@@ -1003,6 +1727,30 @@ void led_matrix_nudge_host_volume_overlay(int8_t direction, uint8_t steps) {
   led_matrix_set_progress_overlay(host_volume_level);
 }
 
+void led_matrix_set_audio_spectrum(const uint8_t *bands, uint8_t band_count,
+                                   uint8_t impact_level) {
+  if (bands == NULL || band_count == 0u) {
+    return;
+  }
+
+  if (band_count > LED_AUDIO_SPECTRUM_BAND_COUNT) {
+    band_count = LED_AUDIO_SPECTRUM_BAND_COUNT;
+  }
+
+  memset(audio_spectrum_levels, 0, sizeof(audio_spectrum_levels));
+  memcpy(audio_spectrum_levels, bands, band_count);
+  audio_impact_level = impact_level;
+  audio_spectrum_valid = true;
+  audio_spectrum_refresh_ms = HAL_GetTick();
+}
+
+void led_matrix_clear_audio_spectrum(void) {
+  memset(audio_spectrum_levels, 0, sizeof(audio_spectrum_levels));
+  audio_impact_level = 0u;
+  audio_spectrum_valid = false;
+  audio_spectrum_refresh_ms = 0u;
+}
+
 void led_matrix_set_live_frame(const uint8_t *data) {
   if (data == NULL) {
     return;
@@ -1039,559 +1787,63 @@ void led_matrix_clear_output_override_frame(void) {
 /**
  * @brief Rainbow Wave effect - diagonal rainbow cycling
  */
-static void effect_rainbow(void) {
-  uint8_t x_mul =
-      (uint8_t)(1u + ((uint16_t)effect_param(0, 160u) * 4u) / 255u);
-  uint8_t y_div = (uint8_t)(2u + ((uint16_t)effect_param(1, 96u) * 6u) / 255u);
-  uint8_t anim_mul =
-      (uint8_t)(1u + ((uint16_t)effect_param(2, 160u) * 5u) / 255u);
-  uint8_t sat = effect_param(3, 255u);
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t hue = (uint8_t)(scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) *
-                            x_mul) +
-                  (scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y) / y_div) +
-                  (uint8_t)(effect_offset * anim_mul);
-    uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, sat, 255, &r, &g, &b);
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Breathing effect - fade in/out with selected color
- */
-static void effect_breathing(void) {
-  uint8_t min_brightness = effect_param(0, 24u);
-  uint8_t max_brightness = effect_param(1, 255u);
-  uint8_t plateau = (uint8_t)(((uint16_t)effect_param(2, 48u) * 20u) / 255u);
-  if (max_brightness < min_brightness) {
-    uint8_t tmp = max_brightness;
-    max_brightness = min_brightness;
-    min_brightness = tmp;
-  }
-  uint8_t breath = (effect_offset % 128);
-  if (breath > 64)
-    breath = 128 - breath;
-  if (plateau > 0u && breath > (uint8_t)(64u - plateau)) {
-    breath = 64u;
-  }
-  uint8_t brightness = (uint8_t)(
-      min_brightness +
-      (((uint16_t)(max_brightness - min_brightness) * breath) / 64u));
-
-  uint8_t r = (uint8_t)((uint16_t)effect_color_r * brightness / 255);
-  uint8_t g = (uint8_t)((uint16_t)effect_color_g * brightness / 255);
-  uint8_t b = (uint8_t)((uint16_t)effect_color_b * brightness / 255);
-
-  led_matrix_fill(r, g, b);
-}
-
-/**
- * @brief Static Rainbow - static rainbow pattern
- */
-static void effect_static_rainbow(void) {
-  uint8_t x_mul =
-      (uint8_t)(1u + ((uint16_t)effect_param(0, 160u) * 4u) / 255u);
-  uint8_t y_div = (uint8_t)(1u + ((uint16_t)effect_param(1, 120u) * 5u) / 255u);
-  uint8_t sat = effect_param(2, 144u);
-  uint8_t value = effect_param(3, 255u);
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t hue = (uint8_t)(scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) *
-                            x_mul) +
-                  (scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y) / y_div);
-    uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, sat, value, &r, &g, &b);
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Solid color effect
- */
-static void effect_solid(void) {
-  uint8_t brightness = effect_param(0, 255u);
-  led_matrix_fill(
-      (uint8_t)(((uint16_t)effect_color_r * brightness) / 255u),
-      (uint8_t)(((uint16_t)effect_color_g * brightness) / 255u),
-      (uint8_t)(((uint16_t)effect_color_b * brightness) / 255u));
-}
-
-/**
- * @brief Plasma effect - psychedelic waves
- */
-static void effect_plasma(void) {
-  uint8_t anim_mul =
-      (uint8_t)(1u + ((uint16_t)effect_param(0, 96u) * 4u) / 255u);
-  uint8_t sat = effect_param(1, 192u);
-  uint8_t radial_div = (uint8_t)(12u + effect_param(2, 128u));
-  uint8_t value = effect_param(3, 255u);
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint16_t x = led_pos_x[i] / 12u;
-    uint16_t y = led_pos_y[i] / 12u;
-    int16_t cx = (int16_t)(led_pos_x[i] / 10u) - (int16_t)(LED_LAYOUT_CENTER_X / 10u);
-    int16_t cy = (int16_t)(led_pos_y[i] / 10u) - (int16_t)(LED_LAYOUT_CENTER_Y / 10u);
-    uint8_t v1 = (uint8_t)(x + effect_offset * anim_mul);
-    uint8_t v2 = (uint8_t)(y + effect_offset * anim_mul);
-    uint8_t v3 = (uint8_t)(((x + y) * 3u) / 2u + effect_offset * (anim_mul + 1u));
-    uint16_t radial = (uint16_t)((cx * cx + cy * cy) / radial_div);
-    uint8_t hue = (uint8_t)(v1 + v2 + v3 + radial);
-    uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, sat, value, &r, &g, &b);
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Fire effect - flames rising from bottom
- */
-static void effect_fire(void) {
-  uint8_t heat_boost = (uint8_t)(((uint16_t)effect_param(0, 160u) * 64u) / 255u);
-  uint8_t ember_floor = (uint8_t)(((uint16_t)effect_param(1, 96u) * 80u) / 255u);
-  uint8_t cooling = (uint8_t)(16u + ((uint16_t)effect_param(2, 96u) * 96u) / 255u);
-  uint8_t palette = effect_param(3, 0u) % 3u;
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t x_term = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X);
-    uint8_t y_term = 255u - scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y);
-    uint8_t heat = (uint8_t)((y_term * 3u) / 4u + ((effect_offset + x_term) % 64u) +
-                             heat_boost);
-    uint8_t r, g, b;
-    heat = (heat > cooling) ? (uint8_t)(heat - cooling) : 0u;
-
-    if (palette == 1u) {
-      if (heat > 220u) {
-        r = 255u;
-        g = 200u;
-        b = 64u;
-      } else if (heat > 170u) {
-        r = 255u;
-        g = 120u;
-        b = 0u;
-      } else if (heat > 100u) {
-        r = 220u;
-        g = 32u;
-        b = 0u;
-      } else if (heat > ember_floor) {
-        r = (uint8_t)(96u + ember_floor);
-        g = 0u;
-        b = 0u;
-      } else {
-        r = g = b = 0u;
-      }
-    } else if (palette == 2u) {
-      if (heat > 220u) {
-        r = 180u;
-        g = 220u;
-        b = 255u;
-      } else if (heat > 170u) {
-        r = 32u;
-        g = 160u;
-        b = 255u;
-      } else if (heat > 100u) {
-        r = 0u;
-        g = 72u;
-        b = 255u;
-      } else if (heat > ember_floor) {
-        r = 0u;
-        g = (uint8_t)(32u + ember_floor / 2u);
-        b = (uint8_t)(96u + ember_floor);
-      } else {
-        r = g = b = 0u;
-      }
-    } else {
-      if (heat > 220u) {
-        r = 255u;
-        g = 255u;
-        b = 160u;
-      } else if (heat > 170u) {
-        r = 255u;
-        g = 170u;
-        b = 0u;
-      } else if (heat > 100u) {
-        r = 255u;
-        g = 72u;
-        b = 0u;
-      } else if (heat > ember_floor) {
-        r = (uint8_t)(96u + ember_floor);
-        g = 0u;
-        b = 0u;
-      } else {
-        r = g = b = 0u;
-      }
-    }
-
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Ocean waves effect - horizontal waves
- */
-static void effect_ocean(void) {
-  uint8_t hue_bias =
-      (uint8_t)(100u + ((uint16_t)effect_param(0, 160u) * 90u) / 255u);
-  uint8_t depth_dim = (uint8_t)(32u + ((uint16_t)effect_param(1, 64u) * 120u) / 255u);
-  bool foam_highlight = effect_param_flag(2, true);
-  uint8_t speed_mul =
-      (uint8_t)(1u + ((uint16_t)effect_param(3, 160u) * 4u) / 255u);
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t x_term = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X);
-    uint8_t y_term = scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y);
-    uint8_t wave = (uint8_t)(x_term + (effect_offset * speed_mul));
-    uint8_t hue = (uint8_t)(hue_bias + (wave / 12u) + (y_term / 16u));
-    uint8_t brightness = (uint8_t)(255u - ((uint16_t)y_term * depth_dim / 255u));
-    uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, 255, brightness, &r, &g, &b);
-    if (foam_highlight && ((wave + y_term) & 0x1Fu) < 4u) {
-      r = (uint8_t)(r + ((255u - r) / 2u));
-      g = (uint8_t)(g + ((255u - g) / 2u));
-      b = (uint8_t)(b + ((255u - b) / 2u));
-    }
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Matrix rain effect - digital rain
- */
-static void effect_matrix(void) {
-  uint8_t trail = (uint8_t)(24u + ((uint16_t)effect_param(0, 64u) * 80u) / 255u);
-  uint8_t head = (uint8_t)(4u + ((uint16_t)effect_param(1, 160u) * 10u) / 255u);
-  uint8_t density = (uint8_t)(4u + ((uint16_t)effect_param(2, 96u) * 24u) / 255u);
-  bool white_heads = effect_param_flag(3, true);
-  uint8_t hue_bias = effect_param(4, 0u);
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t col_seed =
-        (uint8_t)(scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) / density);
-    uint8_t y_term = scale_coord_to_u8(led_pos_y[i], LED_LAYOUT_MAX_Y);
-    uint8_t drop_pos = (uint8_t)((effect_offset * 6u + col_seed * 17u) & 0xFFu);
-    uint8_t dist = abs_u8_diff(y_term, drop_pos);
-    uint8_t r, g, b;
-
-    if (dist < head) {
-      if (white_heads) {
-        r = 255u;
-        g = 255u;
-        b = 255u;
-      } else {
-        led_matrix_hsv_to_rgb((uint8_t)(96u + hue_bias), 255u, 255u, &r, &g, &b);
-      }
-    } else if (dist < trail) {
-      led_matrix_hsv_to_rgb((uint8_t)(96u + hue_bias), 255u,
-                            (uint8_t)(255u - ((uint16_t)dist * 255u) / trail),
-                            &r, &g, &b);
-    } else {
-      r = g = b = 0u;
-    }
-
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Sparkle/Twinkle effect
- */
-static void effect_sparkle(void) {
-  uint8_t density = (uint8_t)(2u + ((uint16_t)(255u - effect_param(0, 48u)) * 10u) / 255u);
-  uint8_t sparkle_value = effect_param(1, 224u);
-  uint8_t rainbow_mix = effect_param(2, 160u);
-  uint8_t ambient = effect_param(3, 0u);
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    uint8_t seed = (uint8_t)((led_pos_x[i] / 19u) + (led_pos_y[i] / 23u) + effect_offset) & 0x1Fu;
-    uint8_t r, g, b;
-
-    if ((seed % density) == 0u) {
-      r = g = b = sparkle_value;
-    } else if (seed < density) {
-      uint8_t hue = scale_coord_to_u8(led_pos_x[i], LED_LAYOUT_MAX_X) + effect_offset;
-      led_matrix_hsv_to_rgb(hue, rainbow_mix, sparkle_value / 2u, &r, &g, &b);
-    } else {
-      r = 0u;
-      g = ambient;
-      b = (uint8_t)(ambient / 3u);
-    }
-
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Breathing rainbow - color cycles while breathing
- */
-static void effect_breathing_rainbow(void) {
-  uint8_t min_brightness = effect_param(0, 24u);
-  uint8_t hue_mul =
-      (uint8_t)(1u + ((uint16_t)effect_param(1, 192u) * 4u) / 255u);
-  uint8_t sat = effect_param(2, 255u);
-  uint8_t breath = (effect_offset % 128);
-  if (breath > 64)
-    breath = 128 - breath;
-  uint8_t brightness =
-      (uint8_t)(min_brightness + (((uint16_t)(255u - min_brightness) * breath) / 64u));
-  uint8_t hue = (uint8_t)((effect_offset * hue_mul) / 2u);
-  uint8_t r, g, b;
-  led_matrix_hsv_to_rgb(hue, sat, brightness, &r, &g, &b);
-  led_matrix_fill(r, g, b);
-}
-
-/**
- * @brief Spiral effect
- */
-static void effect_spiral(void) {
-  uint8_t twist = (uint8_t)(1u + ((uint16_t)effect_param(0, 160u) * 6u) / 255u);
-  uint8_t radial_div = (uint8_t)(48u + effect_param(1, 96u));
-  uint8_t orbit_mul =
-      (uint8_t)(1u + ((uint16_t)effect_param(2, 128u) * 4u) / 255u);
-  uint8_t sat = effect_param(3, 255u);
-  for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
-    int16_t cx = (int16_t)led_pos_x[i] - (int16_t)LED_LAYOUT_CENTER_X;
-    int16_t cy = (int16_t)led_pos_y[i] - (int16_t)LED_LAYOUT_CENTER_Y;
-    uint16_t dist = (uint16_t)((cx * cx + cy * cy) / radial_div);
-    uint8_t angle = (uint8_t)(((cx / 12) + (cy / 12)) * twist);
-    uint8_t hue = (uint8_t)(dist + angle + effect_offset * orbit_mul);
-    uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, sat, 255, &r, &g, &b);
-    led_matrix_set_pixel_idx(i, r, g, b);
-  }
-}
-
-/**
- * @brief Solid color cycle - all LEDs same color, slowly changing
- */
-static void effect_color_cycle(void) {
-  uint8_t hue_step =
-      (uint8_t)(1u + ((uint16_t)effect_param(0, 64u) * 4u) / 255u);
-  uint8_t saturation = effect_param(1, 255u);
-  uint8_t value = effect_param(2, 255u);
-  uint8_t color_mix = effect_param(3, 0u);
-  uint8_t hue = (uint8_t)((effect_offset * hue_step) / 4u);
-  uint8_t r, g, b;
-  led_matrix_hsv_to_rgb(hue, saturation, value, &r, &g, &b);
-  if (color_mix > 0u) {
-    r = (uint8_t)(((uint16_t)r * (255u - color_mix) +
-                   (uint16_t)effect_color_r * color_mix) /
-                  255u);
-    g = (uint8_t)(((uint16_t)g * (255u - color_mix) +
-                   (uint16_t)effect_color_g * color_mix) /
-                  255u);
-    b = (uint8_t)(((uint16_t)b * (255u - color_mix) +
-                   (uint16_t)effect_color_b * color_mix) /
-                  255u);
-  }
-  led_matrix_fill(r, g, b);
-}
-
-/**
- * @brief Sensor distance effect - each key LED color follows its travel distance
- *
- * Mapping used (for the 6-key prototype):
- * - released (0.00 mm): cool blue/cyan
- * - pressed  (4.00 mm): warm red
- */
-static void effect_distance_sensor(void) {
-  led_matrix_clear();
-  uint8_t min_value = effect_param(0, 32u);
-  uint8_t hue_span = effect_param(1, 170u);
-  uint8_t sat = effect_param(2, 255u);
-  bool reverse = effect_param_flag(3, false);
-  if (hue_span == 0u) {
-    hue_span = 1u;
-  }
-
-  for (uint8_t key = 0; key < NUM_KEYS; key++) {
-    uint8_t level = analog_read_normalized_value(key);
-
-    // Hue ramps from cyan/blue to red as distance increases.
-    uint8_t hue = reverse
-                      ? (uint8_t)(((uint16_t)hue_span * level) / 255u)
-                      : (uint8_t)(hue_span -
-                                  ((uint16_t)hue_span * level) / 255u);
-    // Also increase brightness with travel for better readability.
-    uint8_t value = (uint8_t)(min_value + ((uint16_t)(255u - min_value) * level) / 255u);
-
-    uint8_t r, g, b;
-    led_matrix_hsv_to_rgb(hue, sat, value, &r, &g, &b);
-    led_matrix_set_pixel_idx(key, r, g, b);
-  }
-}
-
-/**
- * @brief Reactive effect - lights up on key presses
- */
-static void effect_reactive(void) {
-  uint16_t accum_r[NUM_KEYS];
-  uint16_t accum_g[NUM_KEYS];
-  uint16_t accum_b[NUM_KEYS];
-  uint8_t core_peak[NUM_KEYS];
-  uint16_t lifetime_ms =
-      (uint16_t)(320u + (((uint32_t)(255u - effect_param(0, 36u)) * 930u) /
-                         255u));
-  uint16_t spread =
-      (uint16_t)(7u + (((uint32_t)effect_param(1, 96u) * 17u) / 255u));
-  uint8_t base_glow = effect_param(2, 0u);
-  bool white_core = effect_param_flag(3, true);
-  uint16_t gain =
-      (uint16_t)(160u + (((uint32_t)effect_param(4, 192u) * 160u) / 255u));
-  uint16_t ring_width =
-      (uint16_t)(10u + (((uint32_t)effect_param(1, 96u) * 12u) / 255u));
-  uint16_t trail_length =
-      (uint16_t)(28u + (((uint32_t)effect_param(1, 96u) * 52u) / 255u));
-  uint16_t core_radius =
-      (uint16_t)(12u + (((uint32_t)effect_param(1, 96u) * 8u) / 255u));
-  uint16_t wave_speed_q8 =
-      (uint16_t)(84u + (((uint32_t)effect_speed * 172u) / 255u));
-  uint8_t anchor_sat = 0u;
-  uint8_t ignored_hue = 0u;
-  uint8_t ignored_value = 0u;
-  uint8_t ring_sat;
-  uint8_t trail_sat;
-  uint8_t base_r;
-  uint8_t base_g;
-  uint8_t base_b;
-
-  led_matrix_rgb_to_hsv(effect_color_r, effect_color_g, effect_color_b,
-                        &ignored_hue, &anchor_sat, &ignored_value);
-  ring_sat = (anchor_sat > 176u) ? anchor_sat : 176u;
-  trail_sat = (ring_sat > 56u) ? (uint8_t)(ring_sat - 56u) : 120u;
-  base_r = scale_u8(effect_color_r, base_glow);
-  base_g = scale_u8(effect_color_g, base_glow);
-  base_b = scale_u8(effect_color_b, base_glow);
-
-  for (uint8_t led_idx = 0; led_idx < NUM_KEYS; led_idx++) {
-    accum_r[led_idx] = base_r;
-    accum_g[led_idx] = base_g;
-    accum_b[led_idx] = base_b;
-    core_peak[led_idx] = 0u;
-  }
-
-  for (uint8_t key = 0; key < NUM_KEYS; key++) {
-    if (key_wave_energy[key] == 0u) {
-      continue;
-    }
-
-    uint16_t age_ms = key_wave_age_ms[key];
-    if (age_ms >= lifetime_ms) {
-      key_wave_energy[key] = 0u;
-      key_wave_age_ms[key] = 0u;
-      continue;
-    }
-
-    uint8_t energy = (uint8_t)(((uint32_t)(lifetime_ms - age_ms) * 255u) /
-                               lifetime_ms);
-    if (energy == 0u) {
-      key_wave_energy[key] = 0u;
-      key_wave_age_ms[key] = 0u;
-      continue;
-    }
-
-    uint16_t front = (uint16_t)(((uint32_t)age_ms * wave_speed_q8) >> 8);
-    uint8_t ring_hue = (uint8_t)(key_wave_hue[key] + (front / 6u) +
-                                 (uint8_t)(age_ms / 14u));
-    uint8_t trail_hue = (uint8_t)(ring_hue + 18u);
-    uint8_t ring_r = 0u;
-    uint8_t ring_g = 0u;
-    uint8_t ring_b = 0u;
-    uint8_t trail_r = 0u;
-    uint8_t trail_g = 0u;
-    uint8_t trail_b = 0u;
-
-    led_matrix_hsv_to_rgb(ring_hue, ring_sat, 255u, &ring_r, &ring_g, &ring_b);
-    led_matrix_hsv_to_rgb(trail_hue, trail_sat, 255u, &trail_r, &trail_g,
-                          &trail_b);
-
-    for (uint8_t led_idx = 0; led_idx < NUM_KEYS; led_idx++) {
-      uint16_t distance = led_layout_distance(led_idx, key) / spread;
-      uint16_t ring_delta =
-          (front > distance) ? (front - distance) : (distance - front);
-      uint16_t ring_raw = 0u;
-      uint16_t trail_raw = 0u;
-      uint16_t core_raw = 0u;
-
-      if (ring_delta < ring_width) {
-        ring_raw = ((ring_width - ring_delta) * energy) / ring_width;
-      }
-
-      if (front >= distance) {
-        uint16_t trail_depth = front - distance;
-        if (trail_depth < trail_length) {
-          trail_raw = ((trail_length - trail_depth) * energy) / trail_length;
-        }
-      }
-
-      if (distance < core_radius && age_ms < 160u) {
-        uint16_t spatial = ((core_radius - distance) * 255u) / core_radius;
-        uint16_t temporal = 255u - (((uint32_t)age_ms * 255u) / 160u);
-        core_raw = (spatial * temporal) / 255u;
-      }
-
-      {
-        uint8_t ring_value =
-            clamp_u16_to_u8((uint16_t)(((uint32_t)ring_raw * gain) / 255u));
-        uint8_t trail_value = clamp_u16_to_u8(
-            (uint16_t)(((uint32_t)trail_raw * (gain - 48u)) / 255u));
-        uint8_t core_value = clamp_u16_to_u8(
-            (uint16_t)(((uint32_t)core_raw * (gain + 32u)) / 255u));
-
-        if (ring_value > 0u) {
-          add_scaled_rgb(&accum_r[led_idx], &accum_g[led_idx],
-                         &accum_b[led_idx], ring_r, ring_g, ring_b,
-                         ring_value);
-        }
-        if (trail_value > 0u) {
-          add_scaled_rgb(&accum_r[led_idx], &accum_g[led_idx],
-                         &accum_b[led_idx], trail_r, trail_g, trail_b,
-                         trail_value);
-        }
-        if (core_value > 0u) {
-          add_scaled_rgb(&accum_r[led_idx], &accum_g[led_idx],
-                         &accum_b[led_idx], effect_color_r, effect_color_g,
-                         effect_color_b, core_value);
-          if (core_value > core_peak[led_idx]) {
-            core_peak[led_idx] = core_value;
-          }
-        }
-      }
-    }
-  }
-
-  for (uint8_t led_idx = 0; led_idx < NUM_KEYS; led_idx++) {
-    uint8_t r = clamp_u16_to_u8(accum_r[led_idx]);
-    uint8_t g = clamp_u16_to_u8(accum_g[led_idx]);
-    uint8_t b = clamp_u16_to_u8(accum_b[led_idx]);
-
-    if (white_core && core_peak[led_idx] > 96u) {
-      uint8_t white_mix =
-          (uint8_t)(((uint16_t)(core_peak[led_idx] - 96u) * 255u) / 159u);
-      mix_rgb_towards_white(&r, &g, &b, white_mix);
-    }
-
-    led_matrix_set_pixel_idx(led_idx, r, g, b);
-  }
-
-  {
-    uint16_t delta_ms = reactive_frame_delta_ms;
-    if (delta_ms == 0u) {
-      delta_ms = 1u;
-    } else if (delta_ms > 120u) {
-      delta_ms = 120u;
-    }
-
-    for (uint8_t key = 0; key < NUM_KEYS; key++) {
-      if (key_wave_energy[key] == 0u) {
-        continue;
-      }
-
-      {
-        uint32_t next_age = (uint32_t)key_wave_age_ms[key] + delta_ms;
-        if (next_age >= lifetime_ms) {
-          key_wave_energy[key] = 0u;
-          key_wave_age_ms[key] = 0u;
-        } else {
-          key_wave_age_ms[key] = (uint16_t)next_age;
-        }
-      }
-    }
-  }
-}
+// Effect implementations are split by file for maintainability.
+#include "led_effects/effect_plasma.inc"
+#include "led_effects/effect_fire.inc"
+#include "led_effects/effect_ocean.inc"
+#include "led_effects/effect_sparkle.inc"
+#include "led_effects/effect_breathing_rainbow.inc"
+#include "led_effects/effect_color_cycle.inc"
+#include "led_effects/effect_distance_sensor.inc"
+#include "led_effects/effect_impact_rainbow.inc"
+#include "led_effects/effect_reactive_ghost.inc"
+#include "led_effects/effect_audio_spectrum.inc"
+#include "led_effects/effect_key_state_demo.inc"
+#include "led_effects/effect_cycle_pinwheel.inc"
+#include "led_effects/effect_cycle_spiral.inc"
+#include "led_effects/effect_cycle_out_in_dual.inc"
+#include "led_effects/effect_rainbow_beacon.inc"
+#include "led_effects/effect_rainbow_pinwheels.inc"
+#include "led_effects/effect_rainbow_moving_chevron.inc"
+#include "led_effects/effect_hue_breathing.inc"
+#include "led_effects/effect_hue_pendulum.inc"
+#include "led_effects/effect_hue_wave.inc"
+#include "led_effects/effect_riverflow.inc"
+#include "led_effects/effect_solid_color.inc"
+#include "led_effects/effect_alpha_mods.inc"
+#include "led_effects/effect_gradient_up_down.inc"
+#include "led_effects/effect_gradient_left_right.inc"
+#include "led_effects/effect_breathing.inc"
+#include "led_effects/effect_colorband_sat.inc"
+#include "led_effects/effect_colorband_val.inc"
+#include "led_effects/effect_colorband_pinwheel_sat.inc"
+#include "led_effects/effect_colorband_pinwheel_val.inc"
+#include "led_effects/effect_colorband_spiral_sat.inc"
+#include "led_effects/effect_colorband_spiral_val.inc"
+#include "led_effects/effect_cycle_all.inc"
+#include "led_effects/effect_cycle_left_right.inc"
+#include "led_effects/effect_cycle_up_down.inc"
+#include "led_effects/effect_cycle_out_in.inc"
+#include "led_effects/effect_dual_beacon.inc"
+#include "led_effects/effect_flower_blooming.inc"
+#include "led_effects/effect_raindrops.inc"
+#include "led_effects/effect_jellybean_raindrops.inc"
+#include "led_effects/effect_pixel_rain.inc"
+#include "led_effects/effect_pixel_flow.inc"
+#include "led_effects/effect_pixel_fractal.inc"
+#include "led_effects/effect_typing_heatmap.inc"
+#include "led_effects/effect_digital_rain.inc"
+#include "led_effects/effect_solid_reactive_simple.inc"
+#include "led_effects/effect_solid_reactive.inc"
+#include "led_effects/effect_solid_reactive_wide.inc"
+#include "led_effects/effect_solid_reactive_cross.inc"
+#include "led_effects/effect_solid_reactive_nexus.inc"
+#include "led_effects/effect_splash.inc"
+#include "led_effects/effect_solid_splash.inc"
+#include "led_effects/effect_starlight_smooth.inc"
+#include "led_effects/effect_starlight.inc"
+#include "led_effects/effect_starlight_dual_sat.inc"
+#include "led_effects/effect_starlight_dual_hue.inc"
 
 void led_matrix_effect_tick(uint32_t tick) {
   if (!initialized || !display_enabled) {
@@ -1606,10 +1858,24 @@ void led_matrix_effect_tick(uint32_t tick) {
   // Calculate time deltas
   uint32_t effect_delta = tick - last_effect_tick;
   uint32_t render_delta = tick - last_render_tick;
+  uint32_t sim_delta = 0u;
+
+  if (last_sim_tick == 0u) {
+    last_sim_tick = tick;
+  } else {
+    sim_delta = tick - last_sim_tick;
+    last_sim_tick = tick;
+  }
+
+  if (sim_delta > 0u) {
+    reactive_tick_simulation(
+        (uint16_t)((sim_delta > 65535u) ? 65535u : sim_delta));
+  }
 
   // Effect animation speed (controls how fast effect_offset increments)
   // speed 1 = 200ms interval, speed 255 = 5ms interval
-  uint32_t effect_interval = 200 - (effect_speed * 195 / 255);
+  uint8_t speed = effect_animation_speed();
+  uint32_t effect_interval = 200u - ((uint32_t)speed * 195u / 255u);
   if (effect_interval < 5)
     effect_interval = 5;
 
@@ -1633,8 +1899,6 @@ void led_matrix_effect_tick(uint32_t tick) {
     }
   }
 
-  reactive_frame_delta_ms =
-      (uint16_t)((render_delta > 65535u) ? 65535u : render_delta);
   last_render_tick = tick;
 
   // Matrix static mode and third-party mode do not run internal animations.
@@ -1646,3 +1910,345 @@ void led_matrix_effect_tick(uint32_t tick) {
   // Now render the effect using current effect_offset
   render_current_effect_frame();
 }
+
+//--------------------------------------------------------------------+
+// Per-effect parameter schema (Phase-2A)
+//--------------------------------------------------------------------+
+
+// Descriptor initialiser helpers.
+#define PDESC_U8(id_, min_, max_, def_, step_) \
+  { (id_), LED_PARAM_TYPE_U8, (min_), (max_), (def_), (step_) }
+#define PDESC_BOOL(id_, def_) \
+  { (id_), LED_PARAM_TYPE_BOOL, 0u, 1u, (def_), 1u }
+#define PDESC_HUE(id_, def_) \
+  { (id_), LED_PARAM_TYPE_HUE, 0u, 255u, (def_), 1u }
+#define PDESC_COLOR(id_, dr_, dg_, db_) \
+  { (id_),     LED_PARAM_TYPE_COLOR, 0u, 255u, (dr_), 0u }, \
+  { (id_)+1u,  LED_PARAM_TYPE_COLOR, 0u, 255u, (dg_), 0u }, \
+  { (id_)+2u,  LED_PARAM_TYPE_COLOR, 0u, 255u, (db_), 0u }
+#define PDESC_SPEED(def_) \
+  PDESC_U8(LED_EFFECT_PARAM_SPEED, 1u, 255u, (def_), 1u)
+
+// Shared sets reused by many effects.
+#define PSET_SPEED50  PDESC_SPEED(50u)
+#define PSET_SPEED128 PDESC_SPEED(128u)
+#define PSET_COLOR1(r,g,b) \
+  PDESC_COLOR(LED_EFFECT_PARAM_COLOR_R, (r), (g), (b))
+#define PSET_COLOR12(r1,g1,b1, r2,g2,b2) \
+  PDESC_COLOR(LED_EFFECT_PARAM_COLOR_R,  (r1),(g1),(b1)), \
+  PDESC_COLOR(LED_EFFECT_PARAM_COLOR2_R, (r2),(g2),(b2))
+
+uint8_t led_matrix_get_effect_schema(uint8_t effect_mode,
+                                     led_param_desc_t *out) {
+  if (out == NULL || effect_mode >= (uint8_t)LED_EFFECT_MAX) {
+    return 0u;
+  }
+
+  // Temporary stack buffer; we copy into *out and count non-NONE entries.
+  led_param_desc_t buf[LED_EFFECT_PARAM_COUNT];
+  uint8_t n = 0u;
+
+  // Zero-initialise (type = NONE).
+  for (uint8_t i = 0u; i < LED_EFFECT_PARAM_COUNT; i++) {
+    buf[i].id          = i;
+    buf[i].type        = LED_PARAM_TYPE_NONE;
+    buf[i].min         = 0u;
+    buf[i].max         = 0u;
+    buf[i].default_val = 0u;
+    buf[i].step        = 0u;
+  }
+
+// Inline helper to append a descriptor into buf[] and count it.
+#define P(desc) do { led_param_desc_t _d = desc; buf[_d.id] = _d; n++; } while(0)
+// Inline helper for COLOR triplets (3 slots).
+#define PCOLOR(base_id, dr, dg, db) do { \
+    buf[(base_id)+0u] = (led_param_desc_t){(base_id)+0u, LED_PARAM_TYPE_COLOR, 0u, 255u, (dr), 0u}; \
+    buf[(base_id)+1u] = (led_param_desc_t){(base_id)+1u, LED_PARAM_TYPE_COLOR, 0u, 255u, (dg), 0u}; \
+    buf[(base_id)+2u] = (led_param_desc_t){(base_id)+2u, LED_PARAM_TYPE_COLOR, 0u, 255u, (db), 0u}; \
+    n += 3u; \
+  } while(0)
+
+  switch (effect_mode) {
+  case LED_EFFECT_NONE:
+    // Static matrix: no animated params.
+    break;
+
+  case LED_EFFECT_PLASMA:
+    P(PDESC_U8(0, 0u, 255u, 96u,  8u));  // Motion depth
+    P(PDESC_U8(1, 0u, 255u, 192u, 8u));  // Saturation
+    P(PDESC_U8(2, 0u, 255u, 128u, 8u));  // Radial warp
+    P(PDESC_U8(3, 0u, 255u, 255u, 8u));  // Value
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_FIRE:
+    P(PDESC_U8(0, 0u, 255u, 160u, 8u));  // Heat boost
+    P(PDESC_U8(1, 0u, 255u, 96u,  8u));  // Ember floor
+    P(PDESC_U8(2, 0u, 255u, 96u,  8u));  // Cooling
+    P(PDESC_BOOL(3, 0u));                 // Palette (0=fire, 1=ice)
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_OCEAN:
+    P(PDESC_U8(0, 0u, 255u, 160u, 8u));  // Hue bias
+    P(PDESC_U8(1, 0u, 255u, 64u,  8u));  // Depth dimming
+    P(PDESC_BOOL(2, 1u));                 // Foam highlight
+    P(PDESC_U8(3, 0u, 255u, 160u, 8u));  // Crest speed
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_SPARKLE:
+    P(PDESC_U8(0, 0u, 255u, 48u,  4u));  // Density
+    P(PDESC_U8(1, 0u, 255u, 224u, 8u));  // Sparkle brightness
+    P(PDESC_U8(2, 0u, 255u, 160u, 8u));  // Rainbow mix
+    P(PDESC_U8(3, 0u, 255u, 24u,  4u));  // Ambient glow
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 210u, 96u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_BREATHING_RAINBOW:
+    P(PDESC_U8(0, 0u, 255u, 24u,  4u));  // Brightness floor
+    P(PDESC_U8(1, 0u, 255u, 192u, 8u));  // Hue drift
+    P(PDESC_U8(2, 0u, 255u, 255u, 8u));  // Saturation
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_COLOR_CYCLE:
+    P(PDESC_U8(0, 0u, 255u, 64u,  4u));  // Hue step
+    P(PDESC_U8(1, 0u, 255u, 255u, 8u));  // Saturation
+    P(PDESC_U8(2, 0u, 255u, 255u, 8u));  // Value
+    P(PDESC_U8(3, 0u, 255u, 0u,   4u));  // Effect-color mix
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_DISTANCE_SENSOR:
+    P(PDESC_U8(0, 0u, 255u, 32u,  4u));  // Brightness floor
+    P(PDESC_HUE(1, 170u));               // Hue span
+    P(PDESC_U8(2, 0u, 255u, 255u, 8u));  // Saturation
+    P(PDESC_BOOL(3, 0u));                 // Reverse gradient
+    break;
+
+  case LED_EFFECT_IMPACT_RAINBOW:
+    P(PDESC_U8(0, 0u, 2u,   2u,   1u));  // Boost mode
+    P(PDESC_U8(1, 0u, 255u, 184u, 8u));  // Boost decay
+    P(PDESC_U8(2, 0u, 255u, 96u,  8u));  // Key boost
+    P(PDESC_U8(3, 0u, 255u, 88u,  8u));  // Audio boost
+    P(PDESC_U8(4, 0u, 255u, 208u, 8u));  // Max boost
+    P(PDESC_U8(5, 0u, 255u, 16u,  4u));  // Angle
+    P(PDESC_U8(6, 0u, 255u, 255u, 8u));  // Saturation
+    P(PDESC_U8(7, 0u, 255u, 168u, 8u));  // Wave drift
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_REACTIVE_GHOST:
+    P(PDESC_U8(0, 0u, 255u, 100u, 4u));  // Decay
+    P(PDESC_U8(1, 0u, 255u, 156u, 4u));  // Spread
+    P(PDESC_U8(2, 0u, 255u, 184u, 4u));  // Trail
+    P(PDESC_U8(3, 0u, 255u, 208u, 8u));  // Gain
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 72u, 180u, 255u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_AUDIO_SPECTRUM:
+    P(PDESC_HUE(0, 176u));               // Hue span
+    P(PDESC_U8(1, 0u, 255u, 32u,  4u));  // Base floor
+    P(PDESC_U8(2, 0u, 255u, 208u, 8u));  // Peak gain
+    P(PDESC_BOOL(3, 1u));                 // Mirror
+    P(PDESC_U8(4, 0u, 255u, 172u, 8u));  // Decay
+    P(PDESC_U8(5, 0u, 3u,   0u,   1u));  // Visualizer mode
+    P(PDESC_U8(6, 0u, 255u, 236u, 4u));  // Contrast
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 64u, 255u, 160u);
+    break;
+
+  case LED_EFFECT_KEY_STATE_DEMO:
+    P(PDESC_BOOL(0, 0u));                 // Invert mapping
+    P(PDESC_U8(1, 0u, 255u, 255u, 8u));  // Pressed brightness
+    P(PDESC_U8(2, 0u, 255u, 96u,  8u));  // Released brightness
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R,  0u, 255u, 0u);
+    PCOLOR(LED_EFFECT_PARAM_COLOR2_R, 255u, 0u, 0u);
+    break;
+
+  // --- Fused effects ---
+  case LED_EFFECT_SOLID_COLOR:
+    P(PDESC_U8(0, 0u, 255u, 255u, 8u));  // Brightness trim
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    break;
+
+  case LED_EFFECT_BREATHING:
+    P(PDESC_U8(0, 0u, 255u, 24u,  4u));  // Brightness floor
+    P(PDESC_U8(1, 0u, 255u, 255u, 8u));  // Brightness ceiling
+    P(PDESC_U8(2, 0u, 255u, 48u,  4u));  // Plateau
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_GRADIENT_LEFT_RIGHT:
+    P(PDESC_U8(0, 0u, 255u, 160u, 8u));  // Horizontal scale
+    P(PDESC_U8(1, 0u, 255u, 120u, 8u));  // Vertical scale
+    P(PDESC_U8(2, 0u, 255u, 144u, 8u));  // Saturation
+    P(PDESC_U8(3, 0u, 255u, 255u, 8u));  // Value
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_GRADIENT_UP_DOWN:
+    P(PDESC_U8(0, 0u, 255u, 160u, 8u));  // Vertical hue spread
+    P(PDESC_U8(1, 0u, 255u, 144u, 8u));  // Saturation
+    P(PDESC_U8(2, 0u, 255u, 255u, 8u));  // Value
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_CYCLE_LEFT_RIGHT:
+    P(PDESC_U8(0, 0u, 255u, 160u, 8u));  // Horizontal hue spread
+    P(PDESC_U8(1, 0u, 255u, 96u,  8u));  // Vertical hue contribution
+    // param 2: removed (was drift multiplier — caused jump on uint8 time wrap)
+    P(PDESC_U8(3, 0u, 255u, 255u, 8u));  // Saturation
+    P(PDESC_U8(4, 0u, 255u, 0u,   4u));  // Gradient tilt angle
+    P(PDESC_U8(5, 0u, 255u, 0u,   4u));  // Sinusoidal warp
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_DIGITAL_RAIN:
+    P(PDESC_U8(0, 0u, 255u, 64u,  4u));  // Trail length
+    P(PDESC_U8(1, 0u, 255u, 160u, 8u));  // Head size
+    P(PDESC_U8(2, 0u, 255u, 96u,  8u));  // Density
+    P(PDESC_BOOL(3, 1u));                 // White heads
+    P(PDESC_HUE(4, 0u));                 // Hue bias
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_TYPING_HEATMAP:
+    P(PDESC_U8(0, 0u, 255u, 224u, 8u));  // Heat gain
+    P(PDESC_U8(1, 0u, 255u, 168u, 8u));  // Decay
+    P(PDESC_U8(2, 0u, 255u, 88u,  8u));  // Diffusion
+    P(PDESC_U8(3, 0u, 255u, 48u,  4u));  // Floor
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_SPLASH:
+  case LED_EFFECT_MULTI_SPLASH:
+    P(PDESC_U8(0, 0u, 255u, 72u,  4u));  // Decay / lifetime
+    P(PDESC_U8(1, 0u, 255u, 128u, 8u));  // Spread / radius
+    P(PDESC_U8(2, 0u, 255u, 8u,   4u));  // Base glow
+    P(PDESC_BOOL(3, 1u));                 // White core / burst
+    P(PDESC_U8(4, 0u, 255u, 224u, 8u));  // Gain
+    P(PDESC_BOOL(5, 0u));                 // Palette (0=custom, 1=rainbow)
+    P(PDESC_BOOL(6, 0u));                 // Mode (0=QMK, 1=physics ring+trail)
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 0u, 255u, 96u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_SOLID_SPLASH:
+  case LED_EFFECT_SOLID_MULTI_SPLASH:
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_SOLID_REACTIVE_SIMPLE:
+  case LED_EFFECT_SOLID_REACTIVE:
+  case LED_EFFECT_SOLID_REACTIVE_WIDE:
+  case LED_EFFECT_SOLID_REACTIVE_CROSS:
+  case LED_EFFECT_SOLID_REACTIVE_NEXUS:
+  case LED_EFFECT_SOLID_REACTIVE_MULTI_WIDE:
+  case LED_EFFECT_SOLID_REACTIVE_MULTI_CROSS:
+  case LED_EFFECT_SOLID_REACTIVE_MULTI_NEXUS:
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_STARLIGHT_SMOOTH:
+  case LED_EFFECT_STARLIGHT:
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_STARLIGHT_DUAL_SAT:
+    P(PDESC_U8(0, 0u, 255u, 31u, 4u));  // Saturation spread
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_STARLIGHT_DUAL_HUE:
+    P(PDESC_U8(0, 0u, 255u, 31u, 4u));  // Hue spread
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_HUE_BREATHING:
+    P(PDESC_U8(0, 0u, 255u, 12u, 4u));  // Hue swing range
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_HUE_PENDULUM:
+    P(PDESC_U8(0, 0u, 255u, 12u, 4u));  // Hue swing range
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_HUE_WAVE:
+    P(PDESC_U8(0, 0u, 255u, 24u, 4u));  // Wave amplitude
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_ALPHA_MODS:
+    P(PDESC_U8(0, 0u, 255u, 0u, 4u));   // Hue offset (0=dynamic via speed)
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  case LED_EFFECT_PIXEL_FRACTAL:
+    P(PDESC_U8(0, 0u, 255u, 255u, 8u));  // Saturation
+    P(PDESC_U8(1, 0u, 255u, 255u, 8u));  // Value
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);
+    P(PSET_SPEED50);
+    break;
+
+  // Effects with speed + color (hue/sat/val via PCOLOR):
+  case LED_EFFECT_CYCLE_ALL:
+  case LED_EFFECT_CYCLE_UP_DOWN:
+  case LED_EFFECT_CYCLE_OUT_IN:
+  case LED_EFFECT_CYCLE_PINWHEEL:
+  case LED_EFFECT_CYCLE_SPIRAL:
+  case LED_EFFECT_CYCLE_OUT_IN_DUAL:
+  case LED_EFFECT_RAINBOW_BEACON:
+  case LED_EFFECT_RAINBOW_PINWHEELS:
+  case LED_EFFECT_RAINBOW_MOVING_CHEVRON:
+  case LED_EFFECT_DUAL_BEACON:
+  case LED_EFFECT_FLOWER_BLOOMING:
+  case LED_EFFECT_RIVERFLOW:
+  case LED_EFFECT_COLORBAND_SAT:
+  case LED_EFFECT_COLORBAND_VAL:
+  case LED_EFFECT_COLORBAND_PINWHEEL_SAT:
+  case LED_EFFECT_COLORBAND_PINWHEEL_VAL:
+  case LED_EFFECT_COLORBAND_SPIRAL_SAT:
+  case LED_EFFECT_COLORBAND_SPIRAL_VAL:
+  case LED_EFFECT_RAINDROPS:
+  case LED_EFFECT_JELLYBEAN_RAINDROPS:
+  case LED_EFFECT_PIXEL_RAIN:
+  case LED_EFFECT_PIXEL_FLOW:
+    PCOLOR(LED_EFFECT_PARAM_COLOR_R, 255u, 0u, 0u);  // Base color (QMK default: red)
+    P(PSET_SPEED50);
+    break;
+
+  // Effects with no tunable params (live/hardware driven):
+  case LED_EFFECT_THIRD_PARTY:
+    break;
+
+  default:
+    break;
+  }
+
+#undef P
+#undef PCOLOR
+
+  // Copy buffer to output.
+  for (uint8_t i = 0u; i < LED_EFFECT_PARAM_COUNT; i++) {
+    out[i] = buf[i];
+  }
+
+  return n;
+}
+
+

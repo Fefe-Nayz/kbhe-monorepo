@@ -24,7 +24,6 @@ static uint32_t latest_record_offset = FLASH_STORAGE_SIZE;
 static uint32_t latest_record_length = 0u;
 static uint32_t next_write_offset = 0u;
 static uint32_t next_sequence = 1u;
-static bool legacy_raw_layout = false;
 
 //--------------------------------------------------------------------+
 // Internal Helpers
@@ -43,7 +42,6 @@ static void flash_storage_reset_runtime_state(void) {
   latest_record_length = 0u;
   next_write_offset = 0u;
   next_sequence = 1u;
-  legacy_raw_layout = false;
 }
 
 static uint32_t flash_storage_crc32_compute(const void *data, uint32_t len) {
@@ -87,7 +85,6 @@ static bool flash_storage_program_bytes_locked(uint32_t absolute_addr,
 
 static bool flash_storage_scan_records(void) {
   uint32_t offset = 0u;
-  bool found_record = false;
 
   while (offset + sizeof(flash_storage_record_header_t) <= FLASH_STORAGE_SIZE) {
     uint32_t first_word = *(const uint32_t *)flash_storage_ptr(offset);
@@ -101,9 +98,6 @@ static bool flash_storage_scan_records(void) {
 
     memcpy(&header, flash_storage_ptr(offset), sizeof(header));
     if (header.magic != FLASH_STORAGE_RECORD_MAGIC) {
-      if (!found_record && offset == 0u) {
-        legacy_raw_layout = true;
-      }
       break;
     }
 
@@ -122,7 +116,6 @@ static bool flash_storage_scan_records(void) {
       break;
     }
 
-    found_record = true;
     latest_record_offset = offset;
     latest_record_length = header.length;
     next_sequence = header.sequence + 1u;
@@ -130,7 +123,7 @@ static bool flash_storage_scan_records(void) {
     offset = next_write_offset;
   }
 
-  return found_record;
+  return latest_record_offset < FLASH_STORAGE_SIZE;
 }
 
 //--------------------------------------------------------------------+
@@ -183,11 +176,6 @@ bool flash_storage_read(uint32_t offset, void *buf, uint32_t len) {
       return false;
     }
     base_offset = latest_record_offset + (uint32_t)sizeof(flash_storage_record_header_t);
-  } else if (legacy_raw_layout) {
-    if (offset + len > FLASH_STORAGE_SIZE) {
-      return false;
-    }
-    base_offset = 0u;
   } else {
     return false;
   }
@@ -212,8 +200,7 @@ bool flash_storage_write(uint32_t offset, const void *buf, uint32_t len) {
     return false;
   }
 
-  if (legacy_raw_layout ||
-      next_write_offset + (uint32_t)sizeof(header) + payload_size >
+  if (next_write_offset + (uint32_t)sizeof(header) + payload_size >
           FLASH_STORAGE_SIZE) {
     if (!flash_storage_erase()) {
       return false;
@@ -252,7 +239,6 @@ bool flash_storage_write(uint32_t offset, const void *buf, uint32_t len) {
   next_sequence++;
   next_write_offset =
       record_offset + (uint32_t)sizeof(header) + flash_storage_align4(len);
-  legacy_raw_layout = false;
 
   return true;
 }

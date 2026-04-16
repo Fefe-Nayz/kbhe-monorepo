@@ -72,10 +72,10 @@
  *   bInterval=4 → 1000µs  = 1000 Hz (1kHz)
  */
 #define HID_POLL_INTERVAL_8KHZ 1 // 125µs = 8kHz
-#define RAW_HID_POLL_INTERVAL 4  // 1000µs = 1kHz
+#define RAW_HID_POLL_INTERVAL 1  // 125µs = 8kHz
 #define GAMEPAD_POLL_INTERVAL                                                  \
   1 // 125µs = 8kHz (same as keyboard for fast response)
-#define XINPUT_POLL_INTERVAL 4 // 1000µs = 1kHz
+#define XINPUT_POLL_INTERVAL 1 // 125µs = 8kHz
 
 //--------------------------------------------------------------------+
 // String Descriptor Indices

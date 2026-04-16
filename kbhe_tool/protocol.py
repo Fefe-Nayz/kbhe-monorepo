@@ -15,7 +15,15 @@ LED_BYTES_PER_CHUNK = 60
 LED_MATRIX_SIZE = KEY_COUNT
 LED_MATRIX_WIDTH = 8
 LED_MATRIX_HEIGHT = 8
-LED_EFFECT_PARAM_COUNT = 6
+LED_EFFECT_PARAM_COUNT = 16
+LED_EFFECT_PARAM_COLOR_R = 8
+LED_EFFECT_PARAM_COLOR_G = 9
+LED_EFFECT_PARAM_COLOR_B = 10
+LED_EFFECT_PARAM_COLOR2_R = 11
+LED_EFFECT_PARAM_COLOR2_G = 12
+LED_EFFECT_PARAM_COLOR2_B = 13
+LED_EFFECT_PARAM_SPEED = 14
+LED_AUDIO_SPECTRUM_BAND_COUNT = 16
 FILTER_DEFAULT_ENABLED = True
 FILTER_DEFAULT_NOISE_BAND = 30
 FILTER_DEFAULT_ALPHA_MIN_DENOM = 32
@@ -23,6 +31,8 @@ FILTER_DEFAULT_ALPHA_MAX_DENOM = 4
 GAMEPAD_CURVE_POINT_COUNT = 4
 GAMEPAD_CURVE_MAX_DISTANCE_MM = 4.0
 LAYER_COUNT = 4
+SETTINGS_PROFILE_COUNT = 4
+SETTINGS_PROFILE_NAME_LENGTH = 16
 ADVANCED_TICK_RATE_MIN = 1
 ADVANCED_TICK_RATE_MAX = 100
 ADVANCED_TICK_RATE_DEFAULT = 1
@@ -51,6 +61,8 @@ class Command(IntEnum):
     GET_DEVICE_INFO = 0x2B
     GET_KEYBOARD_NAME = 0x2C
     SET_KEYBOARD_NAME = 0x2D
+    COPY_PROFILE_SLOT = 0x2E
+    RESET_PROFILE_SLOT = 0x2F
 
     GET_KEY_SETTINGS = 0x40
     SET_KEY_SETTINGS = 0x41
@@ -65,8 +77,6 @@ class Command(IntEnum):
     SET_KEY_CURVE = 0x4A
     GET_KEY_GAMEPAD_MAP = 0x4B
     SET_KEY_GAMEPAD_MAP = 0x4C
-    GET_GAMEPAD_WITH_KB = 0x4D
-    SET_GAMEPAD_WITH_KB = 0x4E
     GET_CALIBRATION_MAX = 0x4F
     SET_CALIBRATION_MAX = 0x50
     GUIDED_CALIBRATION_START = 0x51
@@ -77,6 +87,13 @@ class Command(IntEnum):
     GET_LAYER_KEYCODE = 0x56
     SET_LAYER_KEYCODE = 0x57
     RESET_KEY_TRIGGER_SETTINGS = 0x58
+    GET_ROTARY_STATE = 0x59
+    GET_ACTIVE_PROFILE = 0x5A
+    SET_ACTIVE_PROFILE = 0x5B
+    GET_PROFILE_NAME = 0x5C
+    SET_PROFILE_NAME = 0x5D
+    CREATE_PROFILE = 0x5E
+    DELETE_PROFILE = 0x5F
 
     GET_LED_ENABLED = 0x60
     SET_LED_ENABLED = 0x61
@@ -94,18 +111,16 @@ class Command(IntEnum):
     LED_TEST_RAINBOW = 0x6D
     GET_LED_EFFECT = 0x6E
     SET_LED_EFFECT = 0x6F
-    GET_LED_EFFECT_SPEED = 0x70
-    SET_LED_EFFECT_SPEED = 0x71
-    SET_LED_EFFECT_COLOR = 0x72
-    GET_LED_FPS_LIMIT = 0x73
-    SET_LED_FPS_LIMIT = 0x74
-    GET_LED_DIAGNOSTIC = 0x75
-    SET_LED_DIAGNOSTIC = 0x76
-    GET_LED_EFFECT_PARAMS = 0x77
-    SET_LED_EFFECT_PARAMS = 0x78
-    SET_LED_VOLUME_OVERLAY = 0x79
-    CLEAR_LED_VOLUME_OVERLAY = 0x7A
-    GET_LED_EFFECT_COLOR = 0x7C
+    GET_LED_FPS_LIMIT = 0x70
+    SET_LED_FPS_LIMIT = 0x71
+    GET_LED_EFFECT_PARAMS = 0x72
+    SET_LED_EFFECT_PARAMS = 0x73
+    SET_LED_VOLUME_OVERLAY = 0x74
+    CLEAR_LED_VOLUME_OVERLAY = 0x75
+    RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x76
+    GET_LED_EFFECT_SCHEMA = 0x77
+    SET_LED_AUDIO_SPECTRUM = 0x78
+    CLEAR_LED_AUDIO_SPECTRUM = 0x79
 
     GET_FILTER_ENABLED = 0x80
     SET_FILTER_ENABLED = 0x81
@@ -127,45 +142,198 @@ class Command(IntEnum):
 
 
 class LEDEffect(IntEnum):
-    MATRIX = 0
-    RAINBOW = 1
-    BREATHING = 2
-    STATIC_RAINBOW = 3
-    SOLID = 4
-    PLASMA = 5
-    FIRE = 6
-    OCEAN = 7
-    MATRIX_RAIN = 8
-    SPARKLE = 9
-    BREATHING_RAINBOW = 10
-    SPIRAL = 11
-    COLOR_CYCLE = 12
-    REACTIVE = 13
-    THIRD_PARTY = 14
-    DISTANCE_SENSOR = 15
-
-    # Backward-compatible alias for older code paths.
-    NONE = MATRIX
-
+    # Compact IDs after Phase-1B fusion. Old IDs documented in
+    # docs/LED_EFFECTS_CANONICAL_PHASE0.md (breaking change with v0x0017+).
+    NONE = 0              # Static matrix (software pattern)
+    PLASMA = 1
+    FIRE = 2
+    OCEAN = 3
+    SPARKLE = 4
+    BREATHING_RAINBOW = 5
+    COLOR_CYCLE = 6
+    THIRD_PARTY = 7
+    DISTANCE_SENSOR = 8
+    IMPACT_RAINBOW = 9
+    REACTIVE_GHOST = 10
+    AUDIO_SPECTRUM = 11
+    KEY_STATE_DEMO = 12
+    CYCLE_PINWHEEL = 13
+    CYCLE_SPIRAL = 14           # fused: old SPIRAL
+    CYCLE_OUT_IN_DUAL = 15      # fused: DUAL_SPHERE
+    RAINBOW_BEACON = 16         # fused: STRIP_SPIN_ZOOM
+    RAINBOW_PINWHEELS = 17
+    RAINBOW_MOVING_CHEVRON = 18
+    HUE_BREATHING = 19
+    HUE_PENDULUM = 20
+    HUE_WAVE = 21
+    RIVERFLOW = 22
+    SOLID_COLOR = 23            # fused: old SOLID
+    ALPHA_MODS = 24
+    GRADIENT_UP_DOWN = 25
+    GRADIENT_LEFT_RIGHT = 26    # fused: STATIC_RAINBOW
+    BREATHING = 27              # fused: old BREATHING
+    COLORBAND_SAT = 28
+    COLORBAND_VAL = 29
+    COLORBAND_PINWHEEL_SAT = 30
+    COLORBAND_PINWHEEL_VAL = 31
+    COLORBAND_SPIRAL_SAT = 32
+    COLORBAND_SPIRAL_VAL = 33
+    CYCLE_ALL = 34
+    CYCLE_LEFT_RIGHT = 35       # fused: old RAINBOW
+    CYCLE_UP_DOWN = 36
+    CYCLE_OUT_IN = 37           # fused: SPHERE
+    DUAL_BEACON = 38
+    FLOWER_BLOOMING = 39
+    RAINDROPS = 40
+    JELLYBEAN_RAINDROPS = 41
+    PIXEL_RAIN = 42
+    PIXEL_FLOW = 43
+    PIXEL_FRACTAL = 44
+    TYPING_HEATMAP = 45         # fused: REACTIVE_HEATMAP
+    DIGITAL_RAIN = 46           # fused: old MATRIX
+    SOLID_REACTIVE_SIMPLE = 47
+    SOLID_REACTIVE = 48
+    SOLID_REACTIVE_WIDE = 49
+    SOLID_REACTIVE_CROSS = 50
+    SOLID_REACTIVE_NEXUS = 51
+    SPLASH = 52                 # fused: old REACTIVE
+    SOLID_SPLASH = 53
+    STARLIGHT_SMOOTH = 54
+    STARLIGHT = 55
+    STARLIGHT_DUAL_SAT = 56
+    STARLIGHT_DUAL_HUE = 57
+    SOLID_REACTIVE_MULTI_WIDE = 58
+    SOLID_REACTIVE_MULTI_CROSS = 59
+    SOLID_REACTIVE_MULTI_NEXUS = 60
+    MULTI_SPLASH = 61
+    SOLID_MULTI_SPLASH = 62
 
 LED_EFFECT_NAMES = {
-    LEDEffect.MATRIX: "Matrix (Software)",
-    LEDEffect.RAINBOW: "Rainbow Wave",
-    LEDEffect.BREATHING: "Breathing",
-    LEDEffect.STATIC_RAINBOW: "Static Rainbow",
-    LEDEffect.SOLID: "Solid Color",
+    LEDEffect.NONE: "Matrix (Software)",
     LEDEffect.PLASMA: "Plasma",
     LEDEffect.FIRE: "Fire",
     LEDEffect.OCEAN: "Ocean Waves",
-    LEDEffect.MATRIX_RAIN: "Matrix Rain",
     LEDEffect.SPARKLE: "Sparkle",
     LEDEffect.BREATHING_RAINBOW: "Breathing Rainbow",
-    LEDEffect.SPIRAL: "Spiral",
     LEDEffect.COLOR_CYCLE: "Color Cycle",
-    LEDEffect.REACTIVE: "Reactive",
     LEDEffect.THIRD_PARTY: "Third-Party Live",
     LEDEffect.DISTANCE_SENSOR: "Sensor Distance",
+    LEDEffect.IMPACT_RAINBOW: "Impact Rainbow",
+    LEDEffect.REACTIVE_GHOST: "Reactive Ghost",
+    LEDEffect.AUDIO_SPECTRUM: "Audio Spectrum",
+    LEDEffect.KEY_STATE_DEMO: "Key State Demo",
+    LEDEffect.CYCLE_PINWHEEL: "Cycle Pinwheel",
+    LEDEffect.CYCLE_SPIRAL: "Cycle Spiral",
+    LEDEffect.CYCLE_OUT_IN_DUAL: "Cycle Out-In Dual",
+    LEDEffect.RAINBOW_BEACON: "Rainbow Beacon",
+    LEDEffect.RAINBOW_PINWHEELS: "Rainbow Pinwheels",
+    LEDEffect.RAINBOW_MOVING_CHEVRON: "Rainbow Moving Chevron",
+    LEDEffect.HUE_BREATHING: "Hue Breathing",
+    LEDEffect.HUE_PENDULUM: "Hue Pendulum",
+    LEDEffect.HUE_WAVE: "Hue Wave",
+    LEDEffect.RIVERFLOW: "Riverflow",
+    LEDEffect.SOLID_COLOR: "Solid Color",
+    LEDEffect.ALPHA_MODS: "Alpha Mods",
+    LEDEffect.GRADIENT_UP_DOWN: "Gradient Up-Down",
+    LEDEffect.GRADIENT_LEFT_RIGHT: "Gradient Left-Right",
+    LEDEffect.BREATHING: "Breathing",
+    LEDEffect.COLORBAND_SAT: "Colorband Sat",
+    LEDEffect.COLORBAND_VAL: "Colorband Val",
+    LEDEffect.COLORBAND_PINWHEEL_SAT: "Colorband Pinwheel Sat",
+    LEDEffect.COLORBAND_PINWHEEL_VAL: "Colorband Pinwheel Val",
+    LEDEffect.COLORBAND_SPIRAL_SAT: "Colorband Spiral Sat",
+    LEDEffect.COLORBAND_SPIRAL_VAL: "Colorband Spiral Val",
+    LEDEffect.CYCLE_ALL: "Cycle All",
+    LEDEffect.CYCLE_LEFT_RIGHT: "Cycle Left-Right",
+    LEDEffect.CYCLE_UP_DOWN: "Cycle Up-Down",
+    LEDEffect.CYCLE_OUT_IN: "Cycle Out-In",
+    LEDEffect.DUAL_BEACON: "Dual Beacon",
+    LEDEffect.FLOWER_BLOOMING: "Flower Blooming",
+    LEDEffect.RAINDROPS: "Raindrops",
+    LEDEffect.JELLYBEAN_RAINDROPS: "Jellybean Raindrops",
+    LEDEffect.PIXEL_RAIN: "Pixel Rain",
+    LEDEffect.PIXEL_FLOW: "Pixel Flow",
+    LEDEffect.PIXEL_FRACTAL: "Pixel Fractal",
+    LEDEffect.TYPING_HEATMAP: "Typing Heatmap",
+    LEDEffect.DIGITAL_RAIN: "Digital Rain",
+    LEDEffect.SOLID_REACTIVE_SIMPLE: "Solid Reactive Simple",
+    LEDEffect.SOLID_REACTIVE: "Solid Reactive",
+    LEDEffect.SOLID_REACTIVE_WIDE: "Solid Reactive Wide",
+    LEDEffect.SOLID_REACTIVE_CROSS: "Solid Reactive Cross",
+    LEDEffect.SOLID_REACTIVE_NEXUS: "Solid Reactive Nexus",
+    LEDEffect.SPLASH: "Splash",
+    LEDEffect.SOLID_SPLASH: "Solid Splash",
+    LEDEffect.STARLIGHT_SMOOTH: "Starlight Smooth",
+    LEDEffect.STARLIGHT: "Starlight",
+    LEDEffect.STARLIGHT_DUAL_SAT: "Starlight Dual Sat",
+    LEDEffect.STARLIGHT_DUAL_HUE: "Starlight Dual Hue",
+    LEDEffect.SOLID_REACTIVE_MULTI_WIDE: "Solid Reactive Multi Wide",
+    LEDEffect.SOLID_REACTIVE_MULTI_CROSS: "Solid Reactive Multi Cross",
+    LEDEffect.SOLID_REACTIVE_MULTI_NEXUS: "Solid Reactive Multi Nexus",
+    LEDEffect.MULTI_SPLASH: "Multi Splash",
+    LEDEffect.SOLID_MULTI_SPLASH: "Solid Multi Splash",
 }
+
+
+# ---------------------------------------------------------------------------
+# Effect parameter schema (Phase-2A)
+# ---------------------------------------------------------------------------
+
+class ParamType(IntEnum):
+    NONE  = 0  # Slot unused by this effect
+    U8    = 1  # Generic 0-255 integer
+    BOOL  = 2  # Boolean flag (0 or 1)
+    HUE   = 3  # Hue wheel 0-255
+    COLOR = 4  # First byte of RGB triplet; host groups id, id+1, id+2 as one picker
+
+# Number of param descriptors that fit in a single schema HID response chunk.
+SCHEMA_PARAMS_PER_CHUNK = 9
+# Byte size of one packed descriptor on the wire.
+SCHEMA_DESCRIPTOR_BYTES = 6  # [id, type, min, max, default_val, step]
+
+# Parse the payload of a CMD_GET_LED_EFFECT_SCHEMA response into a list of
+# descriptor dicts.  Raises ValueError on malformed input.
+def parse_schema_chunk(payload: bytes) -> dict:
+    """
+    payload = response packet bytes starting at payload[0] (after cmd_id/status).
+    Returns:
+      {
+        "effect_id":    int,
+        "chunk_index":  int,
+        "total_chunks": int,
+        "total_active": int,
+        "descriptors":  [{"id", "type", "min", "max", "default", "step"}, ...]
+      }
+    """
+    if len(payload) < 4:
+        raise ValueError("Schema response payload too short")
+    effect_id    = payload[0]
+    chunk_index  = payload[1]
+    total_chunks = payload[2]
+    total_active = payload[3]
+    raw = payload[4:]
+    if len(raw) % SCHEMA_DESCRIPTOR_BYTES != 0:
+        raise ValueError("Schema payload length not a multiple of descriptor size")
+    descriptors = []
+    for i in range(0, len(raw), SCHEMA_DESCRIPTOR_BYTES):
+        b = raw[i:i + SCHEMA_DESCRIPTOR_BYTES]
+        if len(b) < SCHEMA_DESCRIPTOR_BYTES:
+            break
+        descriptors.append({
+            "id":      b[0],
+            "type":    ParamType(b[1]),
+            "min":     b[2],
+            "max":     b[3],
+            "default": b[4],
+            "step":    b[5],
+        })
+    return {
+        "effect_id":    effect_id,
+        "chunk_index":  chunk_index,
+        "total_chunks": total_chunks,
+        "total_active": total_active,
+        "descriptors":  descriptors,
+    }
 
 
 GAMEPAD_AXES = {
@@ -226,7 +394,7 @@ KEY_BEHAVIORS = {
     "Normal": 0,
     "Tap-Hold": 1,
     "Toggle": 2,
-    "Dynamic Mapping": 3,
+    "Dynamic Keystroke": 3,
 }
 KEY_BEHAVIOR_NAMES = {value: key for key, value in KEY_BEHAVIORS.items()}
 
@@ -270,9 +438,28 @@ ROTARY_PROGRESS_STYLE_NAMES = {
     value: key for key, value in ROTARY_PROGRESS_STYLES.items()
 }
 
+ROTARY_BINDING_MODES = {
+    "Internal Action": 0,
+    "Keycode": 1,
+}
+ROTARY_BINDING_MODE_NAMES = {
+    value: key for key, value in ROTARY_BINDING_MODES.items()
+}
+
+ROTARY_BINDING_LAYER_MODES = {
+    "Active Layer": 0,
+    "Fixed Layer": 1,
+}
+ROTARY_BINDING_LAYER_MODE_NAMES = {
+    value: key for key, value in ROTARY_BINDING_LAYER_MODES.items()
+}
+
 SOCD_RESOLUTIONS = {
     "Last Input Wins": 0,
     "Most Pressed Wins": 1,
+    "Absolute Priority (Key 1)": 2,
+    "Absolute Priority (Key 2)": 3,
+    "Neutral": 4,
 }
 SOCD_RESOLUTION_NAMES = {value: key for key, value in SOCD_RESOLUTIONS.items()}
 
@@ -329,6 +516,9 @@ HID_KEYCODES = {
     'TG Layer 1': 0xF010, 'TG Layer 2': 0xF011, 'TG Layer 3': 0xF012,
     'Set Base Layer': 0xF018, 'Set Fn Layer': 0xF019,
     'Set Layer 2': 0xF01A, 'Set Layer 3': 0xF01B, 'Clear Layer Toggles': 0xF01C,
+    'Prev Profile': 0xF020, 'Next Profile': 0xF021,
+    'Set Profile 1': 0xF022, 'Set Profile 2': 0xF023,
+    'Set Profile 3': 0xF024, 'Set Profile 4': 0xF025,
     'LED Toggle': 0xF200, 'LED Brightness Down': 0xF201, 'LED Brightness Up': 0xF202,
     'LED Effect Prev': 0xF203, 'LED Effect Next': 0xF204,
     'LED Speed Down': 0xF205, 'LED Speed Up': 0xF206, 'LED Color Next': 0xF207,

@@ -68,7 +68,7 @@ Codes status updater:
 | FACTORY_RESET | 0x03 | aucun | status |
 | USB_REENUMERATE | 0x04 | aucun | status |
 
-### 3.2 Options globales (0x20..0x2D)
+### 3.2 Options globales (0x20..0x2F)
 
 | Commande | ID | Parametres requete | Reponse |
 |---|---:|---|---|
@@ -86,6 +86,8 @@ Codes status updater:
 | GET_DEVICE_INFO | 0x2B | aucun | status + version + serial + keyboard_name |
 | GET_KEYBOARD_NAME | 0x2C | aucun | status + keyboard_name |
 | SET_KEYBOARD_NAME | 0x2D | keyboard_name[32] | status + keyboard_name applique |
+| COPY_PROFILE_SLOT | 0x2E | source_profile_index, target_profile_index | status + source + target + profile_used_mask |
+| RESET_PROFILE_SLOT | 0x2F | profile_index | status + profile_index + profile_used_mask |
 
 Note option `raw_hid_echo`:
 
@@ -103,6 +105,32 @@ GET/SET_KEYBOARD_NAME:
 - keyboard_name ASCII printable, longueur max 32
 - les caracteres non imprimables sont ignores/sanitizes cote firmware
 - si nom vide, fallback sur le nom par defaut firmware
+
+COPY_PROFILE_SLOT (0x2E):
+
+- Requete:
+  - source_profile_index (slot present)
+  - target_profile_index (slot 0..3, peut etre utilise ou libre)
+- Reponse:
+  - status
+  - source_profile_index
+  - target_profile_index
+  - profile_used_mask
+
+RESET_PROFILE_SLOT (0x2F):
+
+- Requete:
+  - profile_index (slot present)
+- Reponse:
+  - status
+  - profile_index
+  - profile_used_mask
+
+Notes:
+
+- `COPY_PROFILE_SLOT` clone integralement le snapshot source vers le slot cible.
+- Si le slot cible etait libre, il devient `used` et recoit un nom par defaut de slot.
+- `RESET_PROFILE_SLOT` remet le snapshot du slot aux defaults firmware en conservant son nom et son statut `used`.
 
 Semantique NKRO (0x27/0x28):
 
@@ -160,7 +188,7 @@ Serial number details:
 - encodage: base62 sur 12 octets UID
 - format: prefixe `75HE-NF-` + base62 UID (17 chars)
 
-### 3.3 Configuration touches, layers, calibration, gamepad (0x40..0x58)
+### 3.3 Configuration touches, layers, calibration, gamepad (0x40..0x5F)
 
 #### 3.3.1 Key settings detaillees
 
@@ -168,8 +196,12 @@ GET_KEY_SETTINGS (0x40)
 
 - Requete:
   - key_index
+  - profile_index
+  - layer_index
 - Reponse:
   - key_index
+  - profile_index
+  - layer_index
   - hid_keycode (u16)
   - actuation_point_mm (0.1 mm)
   - release_point_mm (0.1 mm)
@@ -182,12 +214,24 @@ GET_KEY_SETTINGS (0x40)
   - continuous_rapid_trigger
   - behavior_mode
   - hold_threshold_10ms
-  - dynamic_zone_count (1..4)
   - secondary_hid_keycode (u16)
-  - dynamic_zones[4]: end_mm_tenths + hid_keycode(u16)
+  - dynamic_zones[4]:
+    - end_mm_tenths = bitmap DKS (2 bits par phase)
+      - bit0..1 key press
+      - bit2..3 key fully pressed
+      - bit4..5 key release from fully pressed
+      - bit6..7 key release
+    - hid_keycode(u16) = binding DKS
+  - tap_hold_options
+    - bit0 hold_on_other_key_press
+    - bit1 uppercase_hold
+  - dks_bottom_out_point (0.1 mm)
+  - socd_fully_pressed_enabled (0/1)
+  - socd_fully_pressed_point (0.1 mm)
 
 Notes runtime:
 
+- Les champs avances sont maintenant resolus par triplet `profile_index + layer_index + key_index`.
 - Le firmware applique toujours les memes seuils de base:
   - press si distance >= actuation_point_mm
   - release si distance < release_point_mm
@@ -198,10 +242,11 @@ SET_KEY_SETTINGS (0x41)
 - Requete: meme structure que ci-dessus (sans status)
 - Validation:
   - key_index < NUM_KEYS
+  - profile_index < SETTINGS_PROFILE_COUNT et slot present
+  - layer_index < SETTINGS_LAYER_COUNT
   - socd_pair valide (0xFF ou autre key)
   - socd_resolution < SETTINGS_SOCD_RESOLUTION_MAX
   - behavior_mode < KEY_BEHAVIOR_MAX
-  - dynamic_zone_count <= 4
 - Reponse: status + echo de la config appliquee
 
 Valeurs enum associees:
@@ -210,10 +255,13 @@ Valeurs enum associees:
   - 0 Normal
   - 1 Tap-Hold
   - 2 Toggle
-  - 3 Dynamic
+  - 3 Dynamic Keystroke (DKS)
 - socd_resolution:
   - 0 Last input wins
   - 1 Most pressed wins
+  - 2 Absolute priority (Key 1)
+  - 3 Absolute priority (Key 2)
+  - 4 Neutral
 
 #### 3.3.2 Key settings en chunks
 
@@ -231,7 +279,7 @@ GET_ALL_KEY_SETTINGS (0x42)
 - flags:
   - bit0 rapid_trigger_enabled
   - bit1 disable_kb_on_gamepad
-  - bit2..3 socd_resolution
+  - bit2..4 socd_resolution
 
 SET_ALL_KEY_SETTINGS (0x43)
 
@@ -250,7 +298,6 @@ SET_ALL_KEY_SETTINGS (0x43)
 GET_GAMEPAD_SETTINGS (0x44)
 
 - Reponse:
-  - radial_deadzone
   - keyboard_routing
   - square_mode
   - reactive_stick
@@ -260,7 +307,6 @@ GET_GAMEPAD_SETTINGS (0x44)
 SET_GAMEPAD_SETTINGS (0x45)
 
 - Requete:
-  - radial_deadzone
   - keyboard_routing
   - square_mode
   - reactive_stick
@@ -271,6 +317,8 @@ SET_GAMEPAD_SETTINGS (0x45)
   - api_mode < GAMEPAD_API_MAX
   - curve monotone en x et x <= 400 (4.00 mm)
 - Reponse: status + valeurs appliquees
+
+Note: Le deadzone est configure via `curve[0].x_01mm` (point de debut de la courbe gamepad).
 
 Enums utiles:
 
@@ -359,23 +407,9 @@ Enums utiles:
 - direction: 0 positive, 1 negative
 - button: 0..17 (A/B/X/Y/LB/RB/LT/RT/Select/Start/L3/R3/DPad/Home)
 
-#### 3.3.7 Mode gamepad + clavier (compat legacy)
+Note: 0x4D et 0x4E sont reserves (anciens `GET_GAMEPAD_WITH_KB` / `SET_GAMEPAD_WITH_KB`, supprimes). Ces IDs ne doivent pas etre reutilises.
 
-Note:
-
-- Interface recommandee: `keyboard_routing` via `GET_GAMEPAD_SETTINGS` (0x44) / `SET_GAMEPAD_SETTINGS` (0x45).
-- `GET_GAMEPAD_WITH_KB` / `SET_GAMEPAD_WITH_KB` restent disponibles pour compatibilite ancienne, mais ne couvrent que ON/OFF.
-
-GET_GAMEPAD_WITH_KB (0x4D)
-
-- Reponse: status + value (0/1)
-
-SET_GAMEPAD_WITH_KB (0x4E)
-
-- Requete: value (0/1)
-- Reponse: status + value courant
-
-#### 3.3.8 Rotary encoder
+#### 3.3.7 Rotary encoder
 
 GET_ROTARY_ENCODER_SETTINGS (0x54)
 
@@ -390,6 +424,15 @@ GET_ROTARY_ENCODER_SETTINGS (0x54)
   - progress_style
   - progress_effect_mode
   - progress_color_r/g/b
+  - cw_binding:
+    - mode (0 internal, 1 keycode)
+    - keycode(u16)
+    - modifier_mask_exact (HID mods bitmask)
+    - fallback_no_mod_keycode(u16)
+    - layer_mode (0 active, 1 fixed)
+    - layer_index
+  - ccw_binding (meme structure)
+  - click_binding (meme structure)
 
 SET_ROTARY_ENCODER_SETTINGS (0x55)
 
@@ -399,7 +442,86 @@ SET_ROTARY_ENCODER_SETTINGS (0x55)
   - sensitivity 1..16
   - step_size 1..64
   - effect_mode != THIRD_PARTY pour rgb/progress
+  - binding.mode/layer_mode/layer_index valides
 - Reponse: status + echo applique
+
+GET_ROTARY_STATE (0x59)
+
+- Reponse:
+  - button_pressed (0/1)
+  - last_direction (-1, 0, +1)
+  - step_counter (u32, increment a chaque cran)
+
+Notes:
+
+- Commande runtime (polling), non persistante.
+- `step_counter` est remis a zero au redemarrage.
+- En mode keycode, les bindings rotary appliquent `modifier_mask_exact`; si non-match, le firmware tente `fallback_no_mod_keycode`.
+
+#### 3.3.8 Profils persistants (metadata)
+
+GET_ACTIVE_PROFILE (0x5A)
+
+- Reponse:
+  - profile_index (0..3)
+  - profile_used_mask (bit N = slot N present)
+
+SET_ACTIVE_PROFILE (0x5B)
+
+- Requete:
+  - profile_index (slot present)
+- Reponse:
+  - status
+  - profile_index applique
+  - profile_used_mask
+
+GET_PROFILE_NAME (0x5C)
+
+- Requete:
+  - profile_index (slot present)
+- Reponse:
+  - status
+  - profile_index
+  - profile_used_mask
+  - profile_name (ASCII court, taille fixe)
+
+SET_PROFILE_NAME (0x5D)
+
+- Requete:
+  - profile_index (slot present)
+  - profile_name (ASCII court, taille fixe)
+- Reponse:
+  - status
+  - profile_index
+  - profile_used_mask
+  - profile_name applique
+
+CREATE_PROFILE (0x5E)
+
+- Requete:
+  - profile_name (ASCII court, optionnel)
+- Reponse:
+  - status
+  - profile_index cree
+  - profile_used_mask
+  - profile_name applique
+
+DELETE_PROFILE (0x5F)
+
+- Requete:
+  - profile_index (slot present)
+- Reponse:
+  - status
+  - profile_index actif apres suppression
+  - profile_used_mask
+
+Notes:
+
+- Limite MCU: 4 slots max.
+- Etat par defaut firmware/factory reset: les 4 slots sont initialises avec les reglages par defaut (`profile_used_mask = 0x0F`).
+- La suppression du dernier slot restant est refusee.
+- `CREATE_PROFILE` clone l'integralite des reglages du profil actif (mapping, layers, gamepad, LED, filtres, rotary, etc.).
+- `SET_ACTIVE_PROFILE` recharge l'integralite des reglages du slot cible.
 
 #### 3.3.9 Keycode de layer
 
@@ -437,7 +559,7 @@ RESET_KEY_TRIGGER_SETTINGS (0x58)
   - status
   - echo complet du key settings (meme format que GET_KEY_SETTINGS)
 
-### 3.4 LED matrix et effets (0x60..0x7C)
+### 3.4 LED matrix et effets (0x60..0x7E)
 
 | Commande | ID | Parametres requete | Reponse |
 |---|---:|---|---|
@@ -457,19 +579,69 @@ RESET_KEY_TRIGGER_SETTINGS (0x58)
 | LED_TEST_RAINBOW | 0x6D | aucun | status |
 | GET_LED_EFFECT | 0x6E | aucun | status + effect_mode |
 | SET_LED_EFFECT | 0x6F | effect_mode | status (INVALID_PARAM si mode hors borne) |
-| GET_LED_EFFECT_SPEED | 0x70 | aucun | status + speed |
-| SET_LED_EFFECT_SPEED | 0x71 | speed | status |
-| SET_LED_EFFECT_COLOR | 0x72 | r g b | status |
-| GET_LED_FPS_LIMIT | 0x73 | aucun | status + fps_limit |
-| SET_LED_FPS_LIMIT | 0x74 | fps_limit | status + fps_limit |
-| GET_LED_DIAGNOSTIC | 0x75 | aucun | status + mode |
-| SET_LED_DIAGNOSTIC | 0x76 | mode | status + mode |
-| GET_LED_EFFECT_PARAMS | 0x77 | effect_mode | status + effect_mode + param_count + params |
-| SET_LED_EFFECT_PARAMS | 0x78 | effect_mode + params | status + lecture params appliques |
-| SET_LED_VOLUME_OVERLAY | 0x79 | level (0..255) | status + level |
-| CLEAR_LED_VOLUME_OVERLAY | 0x7A | aucun | status |
-| RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY | 0x7B | aucun | status + effect_mode courant |
-| GET_LED_EFFECT_COLOR | 0x7C | aucun | status + r g b |
+| GET_LED_FPS_LIMIT | 0x70 | aucun | status + fps_limit |
+| SET_LED_FPS_LIMIT | 0x71 | fps_limit | status + fps_limit |
+| GET_LED_EFFECT_PARAMS | 0x72 | effect_mode | status + effect_mode + param_count + params |
+| SET_LED_EFFECT_PARAMS | 0x73 | effect_mode + params | status + lecture params appliques |
+| SET_LED_VOLUME_OVERLAY | 0x74 | level (0..255) | status + level |
+| CLEAR_LED_VOLUME_OVERLAY | 0x75 | aucun | status |
+| RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY | 0x76 | aucun | status + effect_mode courant |
+| GET_LED_EFFECT_SCHEMA | 0x77 | effect_mode + chunk_index | status + effect_mode + chunk_index + total_chunks + total_active + descriptors |
+| SET_LED_AUDIO_SPECTRUM | 0x78 | band_count + bands + impact_level | status + echo payload |
+| CLEAR_LED_AUDIO_SPECTRUM | 0x79 | aucun | status |
+
+Notes generales LED:
+- La vitesse et les couleurs des effets sont uniquement transportees via
+  `GET_LED_EFFECT_PARAMS` / `SET_LED_EFFECT_PARAMS`.
+- `LED_EFFECT_PARAM_SPEED` (index 14) porte la vitesse par effet.
+- `LED_EFFECT_PARAM_COLOR_R/G/B` (index 8/9/10) portent la couleur de base (RGB).
+- Tous les effets exposent PCOLOR (couleur de base). Par defaut rouge (255,0,0) = QMK default.
+- `GET_LED_EFFECT_SCHEMA` retourne des descriptors chunks de 6 octets:
+  `id`, `type`, `min`, `max`, `default`, `step`.
+
+Params effets par categorie:
+
+Gradient up-down:
+- Param 0 v_scale: amplitude de la rotation de teinte verticale (160=original)
+- Param 1 sat: saturation (144=original)
+- Param 2 val: luminosite (255=original)
+- PCOLOR: teinte de base
+
+Hue breathing / Hue pendulum:
+- Param 0 swing: plage de rotation de teinte (12=original, 64=large)
+- PCOLOR: teinte de base
+
+Hue wave:
+- Param 0 wave_scale: amplitude de la vague de teinte (24=original, 128=grande)
+- PCOLOR: teinte de base
+
+Alpha mods:
+- Param 0 hue_offset: decalage de teinte entre alphas et modificateurs
+  (0=dynamique pilote par la vitesse, >0=offset fixe, ex: 128=complementaire)
+- PCOLOR: teinte de base
+
+Starlight dual sat:
+- Param 0 sat_spread: ecart de saturation entre etoiles (31=original)
+- PCOLOR: teinte de base
+
+Starlight dual hue:
+- Param 0 hue_spread: ecart de teinte entre etoiles (31=original)
+- PCOLOR: teinte de base
+
+Pixel fractal:
+- Param 0 sat: saturation (255=original)
+- Param 1 val: luminosite (255=original)
+- PCOLOR: teinte de base
+
+Splash / Multi-splash:
+- Param 0 decay: vitesse de disparition (72=taux QMK / duree physique)
+- Param 1 spread: rayon de vague (128=original)
+- Param 2 base_glow: eclat ambient (8=original)
+- Param 3 white_core: burst lumineux au front de vague (bool, 1=defaut)
+- Param 4 gain: echelle de luminosite (224=original)
+- Param 5 palette: 0=couleur custom, 1=arc-en-ciel radial
+- Param 6 mode: 0=QMK (degrade HSV simple, defaut), 1=physique (anneau+trace+noyau)
+- PCOLOR: couleur de base (defaut vert #00FF60)
 
 ### 3.5 Filtre ADC (0x80..0x83)
 
@@ -680,9 +852,10 @@ Le bootloader memorise la derniere requete complete.
 ## 6. Resume rapide IDs
 
 - Systeme: 0x00..0x04
-- Settings: 0x20..0x2D
-- Keys/Calibration/Gamepad/Rotary/Layer: 0x40..0x58
-- LED: 0x60..0x7C
+- Settings: 0x20..0x2F
+- Keys/Calibration/Gamepad/Rotary/Layer/Profile: 0x40..0x5F
+  - 0x4D, 0x4E: reserves (anciens GET/SET_GAMEPAD_WITH_KB, supprimes)
+- LED: 0x60..0x79
 - Filter: 0x80..0x83
 - Debug: 0xE0..0xE9
 - Echo: 0xFE

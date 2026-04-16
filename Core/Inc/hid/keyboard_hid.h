@@ -149,6 +149,11 @@ void keyboard_hid_key_release(uint8_t keycode);
 bool keyboard_hid_send_report_if_changed(void);
 
 /**
+ * @brief Get current 6KRO modifier byte state.
+ */
+uint8_t keyboard_hid_get_modifier_state(void);
+
+/**
  * @brief HID task to be called in main loop
  *        Handles pending HID operations
  */

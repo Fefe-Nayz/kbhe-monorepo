@@ -165,6 +165,10 @@ bool keyboard_hid_send_report_if_changed(void) {
   return false;
 }
 
+uint8_t keyboard_hid_get_modifier_state(void) {
+  return keyboard_report.modifier;
+}
+
 void keyboard_hid_task(void) {
   // Send pending report if any
   keyboard_hid_send_report_if_changed();

@@ -61,8 +61,7 @@ bool flash_storage_read(uint32_t offset, void *buf, uint32_t len);
 
 /**
  * @brief Append a new storage snapshot.
- *        Reads always target the latest snapshot; legacy raw settings blobs
- *        are still readable for migration on the first boot after upgrade.
+ *        Reads always target the latest valid snapshot.
  * @param offset Must be 0 for snapshot writes
  * @param buf Buffer to write from
  * @param len Length in bytes

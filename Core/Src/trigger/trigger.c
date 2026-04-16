@@ -21,6 +21,8 @@ static key_behavior_runtime_t key_behavior_states[NUM_KEYS];
 
 static key_state_e key_states[NUM_KEYS];
 static bool keyboard_blocked_for_calibration = false;
+static bool trigger_non_tap_hold_press_event = false;
+static uint8_t trigger_active_layer_cache = 0xFFu;
 
 #define TRIGGER_DEFERRED_QUEUE_SIZE 32u
 _Static_assert((TRIGGER_DEFERRED_QUEUE_SIZE &
@@ -39,6 +41,20 @@ typedef struct {
     uint16_t keycode;
     uint8_t ticks;
 } trigger_deferred_action_t;
+
+typedef enum {
+    TRIGGER_DKS_ACTION_HOLD = 0,
+    TRIGGER_DKS_ACTION_PRESS = 1,
+    TRIGGER_DKS_ACTION_RELEASE = 2,
+    TRIGGER_DKS_ACTION_TAP = 3,
+} trigger_dks_action_t;
+
+typedef enum {
+    TRIGGER_DKS_PHASE_PRESS = 0,
+    TRIGGER_DKS_PHASE_BOTTOM_OUT = 1,
+    TRIGGER_DKS_PHASE_RELEASE_FROM_BOTTOM_OUT = 2,
+    TRIGGER_DKS_PHASE_RELEASE = 3,
+} trigger_dks_phase_t;
 
 static trigger_deferred_action_t trigger_deferred_queue[TRIGGER_DEFERRED_QUEUE_SIZE];
 static uint8_t trigger_deferred_head = 0u;
@@ -170,29 +186,114 @@ static void trigger_tap_action(uint8_t key, uint16_t keycode) {
                                 keycode, trigger_deferred_ticks_from_setting());
 }
 
-static uint8_t trigger_dynamic_zone_for_distance(
-    const key_trigger_settings_t *settings, int16_t current_distance) {
-    uint8_t zone_count = settings->dynamic_zone_count;
-
-    if (zone_count == 0u || zone_count > SETTINGS_DYNAMIC_ZONE_COUNT) {
-        zone_count = 1u;
+static uint8_t trigger_dks_action_from_bitmap(uint8_t bitmap, uint8_t phase) {
+    if (phase > (uint8_t)TRIGGER_DKS_PHASE_RELEASE) {
+        return (uint8_t)TRIGGER_DKS_ACTION_HOLD;
     }
 
-    for (uint8_t i = 0u; i < zone_count; i++) {
-        uint16_t end_um =
-            (uint16_t)settings->dynamic_zones[i].end_mm_tenths * 100u;
-        if ((uint16_t)current_distance <= end_um) {
-            return i;
+    return (uint8_t)((bitmap >> (phase * 2u)) & 0x03u);
+}
+
+static bool trigger_dks_is_bottomed_out(const key_trigger_settings_t *settings,
+                                        int16_t current_distance) {
+    uint16_t threshold_um =
+        (uint16_t)settings->dynamic_bottom_out_point_tenths * 100u;
+
+    if (threshold_um == 0u) {
+        threshold_um =
+            (uint16_t)SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS * 100u;
+    }
+
+    return current_distance >= (int16_t)threshold_um;
+}
+
+static void trigger_dks_process_phase(uint8_t key, uint8_t phase) {
+    key_behavior_runtime_t *runtime = &key_behavior_states[key];
+    const key_trigger_settings_t *settings = &key_trigger_settings[key];
+
+    for (uint8_t i = 0u; i < SETTINGS_DYNAMIC_ZONE_COUNT; i++) {
+        uint16_t keycode = settings->dynamic_zones[i].hid_keycode;
+        uint8_t action = trigger_dks_action_from_bitmap(
+            settings->dynamic_zones[i].end_mm_tenths, phase);
+
+        if (keycode == KC_NO || action == (uint8_t)TRIGGER_DKS_ACTION_HOLD) {
+            continue;
+        }
+
+        if (runtime->dks_binding_pressed[i]) {
+            layout_release_action_for_key(key, keycode);
+            runtime->dks_binding_pressed[i] = false;
+        }
+
+        if (action == (uint8_t)TRIGGER_DKS_ACTION_PRESS) {
+            if (trigger_deferred_push((uint8_t)TRIGGER_DEFERRED_ACTION_PRESS, key,
+                                      keycode,
+                                      trigger_deferred_ticks_from_setting())) {
+                runtime->dks_binding_pressed[i] = true;
+            }
+        } else if (action == (uint8_t)TRIGGER_DKS_ACTION_TAP) {
+            trigger_tap_action(key, keycode);
         }
     }
+}
 
-    return (uint8_t)(zone_count - 1u);
+static void trigger_activate_tap_hold_hold_action(uint8_t key) {
+    key_behavior_runtime_t *runtime = &key_behavior_states[key];
+    const key_trigger_settings_t *settings = &key_trigger_settings[key];
+    uint16_t primary_keycode = KC_NO;
+
+    if (!runtime->tap_hold_pending) {
+        return;
+    }
+
+    runtime->tap_hold_pending = false;
+    runtime->tap_hold_secondary_active = false;
+    runtime->tap_hold_uppercase_active = false;
+
+    if (settings->tap_hold_uppercase_hold) {
+        primary_keycode = trigger_resolve_primary_action_keycode(key, settings);
+        runtime->active_keycode = primary_keycode;
+        if (primary_keycode != KC_NO) {
+            layout_press_action_for_key(key, KC_LEFT_SHIFT);
+            layout_press_action_for_key(key, primary_keycode);
+            runtime->tap_hold_uppercase_active = true;
+        }
+        return;
+    }
+
+    runtime->tap_hold_secondary_active = true;
+    runtime->active_keycode = settings->secondary_keycode;
+    if (runtime->active_keycode != KC_NO) {
+        layout_press_action_for_key(key, runtime->active_keycode);
+    }
+}
+
+static void trigger_apply_hold_on_other_key_press(void) {
+    for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+        key_behavior_runtime_t *runtime = &key_behavior_states[key];
+        const key_trigger_settings_t *settings = &key_trigger_settings[key];
+
+        if (key_states[key] != PRESSED) {
+            continue;
+        }
+        if (settings->behavior_mode != KEY_BEHAVIOR_TAP_HOLD) {
+            continue;
+        }
+        if (!settings->tap_hold_hold_on_other_key_press ||
+            !runtime->tap_hold_pending) {
+            continue;
+        }
+
+        trigger_activate_tap_hold_hold_action(key);
+    }
 }
 
 static void trigger_behavior_on_press(uint8_t key, int16_t current_distance,
                                       uint32_t now_ms) {
     key_behavior_runtime_t *runtime = &key_behavior_states[key];
     const key_trigger_settings_t *settings = &key_trigger_settings[key];
+    bool was_bottomed_out = false;
+    bool is_bottomed_out = false;
 
     runtime->press_start_ms = now_ms;
 
@@ -200,6 +301,7 @@ static void trigger_behavior_on_press(uint8_t key, int16_t current_distance,
     case KEY_BEHAVIOR_TAP_HOLD:
         runtime->tap_hold_pending = true;
         runtime->tap_hold_secondary_active = false;
+        runtime->tap_hold_uppercase_active = false;
         break;
 
     case KEY_BEHAVIOR_TOGGLE:
@@ -208,12 +310,15 @@ static void trigger_behavior_on_press(uint8_t key, int16_t current_distance,
         break;
 
     case KEY_BEHAVIOR_DYNAMIC: {
-        uint8_t zone =
-            trigger_dynamic_zone_for_distance(settings, current_distance);
-        runtime->active_dynamic_zone = zone;
-        runtime->active_keycode = settings->dynamic_zones[zone].hid_keycode;
-        if (runtime->active_keycode != KC_NO) {
-            layout_press_action_for_key(key, runtime->active_keycode);
+        memset(runtime->dks_binding_pressed, 0, sizeof(runtime->dks_binding_pressed));
+        was_bottomed_out = runtime->dks_is_bottomed_out;
+        is_bottomed_out = trigger_dks_is_bottomed_out(settings, current_distance);
+        runtime->dks_is_bottomed_out = is_bottomed_out;
+
+        if (is_bottomed_out && !was_bottomed_out) {
+            trigger_dks_process_phase(key, (uint8_t)TRIGGER_DKS_PHASE_BOTTOM_OUT);
+        } else {
+            trigger_dks_process_phase(key, (uint8_t)TRIGGER_DKS_PHASE_PRESS);
         }
         break;
     }
@@ -234,17 +339,13 @@ static void trigger_behavior_on_update(uint8_t key, int16_t current_distance,
     key_behavior_runtime_t *runtime = &key_behavior_states[key];
     const key_trigger_settings_t *settings = &key_trigger_settings[key];
     uint32_t elapsed_ms = now_ms - runtime->press_start_ms;
+    bool is_bottomed_out = false;
 
     switch ((key_behavior_mode_t)settings->behavior_mode) {
     case KEY_BEHAVIOR_TAP_HOLD:
         if (runtime->tap_hold_pending &&
             elapsed_ms >= settings->hold_threshold_ms) {
-            runtime->tap_hold_pending = false;
-            runtime->tap_hold_secondary_active = true;
-            runtime->active_keycode = settings->secondary_keycode;
-            if (runtime->active_keycode != KC_NO) {
-                layout_press_action_for_key(key, runtime->active_keycode);
-            }
+            trigger_activate_tap_hold_hold_action(key);
         }
         break;
 
@@ -262,19 +363,15 @@ static void trigger_behavior_on_update(uint8_t key, int16_t current_distance,
         break;
 
     case KEY_BEHAVIOR_DYNAMIC: {
-        uint8_t zone =
-            trigger_dynamic_zone_for_distance(settings, current_distance);
-        if (zone != runtime->active_dynamic_zone) {
-            trigger_deferred_cancel_key(key);
-            trigger_release_active_action(key);
-            runtime->active_dynamic_zone = zone;
-            runtime->active_keycode = settings->dynamic_zones[zone].hid_keycode;
-            if (runtime->active_keycode != KC_NO) {
-                (void)trigger_deferred_push(
-                    (uint8_t)TRIGGER_DEFERRED_ACTION_PRESS, key,
-                    runtime->active_keycode,
-                    trigger_deferred_ticks_from_setting());
-            }
+        is_bottomed_out = trigger_dks_is_bottomed_out(settings, current_distance);
+
+        if (!runtime->dks_is_bottomed_out && is_bottomed_out) {
+            runtime->dks_is_bottomed_out = true;
+            trigger_dks_process_phase(key, (uint8_t)TRIGGER_DKS_PHASE_BOTTOM_OUT);
+        } else if (runtime->dks_is_bottomed_out && !is_bottomed_out) {
+            runtime->dks_is_bottomed_out = false;
+            trigger_dks_process_phase(
+                key, (uint8_t)TRIGGER_DKS_PHASE_RELEASE_FROM_BOTTOM_OUT);
         }
         break;
     }
@@ -291,7 +388,10 @@ static void trigger_behavior_on_release(uint8_t key) {
 
     switch ((key_behavior_mode_t)settings->behavior_mode) {
     case KEY_BEHAVIOR_TAP_HOLD:
-        if (runtime->tap_hold_secondary_active) {
+        if (runtime->tap_hold_uppercase_active) {
+            trigger_release_active_action(key);
+            layout_release_action_for_key(key, KC_LEFT_SHIFT);
+        } else if (runtime->tap_hold_secondary_active) {
             trigger_release_active_action(key);
         } else if (runtime->tap_hold_pending) {
             trigger_tap_action(key,
@@ -299,6 +399,7 @@ static void trigger_behavior_on_release(uint8_t key) {
         }
         runtime->tap_hold_pending = false;
         runtime->tap_hold_secondary_active = false;
+        runtime->tap_hold_uppercase_active = false;
         break;
 
     case KEY_BEHAVIOR_TOGGLE:
@@ -323,8 +424,8 @@ static void trigger_behavior_on_release(uint8_t key) {
 
     case KEY_BEHAVIOR_DYNAMIC:
         trigger_deferred_cancel_key(key);
-        trigger_release_active_action(key);
-        runtime->active_dynamic_zone = 0u;
+        trigger_dks_process_phase(key, (uint8_t)TRIGGER_DKS_PHASE_RELEASE);
+        runtime->dks_is_bottomed_out = false;
         break;
 
     case KEY_BEHAVIOR_NORMAL:
@@ -356,6 +457,8 @@ static void trigger_reset_runtime_state(bool release_keyboard_reports) {
         memset(&key_behavior_states[key], 0, sizeof(key_behavior_states[key]));
         key_behavior_states[key].active_keycode = KC_NO;
     }
+
+    trigger_non_tap_hold_press_event = false;
 }
 
 static inline void press_key(uint8_t key, int16_t current_distance,
@@ -363,6 +466,9 @@ static inline void press_key(uint8_t key, int16_t current_distance,
     if (key_states[key] == RELEASED) {
         key_states[key] = PRESSED;
         trigger_behavior_on_press(key, current_distance, now_ms);
+        if (key_trigger_settings[key].behavior_mode != KEY_BEHAVIOR_TAP_HOLD) {
+            trigger_non_tap_hold_press_event = true;
+        }
         led_matrix_key_event(key, true);
         socd_on_press(key);
     }
@@ -431,7 +537,17 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
     uint16_t release_point = settings->release_point;
     key_rapid_trigger_data_t *rt_data = &key_rapid_trigger_states[key];
 
-    if (!settings->is_rapid_trigger_enabled) {
+    if (settings->behavior_mode == KEY_BEHAVIOR_DYNAMIC) {
+        if (key_states[key] == RELEASED) {
+            if (is_below_actuation_point(current_distance, actuation_point)) {
+                press_key(key, current_distance, now_ms);
+            }
+        } else {
+            if (!is_above_release_point(current_distance, release_point)) {
+                release_key(key);
+            }
+        }
+    } else if (!settings->is_rapid_trigger_enabled) {
         if (key_states[key] == RELEASED) {
             if (is_below_actuation_point(current_distance, actuation_point)) {
                 press_key(key, current_distance, now_ms);
@@ -533,20 +649,49 @@ void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings) {
     runtime->hold_threshold_ms =
         (uint16_t)settings->advanced.hold_threshold_10ms * 10u;
     runtime->secondary_keycode = settings->advanced.secondary_hid_keycode;
-    runtime->dynamic_zone_count = settings->advanced.dynamic_zone_count;
+    runtime->tap_hold_hold_on_other_key_press =
+        settings_key_is_tap_hold_hold_on_other_key_press(settings);
+    runtime->tap_hold_uppercase_hold =
+        settings_key_is_tap_hold_uppercase_hold(settings);
+    runtime->dynamic_bottom_out_point_tenths = settings->advanced.dynamic_zone_count;
     memcpy(runtime->dynamic_zones, settings->advanced.dynamic_zones,
            sizeof(runtime->dynamic_zones));
 }
 
-void trigger_reload_settings(void) {
-    for (uint8_t i = 0; i < NUM_KEYS; i++) {
-        const settings_key_t *settings = settings_get_key(i);
-        if (settings != NULL) {
-            trigger_apply_key_settings(i, settings);
+    static uint8_t trigger_runtime_active_layer(void) {
+        uint8_t layer = layout_get_active_layer_top();
+        if (layer >= SETTINGS_LAYER_COUNT) {
+            return 0u;
         }
+
+        return layer;
     }
 
-    socd_load_settings();
+    static void trigger_reload_settings_for_layer(uint8_t layer) {
+        settings_key_t settings = {0};
+
+        for (uint8_t i = 0; i < NUM_KEYS; i++) {
+            if (settings_get_key_for_layer(i, layer, &settings)) {
+                trigger_apply_key_settings(i, &settings);
+            }
+        }
+
+        socd_load_settings();
+    }
+
+void trigger_reload_settings(void) {
+        trigger_active_layer_cache = trigger_runtime_active_layer();
+        trigger_reload_settings_for_layer(trigger_active_layer_cache);
+    }
+
+    static void trigger_refresh_layer_runtime_settings(void) {
+        uint8_t layer = trigger_runtime_active_layer();
+        if (layer == trigger_active_layer_cache) {
+            return;
+        }
+
+        trigger_active_layer_cache = layer;
+        trigger_reload_settings_for_layer(layer);
 }
 
 uint16_t trigger_get_distance_01mm(uint8_t key) {
@@ -564,6 +709,7 @@ uint16_t trigger_get_distance_01mm(uint8_t key) {
 
 void trigger_init() {
     trigger_deferred_clear();
+        trigger_active_layer_cache = 0xFFu;
 
     for (int i = 0; i < NUM_KEYS; i++) {
         key_trigger_settings[i].primary_keycode = KC_NO;
@@ -576,10 +722,13 @@ void trigger_init() {
         key_trigger_settings[i].behavior_mode = KEY_BEHAVIOR_NORMAL;
         key_trigger_settings[i].hold_threshold_ms = 200u;
         key_trigger_settings[i].secondary_keycode = KC_NO;
-        key_trigger_settings[i].dynamic_zone_count = 1u;
+        key_trigger_settings[i].tap_hold_hold_on_other_key_press = false;
+        key_trigger_settings[i].tap_hold_uppercase_hold = false;
+        key_trigger_settings[i].dynamic_bottom_out_point_tenths =
+            SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS;
         memset(key_trigger_settings[i].dynamic_zones, 0,
                sizeof(key_trigger_settings[i].dynamic_zones));
-        key_trigger_settings[i].dynamic_zones[0].end_mm_tenths = 40u;
+        key_trigger_settings[i].dynamic_zones[0].end_mm_tenths = 0x81u;
 
         // Initialize rapid trigger states
         key_rapid_trigger_states[i].last_distance = 0;
@@ -611,9 +760,16 @@ void trigger_task() {
         keyboard_blocked_for_calibration = false;
     }
 
+    trigger_refresh_layer_runtime_settings();
+
     trigger_process_deferred_actions();
 
     for (uint8_t key = 0; key < NUM_KEYS; key++) {
         handle_trigger(key, now_ms);
+    }
+
+    if (trigger_non_tap_hold_press_event) {
+        trigger_apply_hold_on_other_key_press();
+        trigger_non_tap_hold_press_event = false;
     }
 }

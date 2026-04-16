@@ -484,6 +484,51 @@ static bool layout_is_gamepad_control_keycode(uint16_t keycode) {
          keycode == CUSTOM_GAMEPAD_TOGGLE;
 }
 
+static bool layout_is_profile_control_keycode(uint16_t keycode) {
+  return keycode == CUSTOM_PROFILE_PREV || keycode == CUSTOM_PROFILE_NEXT ||
+         keycode == CUSTOM_PROFILE_SET_1 || keycode == CUSTOM_PROFILE_SET_2 ||
+         keycode == CUSTOM_PROFILE_SET_3 || keycode == CUSTOM_PROFILE_SET_4;
+}
+
+static uint8_t layout_profile_slot_from_keycode(uint16_t keycode) {
+  switch (keycode) {
+  case CUSTOM_PROFILE_SET_1:
+    return 0u;
+  case CUSTOM_PROFILE_SET_2:
+    return 1u;
+  case CUSTOM_PROFILE_SET_3:
+    return 2u;
+  case CUSTOM_PROFILE_SET_4:
+    return 3u;
+  default:
+    return 0xFFu;
+  }
+}
+
+static void layout_cycle_profile(int8_t direction) {
+  uint8_t used_mask = settings_get_profile_used_mask();
+  uint8_t current = settings_get_active_profile_index();
+  uint8_t slot = current;
+
+  if (used_mask == 0u) {
+    return;
+  }
+
+  for (uint8_t i = 0u; i < SETTINGS_PROFILE_COUNT; i++) {
+    if (direction >= 0) {
+      slot = (uint8_t)((slot + 1u) % SETTINGS_PROFILE_COUNT);
+    } else {
+      slot = (uint8_t)((slot + SETTINGS_PROFILE_COUNT - 1u) %
+                       SETTINGS_PROFILE_COUNT);
+    }
+
+    if ((used_mask & (uint8_t)(1u << slot)) != 0u) {
+      (void)settings_set_active_profile_index(slot);
+      return;
+    }
+  }
+}
+
 static bool layout_is_gamepad_action_keycode(uint16_t keycode) {
   uint8_t axis = 0u;
   uint8_t direction = 0u;
@@ -501,7 +546,8 @@ static bool layout_is_internal_keycode(uint16_t keycode) {
          layout_is_toggle_layer_keycode(keycode) ||
          layout_is_set_layer_keycode(keycode) ||
          keycode == CUSTOM_LAYER_CLEAR || layout_is_led_control_keycode(keycode) ||
-         layout_is_gamepad_control_keycode(keycode);
+         layout_is_gamepad_control_keycode(keycode) ||
+         layout_is_profile_control_keycode(keycode);
 }
 
 static uint8_t layout_layer_from_keycode(uint16_t keycode) {
@@ -673,7 +719,19 @@ static void layout_handle_internal_press(uint16_t keycode) {
   case CUSTOM_GAMEPAD_TOGGLE:
     (void)settings_set_gamepad_enabled_live(!settings_is_gamepad_enabled());
     break;
+  case CUSTOM_PROFILE_PREV:
+    layout_cycle_profile(-1);
+    break;
+  case CUSTOM_PROFILE_NEXT:
+    layout_cycle_profile(+1);
+    break;
   default:
+    if (layout_is_profile_control_keycode(keycode)) {
+      uint8_t profile_slot = layout_profile_slot_from_keycode(keycode);
+      if (profile_slot < SETTINGS_PROFILE_COUNT) {
+        (void)settings_set_active_profile_index(profile_slot);
+      }
+    }
     break;
   }
 }
@@ -734,6 +792,21 @@ uint16_t layout_get_active_keycode(uint8_t key) {
   }
 
   return KC_NO;
+}
+
+uint8_t layout_get_active_layer_top(void) {
+  for (int8_t layer = (int8_t)SETTINGS_LAYER_COUNT - 1; layer >= 0; layer--) {
+    if (layout_is_layer_active((uint8_t)layer)) {
+      return (uint8_t)layer;
+    }
+  }
+
+  return 0u;
+}
+
+uint8_t layout_get_active_modifier_mask(void) {
+  return (uint8_t)(keyboard_hid_get_modifier_state() |
+                   keyboard_nkro_hid_get_modifier_state());
 }
 
 void layout_press(uint8_t key) {
@@ -824,6 +897,41 @@ void layout_release_action_for_key(uint8_t source_key, uint16_t keycode) {
   if (layout_should_emit_keyboard_for_key(source_key)) {
     layout_dispatch_release(keycode);
   }
+}
+
+void layout_press_action(uint16_t keycode) {
+  if (layout_is_internal_keycode(keycode)) {
+    layout_handle_internal_press(keycode);
+    return;
+  }
+
+  if ((layout_is_keyboard_page_keycode(keycode) ||
+       layout_consumer_usage_from_keycode(keycode) != 0u) &&
+      !settings_is_keyboard_enabled()) {
+    return;
+  }
+
+  layout_dispatch_press(keycode);
+}
+
+void layout_release_action(uint16_t keycode) {
+  if (layout_is_internal_keycode(keycode)) {
+    layout_handle_internal_release(keycode);
+    return;
+  }
+
+  if ((layout_is_keyboard_page_keycode(keycode) ||
+       layout_consumer_usage_from_keycode(keycode) != 0u) &&
+      !settings_is_keyboard_enabled()) {
+    return;
+  }
+
+  layout_dispatch_release(keycode);
+}
+
+void layout_tap_action(uint16_t keycode) {
+  layout_press_action(keycode);
+  layout_release_action(keycode);
 }
 
 void layout_reset_state(void) {

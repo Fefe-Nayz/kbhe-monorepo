@@ -11,6 +11,7 @@
 #include "led_matrix.h"
 #include "layout/keycodes.h"
 #include "main.h"
+#include "rotary_encoder.h"
 #include "settings.h"
 #include "trigger/trigger.h"
 #include "updater_app.h"
@@ -48,7 +49,26 @@ static inline uint8_t hid_socd_resolution_flags(uint8_t resolution) {
 }
 
 static inline uint8_t hid_socd_resolution_from_flags(uint8_t flags) {
-  return hid_sanitize_socd_resolution((uint8_t)((flags >> 2) & 0x03u));
+  return hid_sanitize_socd_resolution((uint8_t)((flags >> 2) & 0x07u));
+}
+
+static inline uint8_t hid_sanitize_dks_bottom_out_point(uint8_t point_tenths) {
+  if (point_tenths < SETTINGS_DKS_BOTTOM_OUT_POINT_MIN_TENTHS ||
+      point_tenths > SETTINGS_DKS_BOTTOM_OUT_POINT_MAX_TENTHS) {
+    return SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS;
+  }
+
+  return point_tenths;
+}
+
+static inline uint8_t
+hid_sanitize_socd_fully_pressed_point(uint8_t point_tenths) {
+  if (point_tenths < SETTINGS_SOCD_FULLY_PRESSED_POINT_MIN_TENTHS ||
+      point_tenths > SETTINGS_SOCD_FULLY_PRESSED_POINT_MAX_TENTHS) {
+    return SETTINGS_SOCD_FULLY_PRESSED_POINT_DEFAULT_TENTHS;
+  }
+
+  return point_tenths;
 }
 
 static inline uint8_t hid_gamepad_curve_x_01mm_to_deadzone(uint16_t x_01mm) {
@@ -95,9 +115,13 @@ static inline void hid_fill_key_settings_chunk_entry(
 }
 
 static inline void hid_fill_key_settings_packet(hid_packet_key_settings_t *resp,
+                                                uint8_t profile_index,
+                                                uint8_t layer_index,
                                                 uint8_t key_index,
                                                 const settings_key_t *key) {
   resp->key_index = key_index;
+  resp->profile_index = profile_index;
+  resp->layer_index = layer_index;
   resp->hid_keycode = key->hid_keycode;
   resp->actuation_point_mm = key->actuation_point_mm;
   resp->release_point_mm = key->release_point_mm;
@@ -111,10 +135,21 @@ static inline void hid_fill_key_settings_packet(hid_packet_key_settings_t *resp,
       settings_key_is_continuous_rapid_trigger_enabled(key) ? 1u : 0u;
   resp->behavior_mode = key->advanced.behavior_mode;
   resp->hold_threshold_10ms = key->advanced.hold_threshold_10ms;
-  resp->dynamic_zone_count = key->advanced.dynamic_zone_count;
   resp->secondary_hid_keycode = key->advanced.secondary_hid_keycode;
   memcpy(resp->dynamic_zones, key->advanced.dynamic_zones,
          sizeof(resp->dynamic_zones));
+  resp->tap_hold_options = 0u;
+  if (settings_key_is_tap_hold_hold_on_other_key_press(key)) {
+    resp->tap_hold_options |= SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK;
+  }
+  if (settings_key_is_tap_hold_uppercase_hold(key)) {
+    resp->tap_hold_options |= SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK;
+  }
+  resp->dks_bottom_out_point = key->advanced.dynamic_zone_count;
+  resp->socd_fully_pressed_enabled =
+      settings_key_is_socd_fully_pressed_enabled(key) ? 1u : 0u;
+  resp->socd_fully_pressed_point =
+      key->advanced.socd_fully_pressed_point_tenths;
 }
 
 #define HID_DEVICE_SERIAL_PREFIX "75HE-NF-"
@@ -226,6 +261,12 @@ static void cmd_enter_bootloader(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   (void)in;
   resp->command_id = CMD_ENTER_BOOTLOADER;
+
+  if (settings_has_unsaved_changes() && !settings_save()) {
+    resp->status_or_len = HID_RESP_ERROR;
+    return;
+  }
+
   resp->status_or_len =
       updater_app_schedule_action(UPDATER_APP_ACTION_ENTER_UPDATER)
           ? HID_RESP_OK
@@ -382,6 +423,49 @@ static void cmd_set_keyboard_name(const uint8_t *in, uint8_t *out) {
   memcpy(resp->keyboard_name, name, SETTINGS_KEYBOARD_NAME_LENGTH);
 }
 
+static void cmd_copy_profile_slot(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_copy_t *req = (const hid_packet_profile_copy_t *)in;
+  hid_packet_profile_copy_t *resp = (hid_packet_profile_copy_t *)out;
+
+  resp->command_id = CMD_COPY_PROFILE_SLOT;
+  resp->source_profile_index = req->source_profile_index;
+  resp->target_profile_index = req->target_profile_index;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+
+  if (req->source_profile_index >= SETTINGS_PROFILE_COUNT ||
+      req->target_profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(req->source_profile_index)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  resp->status = settings_copy_profile_slot(req->source_profile_index,
+                                            req->target_profile_index)
+                     ? HID_RESP_OK
+                     : HID_RESP_ERROR;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+}
+
+static void cmd_reset_profile_slot(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_index_t *req = (const hid_packet_profile_index_t *)in;
+  hid_packet_profile_index_t *resp = (hid_packet_profile_index_t *)out;
+
+  resp->command_id = CMD_RESET_PROFILE_SLOT;
+  resp->profile_index = req->profile_index;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+
+  if (req->profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(req->profile_index)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  resp->status = settings_reset_profile_slot(req->profile_index)
+                     ? HID_RESP_OK
+                     : HID_RESP_ERROR;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Key Settings Commands
 //--------------------------------------------------------------------+
@@ -389,46 +473,56 @@ static void cmd_set_keyboard_name(const uint8_t *in, uint8_t *out) {
 static void cmd_get_key_settings(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_settings_t *req = (const hid_packet_key_settings_t *)in;
   hid_packet_key_settings_t *resp = (hid_packet_key_settings_t *)out;
+  settings_key_t key = {0};
 
   resp->command_id = CMD_GET_KEY_SETTINGS;
 
-  if (req->key_index >= NUM_KEYS) {
+  if (req->key_index >= NUM_KEYS || req->profile_index >= SETTINGS_PROFILE_COUNT ||
+      req->layer_index >= SETTINGS_LAYER_COUNT ||
+      !settings_is_profile_slot_used(req->profile_index)) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
 
-  const settings_t *s = settings_get();
-  const settings_key_t *key = &s->keys[req->key_index];
+  if (!settings_get_profile_layer_key_settings(req->profile_index,
+                                               req->layer_index,
+                                               req->key_index, &key)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
 
   resp->status = HID_RESP_OK;
-  hid_fill_key_settings_packet(resp, req->key_index, key);
+  hid_fill_key_settings_packet(resp, req->profile_index, req->layer_index,
+                               req->key_index, &key);
 }
 
 static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_settings_t *req = (const hid_packet_key_settings_t *)in;
   hid_packet_key_settings_t *resp = (hid_packet_key_settings_t *)out;
+  settings_key_t key = {0};
 
   resp->command_id = CMD_SET_KEY_SETTINGS;
 
-  if (req->key_index >= NUM_KEYS) {
+  if (req->key_index >= NUM_KEYS || req->profile_index >= SETTINGS_PROFILE_COUNT ||
+      req->layer_index >= SETTINGS_LAYER_COUNT ||
+      !settings_is_profile_slot_used(req->profile_index)) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
   if (!hid_is_valid_socd_pair(req->key_index, req->socd_pair) ||
       req->socd_resolution >= (uint8_t)SETTINGS_SOCD_RESOLUTION_MAX ||
-      req->behavior_mode >= (uint8_t)KEY_BEHAVIOR_MAX ||
-      req->dynamic_zone_count > SETTINGS_DYNAMIC_ZONE_COUNT) {
+      req->behavior_mode >= (uint8_t)KEY_BEHAVIOR_MAX) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
 
-  const settings_key_t *current_key = settings_get_key(req->key_index);
-  if (current_key == NULL) {
+  if (!settings_get_profile_layer_key_settings(req->profile_index,
+                                               req->layer_index,
+                                               req->key_index, &key)) {
     resp->status = HID_RESP_ERROR;
     return;
   }
 
-  settings_key_t key = *current_key;
   key.hid_keycode = req->hid_keycode;
   key.actuation_point_mm = req->actuation_point_mm;
   key.release_point_mm = req->release_point_mm;
@@ -441,17 +535,39 @@ static void cmd_set_key_settings(const uint8_t *in, uint8_t *out) {
   key.disable_kb_on_gamepad = req->disable_kb_on_gamepad ? 1 : 0;
   settings_key_set_continuous_rapid_trigger(
       &key, req->continuous_rapid_trigger != 0u);
+    settings_key_set_socd_fully_pressed_enabled(
+      &key, req->socd_fully_pressed_enabled != 0u);
   key.advanced.behavior_mode = req->behavior_mode;
   key.advanced.hold_threshold_10ms = req->hold_threshold_10ms;
-  key.advanced.dynamic_zone_count = req->dynamic_zone_count;
+    key.advanced.dynamic_zone_count =
+      hid_sanitize_dks_bottom_out_point(req->dks_bottom_out_point != 0u
+                        ? req->dks_bottom_out_point
+                        : key.advanced.dynamic_zone_count);
   key.advanced.secondary_hid_keycode = req->secondary_hid_keycode;
+    settings_key_set_tap_hold_hold_on_other_key_press(
+      &key, (req->tap_hold_options &
+         SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK) != 0u);
+    settings_key_set_tap_hold_uppercase_hold(
+      &key, (req->tap_hold_options &
+         SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK) != 0u);
+    key.advanced.socd_fully_pressed_point_tenths =
+      hid_sanitize_socd_fully_pressed_point(req->socd_fully_pressed_point);
   memcpy(key.advanced.dynamic_zones, req->dynamic_zones,
          sizeof(key.advanced.dynamic_zones));
 
-  bool success = settings_set_key(req->key_index, &key);
+  bool success = settings_set_profile_layer_key_settings(
+      req->profile_index, req->layer_index, req->key_index, &key);
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
-  hid_fill_key_settings_packet(resp, req->key_index, &key);
+  if (!settings_get_profile_layer_key_settings(req->profile_index,
+                                               req->layer_index,
+                                               req->key_index, &key)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  hid_fill_key_settings_packet(resp, req->profile_index, req->layer_index,
+                               req->key_index, &key);
 }
 
 static void cmd_reset_key_trigger_settings(const uint8_t *in, uint8_t *out) {
@@ -477,7 +593,8 @@ static void cmd_reset_key_trigger_settings(const uint8_t *in, uint8_t *out) {
   }
 
   resp->status = HID_RESP_OK;
-  hid_fill_key_settings_packet(resp, req->key_index, key);
+  hid_fill_key_settings_packet(resp, settings_get_active_profile_index(), 0u,
+                               req->key_index, key);
 }
 
 static void cmd_get_all_key_settings(const uint8_t *in, uint8_t *out) {
@@ -571,8 +688,6 @@ static void cmd_get_gamepad_settings(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_GET_GAMEPAD_SETTINGS;
   resp->status = HID_RESP_OK;
-  resp->radial_deadzone =
-      hid_gamepad_curve_x_01mm_to_deadzone(s->gamepad.curve[0].x_01mm);
   resp->keyboard_routing = s->gamepad.keyboard_routing;
   resp->square_mode = s->gamepad.square_mode;
   resp->reactive_stick = s->gamepad.reactive_stick;
@@ -593,7 +708,6 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_SET_GAMEPAD_SETTINGS;
 
-  gamepad.radial_deadzone = 0u;
   gamepad.keyboard_routing = req->keyboard_routing;
   gamepad.square_mode = req->square_mode ? 1 : 0;
   gamepad.reactive_stick = req->reactive_stick ? 1 : 0;
@@ -609,11 +723,6 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
     }
   }
 
-  if (gamepad.curve[0].x_01mm == 0u && req->radial_deadzone > 0u) {
-    gamepad.curve[0].x_01mm =
-        hid_gamepad_deadzone_to_curve_x_01mm(req->radial_deadzone);
-  }
-
   if (invalid) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
@@ -622,8 +731,6 @@ static void cmd_set_gamepad_settings(const uint8_t *in, uint8_t *out) {
   bool success = settings_set_gamepad(&gamepad);
 
   resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
-  resp->radial_deadzone =
-      hid_gamepad_curve_x_01mm_to_deadzone(gamepad.curve[0].x_01mm);
   resp->keyboard_routing = gamepad.keyboard_routing;
   resp->square_mode = gamepad.square_mode;
   resp->reactive_stick = gamepad.reactive_stick;
@@ -656,6 +763,26 @@ static void cmd_get_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   resp->progress_color_r = rotary.progress_color_r;
   resp->progress_color_g = rotary.progress_color_g;
   resp->progress_color_b = rotary.progress_color_b;
+  resp->cw_mode = rotary.cw_binding.mode;
+  resp->cw_keycode = rotary.cw_binding.keycode;
+  resp->cw_modifier_mask_exact = rotary.cw_binding.modifier_mask_exact;
+  resp->cw_fallback_no_mod_keycode = rotary.cw_binding.fallback_no_mod_keycode;
+  resp->cw_layer_mode = rotary.cw_binding.layer_mode;
+  resp->cw_layer_index = rotary.cw_binding.layer_index;
+  resp->ccw_mode = rotary.ccw_binding.mode;
+  resp->ccw_keycode = rotary.ccw_binding.keycode;
+  resp->ccw_modifier_mask_exact = rotary.ccw_binding.modifier_mask_exact;
+  resp->ccw_fallback_no_mod_keycode =
+      rotary.ccw_binding.fallback_no_mod_keycode;
+  resp->ccw_layer_mode = rotary.ccw_binding.layer_mode;
+  resp->ccw_layer_index = rotary.ccw_binding.layer_index;
+  resp->click_mode = rotary.click_binding.mode;
+  resp->click_keycode = rotary.click_binding.keycode;
+  resp->click_modifier_mask_exact = rotary.click_binding.modifier_mask_exact;
+  resp->click_fallback_no_mod_keycode =
+      rotary.click_binding.fallback_no_mod_keycode;
+  resp->click_layer_mode = rotary.click_binding.layer_mode;
+  resp->click_layer_index = rotary.click_binding.layer_index;
 }
 
 static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
@@ -674,7 +801,16 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
       req->rgb_effect_mode == LED_EFFECT_THIRD_PARTY ||
       req->progress_style >= ROTARY_PROGRESS_STYLE_MAX ||
       req->progress_effect_mode >= LED_EFFECT_MAX ||
-      req->progress_effect_mode == LED_EFFECT_THIRD_PARTY;
+      req->progress_effect_mode == LED_EFFECT_THIRD_PARTY ||
+      req->cw_mode >= (uint8_t)ROTARY_BINDING_MODE_MAX ||
+      req->cw_layer_mode >= (uint8_t)ROTARY_BINDING_LAYER_MAX ||
+      req->cw_layer_index >= SETTINGS_LAYER_COUNT ||
+      req->ccw_mode >= (uint8_t)ROTARY_BINDING_MODE_MAX ||
+      req->ccw_layer_mode >= (uint8_t)ROTARY_BINDING_LAYER_MAX ||
+      req->ccw_layer_index >= SETTINGS_LAYER_COUNT ||
+      req->click_mode >= (uint8_t)ROTARY_BINDING_MODE_MAX ||
+      req->click_layer_mode >= (uint8_t)ROTARY_BINDING_LAYER_MAX ||
+      req->click_layer_index >= SETTINGS_LAYER_COUNT;
 
   resp->command_id = CMD_SET_ROTARY_ENCODER_SETTINGS;
   if (invalid) {
@@ -694,6 +830,26 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   rotary.progress_color_r = req->progress_color_r;
   rotary.progress_color_g = req->progress_color_g;
   rotary.progress_color_b = req->progress_color_b;
+    rotary.cw_binding.mode = req->cw_mode;
+    rotary.cw_binding.keycode = req->cw_keycode;
+    rotary.cw_binding.modifier_mask_exact = req->cw_modifier_mask_exact;
+    rotary.cw_binding.fallback_no_mod_keycode = req->cw_fallback_no_mod_keycode;
+    rotary.cw_binding.layer_mode = req->cw_layer_mode;
+    rotary.cw_binding.layer_index = req->cw_layer_index;
+    rotary.ccw_binding.mode = req->ccw_mode;
+    rotary.ccw_binding.keycode = req->ccw_keycode;
+    rotary.ccw_binding.modifier_mask_exact = req->ccw_modifier_mask_exact;
+    rotary.ccw_binding.fallback_no_mod_keycode =
+      req->ccw_fallback_no_mod_keycode;
+    rotary.ccw_binding.layer_mode = req->ccw_layer_mode;
+    rotary.ccw_binding.layer_index = req->ccw_layer_index;
+    rotary.click_binding.mode = req->click_mode;
+    rotary.click_binding.keycode = req->click_keycode;
+    rotary.click_binding.modifier_mask_exact = req->click_modifier_mask_exact;
+    rotary.click_binding.fallback_no_mod_keycode =
+      req->click_fallback_no_mod_keycode;
+    rotary.click_binding.layer_mode = req->click_layer_mode;
+    rotary.click_binding.layer_index = req->click_layer_index;
 
   if (!settings_set_rotary_encoder(&rotary)) {
     resp->status = HID_RESP_ERROR;
@@ -713,6 +869,209 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   resp->progress_color_r = rotary.progress_color_r;
   resp->progress_color_g = rotary.progress_color_g;
   resp->progress_color_b = rotary.progress_color_b;
+  resp->cw_mode = rotary.cw_binding.mode;
+  resp->cw_keycode = rotary.cw_binding.keycode;
+  resp->cw_modifier_mask_exact = rotary.cw_binding.modifier_mask_exact;
+  resp->cw_fallback_no_mod_keycode = rotary.cw_binding.fallback_no_mod_keycode;
+  resp->cw_layer_mode = rotary.cw_binding.layer_mode;
+  resp->cw_layer_index = rotary.cw_binding.layer_index;
+  resp->ccw_mode = rotary.ccw_binding.mode;
+  resp->ccw_keycode = rotary.ccw_binding.keycode;
+  resp->ccw_modifier_mask_exact = rotary.ccw_binding.modifier_mask_exact;
+  resp->ccw_fallback_no_mod_keycode =
+      rotary.ccw_binding.fallback_no_mod_keycode;
+  resp->ccw_layer_mode = rotary.ccw_binding.layer_mode;
+  resp->ccw_layer_index = rotary.ccw_binding.layer_index;
+  resp->click_mode = rotary.click_binding.mode;
+  resp->click_keycode = rotary.click_binding.keycode;
+  resp->click_modifier_mask_exact = rotary.click_binding.modifier_mask_exact;
+  resp->click_fallback_no_mod_keycode =
+      rotary.click_binding.fallback_no_mod_keycode;
+  resp->click_layer_mode = rotary.click_binding.layer_mode;
+  resp->click_layer_index = rotary.click_binding.layer_index;
+}
+
+static void cmd_get_rotary_state(const uint8_t *in, uint8_t *out) {
+  hid_packet_rotary_state_t *resp = (hid_packet_rotary_state_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_GET_ROTARY_STATE;
+  resp->status = HID_RESP_OK;
+  resp->button_pressed = rotary_encoder_is_button_pressed() ? 1u : 0u;
+  resp->last_direction = rotary_encoder_get_last_direction();
+  resp->step_counter = rotary_encoder_get_step_counter();
+}
+
+static void cmd_get_active_profile(const uint8_t *in, uint8_t *out) {
+  hid_packet_profile_index_t *resp = (hid_packet_profile_index_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_GET_ACTIVE_PROFILE;
+  resp->status = HID_RESP_OK;
+  resp->profile_index = settings_get_active_profile_index();
+  resp->profile_used_mask = settings_get_profile_used_mask();
+}
+
+static void cmd_set_active_profile(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_index_t *req =
+      (const hid_packet_profile_index_t *)in;
+  hid_packet_profile_index_t *resp = (hid_packet_profile_index_t *)out;
+
+  resp->command_id = CMD_SET_ACTIVE_PROFILE;
+  resp->profile_index = req->profile_index;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+
+  if (req->profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(req->profile_index)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  resp->status = settings_set_active_profile_index(req->profile_index)
+                     ? HID_RESP_OK
+                     : HID_RESP_ERROR;
+  resp->profile_index = settings_get_active_profile_index();
+  resp->profile_used_mask = settings_get_profile_used_mask();
+}
+
+static void cmd_get_profile_name(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_name_t *req = (const hid_packet_profile_name_t *)in;
+  hid_packet_profile_name_t *resp = (hid_packet_profile_name_t *)out;
+  const char *name = NULL;
+
+  resp->command_id = CMD_GET_PROFILE_NAME;
+  resp->profile_index = req->profile_index;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+  memset(resp->profile_name, 0, sizeof(resp->profile_name));
+
+  if (req->profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(req->profile_index)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  name = settings_get_profile_name(req->profile_index);
+  if (name == NULL) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  for (uint8_t i = 0u; i < SETTINGS_PROFILE_NAME_LENGTH; i++) {
+    char c = name[i];
+    resp->profile_name[i] = c;
+    if (c == '\0') {
+      break;
+    }
+  }
+
+  resp->status = HID_RESP_OK;
+}
+
+static void cmd_set_profile_name(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_name_t *req = (const hid_packet_profile_name_t *)in;
+  hid_packet_profile_name_t *resp = (hid_packet_profile_name_t *)out;
+  const char *name = NULL;
+
+  resp->command_id = CMD_SET_PROFILE_NAME;
+  resp->profile_index = req->profile_index;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+  memset(resp->profile_name, 0, sizeof(resp->profile_name));
+
+  if (req->profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(req->profile_index)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  if (!settings_set_profile_name(req->profile_index, req->profile_name,
+                                 SETTINGS_PROFILE_NAME_LENGTH)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  name = settings_get_profile_name(req->profile_index);
+  if (name == NULL) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  for (uint8_t i = 0u; i < SETTINGS_PROFILE_NAME_LENGTH; i++) {
+    char c = name[i];
+    resp->profile_name[i] = c;
+    if (c == '\0') {
+      break;
+    }
+  }
+
+  resp->status = HID_RESP_OK;
+}
+
+static void cmd_create_profile(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_name_t *req = (const hid_packet_profile_name_t *)in;
+  hid_packet_profile_name_t *resp = (hid_packet_profile_name_t *)out;
+  const char *name = NULL;
+  int8_t created_slot = -1;
+
+  resp->command_id = CMD_CREATE_PROFILE;
+  resp->profile_index = 0xFFu;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+  memset(resp->profile_name, 0, sizeof(resp->profile_name));
+
+  if (resp->profile_used_mask ==
+      (uint8_t)((1u << SETTINGS_PROFILE_COUNT) - 1u)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  created_slot =
+      settings_create_profile(req->profile_name, SETTINGS_PROFILE_NAME_LENGTH);
+  if (created_slot < 0) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  resp->status = HID_RESP_OK;
+  resp->profile_index = (uint8_t)created_slot;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+  name = settings_get_profile_name((uint8_t)created_slot);
+  if (name != NULL) {
+    for (uint8_t i = 0u; i < SETTINGS_PROFILE_NAME_LENGTH; i++) {
+      char c = name[i];
+      resp->profile_name[i] = c;
+      if (c == '\0') {
+        break;
+      }
+    }
+  }
+}
+
+static void cmd_delete_profile(const uint8_t *in, uint8_t *out) {
+  const hid_packet_profile_index_t *req =
+      (const hid_packet_profile_index_t *)in;
+  hid_packet_profile_index_t *resp = (hid_packet_profile_index_t *)out;
+
+  resp->command_id = CMD_DELETE_PROFILE;
+  resp->profile_index = req->profile_index;
+  resp->profile_used_mask = settings_get_profile_used_mask();
+
+  if (req->profile_index >= SETTINGS_PROFILE_COUNT) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  if (!settings_is_profile_slot_used(req->profile_index)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  if (!settings_delete_profile(req->profile_index)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  resp->status = HID_RESP_OK;
+  resp->profile_index = settings_get_active_profile_index();
+  resp->profile_used_mask = settings_get_profile_used_mask();
 }
 
 static void cmd_get_layer_keycode(const uint8_t *in, uint8_t *out) {
@@ -1122,30 +1481,6 @@ static void cmd_set_key_gamepad_map(const uint8_t *in, uint8_t *out) {
   resp->button = req->button;
 }
 
-static void cmd_get_gamepad_with_kb(const uint8_t *in, uint8_t *out) {
-  hid_packet_bool_t *resp = (hid_packet_bool_t *)out;
-  resp->command_id = CMD_GET_GAMEPAD_WITH_KB;
-  resp->status = HID_RESP_OK;
-  resp->value = settings_is_gamepad_with_keyboard() ? 1 : 0;
-}
-
-static void cmd_set_gamepad_with_kb(const uint8_t *in, uint8_t *out) {
-  const hid_packet_bool_t *req = (const hid_packet_bool_t *)in;
-  hid_packet_bool_t *resp = (hid_packet_bool_t *)out;
-
-  if (req->value != 0) {
-    if (!settings_is_gamepad_with_keyboard()) {
-      settings_set_gamepad_with_keyboard(true);
-    }
-  } else {
-    settings_set_gamepad_with_keyboard(false);
-  }
-
-  resp->command_id = CMD_SET_GAMEPAD_WITH_KB;
-  resp->status = HID_RESP_OK;
-  resp->value = settings_is_gamepad_with_keyboard() ? 1 : 0;
-}
-
 //--------------------------------------------------------------------+
 // Internal Functions - LED Matrix Commands
 //--------------------------------------------------------------------+
@@ -1294,21 +1629,6 @@ static void cmd_get_led_all(const uint8_t *in, uint8_t *out) {
   memcpy(resp->data, &pixels[offset], size);
 }
 
-static void cmd_get_led_effect_color(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *resp = (hid_packet_t *)out;
-  uint8_t r = 0u;
-  uint8_t g = 0u;
-  uint8_t b = 0u;
-  (void)in;
-
-  settings_get_led_effect_color(&r, &g, &b);
-  resp->command_id = CMD_GET_LED_EFFECT_COLOR;
-  resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = r;
-  resp->payload[1] = g;
-  resp->payload[2] = b;
-}
-
 static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
   const hid_packet_led_chunk_t *req = (const hid_packet_led_chunk_t *)in;
   hid_packet_led_chunk_t *resp = (hid_packet_led_chunk_t *)out;
@@ -1402,32 +1722,6 @@ static void cmd_set_led_effect(const uint8_t *in, uint8_t *out) {
   }
 }
 
-static void cmd_get_led_effect_speed(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *resp = (hid_packet_t *)out;
-  resp->command_id = CMD_GET_LED_EFFECT_SPEED;
-  resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = settings_get_led_effect_speed();
-}
-
-static void cmd_set_led_effect_speed(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *req = (hid_packet_t *)in;
-  hid_packet_t *resp = (hid_packet_t *)out;
-  resp->command_id = CMD_SET_LED_EFFECT_SPEED;
-
-  settings_set_led_effect_speed(req->payload[0]);
-  resp->status_or_len = HID_RESP_OK;
-}
-
-static void cmd_set_led_effect_color(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *req = (hid_packet_t *)in;
-  hid_packet_t *resp = (hid_packet_t *)out;
-  resp->command_id = CMD_SET_LED_EFFECT_COLOR;
-
-  settings_set_led_effect_color(req->payload[0], req->payload[1],
-                                req->payload[2]);
-  resp->status_or_len = HID_RESP_OK;
-}
-
 static void cmd_get_led_effect_params(const uint8_t *in, uint8_t *out) {
   const hid_packet_t *req = (const hid_packet_t *)in;
   hid_packet_t *resp = (hid_packet_t *)out;
@@ -1467,6 +1761,84 @@ static void cmd_set_led_effect_params(const uint8_t *in, uint8_t *out) {
   settings_get_led_effect_params(effect_mode, &resp->payload[2]);
 }
 
+/**
+ * CMD_GET_LED_EFFECT_SCHEMA (0x77)
+ *
+ * Request:
+ *   payload[0] = effect_id
+ *   payload[1] = chunk_index  (0-based)
+ *
+ * Response:
+ *   payload[0]   = effect_id
+ *   payload[1]   = chunk_index
+ *   payload[2]   = total_chunks
+ *   payload[3]   = total_active_params (type != NONE across all chunks)
+ *   payload[4..] = param descriptors for this chunk
+ *                  each entry: [id, type, min, max, default_val, step] (6 bytes)
+ *                  up to LED_SCHEMA_PARAMS_PER_CHUNK entries per chunk.
+ */
+static void cmd_get_led_effect_schema(const uint8_t *in, uint8_t *out) {
+  const hid_packet_t *req  = (const hid_packet_t *)in;
+  hid_packet_t       *resp = (hid_packet_t *)out;
+
+  uint8_t effect_id   = req->payload[0];
+  uint8_t chunk_index = req->payload[1];
+
+  resp->command_id = CMD_GET_LED_EFFECT_SCHEMA;
+
+  if (effect_id >= (uint8_t)LED_EFFECT_MAX) {
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  led_param_desc_t all_descs[LED_EFFECT_PARAM_COUNT];
+  uint8_t total_active =
+      led_matrix_get_effect_schema((led_effect_mode_t)effect_id, all_descs);
+
+  // Collect only the active (non-NONE) descriptors in order.
+  led_param_desc_t active[LED_EFFECT_PARAM_COUNT];
+  uint8_t active_count = 0u;
+  for (uint8_t i = 0u; i < LED_EFFECT_PARAM_COUNT; i++) {
+    if (all_descs[i].type != LED_PARAM_TYPE_NONE) {
+      active[active_count++] = all_descs[i];
+    }
+  }
+
+  uint8_t total_chunks = (active_count == 0u)
+      ? 1u
+      : (uint8_t)((active_count + LED_SCHEMA_PARAMS_PER_CHUNK - 1u) /
+                  LED_SCHEMA_PARAMS_PER_CHUNK);
+
+  if (chunk_index >= total_chunks) {
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  uint8_t chunk_start = chunk_index * LED_SCHEMA_PARAMS_PER_CHUNK;
+  uint8_t chunk_count = active_count - chunk_start;
+  if (chunk_count > LED_SCHEMA_PARAMS_PER_CHUNK) {
+    chunk_count = LED_SCHEMA_PARAMS_PER_CHUNK;
+  }
+
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = effect_id;
+  resp->payload[1] = chunk_index;
+  resp->payload[2] = total_chunks;
+  resp->payload[3] = total_active;
+
+  // Serialise chunk entries starting at payload[4].
+  uint8_t *dst = &resp->payload[4];
+  for (uint8_t i = 0u; i < chunk_count; i++) {
+    const led_param_desc_t *d = &active[chunk_start + i];
+    *dst++ = d->id;
+    *dst++ = d->type;
+    *dst++ = d->min;
+    *dst++ = d->max;
+    *dst++ = d->default_val;
+    *dst++ = d->step;
+  }
+}
+
 static void cmd_get_led_fps_limit(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id = CMD_GET_LED_FPS_LIMIT;
@@ -1482,23 +1854,6 @@ static void cmd_set_led_fps_limit(const uint8_t *in, uint8_t *out) {
   settings_set_led_fps_limit(req->payload[0]);
   resp->status_or_len = HID_RESP_OK;
   resp->payload[0] = settings_get_led_fps_limit();
-}
-
-static void cmd_get_led_diagnostic(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *resp = (hid_packet_t *)out;
-  resp->command_id = CMD_GET_LED_DIAGNOSTIC;
-  resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = led_matrix_get_diagnostic_mode();
-}
-
-static void cmd_set_led_diagnostic(const uint8_t *in, uint8_t *out) {
-  hid_packet_t *req = (hid_packet_t *)in;
-  hid_packet_t *resp = (hid_packet_t *)out;
-  resp->command_id = CMD_SET_LED_DIAGNOSTIC;
-
-  led_matrix_set_diagnostic_mode(req->payload[0]);
-  resp->status_or_len = HID_RESP_OK;
-  resp->payload[0] = led_matrix_get_diagnostic_mode();
 }
 
 static void cmd_set_led_volume_overlay(const uint8_t *in, uint8_t *out) {
@@ -1531,6 +1886,38 @@ static void cmd_restore_led_effect_before_third_party(const uint8_t *in,
                             ? HID_RESP_OK
                             : HID_RESP_ERROR;
   resp->payload[0] = settings_get_led_effect_mode();
+}
+
+static void cmd_set_led_audio_spectrum(const uint8_t *in, uint8_t *out) {
+  const hid_packet_t *req = (const hid_packet_t *)in;
+  hid_packet_t *resp = (hid_packet_t *)out;
+  uint8_t band_count = req->payload[0];
+  uint8_t impact_level = 0u;
+  uint8_t bands[LED_AUDIO_SPECTRUM_BAND_COUNT] = {0};
+
+  resp->command_id = CMD_SET_LED_AUDIO_SPECTRUM;
+  if (band_count == 0u || band_count > LED_AUDIO_SPECTRUM_BAND_COUNT) {
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  memcpy(bands, &req->payload[1], band_count);
+  impact_level = req->payload[1u + band_count];
+  led_matrix_set_audio_spectrum(bands, band_count, impact_level);
+
+  resp->status_or_len = HID_RESP_OK;
+  resp->payload[0] = band_count;
+  memcpy(&resp->payload[1], bands, band_count);
+  resp->payload[1u + band_count] = impact_level;
+}
+
+static void cmd_clear_led_audio_spectrum(const uint8_t *in, uint8_t *out) {
+  hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_CLEAR_LED_AUDIO_SPECTRUM;
+  led_matrix_clear_audio_spectrum();
+  resp->status_or_len = HID_RESP_OK;
 }
 
 //--------------------------------------------------------------------+
@@ -1966,6 +2353,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_set_keyboard_name(in_packet, out_packet);
     break;
 
+  case CMD_COPY_PROFILE_SLOT:
+    cmd_copy_profile_slot(in_packet, out_packet);
+    break;
+
+  case CMD_RESET_PROFILE_SLOT:
+    cmd_reset_profile_slot(in_packet, out_packet);
+    break;
+
   // Key settings commands
   case CMD_GET_KEY_SETTINGS:
     cmd_get_key_settings(in_packet, out_packet);
@@ -2019,14 +2414,6 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_set_key_gamepad_map(in_packet, out_packet);
     break;
 
-  case CMD_GET_GAMEPAD_WITH_KB:
-    cmd_get_gamepad_with_kb(in_packet, out_packet);
-    break;
-
-  case CMD_SET_GAMEPAD_WITH_KB:
-    cmd_set_gamepad_with_kb(in_packet, out_packet);
-    break;
-
   case CMD_GET_CALIBRATION_MAX:
     cmd_get_calibration_max(in_packet, out_packet);
     break;
@@ -2065,6 +2452,34 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_RESET_KEY_TRIGGER_SETTINGS:
     cmd_reset_key_trigger_settings(in_packet, out_packet);
+    break;
+
+  case CMD_GET_ROTARY_STATE:
+    cmd_get_rotary_state(in_packet, out_packet);
+    break;
+
+  case CMD_GET_ACTIVE_PROFILE:
+    cmd_get_active_profile(in_packet, out_packet);
+    break;
+
+  case CMD_SET_ACTIVE_PROFILE:
+    cmd_set_active_profile(in_packet, out_packet);
+    break;
+
+  case CMD_GET_PROFILE_NAME:
+    cmd_get_profile_name(in_packet, out_packet);
+    break;
+
+  case CMD_SET_PROFILE_NAME:
+    cmd_set_profile_name(in_packet, out_packet);
+    break;
+
+  case CMD_CREATE_PROFILE:
+    cmd_create_profile(in_packet, out_packet);
+    break;
+
+  case CMD_DELETE_PROFILE:
+    cmd_delete_profile(in_packet, out_packet);
     break;
 
   // LED Matrix commands
@@ -2128,32 +2543,12 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_set_led_effect(in_packet, out_packet);
     break;
 
-  case CMD_GET_LED_EFFECT_SPEED:
-    cmd_get_led_effect_speed(in_packet, out_packet);
-    break;
-
-  case CMD_SET_LED_EFFECT_SPEED:
-    cmd_set_led_effect_speed(in_packet, out_packet);
-    break;
-
-  case CMD_SET_LED_EFFECT_COLOR:
-    cmd_set_led_effect_color(in_packet, out_packet);
-    break;
-
   case CMD_GET_LED_FPS_LIMIT:
     cmd_get_led_fps_limit(in_packet, out_packet);
     break;
 
   case CMD_SET_LED_FPS_LIMIT:
     cmd_set_led_fps_limit(in_packet, out_packet);
-    break;
-
-  case CMD_GET_LED_DIAGNOSTIC:
-    cmd_get_led_diagnostic(in_packet, out_packet);
-    break;
-
-  case CMD_SET_LED_DIAGNOSTIC:
-    cmd_set_led_diagnostic(in_packet, out_packet);
     break;
 
   case CMD_GET_LED_EFFECT_PARAMS:
@@ -2176,8 +2571,16 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_restore_led_effect_before_third_party(in_packet, out_packet);
     break;
 
-  case CMD_GET_LED_EFFECT_COLOR:
-    cmd_get_led_effect_color(in_packet, out_packet);
+  case CMD_GET_LED_EFFECT_SCHEMA:
+    cmd_get_led_effect_schema(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_AUDIO_SPECTRUM:
+    cmd_set_led_audio_spectrum(in_packet, out_packet);
+    break;
+
+  case CMD_CLEAR_LED_AUDIO_SPECTRUM:
+    cmd_clear_led_audio_spectrum(in_packet, out_packet);
     break;
 
   // Filter commands

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QScrollArea,
     QFrame,
     QSlider,
@@ -22,6 +23,7 @@ from kbhe_tool.protocol import (
     KEY_BEHAVIORS,
     KEY_COUNT,
     LAYER_NAMES,
+    SETTINGS_PROFILE_COUNT,
     SOCD_RESOLUTIONS,
 )
 from kbhe_tool.key_layout import key_display_name
@@ -100,6 +102,8 @@ class KeyboardPage(QWidget):
         self._apply_timer.setInterval(120)
         self._apply_timer.timeout.connect(self._apply_now)
         self._controls: list[QWidget] = []
+        self._profile_names_cache: list[str | None] = [None] * SETTINGS_PROFILE_COUNT
+        self._profile_state: dict = {"active_profile": 0, "used_mask": 0x01, "used_slots": [0]}
 
         self._build_ui()
         self._connect_session()
@@ -208,6 +212,52 @@ class KeyboardPage(QWidget):
         )
         parent.addWidget(card)
         bl = card.body_layout
+
+        profile_row = QHBoxLayout()
+        profile_row.setSpacing(10)
+        profile_lbl = QLabel("Profile")
+        profile_lbl.setObjectName("Muted")
+        profile_lbl.setFixedWidth(165)
+        profile_row.addWidget(profile_lbl)
+        self.profile_combo = QComboBox()
+        self.profile_combo.currentIndexChanged.connect(self._on_profile_slot_changed)
+        self._controls.append(self.profile_combo)
+        profile_row.addWidget(self.profile_combo, 1)
+        self.profile_set_btn = make_secondary_button("Set Active", self._on_set_active_profile)
+        self._controls.append(self.profile_set_btn)
+        profile_row.addWidget(self.profile_set_btn)
+        bl.addLayout(profile_row)
+
+        profile_name_row = QHBoxLayout()
+        profile_name_row.setSpacing(10)
+        profile_name_lbl = QLabel("Profile name")
+        profile_name_lbl.setObjectName("Muted")
+        profile_name_lbl.setFixedWidth(165)
+        profile_name_row.addWidget(profile_name_lbl)
+        self.profile_name_edit = QLineEdit()
+        self.profile_name_edit.setMaxLength(16)
+        self.profile_name_edit.setPlaceholderText("Name")
+        self._controls.append(self.profile_name_edit)
+        profile_name_row.addWidget(self.profile_name_edit, 1)
+        self.profile_rename_btn = make_secondary_button("Rename", self._on_rename_profile)
+        self._controls.append(self.profile_rename_btn)
+        profile_name_row.addWidget(self.profile_rename_btn)
+        bl.addLayout(profile_name_row)
+
+        profile_actions_row = QHBoxLayout()
+        profile_actions_row.setSpacing(8)
+        self.profile_create_btn = make_secondary_button("Create", self._on_create_profile)
+        self.profile_delete_btn = make_secondary_button("Delete", self._on_delete_profile)
+        self._controls += [self.profile_create_btn, self.profile_delete_btn]
+        profile_actions_row.addWidget(self.profile_create_btn)
+        profile_actions_row.addWidget(self.profile_delete_btn)
+        profile_actions_row.addStretch(1)
+        bl.addLayout(profile_actions_row)
+
+        self.profile_hint = QLabel()
+        self.profile_hint.setObjectName("Muted")
+        self.profile_hint.setWordWrap(True)
+        bl.addWidget(self.profile_hint)
 
         layer_row = QHBoxLayout()
         layer_row.setSpacing(10)
@@ -553,6 +603,171 @@ class KeyboardPage(QWidget):
             return
         self.load_selected_key_settings()
 
+    def _on_profile_slot_changed(self, *_) -> None:
+        slot = self._selected_profile_slot()
+        if slot is None:
+            with QSignalBlocker(self.profile_name_edit):
+                self.profile_name_edit.setText("")
+            self._update_profile_buttons_enabled()
+            return
+
+        profile_name = self._profile_names_cache[slot] or ""
+        with QSignalBlocker(self.profile_name_edit):
+            self.profile_name_edit.setText(profile_name)
+        self._update_profile_buttons_enabled()
+
+    def _selected_profile_slot(self) -> int | None:
+        if not hasattr(self, "profile_combo") or self.profile_combo.currentIndex() < 0:
+            return None
+        slot = self.profile_combo.currentData()
+        try:
+            slot = int(slot)
+        except Exception:
+            return None
+        if slot < 0 or slot >= SETTINGS_PROFILE_COUNT:
+            return None
+        return slot
+
+    def _update_profile_buttons_enabled(self) -> None:
+        has_device = self._device() is not None
+        slot = self._selected_profile_slot()
+        used_slots = list(self._profile_state.get("used_slots", []))
+        used_count = len(used_slots)
+
+        if hasattr(self, "profile_set_btn"):
+            self.profile_set_btn.setEnabled(has_device and slot is not None)
+        if hasattr(self, "profile_rename_btn"):
+            self.profile_rename_btn.setEnabled(has_device and slot is not None)
+        if hasattr(self, "profile_create_btn"):
+            self.profile_create_btn.setEnabled(has_device and used_count < SETTINGS_PROFILE_COUNT)
+        if hasattr(self, "profile_delete_btn"):
+            self.profile_delete_btn.setEnabled(has_device and slot is not None and used_count > 1)
+
+    def _refresh_profile_controls(self, preferred_slot: int | None = None) -> None:
+        device = self._device()
+        if not device:
+            self._profile_names_cache = [None] * SETTINGS_PROFILE_COUNT
+            self._profile_state = {"active_profile": 0, "used_mask": 0x01, "used_slots": [0]}
+            with QSignalBlocker(self.profile_combo):
+                self.profile_combo.clear()
+            with QSignalBlocker(self.profile_name_edit):
+                self.profile_name_edit.setText("")
+            self.profile_hint.setText("No device connected.")
+            self._update_profile_buttons_enabled()
+            return
+
+        state = device.get_profile_state()
+        names = device.get_profile_names()
+        if not state or names is None:
+            self.profile_hint.setText("Profile metadata unavailable on device.")
+            self._update_profile_buttons_enabled()
+            return
+
+        active = int(state.get("active_profile", 0))
+        used_mask = int(state.get("used_mask", 0)) & ((1 << SETTINGS_PROFILE_COUNT) - 1)
+        used_slots = [i for i in range(SETTINGS_PROFILE_COUNT) if used_mask & (1 << i)]
+        if not used_slots:
+            used_slots = [0]
+
+        self._profile_state = {
+            "active_profile": active,
+            "used_mask": used_mask,
+            "used_slots": used_slots,
+        }
+        self._profile_names_cache = [
+            (str(name) if name is not None else None) for name in names
+        ]
+
+        with QSignalBlocker(self.profile_combo):
+            self.profile_combo.clear()
+            for slot in used_slots:
+                label = self._profile_names_cache[slot] or f"Profile {slot + 1}"
+                self.profile_combo.addItem(f"{slot + 1}: {label}", slot)
+
+            target_slot = preferred_slot if preferred_slot in used_slots else active
+            if target_slot not in used_slots:
+                target_slot = used_slots[0]
+            self.profile_combo.setCurrentIndex(max(0, self.profile_combo.findData(target_slot)))
+
+        self._on_profile_slot_changed()
+        self.profile_hint.setText(
+            f"{len(used_slots)}/{SETTINGS_PROFILE_COUNT} profile slots used on MCU."
+        )
+
+    def _on_set_active_profile(self) -> None:
+        device = self._device()
+        slot = self._selected_profile_slot()
+        if not device or slot is None:
+            self._set_status("No profile selected.", "warn")
+            return
+
+        try:
+            if not device.set_active_profile(slot):
+                self._set_status("Failed to set active profile.", "bad")
+                return
+            self._refresh_profile_controls(preferred_slot=slot)
+            self.load_selected_key_settings()
+            self._set_status(f"Active profile set to slot {slot + 1}.", "ok")
+        except Exception as exc:
+            self._set_status(f"Set active profile error: {exc}", "bad")
+
+    def _on_rename_profile(self) -> None:
+        device = self._device()
+        slot = self._selected_profile_slot()
+        if not device or slot is None:
+            self._set_status("No profile selected.", "warn")
+            return
+
+        name = self.profile_name_edit.text().strip()
+        if not name:
+            name = f"Profile {slot + 1}"
+
+        try:
+            if not device.set_profile_name(slot, name):
+                self._set_status("Profile rename failed.", "bad")
+                return
+            self._refresh_profile_controls(preferred_slot=slot)
+            self._set_status(f"Renamed profile slot {slot + 1}.", "ok")
+        except Exception as exc:
+            self._set_status(f"Rename profile error: {exc}", "bad")
+
+    def _on_create_profile(self) -> None:
+        device = self._device()
+        if not device:
+            self._set_status("No device connected.", "warn")
+            return
+
+        name = self.profile_name_edit.text().strip()
+        try:
+            created = device.create_profile(name)
+            if not created:
+                self._set_status("Unable to create profile (slots may be full).", "warn")
+                return
+            slot = int(created.get("profile_index", 0))
+            self._refresh_profile_controls(preferred_slot=slot)
+            self._set_status(f"Created profile slot {slot + 1}.", "ok")
+        except Exception as exc:
+            self._set_status(f"Create profile error: {exc}", "bad")
+
+    def _on_delete_profile(self) -> None:
+        device = self._device()
+        slot = self._selected_profile_slot()
+        if not device or slot is None:
+            self._set_status("No profile selected.", "warn")
+            return
+
+        try:
+            deleted = device.delete_profile(slot)
+            if not deleted:
+                self._set_status("Unable to delete profile (last slot cannot be removed).", "warn")
+                return
+            active = int(deleted.get("active_profile", 0))
+            self._refresh_profile_controls(preferred_slot=active)
+            self.load_selected_key_settings()
+            self._set_status(f"Deleted profile slot {slot + 1}.", "ok")
+        except Exception as exc:
+            self._set_status(f"Delete profile error: {exc}", "bad")
+
     def _update_behavior_visibility(self) -> None:
         behavior = (
             int(self.behavior_combo.currentData())
@@ -566,7 +781,7 @@ class KeyboardPage(QWidget):
         )
         self.tap_hold_body.setVisible(behavior == KEY_BEHAVIORS["Tap-Hold"])
         self.toggle_body.setVisible(behavior == KEY_BEHAVIORS["Toggle"])
-        self.dynamic_body.setVisible(behavior == KEY_BEHAVIORS["Dynamic Mapping"])
+        self.dynamic_body.setVisible(behavior == KEY_BEHAVIORS["Dynamic Keystroke"])
         for index, (widget, _slider, _combo) in enumerate(getattr(self, "dynamic_zone_rows", []), start=1):
             widget.setVisible(index <= zone_count)
 
@@ -613,22 +828,16 @@ class KeyboardPage(QWidget):
             self.dynamic_zone_count_combo,
         ]
         for widget in base_controls:
-            widget.setEnabled(enabled)
+            widget.setEnabled(True)
         for _widget, slider, combo in self.dynamic_zone_rows:
-            slider.slider.setEnabled(enabled)
+            slider.slider.setEnabled(True)
             combo.setEnabled(enabled)
 
     def _update_layer_ui(self) -> None:
-        base_layer = self._current_layer() == 0
-        self._set_base_only_enabled(base_layer)
-        if base_layer:
-            self.layer_mode_hint.setText(
-                "Base layer stores the analog trigger, rapid trigger, SOCD, and advanced behavior settings."
-            )
-        else:
-            self.layer_mode_hint.setText(
-                "Overlay layers only replace the outgoing action. Use TRANSPARENT to fall through to a lower layer."
-            )
+        self._set_base_only_enabled(True)
+        self.layer_mode_hint.setText(
+            "All key settings are now profile+layer dependent. Use TRANSPARENT to fall through to a lower layer keycode."
+        )
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         for w in self._controls:
@@ -787,14 +996,9 @@ class KeyboardPage(QWidget):
         rt_press = _safe_float(settings.get("rapid_trigger_press", 0.0))
         behavior_mode = int(settings.get("behavior_mode", KEY_BEHAVIORS["Normal"]))
         self.summary_keycode_chip.set_text_and_level(key_name, "info")
-        if current_layer == 0:
-            self.summary_actuation_chip.set_text_and_level(
-                f"{layer_label} • {actuation:.2f} mm", "neutral"
-            )
-        else:
-            self.summary_actuation_chip.set_text_and_level(layer_label, "neutral")
-            self.summary_rt_chip.set_text_and_level("Overlay only", "info")
-            return
+        self.summary_actuation_chip.set_text_and_level(
+            f"{layer_label} • {actuation:.2f} mm", "neutral"
+        )
         if rt_enabled:
             suffix = " C" if bool(settings.get("continuous_rapid_trigger", False)) else ""
             self.summary_rt_chip.set_text_and_level(f"RT {rt_press:.2f} mm{suffix}", "ok")
@@ -802,7 +1006,7 @@ class KeyboardPage(QWidget):
             self.summary_rt_chip.set_text_and_level("Tap-Hold", "info")
         elif behavior_mode == KEY_BEHAVIORS["Toggle"]:
             self.summary_rt_chip.set_text_and_level("Toggle", "info")
-        elif behavior_mode == KEY_BEHAVIORS["Dynamic Mapping"]:
+        elif behavior_mode == KEY_BEHAVIORS["Dynamic Keystroke"]:
             self.summary_rt_chip.set_text_and_level("Dynamic", "info")
         else:
             self.summary_rt_chip.set_text_and_level("RT Off", "neutral")
@@ -819,37 +1023,33 @@ class KeyboardPage(QWidget):
             self._set_status("No device connected.", "warn")
             return
         self._set_controls_enabled(True)
+        self._refresh_profile_controls()
         self.load_selected_key_settings(idx)
 
     def load_selected_key_settings(self, key_idx: int | None = None) -> None:
         idx = _clamp(int(key_idx if key_idx is not None else self._selected_key()), 0, KEY_COUNT - 1)
         layer = self._current_layer()
+        profile = self._selected_profile_slot()
+        if profile is None:
+            profile = 0
         self._set_key_badge(idx)
         device = self._device()
         if not device:
             self._set_status("No device connected.", "warn")
             return
         try:
-            settings = device.get_key_settings(idx)
+            settings = device.get_key_settings(
+                idx, profile_index=profile, layer_index=layer
+            )
             if not settings:
                 self._set_status(f"No settings returned for {key_display_name(idx)}.", "warn")
                 return
-            if layer != 0:
-                layer_entry = device.get_layer_keycode(layer, idx)
-                if not layer_entry:
-                    self._set_status(
-                        f"No layer keycode returned for {key_display_name(idx)} on {LAYER_NAMES.get(layer, layer)}.",
-                        "warn",
-                    )
-                    return
-                settings = dict(settings)
-                settings["hid_keycode"] = int(layer_entry.get("hid_keycode", HID_KEYCODES["TRANSPARENT"]))
             tick_rate = device.get_advanced_tick_rate()
             self._sync_from_settings(settings)
             if tick_rate is not None:
                 self.tick_rate_row.set_value(float(tick_rate))
             self._set_status(
-                f"Loaded {key_display_name(idx)} on {LAYER_NAMES.get(layer, f'Layer {layer}')}.",
+                f"Loaded {key_display_name(idx)} on profile {profile + 1}, {LAYER_NAMES.get(layer, f'Layer {layer}')}.",
                 "ok",
             )
         except Exception as exc:
@@ -868,35 +1068,34 @@ class KeyboardPage(QWidget):
             return
         idx = self._selected_key()
         layer = self._current_layer()
+        profile = self._selected_profile_slot()
+        if profile is None:
+            profile = 0
         try:
-            if layer == 0:
-                ok = device.set_key_settings_extended(idx, self._build_payload())
-                tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
-                if ok and tick_ok:
-                    self._set_status(f"Updated {key_display_name(idx)} live.", "ok")
-                elif ok:
-                    self._set_status(
-                        f"Updated {key_display_name(idx)} live, but tick rate update failed.",
-                        "warn",
-                    )
-                else:
-                    self._set_status(f"Live update failed for {key_display_name(idx)}.", "bad")
-            else:
-                ok = device.set_layer_keycode(
-                    layer,
-                    idx,
-                    HID_KEYCODES.get(self.keycode_combo.currentText(), HID_KEYCODES["TRANSPARENT"]),
+            ok = device.set_key_settings_extended(
+                idx,
+                self._build_payload(),
+                profile_index=profile,
+                layer_index=layer,
+            )
+            tick_ok = True
+            if int(self._profile_state.get("active_profile", 0)) == profile:
+                tick_ok = device.set_advanced_tick_rate(
+                    int(round(self.tick_rate_row.get_value()))
                 )
-                if ok:
-                    self._set_status(
-                        f"Updated {LAYER_NAMES.get(layer, f'Layer {layer}')} for {key_display_name(idx)} live.",
-                        "ok",
-                    )
-                else:
-                    self._set_status(
-                        f"Layer live update failed for {key_display_name(idx)}.",
-                        "bad",
-                    )
+
+            if ok and tick_ok:
+                self._set_status(
+                    f"Updated {key_display_name(idx)} on profile {profile + 1}, layer {layer}.",
+                    "ok",
+                )
+            elif ok:
+                self._set_status(
+                    f"Updated {key_display_name(idx)} but tick rate update failed (active profile only).",
+                    "warn",
+                )
+            else:
+                self._set_status(f"Live update failed for {key_display_name(idx)}.", "bad")
         except Exception as exc:
             self._set_status(f"Live update error: {exc}", "bad")
 
@@ -909,36 +1108,38 @@ class KeyboardPage(QWidget):
             self._set_status("No device connected.", "warn")
             return
         layer = self._current_layer()
+        profile = self._selected_profile_slot()
+        if profile is None:
+            profile = 0
         try:
-            if layer == 0:
-                payload = self._build_payload()
-                failures = [
-                    i + 1 for i in range(KEY_COUNT)
-                    if not device.set_key_settings_extended(i, payload)
-                ]
-                tick_ok = device.set_advanced_tick_rate(int(round(self.tick_rate_row.get_value())))
-                if failures:
-                    self._set_status(f"Applied with failures on Key(s) {failures}.", "warn")
-                elif not tick_ok:
-                    self._set_status("Applied key settings, but tick rate update failed.", "warn")
-                else:
-                    self._set_status(f"Applied to all {KEY_COUNT} keys live.", "ok")
+            payload = self._build_payload()
+            failures = [
+                i + 1 for i in range(KEY_COUNT)
+                if not device.set_key_settings_extended(
+                    i,
+                    payload,
+                    profile_index=profile,
+                    layer_index=layer,
+                )
+            ]
+            tick_ok = True
+            if int(self._profile_state.get("active_profile", 0)) == profile:
+                tick_ok = device.set_advanced_tick_rate(
+                    int(round(self.tick_rate_row.get_value()))
+                )
+
+            if failures:
+                self._set_status(f"Applied with failures on Key(s) {failures}.", "warn")
+            elif not tick_ok:
+                self._set_status(
+                    "Applied key settings, but tick rate update failed (active profile only).",
+                    "warn",
+                )
             else:
-                keycode = HID_KEYCODES.get(self.keycode_combo.currentText(), HID_KEYCODES["TRANSPARENT"])
-                failures = [
-                    i + 1 for i in range(KEY_COUNT)
-                    if not device.set_layer_keycode(layer, i, keycode)
-                ]
-                if failures:
-                    self._set_status(
-                        f"Applied {LAYER_NAMES.get(layer, f'Layer {layer}')} with failures on Key(s) {failures}.",
-                        "warn",
-                    )
-                else:
-                    self._set_status(
-                        f"Applied {LAYER_NAMES.get(layer, f'Layer {layer}')} to all {KEY_COUNT} keys live.",
-                        "ok",
-                    )
+                self._set_status(
+                    f"Applied to profile {profile + 1}, layer {layer} across all {KEY_COUNT} keys.",
+                    "ok",
+                )
         except Exception as exc:
             self._set_status(f"Apply-all error: {exc}", "bad")
 

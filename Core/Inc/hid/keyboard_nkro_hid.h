@@ -58,6 +58,11 @@ void keyboard_nkro_hid_key_release(uint8_t keycode);
 bool keyboard_nkro_hid_send_report_if_changed(void);
 
 /**
+ * @brief Get current NKRO modifier byte state.
+ */
+uint8_t keyboard_nkro_hid_get_modifier_state(void);
+
+/**
  * @brief Returns true when NKRO should be used for key routing
  *
  * In Auto mode, this becomes true once NKRO is ready after USB enumeration.

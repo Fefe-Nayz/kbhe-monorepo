@@ -4,3 +4,5 @@ mx.scratch
 /libhmk-main
 /hmkconf-main
 __pycache__/
+qmk_led_effects/
+*.old

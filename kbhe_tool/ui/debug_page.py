@@ -5,7 +5,6 @@ from typing import Any, Optional
 
 from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import (
-    QButtonGroup,
     QCheckBox,
     QFrame,
     QGridLayout,
@@ -13,7 +12,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QPushButton,
-    QRadioButton,
     QScrollArea,
     QSpinBox,
     QProgressBar,
@@ -36,7 +34,6 @@ class DebugPage(QWidget):
         self._last_sensor_error: Optional[str] = None
         self._gui_tick_started = time.monotonic()
         self._gui_tick_count = 0
-        self._diag_group: QButtonGroup | None = None
 
         self.setObjectName("DebugPage")
         self._build_ui()
@@ -88,7 +85,7 @@ class DebugPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        header = self._card("Diagnostics", "Live sensor monitoring, filter tuning, and diagnostic controls.")
+        header = self._card("Diagnostics", "Live sensor monitoring and filter tuning.")
         hl = header.layout()
         self.connection_label = QLabel("No device connected")
         self.status_label = QLabel("Ready.")
@@ -271,31 +268,6 @@ class DebugPage(QWidget):
         fl.addLayout(filter_actions)
         layout.addWidget(filter_box)
 
-        diag = self._card("LED Diagnostic Mode", "Use these modes to isolate DMA, CPU, and pin-coupling behavior.")
-        dl = diag.layout()
-        self._diag_group = QButtonGroup(self)
-        grid = QGridLayout()
-        for idx, (mode, title, detail) in enumerate([
-            (0, "Normal operation", "Standard keyboard and LED behavior."),
-            (1, "DMA stress", "Send LED data without CPU computation."),
-            (2, "CPU stress", "Compute effects without LED updates."),
-            (3, "DMA + CPU", "Compute and send data with the LED pin disabled."),
-        ]):
-            box = self._subcard()
-            box_l = QVBoxLayout(box)
-            box_l.setContentsMargins(10, 10, 10, 10)
-            box_l.setSpacing(4)
-            radio = QRadioButton(title)
-            radio.toggled.connect(lambda checked, m=mode: checked and self.on_diagnostic_mode_change(m))
-            self._diag_group.addButton(radio, mode)
-            detail_label = QLabel(detail)
-            detail_label.setProperty("muted", True)
-            detail_label.setWordWrap(True)
-            box_l.addWidget(radio)
-            box_l.addWidget(detail_label)
-            grid.addWidget(box, idx // 2, idx % 2)
-        dl.addLayout(grid)
-        layout.addWidget(diag)
         layout.addStretch(1)
 
     def _apply_style(self):
@@ -396,9 +368,6 @@ class DebugPage(QWidget):
             self.config_text,
         ]:
             widget.setEnabled(has_device)
-        if self._diag_group is not None:
-            for btn in self._diag_group.buttons():
-                btn.setEnabled(has_device)
         self._refresh_connection_state()
 
     def _refresh_live_state(self):
@@ -624,20 +593,6 @@ class DebugPage(QWidget):
             self._set_status("Filter reset to defaults.", "ok")
         else:
             self._set_status("Filter defaults were sent, but the device reported a failure.", "warn")
-
-    def on_diagnostic_mode_change(self, mode: int | None = None):
-        if self.device is None:
-            self._set_status("Connect a device before changing diagnostic mode.", "warn")
-            return
-        if mode is None and self._diag_group is not None:
-            mode = self._diag_group.checkedId()
-        if mode is None or mode < 0:
-            return
-        names = {0: "Normal", 1: "DMA Stress", 2: "CPU Stress", 3: "DMA + CPU"}
-        if self._device_call("set_led_diagnostic", False, mode):
-            self._set_status(f"Diagnostic mode: {names.get(mode, 'Unknown')}", "ok")
-        else:
-            self._set_status("Failed to set diagnostic mode.", "error")
 
     def refresh_config_display(self):
         if self.device is None:

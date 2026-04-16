@@ -172,6 +172,10 @@ bool keyboard_nkro_hid_send_report_if_changed(void) {
   return false;
 }
 
+uint8_t keyboard_nkro_hid_get_modifier_state(void) {
+  return nkro_report.modifier;
+}
+
 bool keyboard_nkro_hid_can_route_keycodes(void) {
   keyboard_nkro_hid_update_runtime_state();
   return runtime_state == NKRO_RUNTIME_ACTIVE;

@@ -24,7 +24,9 @@ typedef struct {
     key_behavior_mode_t behavior_mode;
     uint16_t hold_threshold_ms;
     uint16_t secondary_keycode;
-    uint8_t dynamic_zone_count;
+    bool tap_hold_hold_on_other_key_press;
+    bool tap_hold_uppercase_hold;
+    uint8_t dynamic_bottom_out_point_tenths;
     settings_dynamic_zone_t dynamic_zones[SETTINGS_DYNAMIC_ZONE_COUNT];
 } key_trigger_settings_t;
 
@@ -39,8 +41,10 @@ typedef struct {
     uint32_t press_start_ms;
     uint16_t active_keycode;
     uint16_t pending_release_keycode;
-    uint8_t active_dynamic_zone;
+    bool dks_is_bottomed_out;
+    bool dks_binding_pressed[SETTINGS_DYNAMIC_ZONE_COUNT];
     bool tap_hold_secondary_active;
+    bool tap_hold_uppercase_active;
     bool tap_hold_pending;
     bool toggle_latched;
     bool toggle_hold_active;

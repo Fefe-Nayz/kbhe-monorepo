@@ -600,28 +600,22 @@ class GamepadPageMixin:
                 self.gamepad_curve_var.set(settings.get("curve_type", 0))
                 self.gamepad_square_var.set(bool(settings.get("square_mode", False)))
                 self.gamepad_snappy_var.set(bool(settings.get("snappy_mode", False)))
+                routing = int(settings.get("keyboard_routing", 1))
+                gp_kb = routing != 0
+                self.gamepad_kb_always_var.set(gp_kb)
                 global_message = "Global settings loaded from device."
+                device_message = f"Keyboard mirroring is {'on' if gp_kb else 'off'}."
             else:
                 global_message = "Device returned no global gamepad settings."
+                device_message = "Keyboard mirroring state is unavailable."
                 if status_message is None:
                     status_message = global_message
         except Exception as exc:
             global_message = f"Global settings load failed: {exc}"
+            device_message = f"Keyboard mirroring load failed: {exc}"
             status_message = global_message
         finally:
             self._gamepad_loading_gamepad_settings = False
-
-        try:
-            gp_kb = self.device.get_gamepad_with_keyboard()
-            if gp_kb is not None:
-                self.gamepad_kb_always_var.set(bool(gp_kb))
-                device_message = f"Keyboard mirroring is {'on' if gp_kb else 'off'}."
-            else:
-                device_message = "Keyboard mirroring state is unavailable."
-        except Exception as exc:
-            device_message = f"Keyboard mirroring load failed: {exc}"
-            if status_message is None:
-                status_message = device_message
 
         loaded_count, missing_keys = self.load_gamepad_mapping()
         if loaded_count == len(self.key_gamepad_vars):
@@ -688,25 +682,41 @@ class GamepadPageMixin:
             snappy = bool(self.gamepad_snappy_var.get())
             gp_kb = bool(self.gamepad_kb_always_var.get())
 
-            settings_ok = bool(self.device.set_gamepad_settings(deadzone, curve, square, snappy))
-            mirror_ok = bool(self.device.set_gamepad_with_keyboard(gp_kb))
+            current = self.device.get_gamepad_settings() or {}
+            points = current.get("curve_points")
+            if not isinstance(points, (list, tuple)) or len(points) != 4:
+                points = [
+                    {"x_01mm": 0, "x_mm": 0.00, "y": 0},
+                    {"x_01mm": 133, "x_mm": 1.33, "y": 85},
+                    {"x_01mm": 266, "x_mm": 2.66, "y": 170},
+                    {"x_01mm": 400, "x_mm": 4.00, "y": 255},
+                ]
+
+            start_01mm = int(round(deadzone * 400.0 / 255.0))
+            points = [dict(p) for p in points]
+            points[0]["x_01mm"] = max(0, min(400, start_01mm))
+            points[0]["x_mm"] = points[0]["x_01mm"] / 100.0
+
+            settings_payload = {
+                "radial_deadzone": deadzone,
+                "deadzone": deadzone,
+                "curve_type": curve,
+                "square_mode": square,
+                "reactive_stick": snappy,
+                "snappy_mode": snappy,
+                "keyboard_routing": 1 if gp_kb else 0,
+                "curve_points": points,
+            }
+            settings_ok = bool(self.device.set_gamepad_settings(settings_payload))
 
             self._gamepad_refresh_global_summary()
             self._gamepad_redraw_preview()
 
-            if settings_ok and mirror_ok:
+            if settings_ok:
                 message = "Global gamepad settings applied live. Save to Flash on the Device page to persist them."
                 device_message = (
                     f"Keyboard mirroring is {'on' if gp_kb else 'off'}. Current gamepad settings are active in RAM."
                 )
-            elif settings_ok:
-                message = "Global settings applied, but keyboard mirroring update failed."
-                device_message = (
-                    "Device accepted the gamepad settings in RAM, but keyboard mirroring did not confirm."
-                )
-            elif mirror_ok:
-                message = "Keyboard mirroring updated, but gamepad settings failed."
-                device_message = "Device accepted the keyboard mirroring update, but global settings did not confirm."
             else:
                 message = "Gamepad settings failed to apply."
                 device_message = "The device rejected the global gamepad settings."

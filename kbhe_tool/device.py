@@ -22,12 +22,22 @@ from .protocol import (
     LAYER_COUNT,
     KEY_BEHAVIORS,
     KEY_COUNT,
+    SETTINGS_PROFILE_COUNT,
+    SETTINGS_PROFILE_NAME_LENGTH,
     KEY_SETTINGS_PER_CHUNK,
     KEY_STATES_PER_CHUNK,
     LED_BYTES_PER_CHUNK,
     LED_EFFECT_PARAM_COUNT,
+    LED_EFFECT_PARAM_COLOR_B,
+    LED_EFFECT_PARAM_COLOR_G,
+    LED_EFFECT_PARAM_COLOR_R,
+    LED_EFFECT_PARAM_SPEED,
+    LED_AUDIO_SPECTRUM_BAND_COUNT,
+    SCHEMA_DESCRIPTOR_BYTES,
+    SCHEMA_PARAMS_PER_CHUNK,
     PACKET_SIZE,
     PID,
+    parse_schema_chunk,
     RAW_HID_INTERFACE,
     RAW_HID_USAGE_PAGE,
     Status,
@@ -143,7 +153,7 @@ class KBHEDevice:
             value = int(value)
         except Exception:
             return 0
-        return value if value in (0, 1) else 0
+        return value if value in (0, 1, 2, 3, 4) else 0
 
     @staticmethod
     def _sanitize_key_behavior_mode(value):
@@ -318,6 +328,189 @@ class KBHEDevice:
         payload = [0] + list(name_bytes) + [0] * (KEYBOARD_NAME_LENGTH - len(name_bytes))
         resp = self.send_command(Command.SET_KEYBOARD_NAME, payload, timeout_ms=3000)
         return resp and len(resp) >= 34 and resp[1] == Status.OK
+
+    def get_profile_state(self):
+        """Get active profile and used-slot mask from MCU."""
+        resp = self.send_command(Command.GET_ACTIVE_PROFILE)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            active_profile = int(resp[2])
+            used_mask = int(resp[3]) & ((1 << SETTINGS_PROFILE_COUNT) - 1)
+            if 0 <= active_profile < SETTINGS_PROFILE_COUNT:
+                return {
+                    'active_profile': active_profile,
+                    'used_mask': used_mask,
+                    'used_slots': [i for i in range(SETTINGS_PROFILE_COUNT) if used_mask & (1 << i)],
+                }
+        return None
+
+    def get_active_profile(self):
+        """Get active persistent profile index (0..3)."""
+        state = self.get_profile_state()
+        if not state:
+            return None
+        return int(state['active_profile'])
+
+    def set_active_profile(self, profile_index):
+        """Set active persistent profile index (0..3)."""
+        try:
+            profile_index = int(profile_index)
+        except Exception:
+            return False
+        if profile_index < 0 or profile_index >= SETTINGS_PROFILE_COUNT:
+            return False
+
+        payload = [0, profile_index]
+        resp = self.send_command(Command.SET_ACTIVE_PROFILE, payload, timeout_ms=3000)
+        return resp and len(resp) >= 4 and resp[1] == Status.OK
+
+    def get_profile_name(self, profile_index):
+        """Get profile name for one slot."""
+        try:
+            profile_index = int(profile_index)
+        except Exception:
+            return None
+        if profile_index < 0 or profile_index >= SETTINGS_PROFILE_COUNT:
+            return None
+
+        payload = [0, profile_index]
+        resp = self.send_command(Command.GET_PROFILE_NAME, payload, timeout_ms=3000)
+        if resp and len(resp) >= 4 + SETTINGS_PROFILE_NAME_LENGTH and resp[1] == Status.OK:
+            return self._decode_c_string(resp[4:4 + SETTINGS_PROFILE_NAME_LENGTH])
+        return None
+
+    def set_profile_name(self, profile_index, name):
+        """Set profile name for one slot (ASCII, fixed-size payload)."""
+        try:
+            profile_index = int(profile_index)
+        except Exception:
+            return False
+        if profile_index < 0 or profile_index >= SETTINGS_PROFILE_COUNT:
+            return False
+
+        if name is None:
+            name = ""
+        name_bytes = str(name).encode("ascii", errors="ignore")[:SETTINGS_PROFILE_NAME_LENGTH]
+        payload = [0, profile_index] + list(name_bytes)
+        payload += [0] * (SETTINGS_PROFILE_NAME_LENGTH - len(name_bytes))
+
+        resp = self.send_command(Command.SET_PROFILE_NAME, payload, timeout_ms=3000)
+        return resp and len(resp) >= 4 + SETTINGS_PROFILE_NAME_LENGTH and resp[1] == Status.OK
+
+    def create_profile(self, name=""):
+        """Create a profile in the first free slot on MCU (max 4)."""
+        if name is None:
+            name = ""
+        name_bytes = str(name).encode("ascii", errors="ignore")[:SETTINGS_PROFILE_NAME_LENGTH]
+        payload = [0, 0xFF] + list(name_bytes)
+        payload += [0] * (SETTINGS_PROFILE_NAME_LENGTH - len(name_bytes))
+
+        resp = self.send_command(Command.CREATE_PROFILE, payload, timeout_ms=3000)
+        if resp and len(resp) >= 4 + SETTINGS_PROFILE_NAME_LENGTH and resp[1] == Status.OK:
+            return {
+                'profile_index': int(resp[2]),
+                'used_mask': int(resp[3]) & ((1 << SETTINGS_PROFILE_COUNT) - 1),
+                'profile_name': self._decode_c_string(resp[4:4 + SETTINGS_PROFILE_NAME_LENGTH]),
+            }
+        return None
+
+    def delete_profile(self, profile_index):
+        """Delete one MCU profile slot (fails if it is the last remaining slot)."""
+        try:
+            profile_index = int(profile_index)
+        except Exception:
+            return None
+        if profile_index < 0 or profile_index >= SETTINGS_PROFILE_COUNT:
+            return None
+
+        payload = [0, profile_index]
+        resp = self.send_command(Command.DELETE_PROFILE, payload, timeout_ms=3000)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            return {
+                'active_profile': int(resp[2]),
+                'used_mask': int(resp[3]) & ((1 << SETTINGS_PROFILE_COUNT) - 1),
+            }
+        return None
+
+    def copy_profile_slot(self, source_profile_index, target_profile_index):
+        """Copy source profile slot into target profile slot on MCU."""
+        try:
+            source_profile_index = int(source_profile_index)
+            target_profile_index = int(target_profile_index)
+        except Exception:
+            return None
+
+        if (
+            source_profile_index < 0
+            or source_profile_index >= SETTINGS_PROFILE_COUNT
+            or target_profile_index < 0
+            or target_profile_index >= SETTINGS_PROFILE_COUNT
+        ):
+            return None
+
+        payload = [0, source_profile_index, target_profile_index]
+        resp = self.send_command(Command.COPY_PROFILE_SLOT, payload, timeout_ms=3000)
+        if resp and len(resp) >= 5 and resp[1] == Status.OK:
+            return {
+                'source_profile_index': int(resp[2]),
+                'target_profile_index': int(resp[3]),
+                'used_mask': int(resp[4]) & ((1 << SETTINGS_PROFILE_COUNT) - 1),
+            }
+        return None
+
+    def reset_profile_slot(self, profile_index):
+        """Reset one used profile slot to firmware defaults."""
+        try:
+            profile_index = int(profile_index)
+        except Exception:
+            return None
+        if profile_index < 0 or profile_index >= SETTINGS_PROFILE_COUNT:
+            return None
+
+        payload = [0, profile_index]
+        resp = self.send_command(Command.RESET_PROFILE_SLOT, payload, timeout_ms=3000)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            return {
+                'profile_index': int(resp[2]),
+                'used_mask': int(resp[3]) & ((1 << SETTINGS_PROFILE_COUNT) - 1),
+            }
+        return None
+
+    def get_profile_names(self):
+        """Get profile names in slot order (unused slots return None)."""
+        state = self.get_profile_state()
+        if not state:
+            return None
+
+        used_mask = int(state['used_mask'])
+        names = [None] * SETTINGS_PROFILE_COUNT
+        for i in range(SETTINGS_PROFILE_COUNT):
+            if not (used_mask & (1 << i)):
+                continue
+            name = self.get_profile_name(i)
+            if name is None:
+                return None
+            names[i] = name
+        return names
+
+    def list_profiles(self):
+        """Return used MCU profiles as [{'index','name','is_active'}]."""
+        state = self.get_profile_state()
+        if not state:
+            return None
+
+        active = int(state['active_profile'])
+        used_slots = list(state['used_slots'])
+        profiles = []
+        for idx in used_slots:
+            name = self.get_profile_name(idx)
+            if name is None:
+                return None
+            profiles.append({
+                'index': int(idx),
+                'name': str(name),
+                'is_active': int(idx) == active,
+            })
+        return profiles
     
     def get_options(self):
         """Get all options."""
@@ -537,52 +730,59 @@ class KBHEDevice:
     
     # --- Key Settings Commands ---
     
-    def get_key_settings(self, key_index):
-        """Get settings for a specific key (extended format)."""
-        data = [0, key_index]  # 0 = placeholder for status
+    def get_key_settings(self, key_index, profile_index=None, layer_index=0):
+        """Get settings for a specific key/profile/layer (extended format)."""
+        key_index = max(0, min(int(KEY_COUNT) - 1, int(key_index)))
+        layer_index = max(0, min(int(LAYER_COUNT) - 1, int(layer_index)))
+        if profile_index is None:
+            active = self.get_active_profile()
+            profile_index = 0 if active is None else int(active)
+        profile_index = max(0, min(int(SETTINGS_PROFILE_COUNT) - 1, int(profile_index)))
+
+        data = [0, key_index, profile_index, layer_index]  # 0 = placeholder for status
         resp = self.send_command(Command.GET_KEY_SETTINGS, data)
-        if resp and len(resp) >= 13 and resp[1] == Status.OK:
-            has_socd_resolution = len(resp) >= 14
-            socd_resolution = (
-                self._sanitize_socd_resolution(resp[10]) if has_socd_resolution else 0
-            )
-            rapid_idx = 11 if has_socd_resolution else 10
-            disable_idx = 12 if has_socd_resolution else 11
-            continuous_idx = 13 if len(resp) > 13 else None
-            behavior_idx = 14 if len(resp) > 14 else None
-            hold_idx = 15 if len(resp) > 15 else None
-            zone_count_idx = 16 if len(resp) > 16 else None
-            secondary_idx = 17 if len(resp) > 18 else None
-            primary_keycode = self._unpack_u16(resp, 3)
+        if resp and len(resp) >= 37 and resp[1] == Status.OK:
+            primary_keycode = self._unpack_u16(resp, 5)
             dynamic_zones = self._default_dynamic_zones(primary_keycode)
-            if len(resp) >= 31:
+            if len(resp) >= 33:
                 dynamic_zones = self._sanitize_dynamic_zones(
                     [
                         {
-                            "end_mm_tenths": int(resp[19 + i * 3]),
-                            "hid_keycode": self._unpack_u16(resp, 20 + i * 3),
+                            "end_mm_tenths": int(resp[21 + i * 3]),
+                            "hid_keycode": self._unpack_u16(resp, 22 + i * 3),
                         }
                         for i in range(4)
                     ],
                     primary_keycode=primary_keycode,
                 )
+            tap_hold_options = int(resp[33]) if len(resp) > 33 else 0
+            dks_bottom_out_point = int(resp[34]) if len(resp) > 34 else 40
+            socd_fully_pressed_enabled = bool(resp[35]) if len(resp) > 35 else False
+            socd_fully_pressed_point = int(resp[36]) if len(resp) > 36 else 40
             return {
                 'key_index': resp[2],
+                'profile_index': int(resp[3]),
+                'layer_index': int(resp[4]),
                 'hid_keycode': primary_keycode,
-                'actuation_point_mm': resp[5] / 10.0,  # 0.1mm to mm
-                'release_point_mm': resp[6] / 10.0,
-                'rapid_trigger_press': resp[7] / 100.0,  # 0.01mm to mm
-                'rapid_trigger_release': resp[8] / 100.0,
-                'socd_pair': resp[9] if resp[9] != 255 else None,
-                'socd_resolution': socd_resolution,
-                'rapid_trigger_enabled': bool(resp[rapid_idx]),
-                'disable_kb_on_gamepad': bool(resp[disable_idx]),
-                'continuous_rapid_trigger': bool(resp[continuous_idx]) if continuous_idx is not None else False,
-                'behavior_mode': self._sanitize_key_behavior_mode(resp[behavior_idx]) if behavior_idx is not None else int(KEY_BEHAVIORS["Normal"]),
-                'hold_threshold_ms': (int(resp[hold_idx]) * 10) if hold_idx is not None else 200,
-                'dynamic_zone_count': max(1, min(4, int(resp[zone_count_idx]) if zone_count_idx is not None else 1)),
-                'secondary_hid_keycode': self._unpack_u16(resp, secondary_idx) if secondary_idx is not None else 0,
+                'actuation_point_mm': resp[7] / 10.0,  # 0.1mm to mm
+                'release_point_mm': resp[8] / 10.0,
+                'rapid_trigger_press': resp[9] / 100.0,  # 0.01mm to mm
+                'rapid_trigger_release': resp[10] / 100.0,
+                'socd_pair': resp[11] if resp[11] != 255 else None,
+                'socd_resolution': self._sanitize_socd_resolution(resp[12]),
+                'rapid_trigger_enabled': bool(resp[13]),
+                'disable_kb_on_gamepad': bool(resp[14]),
+                'continuous_rapid_trigger': bool(resp[15]),
+                'behavior_mode': self._sanitize_key_behavior_mode(resp[16]),
+                'hold_threshold_ms': int(resp[17]) * 10,
+                'dynamic_zone_count': max(1, min(4, int(resp[18]))),
+                'secondary_hid_keycode': self._unpack_u16(resp, 19),
                 'dynamic_zones': dynamic_zones,
+                'tap_hold_hold_on_other_key_press': bool(tap_hold_options & 0x01),
+                'tap_hold_uppercase_hold': bool(tap_hold_options & 0x02),
+                'dks_bottom_out_point_mm': dks_bottom_out_point / 10.0,
+                'socd_fully_pressed_enabled': socd_fully_pressed_enabled,
+                'socd_fully_pressed_point_mm': socd_fully_pressed_point / 10.0,
             }
         return None
 
@@ -618,30 +818,15 @@ class KBHEDevice:
         )
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
-    def set_key_settings(self, key_index, hid_keycode, actuation_mm, release_mm, rapid_trigger_mm, socd_pair=None, socd_resolution=0):
-        """Set settings for a specific key (legacy format for backwards compatibility)."""
-        # Use extended format with defaults
-        settings = {
-            'hid_keycode': hid_keycode,
-            'actuation_point_mm': actuation_mm,
-            'release_point_mm': release_mm,
-            'rapid_trigger_enabled': False,
-            'rapid_trigger_press': rapid_trigger_mm,
-            'rapid_trigger_release': rapid_trigger_mm,
-            'socd_pair': socd_pair if socd_pair is not None else 255,
-            'socd_resolution': self._sanitize_socd_resolution(socd_resolution),
-            'disable_kb_on_gamepad': False,
-            'continuous_rapid_trigger': False,
-            'behavior_mode': int(KEY_BEHAVIORS["Normal"]),
-            'hold_threshold_ms': 200,
-            'secondary_hid_keycode': 0,
-            'dynamic_zone_count': 1,
-            'dynamic_zones': self._default_dynamic_zones(hid_keycode),
-        }
-        return self.set_key_settings_extended(key_index, settings)
-    
-    def set_key_settings_extended(self, key_index, settings):
-        """Set settings for a specific key (extended format)."""
+    def set_key_settings_extended(self, key_index, settings, profile_index=None, layer_index=0):
+        """Set settings for a specific key/profile/layer (extended format)."""
+        key_index = max(0, min(int(KEY_COUNT) - 1, int(key_index)))
+        layer_index = max(0, min(int(LAYER_COUNT) - 1, int(layer_index)))
+        if profile_index is None:
+            active = self.get_active_profile()
+            profile_index = 0 if active is None else int(active)
+        profile_index = max(0, min(int(SETTINGS_PROFILE_COUNT) - 1, int(profile_index)))
+
         hid_keycode = int(settings.get('hid_keycode', 0x14))
         dynamic_zones = self._sanitize_dynamic_zones(
             settings.get('dynamic_zones'),
@@ -650,6 +835,8 @@ class KBHEDevice:
         data = [
             0,  # placeholder for status
             key_index,
+            profile_index,
+            layer_index,
             hid_keycode & 0xFF,
             (hid_keycode >> 8) & 0xFF,
             int(settings.get('actuation_point_mm', 2.0) * 10),  # mm to 0.1mm
@@ -671,6 +858,21 @@ class KBHEDevice:
             data.append(int(zone['end_mm_tenths']) & 0xFF)
             data.append(int(zone['hid_keycode']) & 0xFF)
             data.append((int(zone['hid_keycode']) >> 8) & 0xFF)
+        tap_hold_options = 0
+        if settings.get('tap_hold_hold_on_other_key_press', False):
+            tap_hold_options |= 0x01
+        if settings.get('tap_hold_uppercase_hold', False):
+            tap_hold_options |= 0x02
+        dks_bottom_out_point = int(round(settings.get('dks_bottom_out_point_mm', 4.0) * 10.0))
+        dks_bottom_out_point = max(1, min(40, dks_bottom_out_point))
+        socd_fully_pressed_point = int(round(settings.get('socd_fully_pressed_point_mm', 4.0) * 10.0))
+        socd_fully_pressed_point = max(1, min(40, socd_fully_pressed_point))
+        data.extend([
+            tap_hold_options,
+            dks_bottom_out_point,
+            1 if settings.get('socd_fully_pressed_enabled', False) else 0,
+            socd_fully_pressed_point,
+        ])
         resp = self.send_command(Command.SET_KEY_SETTINGS, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
@@ -700,7 +902,7 @@ class KBHEDevice:
                     'rapid_trigger_press': resp[offset + 4] / 100.0,
                     'rapid_trigger_release': resp[offset + 5] / 100.0,
                     'socd_pair': resp[offset + 6] if resp[offset + 6] != 255 else None,
-                    'socd_resolution': self._sanitize_socd_resolution((flags >> 2) & 0x03),
+                    'socd_resolution': self._sanitize_socd_resolution((flags >> 2) & 0x07),
                     'rapid_trigger_enabled': bool(flags & 0x01),
                     'disable_kb_on_gamepad': bool(flags & 0x02),
                     'continuous_rapid_trigger': False,
@@ -748,28 +950,9 @@ class KBHEDevice:
             }
         return None
 
-    def set_gamepad_settings(self, settings_or_deadzone, curve_type=None, square_mode=None, snappy_mode=None):
-        """Set gamepad settings. Accepts either a settings dict or the legacy positional format."""
-        if isinstance(settings_or_deadzone, dict):
-            settings = dict(settings_or_deadzone)
-        else:
-            existing = self.get_gamepad_settings() or {}
-            points = self._sanitize_gamepad_curve_points(
-                existing.get("curve_points") or self._default_gamepad_curve_points()
-            )
-            if points:
-                points[0]["x_01mm"] = int(
-                    round(max(0, min(255, int(settings_or_deadzone))) * (GAMEPAD_CURVE_MAX_DISTANCE_MM * 100.0) / 255.0)
-                )
-                points[0]["x_mm"] = points[0]["x_01mm"] / 100.0
-                points = self._sanitize_gamepad_curve_points(points)
-            settings = {
-                "radial_deadzone": int(settings_or_deadzone),
-                "keyboard_routing": int(existing.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])),
-                "square_mode": bool(square_mode),
-                "reactive_stick": bool(snappy_mode),
-                "curve_points": points,
-            }
+    def set_gamepad_settings(self, settings):
+        """Set gamepad settings from the canonical dictionary payload."""
+        settings = dict(settings or {})
 
         routing = self._sanitize_gamepad_routing(
             settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])
@@ -799,7 +982,7 @@ class KBHEDevice:
     def get_rotary_encoder_settings(self):
         """Get rotary encoder settings."""
         resp = self.send_command(Command.GET_ROTARY_ENCODER_SETTINGS)
-        if resp and len(resp) >= 14 and resp[1] == Status.OK:
+        if resp and len(resp) >= 38 and resp[1] == Status.OK:
             return {
                 'rotation_action': int(resp[2]),
                 'button_action': int(resp[3]),
@@ -811,14 +994,58 @@ class KBHEDevice:
                 'progress_style': int(resp[9]),
                 'progress_effect_mode': int(resp[10]),
                 'progress_color': [int(resp[11]), int(resp[12]), int(resp[13])],
+                'cw_binding': {
+                    'mode': int(resp[14]),
+                    'keycode': self._unpack_u16(resp, 15),
+                    'modifier_mask_exact': int(resp[17]),
+                    'fallback_no_mod_keycode': self._unpack_u16(resp, 18),
+                    'layer_mode': int(resp[20]),
+                    'layer_index': int(resp[21]),
+                },
+                'ccw_binding': {
+                    'mode': int(resp[22]),
+                    'keycode': self._unpack_u16(resp, 23),
+                    'modifier_mask_exact': int(resp[25]),
+                    'fallback_no_mod_keycode': self._unpack_u16(resp, 26),
+                    'layer_mode': int(resp[28]),
+                    'layer_index': int(resp[29]),
+                },
+                'click_binding': {
+                    'mode': int(resp[30]),
+                    'keycode': self._unpack_u16(resp, 31),
+                    'modifier_mask_exact': int(resp[33]),
+                    'fallback_no_mod_keycode': self._unpack_u16(resp, 34),
+                    'layer_mode': int(resp[36]),
+                    'layer_index': int(resp[37]),
+                },
             }
         return None
 
     def set_rotary_encoder_settings(self, settings):
         """Set rotary encoder settings."""
+        def _binding_payload(binding):
+            binding = dict(binding or {})
+            keycode = int(binding.get('keycode', 0)) & 0xFFFF
+            fallback = int(binding.get('fallback_no_mod_keycode', 0)) & 0xFFFF
+            return [
+                int(binding.get('mode', 0)) & 0xFF,
+                keycode & 0xFF,
+                (keycode >> 8) & 0xFF,
+                int(binding.get('modifier_mask_exact', 0)) & 0xFF,
+                fallback & 0xFF,
+                (fallback >> 8) & 0xFF,
+                int(binding.get('layer_mode', 0)) & 0xFF,
+                int(binding.get('layer_index', 0)) & 0xFF,
+            ]
+
         progress_color = list(settings.get('progress_color', [40, 210, 64]))
         while len(progress_color) < 3:
             progress_color.append(0)
+
+        cw_binding = settings.get('cw_binding', {'mode': 0})
+        ccw_binding = settings.get('ccw_binding', {'mode': 0})
+        click_binding = settings.get('click_binding', {'mode': 0})
+
         data = [
             0,
             int(settings.get('rotation_action', 0)) & 0xFF,
@@ -834,8 +1061,29 @@ class KBHEDevice:
             int(progress_color[1]) & 0xFF,
             int(progress_color[2]) & 0xFF,
         ]
+        data.extend(_binding_payload(cw_binding))
+        data.extend(_binding_payload(ccw_binding))
+        data.extend(_binding_payload(click_binding))
         resp = self.send_command(Command.SET_ROTARY_ENCODER_SETTINGS, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def get_rotary_state(self):
+        """Get runtime rotary state (button + last direction + step counter)."""
+        resp = self.send_command(Command.GET_ROTARY_STATE)
+        if resp and len(resp) >= 8 and resp[1] == Status.OK:
+            step_counter = (
+                int(resp[4])
+                | (int(resp[5]) << 8)
+                | (int(resp[6]) << 16)
+                | (int(resp[7]) << 24)
+            )
+            last_direction = struct.unpack('<b', bytes([int(resp[3])]))[0]
+            return {
+                'button_pressed': bool(resp[2]),
+                'last_direction': int(last_direction),
+                'step_counter': int(step_counter),
+            }
+        return None
     
     # --- Calibration Commands ---
     
@@ -1017,32 +1265,6 @@ class KBHEDevice:
         resp = self.send_command(Command.SET_KEY_GAMEPAD_MAP, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
-    # --- Gamepad + Keyboard Mode (compat wrappers mapped to keyboard_routing) ---
-    
-    def get_gamepad_with_keyboard(self):
-        """Compatibility helper mapped to gamepad keyboard_routing."""
-        settings = self.get_gamepad_settings()
-        if not settings:
-            return None
-        routing = self._sanitize_gamepad_routing(
-            settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"])
-        )
-        return routing != int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
-    
-    def set_gamepad_with_keyboard(self, enabled):
-        """Compatibility helper mapped to gamepad keyboard_routing."""
-        settings = self.get_gamepad_settings()
-        if not settings:
-            return False
-
-        settings = dict(settings)
-        settings["keyboard_routing"] = (
-            int(GAMEPAD_KEYBOARD_ROUTING["All Keys"])
-            if enabled
-            else int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
-        )
-        return bool(self.set_gamepad_settings(settings))
-    
     # --- LED Effect Commands ---
     
     def get_led_effect(self):
@@ -1059,30 +1281,65 @@ class KBHEDevice:
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def get_led_effect_speed(self):
-        """Get LED effect speed."""
-        resp = self.send_command(Command.GET_LED_EFFECT_SPEED)
-        if resp and len(resp) >= 3 and resp[1] == Status.OK:
-            return resp[2]
-        return None
+        """Get speed parameter for the active LED effect."""
+        mode = self.get_led_effect()
+        if mode is None:
+            return None
+
+        params = self.get_led_effect_params(mode)
+        if params is None or len(params) <= LED_EFFECT_PARAM_SPEED:
+            return None
+
+        speed = int(params[LED_EFFECT_PARAM_SPEED])
+        return speed if speed > 0 else 1
     
     def set_led_effect_speed(self, speed):
-        """Set LED effect speed."""
-        data = [0, speed]  # placeholder, speed
-        resp = self.send_command(Command.SET_LED_EFFECT_SPEED, data)
-        return resp and len(resp) >= 2 and resp[1] == Status.OK
+        """Set speed parameter for the active LED effect."""
+        mode = self.get_led_effect()
+        if mode is None:
+            return False
+
+        params = self.get_led_effect_params(mode)
+        if params is None:
+            return False
+
+        while len(params) < LED_EFFECT_PARAM_COUNT:
+            params.append(0)
+        params[LED_EFFECT_PARAM_SPEED] = max(1, min(255, int(speed)))
+        return bool(self.set_led_effect_params(mode, params))
     
     def set_led_effect_color(self, r, g, b):
-        """Set LED effect color."""
-        data = [0, r, g, b]  # placeholder, r, g, b
-        resp = self.send_command(Command.SET_LED_EFFECT_COLOR, data)
-        return resp and len(resp) >= 2 and resp[1] == Status.OK
+        """Set color for the active LED effect."""
+        mode = self.get_led_effect()
+        if mode is None:
+            return False
+
+        params = self.get_led_effect_params(mode)
+        if params is None:
+            return False
+
+        while len(params) < LED_EFFECT_PARAM_COUNT:
+            params.append(0)
+        params[LED_EFFECT_PARAM_COLOR_R] = max(0, min(255, int(r)))
+        params[LED_EFFECT_PARAM_COLOR_G] = max(0, min(255, int(g)))
+        params[LED_EFFECT_PARAM_COLOR_B] = max(0, min(255, int(b)))
+        return bool(self.set_led_effect_params(mode, params))
 
     def get_led_effect_color(self):
-        """Get persisted LED effect color."""
-        resp = self.send_command(Command.GET_LED_EFFECT_COLOR)
-        if resp and len(resp) >= 5 and resp[1] == Status.OK:
-            return [int(resp[2]), int(resp[3]), int(resp[4])]
-        return None
+        """Get color for the active LED effect."""
+        mode = self.get_led_effect()
+        if mode is None:
+            return None
+
+        params = self.get_led_effect_params(mode)
+        if params is None or len(params) <= LED_EFFECT_PARAM_COLOR_B:
+            return None
+
+        return [
+            int(params[LED_EFFECT_PARAM_COLOR_R]),
+            int(params[LED_EFFECT_PARAM_COLOR_G]),
+            int(params[LED_EFFECT_PARAM_COLOR_B]),
+        ]
 
     def get_led_effect_params(self, effect_mode):
         """Get persisted tuning params for one LED effect."""
@@ -1093,6 +1350,89 @@ class KBHEDevice:
             return list(resp[4:4 + count])
         return None
 
+    def get_led_effect_schema(self, effect_mode):
+        """Get dynamic parameter schema for one LED effect (chunked HID read)."""
+        mode = int(effect_mode) & 0xFF
+        descriptors = []
+        total_chunks = None
+        total_active = None
+        chunk_index = 0
+
+        while True:
+            data = [0, mode, chunk_index]
+            resp = self.send_command(Command.GET_LED_EFFECT_SCHEMA, data)
+            if not resp or len(resp) < 6 or resp[1] != Status.OK:
+                return None
+
+            payload = bytes(resp[2:])
+            if len(payload) < 4:
+                return None
+
+            current_total_chunks = int(payload[2])
+            current_total_active = int(payload[3])
+
+            if current_total_chunks <= 0:
+                return None
+
+            expected_count = max(
+                0,
+                min(
+                    SCHEMA_PARAMS_PER_CHUNK,
+                    current_total_active - (chunk_index * SCHEMA_PARAMS_PER_CHUNK),
+                ),
+            )
+            payload_len = 4 + (expected_count * SCHEMA_DESCRIPTOR_BYTES)
+            if len(payload) < payload_len:
+                return None
+
+            try:
+                parsed = parse_schema_chunk(payload[:payload_len])
+            except Exception:
+                return None
+
+            if int(parsed.get("effect_id", -1)) != mode:
+                return None
+            if int(parsed.get("chunk_index", -1)) != chunk_index:
+                return None
+
+            if total_chunks is None:
+                total_chunks = current_total_chunks
+                total_active = current_total_active
+            elif (
+                total_chunks != current_total_chunks
+                or total_active != current_total_active
+            ):
+                return None
+
+            for desc in parsed.get("descriptors", []):
+                descriptors.append(
+                    {
+                        "id": int(desc.get("id", 0)),
+                        "type": int(desc.get("type", 0)),
+                        "min": int(desc.get("min", 0)),
+                        "max": int(desc.get("max", 0)),
+                        "default": int(desc.get("default", 0)),
+                        "step": int(desc.get("step", 0)),
+                    }
+                )
+
+            chunk_index += 1
+            if chunk_index >= total_chunks:
+                break
+
+        descriptors.sort(key=lambda d: d["id"])
+        if total_active is not None and total_active >= 0:
+            descriptors = descriptors[:total_active]
+
+        return {
+            "effect_id": mode,
+            "total_chunks": int(total_chunks if total_chunks is not None else 0),
+            "total_active": int(
+                total_active if total_active is not None else len(descriptors)
+            ),
+            "descriptors": descriptors,
+        }
+
     def set_led_effect_params(self, effect_mode, params):
         """Set persisted tuning params for one LED effect."""
         values = [int(v) & 0xFF for v in list(params)[:LED_EFFECT_PARAM_COUNT]]
@@ -1100,6 +1440,20 @@ class KBHEDevice:
             values.append(0)
         data = [0, int(effect_mode) & 0xFF, *values]
         resp = self.send_command(Command.SET_LED_EFFECT_PARAMS, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def led_set_audio_spectrum(self, bands, impact_level=0):
+        """Push host-side audio spectrum levels for audio-reactive effects."""
+        values = [max(0, min(255, int(v))) for v in list(bands or [])[:LED_AUDIO_SPECTRUM_BAND_COUNT]]
+        if not values:
+            return False
+        payload = [0, len(values), *values, max(0, min(255, int(impact_level)))]
+        resp = self.send_command(Command.SET_LED_AUDIO_SPECTRUM, payload)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def led_clear_audio_spectrum(self):
+        """Clear host-side audio spectrum data on the firmware."""
+        resp = self.send_command(Command.CLEAR_LED_AUDIO_SPECTRUM)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def get_led_fps_limit(self):
@@ -1113,23 +1467,6 @@ class KBHEDevice:
         """Set LED FPS limit (0 = unlimited, 1-255 = limit)."""
         data = [0, fps]  # placeholder, fps
         resp = self.send_command(Command.SET_LED_FPS_LIMIT, data)
-        return resp and len(resp) >= 2 and resp[1] == Status.OK
-    
-    def get_led_diagnostic(self):
-        """Get LED diagnostic mode (0=normal, 1=DMA stress, 2=CPU stress)."""
-        resp = self.send_command(Command.GET_LED_DIAGNOSTIC)
-        if resp and len(resp) >= 3 and resp[1] == Status.OK:
-            return resp[2]
-        return None
-    
-    def set_led_diagnostic(self, mode):
-        """Set LED diagnostic mode.
-        0 = Normal operation
-        1 = DMA stress only (sends data without computing effects - tests if DMA causes ADC noise)
-        2 = CPU stress only (computes effects but doesn't send to LEDs - tests if CPU load causes ADC issues)
-        """
-        data = [0, mode]
-        resp = self.send_command(Command.SET_LED_DIAGNOSTIC, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     # --- ADC Filter Commands ---
@@ -1172,102 +1509,57 @@ class KBHEDevice:
     # --- Debug Commands ---
     
     def get_adc_values(self):
-        """Get ADC values for all keys (debug) with timing info.
-
-        Supports both payload formats:
-        - New: raw[6] + filtered[6] + timing
-        - Legacy: adc[6] + timing
-        """
+        """Get ADC values for all keys (debug) with timing info."""
         resp = self.send_command(Command.GET_ADC_VALUES)
-        if resp and len(resp) >= 18 and resp[1] == Status.OK:
-            # Legacy format candidate: adc (bytes 2..13), timing (14..17)
-            legacy_values = []
+        if resp and len(resp) >= 30 and resp[1] == Status.OK:
+            raw_values = []
+            filtered_values = []
+
             for i in range(6):
-                legacy_values.append(resp[2 + i * 2] | (resp[3 + i * 2] << 8))
+                raw_idx = 2 + i * 2
+                filt_idx = 14 + i * 2
+                raw_values.append(resp[raw_idx] | (resp[raw_idx + 1] << 8))
+                filtered_values.append(resp[filt_idx] | (resp[filt_idx + 1] << 8))
 
-            legacy_scan_time_us = resp[14] | (resp[15] << 8)
-            legacy_scan_rate_hz = resp[16] | (resp[17] << 8)
+            scan_time_us = resp[26] | (resp[27] << 8)
+            scan_rate_hz = resp[28] | (resp[29] << 8)
 
-            # New format candidate: raw (2..13), filtered (14..25), timing (26..29)
-            if len(resp) >= 30:
-                raw_values = []
-                filtered_values = []
+            task_times_us = None
+            if len(resp) >= 46:
+                task_times_us = {
+                    'analog': resp[30] | (resp[31] << 8),
+                    'trigger': resp[32] | (resp[33] << 8),
+                    'socd': resp[34] | (resp[35] << 8),
+                    'keyboard': resp[36] | (resp[37] << 8),
+                    'keyboard_nkro': resp[38] | (resp[39] << 8),
+                    'gamepad': resp[40] | (resp[41] << 8),
+                    'led': resp[42] | (resp[43] << 8),
+                    'total': resp[44] | (resp[45] << 8),
+                }
 
-                for i in range(6):
-                    raw_idx = 2 + i * 2
-                    filt_idx = 14 + i * 2
-                    raw_values.append(resp[raw_idx] | (resp[raw_idx + 1] << 8))
-                    filtered_values.append(resp[filt_idx] | (resp[filt_idx + 1] << 8))
-
-                scan_time_us = resp[26] | (resp[27] << 8)
-                scan_rate_hz = resp[28] | (resp[29] << 8)
-
-                task_times_us = None
-                if len(resp) >= 46:
-                    task_times_us = {
-                        'analog': resp[30] | (resp[31] << 8),
-                        'trigger': resp[32] | (resp[33] << 8),
-                        'socd': resp[34] | (resp[35] << 8),
-                        'keyboard': resp[36] | (resp[37] << 8),
-                        'keyboard_nkro': resp[38] | (resp[39] << 8),
-                        'gamepad': resp[40] | (resp[41] << 8),
-                        'led': resp[42] | (resp[43] << 8),
-                        'total': resp[44] | (resp[45] << 8),
-                    }
-
-                analog_monitor_us = None
-                if len(resp) >= 64:
-                    analog_monitor_us = {
-                        'raw': resp[46] | (resp[47] << 8),
-                        'filter': resp[48] | (resp[49] << 8),
-                        'calibration': resp[50] | (resp[51] << 8),
-                        'lut': resp[52] | (resp[53] << 8),
-                        'store': resp[54] | (resp[55] << 8),
-                        'key_min': resp[56] | (resp[57] << 8),
-                        'key_max': resp[58] | (resp[59] << 8),
-                        'key_avg': resp[60] | (resp[61] << 8),
-                        'nonzero_keys': resp[62] | (resp[63] << 8),
-                    }
-
-                # If timing fields are zero here but valid in legacy position,
-                # we are most likely talking to legacy firmware.
-                if (
-                    scan_time_us == 0
-                    and scan_rate_hz == 0
-                    and (legacy_scan_time_us != 0 or legacy_scan_rate_hz != 0)
-                ):
-                    return {
-                        'adc': legacy_values,
-                        'adc_raw': legacy_values,
-                        'adc_filtered': legacy_values,
-                        'scan_time_us': legacy_scan_time_us,
-                        'scan_rate_hz': legacy_scan_rate_hz,
-                        'task_times_us': None,
-                        'analog_monitor_us': None,
-                        'adc_payload_format': 'legacy'
-                    }
-
-                return {
-                    # Keep legacy key for existing UI code paths.
-                    'adc': raw_values,
-                    'adc_raw': raw_values,
-                    'adc_filtered': filtered_values,
-                    'scan_time_us': scan_time_us,
-                    'scan_rate_hz': scan_rate_hz,
-                    'task_times_us': task_times_us,
-                    'analog_monitor_us': analog_monitor_us,
-                    'adc_payload_format': 'extended'
+            analog_monitor_us = None
+            if len(resp) >= 64:
+                analog_monitor_us = {
+                    'raw': resp[46] | (resp[47] << 8),
+                    'filter': resp[48] | (resp[49] << 8),
+                    'calibration': resp[50] | (resp[51] << 8),
+                    'lut': resp[52] | (resp[53] << 8),
+                    'store': resp[54] | (resp[55] << 8),
+                    'key_min': resp[56] | (resp[57] << 8),
+                    'key_max': resp[58] | (resp[59] << 8),
+                    'key_avg': resp[60] | (resp[61] << 8),
+                    'nonzero_keys': resp[62] | (resp[63] << 8),
                 }
 
             return {
-                'adc': legacy_values,
-                'adc_raw': legacy_values,
-                'adc_filtered': legacy_values,
-                'scan_time_us': legacy_scan_time_us,
-                'scan_rate_hz': legacy_scan_rate_hz,
-                'task_times_us': None,
-                'analog_monitor_us': None,
-                'adc_payload_format': 'legacy'
+                'adc': raw_values,
+                'adc_raw': raw_values,
+                'adc_filtered': filtered_values,
+                'scan_time_us': scan_time_us,
+                'scan_rate_hz': scan_rate_hz,
+                'task_times_us': task_times_us,
+                'analog_monitor_us': analog_monitor_us,
+                'adc_payload_format': 'extended'
             }
         return None
 

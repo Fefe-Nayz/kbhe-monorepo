@@ -2,7 +2,23 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from .protocol import ADVANCED_TICK_RATE_DEFAULT, ADVANCED_TICK_RATE_MAX, ADVANCED_TICK_RATE_MIN, GAMEPAD_API_MODES, KEY_COUNT, LAYER_COUNT
+from .protocol import (
+    ADVANCED_TICK_RATE_DEFAULT,
+    ADVANCED_TICK_RATE_MAX,
+    ADVANCED_TICK_RATE_MIN,
+    GAMEPAD_API_MODES,
+    GAMEPAD_KEYBOARD_ROUTING,
+    KEY_COUNT,
+    LEDEffect,
+    LAYER_COUNT,
+    LED_AUDIO_SPECTRUM_BAND_COUNT,
+    LED_EFFECT_PARAM_COLOR_B,
+    LED_EFFECT_PARAM_COLOR_G,
+    LED_EFFECT_PARAM_COLOR_R,
+    LED_EFFECT_PARAM_COUNT,
+    LED_EFFECT_PARAM_SPEED,
+    ParamType,
+)
 
 
 def _default_key_settings(index: int) -> dict:
@@ -95,11 +111,11 @@ class DemoDevice:
         self._led_enabled = True
         self._led_brightness = 96
         self._led_effect = 1
-        self._led_effect_speed = 75
         self._led_effect_color = [64, 180, 255]
         self._led_effect_params = {}
+        self._audio_spectrum_bands = [0] * LED_AUDIO_SPECTRUM_BAND_COUNT
+        self._audio_spectrum_impact = 0
         self._led_fps_limit = 60
-        self._led_diagnostic = 0
         self._led_pixels = []
         for i in range(KEY_COUNT):
             self._led_pixels.extend([(i * 17) % 256, (i * 37) % 256, (i * 53) % 256])
@@ -300,20 +316,6 @@ class DemoDevice:
         }
         return True
 
-    def get_gamepad_with_keyboard(self):
-        return bool(
-            int(self._gamepad_settings.get("keyboard_routing", GAMEPAD_KEYBOARD_ROUTING["All Keys"]))
-            != int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
-        )
-
-    def set_gamepad_with_keyboard(self, enabled):
-        self._gamepad_settings["keyboard_routing"] = (
-            int(GAMEPAD_KEYBOARD_ROUTING["All Keys"])
-            if enabled
-            else int(GAMEPAD_KEYBOARD_ROUTING["Disabled"])
-        )
-        return True
-
     def get_gamepad_settings(self):
         settings = deepcopy(self._gamepad_settings)
         curve_points = list(settings.get("curve_points") or [])
@@ -328,20 +330,8 @@ class DemoDevice:
         settings.setdefault("api_mode", int(GAMEPAD_API_MODES["HID (DirectInput)"]))
         return settings
 
-    def set_gamepad_settings(self, settings_or_deadzone, curve_type=None, square_mode=None, snappy_mode=None):
-        if isinstance(settings_or_deadzone, dict):
-            settings = deepcopy(settings_or_deadzone)
-        else:
-            settings = deepcopy(self._gamepad_settings)
-            deadzone = max(0, min(255, int(settings_or_deadzone)))
-            curve_points = list(settings.get("curve_points") or [])
-            if curve_points:
-                curve_points[0]["x_01mm"] = int(round(deadzone * 400.0 / 255.0))
-                curve_points[0]["x_mm"] = curve_points[0]["x_01mm"] / 100.0
-                settings["curve_points"] = curve_points
-            settings["radial_deadzone"] = deadzone
-            settings["square_mode"] = bool(square_mode)
-            settings["reactive_stick"] = bool(snappy_mode)
+    def set_gamepad_settings(self, settings):
+        settings = deepcopy(settings or {})
         curve_points = list(settings.get("curve_points") or self._gamepad_settings.get("curve_points") or [])
         if curve_points:
             settings["radial_deadzone"] = int(
@@ -380,27 +370,151 @@ class DemoDevice:
 
     def set_led_effect(self, mode):
         self._led_effect = int(mode)
+        params = self.get_led_effect_params(self._led_effect)
+        self._led_effect_color = [
+            int(params[LED_EFFECT_PARAM_COLOR_R]),
+            int(params[LED_EFFECT_PARAM_COLOR_G]),
+            int(params[LED_EFFECT_PARAM_COLOR_B]),
+        ]
         return True
 
     def get_led_effect_speed(self):
-        return int(self._led_effect_speed)
+        mode = int(self._led_effect)
+        params = self.get_led_effect_params(mode)
+        speed = int(params[LED_EFFECT_PARAM_SPEED])
+        return speed if speed > 0 else 1
 
     def set_led_effect_speed(self, speed):
-        self._led_effect_speed = int(speed)
+        mode = int(self._led_effect)
+        params = self.get_led_effect_params(mode)
+        params[LED_EFFECT_PARAM_SPEED] = max(1, min(255, int(speed)))
+        self._led_effect_params[mode] = list(params)
         return True
 
     def set_led_effect_color(self, r, g, b):
-        self._led_effect_color = [int(r), int(g), int(b)]
+        mode = int(self._led_effect)
+        params = self.get_led_effect_params(mode)
+        params[LED_EFFECT_PARAM_COLOR_R] = max(0, min(255, int(r)))
+        params[LED_EFFECT_PARAM_COLOR_G] = max(0, min(255, int(g)))
+        params[LED_EFFECT_PARAM_COLOR_B] = max(0, min(255, int(b)))
+        self._led_effect_params[mode] = list(params)
+        self._led_effect_color = [
+            params[LED_EFFECT_PARAM_COLOR_R],
+            params[LED_EFFECT_PARAM_COLOR_G],
+            params[LED_EFFECT_PARAM_COLOR_B],
+        ]
         return True
 
     def get_led_effect_color(self):
+        mode = int(self._led_effect)
+        params = self.get_led_effect_params(mode)
+        if len(params) > LED_EFFECT_PARAM_COLOR_B:
+            return [
+                int(params[LED_EFFECT_PARAM_COLOR_R]),
+                int(params[LED_EFFECT_PARAM_COLOR_G]),
+                int(params[LED_EFFECT_PARAM_COLOR_B]),
+            ]
         return list(self._led_effect_color)
 
     def get_led_effect_params(self, effect_mode):
-        return list(self._led_effect_params.get(int(effect_mode), [160, 96, 160, 255, 0, 0]))
+        mode = int(effect_mode)
+        defaults = [0] * LED_EFFECT_PARAM_COUNT
+        defaults[0:6] = [160, 96, 160, 255, 0, 0]
+        defaults[LED_EFFECT_PARAM_SPEED] = 75
+        defaults[LED_EFFECT_PARAM_COLOR_R] = int(self._led_effect_color[0])
+        defaults[LED_EFFECT_PARAM_COLOR_G] = int(self._led_effect_color[1])
+        defaults[LED_EFFECT_PARAM_COLOR_B] = int(self._led_effect_color[2])
+
+        values = list(self._led_effect_params.get(mode, defaults))
+        while len(values) < LED_EFFECT_PARAM_COUNT:
+            values.append(0)
+        return values[:LED_EFFECT_PARAM_COUNT]
+
+    def get_led_effect_schema(self, effect_mode):
+        mode = int(effect_mode)
+        params = self.get_led_effect_params(mode)
+        descriptors = []
+
+        def add_desc(param_id, param_type, minimum, maximum, default_value, step):
+            descriptors.append(
+                {
+                    "id": int(param_id),
+                    "type": int(param_type),
+                    "min": int(minimum),
+                    "max": int(maximum),
+                    "default": int(default_value),
+                    "step": int(step),
+                }
+            )
+
+        if mode == int(LEDEffect.AUDIO_SPECTRUM):
+            add_desc(0, ParamType.HUE, 0, 255, 176, 1)
+            add_desc(1, ParamType.U8, 0, 255, 32, 4)
+            add_desc(2, ParamType.U8, 0, 255, 208, 8)
+            add_desc(3, ParamType.BOOL, 0, 1, 1, 1)
+            add_desc(4, ParamType.U8, 0, 255, 172, 8)
+            add_desc(5, ParamType.U8, 0, 3, 0, 1)
+            add_desc(6, ParamType.U8, 0, 255, 236, 4)
+
+        if mode == int(LEDEffect.KEY_STATE_DEMO):
+            add_desc(0, ParamType.BOOL, 0, 1, 0, 1)
+            add_desc(1, ParamType.U8, 0, 255, 255, 8)
+            add_desc(2, ParamType.U8, 0, 255, 96, 8)
+
+        if mode not in (int(LEDEffect.NONE), int(LEDEffect.THIRD_PARTY)):
+            add_desc(
+                LED_EFFECT_PARAM_SPEED,
+                ParamType.U8,
+                1,
+                255,
+                max(1, int(params[LED_EFFECT_PARAM_SPEED])),
+                1,
+            )
+            add_desc(LED_EFFECT_PARAM_COLOR_R, ParamType.COLOR, 0, 255, int(params[LED_EFFECT_PARAM_COLOR_R]), 0)
+            add_desc(LED_EFFECT_PARAM_COLOR_G, ParamType.COLOR, 0, 255, int(params[LED_EFFECT_PARAM_COLOR_G]), 0)
+            add_desc(LED_EFFECT_PARAM_COLOR_B, ParamType.COLOR, 0, 255, int(params[LED_EFFECT_PARAM_COLOR_B]), 0)
+
+        if mode == int(LEDEffect.KEY_STATE_DEMO):
+            add_desc(LED_EFFECT_PARAM_COLOR_R + 3, ParamType.COLOR, 0, 255, int(params[LED_EFFECT_PARAM_COLOR_R + 3]), 0)
+            add_desc(LED_EFFECT_PARAM_COLOR_G + 3, ParamType.COLOR, 0, 255, int(params[LED_EFFECT_PARAM_COLOR_G + 3]), 0)
+            add_desc(LED_EFFECT_PARAM_COLOR_B + 3, ParamType.COLOR, 0, 255, int(params[LED_EFFECT_PARAM_COLOR_B + 3]), 0)
+
+        descriptors.sort(key=lambda entry: int(entry["id"]))
+        return {
+            "effect_id": mode,
+            "total_chunks": 1,
+            "total_active": len(descriptors),
+            "descriptors": descriptors,
+        }
 
     def set_led_effect_params(self, effect_mode, params):
-        self._led_effect_params[int(effect_mode)] = list(params)
+        mode = int(effect_mode)
+        values = [int(v) & 0xFF for v in list(params)[:LED_EFFECT_PARAM_COUNT]]
+        while len(values) < LED_EFFECT_PARAM_COUNT:
+            values.append(0)
+        values[LED_EFFECT_PARAM_SPEED] = max(1, values[LED_EFFECT_PARAM_SPEED])
+        self._led_effect_params[mode] = list(values)
+        if mode == int(self._led_effect):
+            self._led_effect_color = [
+                values[LED_EFFECT_PARAM_COLOR_R],
+                values[LED_EFFECT_PARAM_COLOR_G],
+                values[LED_EFFECT_PARAM_COLOR_B],
+            ]
+        return True
+
+    def led_set_audio_spectrum(self, bands, impact_level=0):
+        values = [max(0, min(255, int(v))) for v in list(bands or [])[:LED_AUDIO_SPECTRUM_BAND_COUNT]]
+        if not values:
+            return False
+        if len(values) < LED_AUDIO_SPECTRUM_BAND_COUNT:
+            values.extend([0] * (LED_AUDIO_SPECTRUM_BAND_COUNT - len(values)))
+        self._audio_spectrum_bands = values[:LED_AUDIO_SPECTRUM_BAND_COUNT]
+        self._audio_spectrum_impact = max(0, min(255, int(impact_level)))
+        return True
+
+    def led_clear_audio_spectrum(self):
+        self._audio_spectrum_bands = [0] * LED_AUDIO_SPECTRUM_BAND_COUNT
+        self._audio_spectrum_impact = 0
         return True
 
     def get_led_fps_limit(self):
@@ -408,13 +522,6 @@ class DemoDevice:
 
     def set_led_fps_limit(self, fps):
         self._led_fps_limit = int(fps)
-        return True
-
-    def get_led_diagnostic(self):
-        return int(self._led_diagnostic)
-
-    def set_led_diagnostic(self, mode):
-        self._led_diagnostic = int(mode)
         return True
 
     def led_get_brightness(self):

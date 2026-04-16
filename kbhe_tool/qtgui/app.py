@@ -37,7 +37,11 @@ from .pages import (
 from .session import AppSession
 from .theme import apply_app_style, current_theme_mode
 from .widgets import StatusPill, make_primary_button, make_secondary_button
-from ..windows_volume import get_default_render_volume_level
+from ..windows_volume import (
+    get_last_render_spectrum_source,
+    get_default_render_spectrum_levels,
+    get_default_render_volume_level,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +83,13 @@ class KBHEQtMainWindow(QMainWindow):
         self.live_timer = QTimer(self)
         self.live_timer.timeout.connect(self._on_live_tick)
         self.volume_timer = QTimer(self)
-        self.volume_timer.setInterval(150)
+        self.volume_timer.setInterval(25)
         self.volume_timer.timeout.connect(self._on_volume_tick)
         self._last_host_volume_level: int | None = None
         self._last_host_volume_push_monotonic = 0.0
+        self._last_audio_spectrum: list[int] | None = None
+        self._last_audio_spectrum_push_monotonic = 0.0
+        self._last_audio_spectrum_source = "none"
 
         self.setWindowTitle("KBHE Configurator")
         self.resize(1440, 900)
@@ -298,6 +305,9 @@ class KBHEQtMainWindow(QMainWindow):
         if not connected:
             self._last_host_volume_level = None
             self._last_host_volume_push_monotonic = 0.0
+            self._last_audio_spectrum = None
+            self._last_audio_spectrum_push_monotonic = 0.0
+            self._last_audio_spectrum_source = "none"
 
     def _on_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
         if enabled:
@@ -324,22 +334,48 @@ class KBHEQtMainWindow(QMainWindow):
         if not self.session.connected:
             return
 
-        level = get_default_render_volume_level()
-        if level is None:
-            return
-
         now = time.monotonic()
-        should_push = (
-            self._last_host_volume_level is None
-            or self._last_host_volume_level != level
-            or (now - self._last_host_volume_push_monotonic) >= 0.75
-        )
+        level = get_default_render_volume_level()
+        if level is not None:
+            should_push = (
+                self._last_host_volume_level is None
+                or self._last_host_volume_level != level
+                or (now - self._last_host_volume_push_monotonic) >= 0.75
+            )
 
-        if should_push:
+            if should_push:
+                try:
+                    if self.session.device.led_set_volume_overlay(level):
+                        self._last_host_volume_level = level
+                        self._last_host_volume_push_monotonic = now
+                except Exception:
+                    pass
+
+        spectrum = get_default_render_spectrum_levels(16)
+        if spectrum is not None:
+            self._last_audio_spectrum_source = get_last_render_spectrum_source()
+            impact = min(255, int((max(spectrum) if spectrum else 0) * 1.6))
+            should_push_spectrum = (
+                self._last_audio_spectrum is None
+                or self._last_audio_spectrum != spectrum
+                or (now - self._last_audio_spectrum_push_monotonic) >= 0.04
+            )
+
+            if should_push_spectrum:
+                try:
+                    if self.session.device.led_set_audio_spectrum(spectrum, impact):
+                        self._last_audio_spectrum = list(spectrum)
+                        self._last_audio_spectrum_push_monotonic = now
+                except Exception:
+                    pass
+        elif self._last_audio_spectrum is not None and (
+            now - self._last_audio_spectrum_push_monotonic
+        ) >= 0.30:
             try:
-                if self.session.device.led_set_volume_overlay(level):
-                    self._last_host_volume_level = level
-                    self._last_host_volume_push_monotonic = now
+                if self.session.device.led_clear_audio_spectrum():
+                    self._last_audio_spectrum = None
+                    self._last_audio_spectrum_push_monotonic = now
+                    self._last_audio_spectrum_source = "none"
             except Exception:
                 pass
 
@@ -466,6 +502,10 @@ class KBHEQtMainWindow(QMainWindow):
         if self.session.connected:
             try:
                 self.session.device.led_clear_volume_overlay()
+            except Exception:
+                pass
+            try:
+                self.session.device.led_clear_audio_spectrum()
             except Exception:
                 pass
         if self.active_page_id and self.active_page_id in self.pages:

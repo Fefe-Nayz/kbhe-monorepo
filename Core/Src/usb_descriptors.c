@@ -268,8 +268,8 @@ static void generate_desc_configuration(uint8_t *dst) {
                                0x80 | EPNUM_RAW_HID_IN, HID_EP_SIZE,
                                RAW_HID_POLL_INTERVAL),
 
-      // Interface 2: NKRO keyboard HID
-      TUD_HID_DESCRIPTOR(ITF_NUM_NKRO, STRID_NKRO, HID_ITF_PROTOCOL_KEYBOARD,
+      // Interface 2: NKRO keyboard HID (non-boot; legacy hosts use interface 0)
+      TUD_HID_DESCRIPTOR(ITF_NUM_NKRO, STRID_NKRO, HID_ITF_PROTOCOL_NONE,
                          sizeof(desc_nkro_report), EPNUM_NKRO, HID_EP_SIZE,
                          HID_POLL_INTERVAL_8KHZ),
 

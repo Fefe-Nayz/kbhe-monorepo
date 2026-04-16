@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x0013         // Trigger model cleanup: remove rapid_trigger_activation
+#define SETTINGS_VERSION 0x001B         // Phase-3B: compact gamepad struct (removed reserved_deadzone)
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -36,10 +36,18 @@ extern "C" {
 #define GAMEPAD_CURVE_POINT_COUNT 4u
 #define GAMEPAD_CURVE_MAX_DISTANCE_01MM 400u // 4.00 mm
 #define SETTINGS_LAYER_COUNT 4u
+#define SETTINGS_PROFILE_COUNT 4u
+#define SETTINGS_PROFILE_NAME_LENGTH 16u
 #define SETTINGS_DYNAMIC_ZONE_COUNT 4u
 #define SETTINGS_ADVANCED_TICK_RATE_MIN 1u
 #define SETTINGS_ADVANCED_TICK_RATE_MAX 100u
 #define SETTINGS_DEFAULT_ADVANCED_TICK_RATE 1u
+#define SETTINGS_DKS_BOTTOM_OUT_POINT_MIN_TENTHS 1u
+#define SETTINGS_DKS_BOTTOM_OUT_POINT_MAX_TENTHS 40u
+#define SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS 40u
+#define SETTINGS_SOCD_FULLY_PRESSED_POINT_MIN_TENTHS 1u
+#define SETTINGS_SOCD_FULLY_PRESSED_POINT_MAX_TENTHS 40u
+#define SETTINGS_SOCD_FULLY_PRESSED_POINT_DEFAULT_TENTHS 40u
 #define SETTINGS_KEYBOARD_NAME_LENGTH 32u
 
 //--------------------------------------------------------------------+
@@ -127,6 +135,27 @@ typedef enum {
   ROTARY_PROGRESS_STYLE_MAX
 } rotary_progress_style_t;
 
+typedef enum {
+  ROTARY_BINDING_MODE_INTERNAL = 0,
+  ROTARY_BINDING_MODE_KEYCODE = 1,
+  ROTARY_BINDING_MODE_MAX
+} rotary_binding_mode_t;
+
+typedef enum {
+  ROTARY_BINDING_LAYER_ACTIVE = 0,
+  ROTARY_BINDING_LAYER_FIXED = 1,
+  ROTARY_BINDING_LAYER_MAX
+} rotary_binding_layer_mode_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t mode; // rotary_binding_mode_t
+  uint16_t keycode;
+  uint8_t modifier_mask_exact;
+  uint16_t fallback_no_mod_keycode;
+  uint8_t layer_mode;  // rotary_binding_layer_mode_t
+  uint8_t layer_index; // Valid only when layer_mode=fixed
+} settings_rotary_binding_t;
+
 typedef struct __attribute__((packed)) {
   uint8_t rotation_action;
   uint8_t button_action;
@@ -140,6 +169,9 @@ typedef struct __attribute__((packed)) {
   uint8_t progress_color_r;
   uint8_t progress_color_g;
   uint8_t progress_color_b;
+  settings_rotary_binding_t cw_binding;
+  settings_rotary_binding_t ccw_binding;
+  settings_rotary_binding_t click_binding;
 } settings_rotary_encoder_t;
 
 //--------------------------------------------------------------------+
@@ -155,8 +187,7 @@ typedef struct __attribute__((packed)) {
   uint8_t raw_hid_echo : 1;          // Enable RAW HID echo mode
   uint8_t led_enabled : 1;           // Enable LED matrix
   uint8_t nkro_enabled : 1;          // Auto mode: try NKRO, fallback to 6KRO
-  uint8_t gamepad_with_keyboard : 1; // Send keyboard along with gamepad
-  uint8_t reserved : 2;              // Reserved for future use
+  uint8_t reserved : 3;              // Reserved for future use
 } settings_options_t;
 
 /**
@@ -196,33 +227,46 @@ typedef enum {
   KEY_BEHAVIOR_NORMAL = 0,
   KEY_BEHAVIOR_TAP_HOLD = 1,
   KEY_BEHAVIOR_TOGGLE = 2,
-  KEY_BEHAVIOR_DYNAMIC = 3,
+  KEY_BEHAVIOR_DYNAMIC = 3, // Dynamic Keystroke (DKS)
   KEY_BEHAVIOR_MAX
 } key_behavior_mode_t;
 
 typedef struct __attribute__((packed)) {
-  uint8_t end_mm_tenths; // Inclusive upper bound of the zone in 0.1 mm
-  uint16_t hid_keycode;  // Action sent while the key travel is in this zone
+  // DKS action bitmap:
+  // bit 0-1: key press
+  // bit 2-3: key fully pressed
+  // bit 4-5: key release from fully pressed
+  // bit 6-7: key release
+  uint8_t end_mm_tenths;
+  uint16_t hid_keycode; // Binding keycode for this DKS slot
 } settings_dynamic_zone_t;
+
+#define SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK 0x01u
+#define SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK 0x02u
 
 typedef struct __attribute__((packed)) {
   uint8_t behavior_mode;            // key_behavior_mode_t
   uint8_t hold_threshold_10ms;      // Tap-hold / toggle hold threshold
-  uint8_t dynamic_zone_count;       // 1..4 when dynamic mapping is enabled
-  uint8_t reserved;
+  uint8_t dynamic_zone_count;       // DKS bottom-out point in 0.1 mm
+  uint8_t reserved;                 // Tap-hold option flags
   uint16_t secondary_hid_keycode;   // Hold / alternate action
   settings_dynamic_zone_t dynamic_zones[SETTINGS_DYNAMIC_ZONE_COUNT];
+  uint8_t socd_fully_pressed_point_tenths;
 } settings_key_advanced_t;
 
 typedef enum {
   SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS = 0,
   SETTINGS_SOCD_RESOLUTION_MOST_PRESSED_WINS = 1,
+  SETTINGS_SOCD_RESOLUTION_ABSOLUTE_PRIORITY_KEY1 = 2,
+  SETTINGS_SOCD_RESOLUTION_ABSOLUTE_PRIORITY_KEY2 = 3,
+  SETTINGS_SOCD_RESOLUTION_NEUTRAL = 4,
   SETTINGS_SOCD_RESOLUTION_MAX
 } settings_socd_resolution_t;
 
 #define SETTINGS_SOCD_PAIR_NONE 0xFFu
-#define SETTINGS_KEY_SOCD_RESOLUTION_MASK 0x03u
-#define SETTINGS_KEY_CONTINUOUS_RAPID_TRIGGER_MASK 0x04u
+#define SETTINGS_KEY_SOCD_RESOLUTION_MASK 0x07u
+#define SETTINGS_KEY_CONTINUOUS_RAPID_TRIGGER_MASK 0x08u
+#define SETTINGS_KEY_SOCD_FULLY_PRESSED_ENABLE_MASK 0x10u
 
 /**
  * @brief Key-specific settings
@@ -239,7 +283,7 @@ typedef struct __attribute__((packed)) {
   uint8_t
       disable_kb_on_gamepad : 1; // Disable keyboard output when gamepad active
   uint8_t curve_enabled : 1;     // Enable custom analog curve
-  uint8_t reserved_bits : 5;     // Reserved bits
+  uint8_t reserved_bits : 5;     // SOCD mode + continuous RT + SOCD fully pressed
   settings_curve_t curve;        // Per-key analog curve (4 bytes)
   settings_gamepad_mapping_t gamepad_map; // Per-key gamepad mapping (4 bytes)
   settings_key_advanced_t advanced;     // Advanced per-key behaviors
@@ -299,6 +343,80 @@ static inline void settings_key_set_continuous_rapid_trigger(
   }
 }
 
+static inline bool
+settings_key_is_socd_fully_pressed_enabled(const settings_key_t *key) {
+  if (key == 0) {
+    return false;
+  }
+
+  return (key->reserved_bits & SETTINGS_KEY_SOCD_FULLY_PRESSED_ENABLE_MASK) != 0u;
+}
+
+static inline void settings_key_set_socd_fully_pressed_enabled(
+    settings_key_t *key, bool enabled) {
+  if (key == 0) {
+    return;
+  }
+
+  if (enabled) {
+    key->reserved_bits |= SETTINGS_KEY_SOCD_FULLY_PRESSED_ENABLE_MASK;
+  } else {
+    key->reserved_bits =
+        (uint8_t)(key->reserved_bits &
+                  (uint8_t)(~SETTINGS_KEY_SOCD_FULLY_PRESSED_ENABLE_MASK));
+  }
+}
+
+static inline bool settings_key_is_tap_hold_hold_on_other_key_press(
+    const settings_key_t *key) {
+  if (key == 0) {
+    return false;
+  }
+
+  return (key->advanced.reserved &
+          SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK) != 0u;
+}
+
+static inline void settings_key_set_tap_hold_hold_on_other_key_press(
+    settings_key_t *key, bool enabled) {
+  if (key == 0) {
+    return;
+  }
+
+  if (enabled) {
+    key->advanced.reserved |= SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK;
+  } else {
+    key->advanced.reserved =
+        (uint8_t)(key->advanced.reserved &
+                  (uint8_t)(~SETTINGS_KEY_ADV_TAP_HOLD_HOLD_ON_OTHER_MASK));
+  }
+}
+
+static inline bool
+settings_key_is_tap_hold_uppercase_hold(const settings_key_t *key) {
+  if (key == 0) {
+    return false;
+  }
+
+  return (key->advanced.reserved &
+          SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK) != 0u;
+}
+
+static inline void settings_key_set_tap_hold_uppercase_hold(
+    settings_key_t *key, bool enabled) {
+  if (key == 0) {
+    return;
+  }
+
+  if (enabled) {
+    key->advanced.reserved |= SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK;
+  } else {
+    key->advanced.reserved =
+        (uint8_t)(key->advanced.reserved &
+                  (uint8_t)(~SETTINGS_KEY_ADV_TAP_HOLD_UPPERCASE_HOLD_MASK));
+  }
+}
+
 /**
  * @brief Calibration settings for ADC offset correction
  */
@@ -312,7 +430,6 @@ typedef struct __attribute__((packed)) {
  * @brief Gamepad settings
  */
 typedef struct __attribute__((packed)) {
-  uint8_t radial_deadzone;   // Deprecated compatibility field, curve[0].x_01mm is authoritative
   uint8_t keyboard_routing;  // gamepad_keyboard_routing_t
   uint8_t square_mode;       // Preserve full diagonal output
   uint8_t reactive_stick;    // Strongest opposing direction wins
@@ -328,6 +445,30 @@ typedef struct __attribute__((packed)) {
   uint8_t brightness;                    // Global brightness (0-255)
   uint8_t reserved[3];                   // Padding for alignment
 } settings_led_t;
+
+/**
+ * @brief Full per-profile persistent configuration snapshot.
+ */
+typedef struct __attribute__((packed)) {
+  settings_key_t keys[NUM_KEYS];
+  uint16_t layer_keycodes[SETTINGS_LAYER_COUNT - 1u][NUM_KEYS];
+  settings_key_advanced_t advanced_by_layer[SETTINGS_LAYER_COUNT][NUM_KEYS];
+  settings_gamepad_t gamepad;
+  settings_led_t led;
+  uint8_t led_effect_mode;
+  uint8_t led_effect_speed;
+  uint8_t led_effect_color_r;
+  uint8_t led_effect_color_g;
+  uint8_t led_effect_color_b;
+  uint8_t led_fps_limit;
+  uint8_t led_effect_params[LED_EFFECT_MAX][LED_EFFECT_PARAM_COUNT];
+  settings_rotary_encoder_t rotary;
+  uint8_t filter_enabled;
+  uint8_t filter_noise_band;
+  uint8_t filter_alpha_min;
+  uint8_t filter_alpha_max;
+  uint8_t advanced_tick_rate;
+} settings_profile_t;
 
 /**
  * @brief Complete settings structure stored in flash
@@ -357,7 +498,7 @@ typedef struct __attribute__((packed)) {
 
   // LED effect settings
   uint8_t led_effect_mode;  // Current effect mode
-  uint8_t led_effect_speed; // Effect animation speed
+  uint8_t led_effect_speed; // Deprecated mirror of active effect speed
   uint8_t led_effect_color_r;
   uint8_t led_effect_color_g;
   uint8_t led_effect_color_b;
@@ -371,7 +512,15 @@ typedef struct __attribute__((packed)) {
   uint8_t filter_alpha_min;  // Alpha min denominator (1/N, default 32)
   uint8_t filter_alpha_max;  // Alpha max denominator (1/N, default 4)
   uint8_t advanced_tick_rate; // Delay in scan ticks between advanced actions
+
+  // Global non-profile metadata
   char keyboard_name[SETTINGS_KEYBOARD_NAME_LENGTH];
+  uint8_t active_profile_index;
+  uint8_t profile_used_mask;
+  char profile_names[SETTINGS_PROFILE_COUNT][SETTINGS_PROFILE_NAME_LENGTH];
+
+  // Persistent snapshots for all profile slots
+  settings_profile_t profiles[SETTINGS_PROFILE_COUNT];
 
   // Footer
   uint32_t magic_end; // Magic number to validate end
@@ -395,14 +544,6 @@ typedef struct __attribute__((packed)) {
    .led_enabled = 1,                                                           \
    .reserved = 0}
 
-// Legacy default HID keycodes kept for compatibility with old bring-up code.
-#define HID_KEY_Q_CODE 0x14
-#define HID_KEY_W_CODE 0x1A
-#define HID_KEY_E_CODE 0x08
-#define HID_KEY_A_CODE 0x04
-#define HID_KEY_S_CODE 0x16
-#define HID_KEY_D_CODE 0x07
-
 // Default curve: linear (control points at 1/3 and 2/3 of the line)
 #define SETTINGS_DEFAULT_CURVE {.p1 = {85, 85}, .p2 = {170, 170}}
 
@@ -410,81 +551,11 @@ typedef struct __attribute__((packed)) {
 #define SETTINGS_DEFAULT_GAMEPAD_MAP                                           \
   {.axis = 0, .direction = 0, .button = 0, .reserved = 0}
 
-// Default key settings template used for all keys. The runtime default keycode is
-// derived from the physical keyboard layout in layout.c.
-#define SETTINGS_DEFAULT_KEY_0                                                 \
-  {.hid_keycode = HID_KEY_Q_CODE,                                              \
-  .actuation_point_mm = 12,                                                   \
-  .release_point_mm = 12,                                                     \
-   .rapid_trigger_press = 30,                                                  \
-   .rapid_trigger_release = 30,                                                \
-   .socd_pair = 255,                                                           \
-   .rapid_trigger_enabled = 0,                                                 \
-   .curve_enabled = 0,                                                         \
-   .curve = SETTINGS_DEFAULT_CURVE,                                            \
-   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
-#define SETTINGS_DEFAULT_KEY_1                                                 \
-  {.hid_keycode = HID_KEY_W_CODE,                                              \
-  .actuation_point_mm = 12,                                                   \
-  .release_point_mm = 12,                                                     \
-   .rapid_trigger_press = 30,                                                  \
-   .rapid_trigger_release = 30,                                                \
-   .socd_pair = 255,                                                           \
-   .rapid_trigger_enabled = 0,                                                 \
-   .curve_enabled = 0,                                                         \
-   .curve = SETTINGS_DEFAULT_CURVE,                                            \
-   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
-#define SETTINGS_DEFAULT_KEY_2                                                 \
-  {.hid_keycode = HID_KEY_E_CODE,                                              \
-  .actuation_point_mm = 12,                                                   \
-  .release_point_mm = 12,                                                     \
-   .rapid_trigger_press = 30,                                                  \
-   .rapid_trigger_release = 30,                                                \
-   .socd_pair = 255,                                                           \
-   .rapid_trigger_enabled = 0,                                                 \
-   .curve_enabled = 0,                                                         \
-   .curve = SETTINGS_DEFAULT_CURVE,                                            \
-   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
-#define SETTINGS_DEFAULT_KEY_3                                                 \
-  {.hid_keycode = HID_KEY_A_CODE,                                              \
-  .actuation_point_mm = 12,                                                   \
-  .release_point_mm = 12,                                                     \
-   .rapid_trigger_press = 30,                                                  \
-   .rapid_trigger_release = 30,                                                \
-   .socd_pair = 5,                                                             \
-   .rapid_trigger_enabled = 0,                                                 \
-   .curve_enabled = 0,                                                         \
-   .curve = SETTINGS_DEFAULT_CURVE,                                            \
-   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
-#define SETTINGS_DEFAULT_KEY_4                                                 \
-  {.hid_keycode = HID_KEY_S_CODE,                                              \
-  .actuation_point_mm = 12,                                                   \
-  .release_point_mm = 12,                                                     \
-   .rapid_trigger_press = 30,                                                  \
-   .rapid_trigger_release = 30,                                                \
-   .socd_pair = 255,                                                           \
-   .rapid_trigger_enabled = 0,                                                 \
-   .curve_enabled = 0,                                                         \
-   .curve = SETTINGS_DEFAULT_CURVE,                                            \
-   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
-#define SETTINGS_DEFAULT_KEY_5                                                 \
-  {.hid_keycode = HID_KEY_D_CODE,                                              \
-  .actuation_point_mm = 12,                                                   \
-  .release_point_mm = 12,                                                     \
-   .rapid_trigger_press = 30,                                                  \
-   .rapid_trigger_release = 30,                                                \
-   .socd_pair = 3,                                                             \
-   .rapid_trigger_enabled = 0,                                                 \
-   .curve_enabled = 0,                                                         \
-   .curve = SETTINGS_DEFAULT_CURVE,                                            \
-   .gamepad_map = SETTINGS_DEFAULT_GAMEPAD_MAP}
-
 #define SETTINGS_DEFAULT_GAMEPAD                                               \
-  {.radial_deadzone = 0,                                                       \
-   .keyboard_routing = GAMEPAD_KEYBOARD_ROUTING_UNMAPPED_ONLY,                 \
+  {.keyboard_routing = GAMEPAD_KEYBOARD_ROUTING_UNMAPPED_ONLY,                 \
    .square_mode = 0,                                                           \
    .reactive_stick = 0,                                                        \
-  .api_mode = GAMEPAD_API_XINPUT,                                             \
+   .api_mode = GAMEPAD_API_XINPUT,                                             \
    .curve = {{0u, 0u}, {133u, 85u}, {266u, 170u}, {GAMEPAD_CURVE_MAX_DISTANCE_01MM, 255u}}}
 
 // Default calibration values (from offset.c)
@@ -625,6 +696,91 @@ uint8_t settings_get_advanced_tick_rate(void);
  */
 bool settings_set_advanced_tick_rate(uint8_t tick_rate);
 
+/**
+ * @brief Get currently active persistent profile slot.
+ * @return Profile index (0..SETTINGS_PROFILE_COUNT-1)
+ */
+uint8_t settings_get_active_profile_index(void);
+
+/**
+ * @brief Set currently active persistent profile slot.
+ * @param profile_index Profile index (0..SETTINGS_PROFILE_COUNT-1)
+ * @return true if successful
+ */
+bool settings_set_active_profile_index(uint8_t profile_index);
+
+/**
+ * @brief Return bitmask of profile slots currently used/persisted on MCU.
+ * bit N corresponds to profile slot N.
+ */
+uint8_t settings_get_profile_used_mask(void);
+
+/**
+ * @brief Check whether a profile slot is currently used.
+ */
+bool settings_is_profile_slot_used(uint8_t profile_index);
+
+/**
+ * @brief Create a profile in the first free slot.
+ *
+ * @param name Optional profile name bytes (ASCII sanitized). Can be NULL.
+ * @param length Input length in bytes.
+ * @return Created slot index [0..SETTINGS_PROFILE_COUNT-1], or -1 on failure.
+ */
+int8_t settings_create_profile(const char *name, uint8_t length);
+
+/**
+ * @brief Delete a profile slot.
+ *
+ * Cannot delete the last remaining used slot.
+ *
+ * @param profile_index Slot index to delete.
+ * @return true if deleted.
+ */
+bool settings_delete_profile(uint8_t profile_index);
+
+/**
+ * @brief Copy one profile slot into another slot.
+ *
+ * If target slot is unused, it becomes used and receives a default slot name.
+ *
+ * @param source_profile_index Source slot index.
+ * @param target_profile_index Target slot index.
+ * @return true if copied.
+ */
+bool settings_copy_profile_slot(uint8_t source_profile_index,
+                                uint8_t target_profile_index);
+
+/**
+ * @brief Reset one used profile slot to factory defaults.
+ *
+ * The slot name and used-mask membership are preserved.
+ *
+ * @param profile_index Slot index to reset.
+ * @return true if reset.
+ */
+bool settings_reset_profile_slot(uint8_t profile_index);
+
+/**
+ * @brief Get profile name for one slot.
+ * @param profile_index Profile index (0..SETTINGS_PROFILE_COUNT-1)
+ * @return Pointer to NUL-terminated profile name, or NULL on invalid index
+ */
+const char *settings_get_profile_name(uint8_t profile_index);
+
+/**
+ * @brief Set profile name for one slot.
+ *
+ * Input bytes are sanitized to printable ASCII.
+ *
+ * @param profile_index Profile index (0..SETTINGS_PROFILE_COUNT-1)
+ * @param name Input bytes (not required to be NUL-terminated)
+ * @param length Number of input bytes
+ * @return true if accepted
+ */
+bool settings_set_profile_name(uint8_t profile_index, const char *name,
+                               uint8_t length);
+
 //--------------------------------------------------------------------+
 // LED Matrix Settings API
 //--------------------------------------------------------------------+
@@ -697,14 +853,14 @@ uint8_t settings_get_led_effect_mode(void);
 bool settings_set_led_effect_mode(uint8_t mode);
 
 /**
- * @brief Get LED effect speed
- * @return Current effect speed
+ * @brief Get speed for the currently selected LED effect
+ * @return Current effect speed parameter
  */
 uint8_t settings_get_led_effect_speed(void);
 
 /**
- * @brief Set LED effect speed
- * @param speed Effect speed
+ * @brief Set speed for the currently selected LED effect
+ * @param speed Effect speed parameter
  * @return true if successful
  */
 bool settings_set_led_effect_speed(uint8_t speed);
@@ -723,7 +879,10 @@ uint8_t settings_get_led_fps_limit(void);
 bool settings_set_led_fps_limit(uint8_t fps_limit);
 
 /**
- * @brief Get LED effect color
+ * @brief Get active effect color (compatibility wrapper).
+ *
+ * Color values come from the active effect parameter block
+ * (`LED_EFFECT_PARAM_COLOR_*`).
  * @param r Pointer to store red value
  * @param g Pointer to store green value
  * @param b Pointer to store blue value
@@ -731,7 +890,10 @@ bool settings_set_led_fps_limit(uint8_t fps_limit);
 void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b);
 
 /**
- * @brief Set LED effect color
+ * @brief Set active effect color (compatibility wrapper).
+ *
+ * Color values are written into the active effect parameter block
+ * (`LED_EFFECT_PARAM_COLOR_*`).
  * @param r Red value
  * @param g Green value
  * @param b Blue value
@@ -800,6 +962,62 @@ bool settings_set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
  * @return Pointer to key settings or NULL if invalid index
  */
 const settings_key_t *settings_get_key(uint8_t key_index);
+
+/**
+ * @brief Get effective key settings for the active profile and one layer/key.
+ *
+ * Layer-dependent advanced behavior is resolved from profile storage while
+ * retaining per-key trigger parameters from layer 0.
+ *
+ * @param key_index Physical key index
+ * @param layer_index Logical layer index
+ * @param key Output settings structure
+ * @return true if successful
+ */
+bool settings_get_key_for_layer(uint8_t key_index, uint8_t layer_index,
+                                settings_key_t *key);
+
+/**
+ * @brief Set effective key settings for the active profile and one layer/key.
+ *
+ * For layer 0 this updates the full per-key trigger settings. For layers 1..N,
+ * only layer keycode + layer-dependent advanced behavior are updated.
+ *
+ * @param key_index Physical key index
+ * @param layer_index Logical layer index
+ * @param key Input settings
+ * @return true if successful
+ */
+bool settings_set_key_for_layer(uint8_t key_index, uint8_t layer_index,
+                                const settings_key_t *key);
+
+/**
+ * @brief Get effective key settings for a specific profile and layer/key.
+ *
+ * @param profile_index Profile slot index
+ * @param layer_index Logical layer index
+ * @param key_index Physical key index
+ * @param key Output settings structure
+ * @return true if successful
+ */
+bool settings_get_profile_layer_key_settings(uint8_t profile_index,
+                                             uint8_t layer_index,
+                                             uint8_t key_index,
+                                             settings_key_t *key);
+
+/**
+ * @brief Set effective key settings for a specific profile and layer/key.
+ *
+ * @param profile_index Profile slot index
+ * @param layer_index Logical layer index
+ * @param key_index Physical key index
+ * @param key Input settings structure
+ * @return true if successful
+ */
+bool settings_set_profile_layer_key_settings(uint8_t profile_index,
+                                             uint8_t layer_index,
+                                             uint8_t key_index,
+                                             const settings_key_t *key);
 
 /**
  * @brief Set key settings for a specific key
@@ -995,19 +1213,6 @@ settings_get_key_gamepad_mapping(uint8_t key_index);
  */
 bool settings_set_key_gamepad_mapping(
     uint8_t key_index, const settings_gamepad_mapping_t *mapping);
-
-/**
- * @brief Check if gamepad+keyboard mode is enabled
- * @return true if keyboard should be sent along with gamepad
- */
-bool settings_is_gamepad_with_keyboard(void);
-
-/**
- * @brief Enable/disable gamepad+keyboard mode
- * @param enabled true to send keyboard along with gamepad
- * @return true if successful
- */
-bool settings_set_gamepad_with_keyboard(bool enabled);
 
 #ifdef __cplusplus
 }

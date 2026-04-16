@@ -41,6 +41,8 @@ STATUS_NAMES = {
 PROTOCOL_VERSION = 0x0001
 FLASH_WRITE_ALIGN = 4
 DATA_CHUNK_SIZE = 56
+READ_POLL_DELAY_S = 0.001
+DEVICE_POLL_DELAY_S = 0.02
 
 
 def default_logger(message):
@@ -131,7 +133,7 @@ def wait_for_path(find_fn, timeout_s, description):
         path = find_fn()
         if path is not None:
             return path
-        time.sleep(0.1)
+        time.sleep(DEVICE_POLL_DELAY_S)
     raise RuntimeError(f"timed out waiting for {description}")
 
 
@@ -140,7 +142,7 @@ def wait_for_absence(find_fn, timeout_s, description):
     while time.time() < deadline:
         if find_fn() is None:
             return
-        time.sleep(0.05)
+        time.sleep(DEVICE_POLL_DELAY_S)
     raise RuntimeError(f"timed out waiting for {description} to disconnect")
 
 
@@ -167,7 +169,7 @@ class HidDevice:
             data = self.device.read(PACKET_SIZE)
             if data:
                 return bytes(data)
-            time.sleep(0.01)
+            time.sleep(READ_POLL_DELAY_S)
         return None
 
     def transact(self, packet, timeout_s):
@@ -317,11 +319,13 @@ def flash_firmware(firmware_path, firmware_version, timeout_s, retries, logger=d
             progress = min(offset, len(firmware))
             percent = (progress * 100) // len(firmware)
             if logger is default_logger:
-                print(
-                    f"\rFlashing: {progress}/{len(firmware)} bytes ({percent}%)",
-                    end="",
-                    flush=True,
-                )
+                if percent != last_logged_percent:
+                    print(
+                        f"\rFlashing: {progress}/{len(firmware)} bytes ({percent}%)",
+                        end="",
+                        flush=True,
+                    )
+                    last_logged_percent = percent
             elif progress == len(firmware) or (percent % 5 == 0 and percent != last_logged_percent):
                 logger(f"Flashing: {progress}/{len(firmware)} bytes ({percent}%)")
                 last_logged_percent = percent
