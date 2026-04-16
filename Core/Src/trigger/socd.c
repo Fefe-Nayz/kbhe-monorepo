@@ -162,8 +162,14 @@ void socd_load_settings() {
             (socd_resolution_e)settings_key_get_socd_resolution(key_settings);
         socd_key_settings[i].fully_pressed_enabled =
             settings_key_is_socd_fully_pressed_enabled(key_settings);
-        socd_key_settings[i].fully_pressed_point_um =
-            (uint16_t)key_settings->advanced.socd_fully_pressed_point_tenths * 100u;
+        /* Only override the reset-to-default value when a valid threshold is
+         * stored.  A stored zero would make distance>=0 always true, which
+         * would permanently disable SOCD resolution. */
+        if (key_settings->advanced.socd_fully_pressed_point_tenths != 0u) {
+          socd_key_settings[i].fully_pressed_point_um =
+              (uint16_t)key_settings->advanced.socd_fully_pressed_point_tenths *
+              100u;
+        }
         socd_key_settings[i].is_socd_enabled = true;
         socd_key_settings[i].linked_key = linked_key;
     }
