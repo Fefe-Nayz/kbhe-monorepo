@@ -1630,6 +1630,56 @@ export class KBHEDevice {
     return null;
   }
 
+  async getDefaultProfile(): Promise<{ profile_index: number; profile_used_mask: number } | null> {
+    const response = await this.sendCommand(Command.GET_DEFAULT_PROFILE);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        profile_index: response[2] ?? 0xff,
+        profile_used_mask: response[3] ?? 0,
+      };
+    }
+    return null;
+  }
+
+  /** @param profileIndex Profile index 0-3, or 0xFF to clear the default. */
+  async setDefaultProfile(profileIndex: number): Promise<{ profile_index: number; profile_used_mask: number } | null> {
+    const response = await this.sendCommand(Command.SET_DEFAULT_PROFILE, [0, profileIndex & 0xff], 300);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        profile_index: response[2] ?? 0xff,
+        profile_used_mask: response[3] ?? 0,
+      };
+    }
+    return null;
+  }
+
+  async getRamOnlyMode(): Promise<boolean | null> {
+    const response = await this.sendCommand(Command.GET_RAM_ONLY_MODE);
+    if (response && response.length >= 3 && response[1] === Status.OK) {
+      return Boolean(response[2]);
+    }
+    return null;
+  }
+
+  /**
+   * Enter RAM-only mode: all subsequent settings writes go to MCU RAM only
+   * and are never persisted to flash.  Push all profile settings after calling
+   * this to load an inactive (app-only) profile into the keyboard.
+   */
+  async enterRamOnlyMode(): Promise<boolean> {
+    const response = await this.sendCommand(Command.SET_RAM_ONLY_MODE, [0, 1], 300);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  /**
+   * Exit RAM-only mode and reload the last-saved flash settings, discarding
+   * any RAM-only changes.  Call this when switching back to an active profile.
+   */
+  async exitRamOnlyMode(): Promise<boolean> {
+    const response = await this.sendCommand(Command.RELOAD_SETTINGS_FROM_FLASH, [], 1000);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
   async getFilterEnabled(): Promise<boolean | null> {
     const response = await this.sendCommand(Command.GET_FILTER_ENABLED);
     if (response && response.length >= 3 && response[1] === Status.OK) {

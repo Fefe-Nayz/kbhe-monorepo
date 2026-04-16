@@ -85,6 +85,7 @@ export function ColorPicker({ color, onChange, onLiveChange, className }: ColorP
   const draftColorRef = useRef<RGBColor>(color)
   const pendingCommitRef = useRef<RGBColor | null>(null)
   const clearDraftTimerRef = useRef<number | null>(null)
+  const pointerInteractionRef = useRef(false)
 
   useEffect(() => {
     if (!draftColor) {
@@ -180,12 +181,23 @@ export function ColorPicker({ color, onChange, onLiveChange, className }: ColorP
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
+        pointerInteractionRef.current = false
         commitCurrentDraft()
       }
       setOpen(nextOpen)
     },
     [commitCurrentDraft],
   )
+
+  const handlePointerDownCapture = useCallback(() => {
+    pointerInteractionRef.current = true
+  }, [])
+
+  const handlePointerRelease = useCallback(() => {
+    if (!pointerInteractionRef.current) return
+    pointerInteractionRef.current = false
+    commitCurrentDraft()
+  }, [commitCurrentDraft])
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -203,7 +215,10 @@ export function ColorPicker({ color, onChange, onLiveChange, className }: ColorP
       <PopoverContent
         className="w-72"
         align="start"
-        onPointerUpCapture={commitCurrentDraft}
+        onPointerDownCapture={handlePointerDownCapture}
+        onPointerUp={handlePointerRelease}
+        onPointerCancel={handlePointerRelease}
+        onLostPointerCapture={handlePointerRelease}
         onKeyUpCapture={event => {
           if (event.key === "Enter") {
             commitCurrentDraft()
