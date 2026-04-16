@@ -55,6 +55,8 @@ static uint16_t effect_offset = 0;
 
 // Effect renderer context flag: when true, pixel writes target runtime frame only.
 static bool effect_render_context = false;
+static uint16_t pixel_batch_depth = 0u;
+static bool pixel_batch_show_pending = false;
 
 typedef struct {
   bool active;
@@ -92,6 +94,12 @@ typedef struct {
   uint8_t v;
 } led_hsv_t;
 
+typedef struct {
+  uint8_t scale;
+  uint8_t bias;
+  bool initialized;
+} mxfx_runner_time_map_t;
+
 typedef void (*mxfx_reactive_math_f)(const led_hsv_t *base, led_hsv_t *hsv,
                                     uint16_t offset);
 typedef void (*mxfx_reactive_splash_math_f)(const led_hsv_t *base,
@@ -100,6 +108,10 @@ typedef void (*mxfx_reactive_splash_math_f)(const led_hsv_t *base,
                                            uint16_t tick);
 
 static mxfx_last_hit_t mxfx_last_hit_tracker = {0};
+
+static mxfx_runner_time_map_t mxfx_runner_time_i_map[LED_EFFECT_MAX] = {0};
+static mxfx_runner_time_map_t mxfx_runner_time_dxdy_map[LED_EFFECT_MAX] = {0};
+static mxfx_runner_time_map_t mxfx_runner_time_sincos_map[LED_EFFECT_MAX] = {0};
 
 static uint8_t audio_spectrum_levels[LED_AUDIO_SPECTRUM_BAND_COUNT] = {0};
 static uint8_t audio_impact_level = 0u;
@@ -301,6 +313,39 @@ static inline uint8_t effect_animation_speed(void) {
   return speed > 0u ? speed : 1u;
 }
 
+static inline uint32_t effect_interval_from_speed(uint8_t speed) {
+  uint32_t interval = 200u - ((uint32_t)speed * 195u / 255u);
+  return interval < 5u ? 5u : interval;
+}
+
+static inline uint8_t mxfx_runner_effect_id(void) {
+  uint8_t id = (uint8_t)current_effect;
+  return (id < (uint8_t)LED_EFFECT_MAX) ? id : 0u;
+}
+
+static inline uint8_t mxfx_runner_time_from_scale(mxfx_runner_time_map_t *map,
+                                                  uint8_t scale) {
+  uint16_t tick = (uint16_t)HAL_GetTick();
+  uint8_t raw = (uint8_t)(((uint32_t)tick * scale) >> 8);
+
+  if (!map->initialized) {
+    map->scale = scale;
+    map->bias = 0u;
+    map->initialized = true;
+    return raw;
+  }
+
+  if (map->scale != scale) {
+    uint8_t old_raw = (uint8_t)(((uint32_t)tick * map->scale) >> 8);
+    uint8_t old_time = (uint8_t)(old_raw + map->bias);
+    map->scale = scale;
+    raw = (uint8_t)(((uint32_t)tick * map->scale) >> 8);
+    map->bias = (uint8_t)(old_time - raw);
+  }
+
+  return (uint8_t)(raw + map->bias);
+}
+
 static inline bool effect_param_flag(uint8_t index, bool fallback) {
   return effect_param(index, fallback ? 1u : 0u) != 0u;
 }
@@ -358,19 +403,22 @@ static inline uint16_t mxfx_timer16(void) {
 }
 
 static inline uint8_t mxfx_runner_time_i(void) {
-  return (uint8_t)mxfx_scale16by8(mxfx_timer16(),
-                                 mxfx_qadd8((uint8_t)(effect_animation_speed() / 4u),
-                                           1u));
+  uint8_t id = mxfx_runner_effect_id();
+  uint8_t scale =
+      mxfx_qadd8((uint8_t)(effect_animation_speed() / 4u), 1u);
+  return mxfx_runner_time_from_scale(&mxfx_runner_time_i_map[id], scale);
 }
 
 static inline uint8_t mxfx_runner_time_dx_dy(void) {
-  return (uint8_t)mxfx_scale16by8(mxfx_timer16(),
-                                 (uint8_t)(effect_animation_speed() / 2u));
+  uint8_t id = mxfx_runner_effect_id();
+  uint8_t scale = (uint8_t)(effect_animation_speed() / 2u);
+  return mxfx_runner_time_from_scale(&mxfx_runner_time_dxdy_map[id], scale);
 }
 
 static inline uint8_t mxfx_runner_time_sin_cos(void) {
-  return (uint8_t)mxfx_scale16by8(mxfx_timer16(),
-                                 (uint8_t)(effect_animation_speed() / 4u));
+  uint8_t id = mxfx_runner_effect_id();
+  uint8_t scale = (uint8_t)(effect_animation_speed() / 4u);
+  return mxfx_runner_time_from_scale(&mxfx_runner_time_sincos_map[id], scale);
 }
 
 static uint8_t mxfx_sin8(uint8_t angle) {
@@ -1061,6 +1109,8 @@ bool led_matrix_init(void *htim, uint32_t channel) {
   display_enabled = true;
   initialized = true;
   last_sim_tick = 0;
+  pixel_batch_depth = 0u;
+  pixel_batch_show_pending = false;
 
   // Clear all LEDs
   zeroLedValues(&led_ws2812_handle);
@@ -1075,6 +1125,23 @@ void led_matrix_set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g,
 
   uint8_t idx = xy_to_index(x, y);
   led_matrix_set_pixel_idx(idx, r, g, b);
+}
+
+void led_matrix_begin_pixel_batch(void) {
+  pixel_batch_depth++;
+}
+
+void led_matrix_end_pixel_batch(void) {
+  if (pixel_batch_depth == 0u) {
+    return;
+  }
+
+  pixel_batch_depth--;
+  if (pixel_batch_depth == 0u && pixel_batch_show_pending && initialized &&
+      display_enabled) {
+    ws2812_show(&led_ws2812_handle);
+    pixel_batch_show_pending = false;
+  }
 }
 
 void led_matrix_get_pixel(uint8_t x, uint8_t y, uint8_t *r, uint8_t *g,
@@ -1115,7 +1182,11 @@ void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
     pixels_runtime[index * 3 + 2] = b;
     if (initialized && display_enabled) {
       push_runtime_pixel_to_ws2812(index);
-      ws2812_show(&led_ws2812_handle);
+      if (pixel_batch_depth > 0u) {
+        pixel_batch_show_pending = true;
+      } else {
+        ws2812_show(&led_ws2812_handle);
+      }
     }
     return;
   }
@@ -1128,7 +1199,11 @@ void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
     pixels_runtime[index * 3 + 2] = b;
     if (initialized && display_enabled) {
       push_runtime_pixel_to_ws2812(index);
-      ws2812_show(&led_ws2812_handle);
+      if (pixel_batch_depth > 0u) {
+        pixel_batch_show_pending = true;
+      } else {
+        ws2812_show(&led_ws2812_handle);
+      }
     }
     return;
   }
@@ -1363,6 +1438,10 @@ void led_matrix_test_rainbow(uint8_t offset) {
 //--------------------------------------------------------------------+
 
 void led_matrix_set_effect(led_effect_mode_t mode) {
+  if (mode == current_effect) {
+    return;
+  }
+
   led_effect_mode_t previous_effect = current_effect;
   current_effect = mode;
   effect_offset = 0;
@@ -1875,9 +1954,7 @@ void led_matrix_effect_tick(uint32_t tick) {
   // Effect animation speed (controls how fast effect_offset increments)
   // speed 1 = 200ms interval, speed 255 = 5ms interval
   uint8_t speed = effect_animation_speed();
-  uint32_t effect_interval = 200u - ((uint32_t)speed * 195u / 255u);
-  if (effect_interval < 5)
-    effect_interval = 5;
+  uint32_t effect_interval = effect_interval_from_speed(speed);
 
   // Update effect_offset based on effect speed (independent of render rate)
   // This ensures animation speed stays constant regardless of FPS limit

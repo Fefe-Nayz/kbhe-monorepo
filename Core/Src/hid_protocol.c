@@ -344,8 +344,9 @@ static void cmd_set_gamepad_enabled(const uint8_t *in, uint8_t *out) {
 
 static void cmd_save_settings(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
+  (void)in;
   resp->command_id = CMD_SAVE_SETTINGS;
-  resp->status_or_len = settings_save() ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->status_or_len = settings_request_save() ? HID_RESP_OK : HID_RESP_ERROR;
 }
 
 static void cmd_get_nkro_enabled(const uint8_t *in, uint8_t *out) {
@@ -1610,6 +1611,8 @@ static void cmd_get_led_pixel(const uint8_t *in, uint8_t *out) {
 static void cmd_set_led_pixel(const uint8_t *in, uint8_t *out) {
   const hid_packet_led_pixel_t *req = (const hid_packet_led_pixel_t *)in;
   hid_packet_led_pixel_t *resp = (hid_packet_led_pixel_t *)out;
+  bool third_party_mode =
+      settings_get_led_effect_mode() == (uint8_t)LED_EFFECT_THIRD_PARTY;
 
   resp->command_id = CMD_SET_LED_PIXEL;
 
@@ -1618,7 +1621,11 @@ static void cmd_set_led_pixel(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  settings_set_led_pixel(req->index, req->r, req->g, req->b);
+  if (third_party_mode) {
+    led_matrix_set_pixel_idx(req->index, req->r, req->g, req->b);
+  } else {
+    settings_set_led_pixel(req->index, req->r, req->g, req->b);
+  }
 
   resp->status = HID_RESP_OK;
   resp->index = req->index;
@@ -1649,6 +1656,8 @@ static void cmd_get_led_row(const uint8_t *in, uint8_t *out) {
 static void cmd_set_led_row(const uint8_t *in, uint8_t *out) {
   const hid_packet_led_row_t *req = (const hid_packet_led_row_t *)in;
   hid_packet_led_row_t *resp = (hid_packet_led_row_t *)out;
+  bool third_party_mode =
+      settings_get_led_effect_mode() == (uint8_t)LED_EFFECT_THIRD_PARTY;
 
   resp->command_id = CMD_SET_LED_ROW;
 
@@ -1657,11 +1666,26 @@ static void cmd_set_led_row(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  // Set each pixel in the row
-  for (int x = 0; x < LED_MATRIX_WIDTH; x++) {
-    uint8_t idx = req->row * LED_MATRIX_WIDTH + x;
-    settings_set_led_pixel(idx, req->pixels[x * 3], req->pixels[x * 3 + 1],
-                           req->pixels[x * 3 + 2]);
+  if (third_party_mode) {
+    // Third-party streaming must stay runtime-only and avoid dirty autosaves.
+    led_matrix_begin_pixel_batch();
+    for (int x = 0; x < LED_MATRIX_WIDTH; x++) {
+      uint8_t idx = req->row * LED_MATRIX_WIDTH + x;
+      led_matrix_set_pixel_idx(idx, req->pixels[x * 3], req->pixels[x * 3 + 1],
+                               req->pixels[x * 3 + 2]);
+    }
+    led_matrix_end_pixel_batch();
+  } else {
+    uint8_t pixels[LED_MATRIX_DATA_BYTES];
+    uint16_t offset = req->row * LED_MATRIX_WIDTH * 3u;
+
+    memcpy(pixels, settings_get_led_pixels(), LED_MATRIX_DATA_BYTES);
+    memcpy(&pixels[offset], req->pixels, 24u);
+
+    if (!settings_set_led_pixels(pixels)) {
+      resp->status = HID_RESP_ERROR;
+      return;
+    }
   }
 
   resp->status = HID_RESP_OK;
@@ -1698,6 +1722,8 @@ static void cmd_get_led_all(const uint8_t *in, uint8_t *out) {
 static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
   const hid_packet_led_chunk_t *req = (const hid_packet_led_chunk_t *)in;
   hid_packet_led_chunk_t *resp = (hid_packet_led_chunk_t *)out;
+  bool third_party_mode =
+      settings_get_led_effect_mode() == (uint8_t)LED_EFFECT_THIRD_PARTY;
 
   resp->command_id = CMD_SET_LED_ALL_CHUNK;
   resp->chunk_index = req->chunk_index;
@@ -1715,12 +1741,26 @@ static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  // Set pixels from chunk
-  for (uint16_t i = 0; i + 2 < req->chunk_size; i += 3) {
-    uint8_t idx = (offset + i) / 3;
-    if (idx < LED_MATRIX_SIZE) {
-      settings_set_led_pixel(idx, req->data[i], req->data[i + 1],
-                             req->data[i + 2]);
+  if (third_party_mode) {
+    // Third-party live chunks should not mutate persisted matrix storage.
+    led_matrix_begin_pixel_batch();
+    for (uint16_t i = 0; i + 2 < req->chunk_size; i += 3) {
+      uint8_t idx = (offset + i) / 3u;
+      if (idx < LED_MATRIX_SIZE) {
+        led_matrix_set_pixel_idx(idx, req->data[i], req->data[i + 1],
+                                 req->data[i + 2]);
+      }
+    }
+    led_matrix_end_pixel_batch();
+  } else {
+    uint8_t pixels[LED_MATRIX_DATA_BYTES];
+
+    memcpy(pixels, settings_get_led_pixels(), LED_MATRIX_DATA_BYTES);
+    memcpy(&pixels[offset], req->data, req->chunk_size);
+
+    if (!settings_set_led_pixels(pixels)) {
+      resp->status = HID_RESP_ERROR;
+      return;
     }
   }
 
@@ -1730,11 +1770,19 @@ static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
 
 static void cmd_led_clear(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
+  bool third_party_mode =
+      settings_get_led_effect_mode() == (uint8_t)LED_EFFECT_THIRD_PARTY;
+  (void)in;
   resp->command_id = CMD_LED_CLEAR;
 
-  // Clear all pixels to black
-  for (int i = 0; i < LED_MATRIX_SIZE; i++) {
-    settings_set_led_pixel(i, 0, 0, 0);
+  if (third_party_mode) {
+    led_matrix_clear();
+  } else {
+    uint8_t pixels[LED_MATRIX_DATA_BYTES] = {0};
+    if (!settings_set_led_pixels(pixels)) {
+      resp->status_or_len = HID_RESP_ERROR;
+      return;
+    }
   }
 
   resp->status_or_len = HID_RESP_OK;
@@ -1743,12 +1791,28 @@ static void cmd_led_clear(const uint8_t *in, uint8_t *out) {
 static void cmd_led_fill(const uint8_t *in, uint8_t *out) {
   const hid_packet_led_fill_t *req = (const hid_packet_led_fill_t *)in;
   hid_packet_led_fill_t *resp = (hid_packet_led_fill_t *)out;
+  bool third_party_mode =
+      settings_get_led_effect_mode() == (uint8_t)LED_EFFECT_THIRD_PARTY;
 
   resp->command_id = CMD_LED_FILL;
 
-  // Fill all pixels with the specified color
-  for (int i = 0; i < LED_MATRIX_SIZE; i++) {
-    settings_set_led_pixel(i, req->r, req->g, req->b);
+  if (third_party_mode) {
+    led_matrix_begin_pixel_batch();
+    led_matrix_fill(req->r, req->g, req->b);
+    led_matrix_end_pixel_batch();
+  } else {
+    uint8_t pixels[LED_MATRIX_DATA_BYTES];
+
+    for (uint8_t i = 0u; i < LED_MATRIX_SIZE; i++) {
+      pixels[i * 3u + 0u] = req->r;
+      pixels[i * 3u + 1u] = req->g;
+      pixels[i * 3u + 2u] = req->b;
+    }
+
+    if (!settings_set_led_pixels(pixels)) {
+      resp->status = HID_RESP_ERROR;
+      return;
+    }
   }
 
   resp->status = HID_RESP_OK;

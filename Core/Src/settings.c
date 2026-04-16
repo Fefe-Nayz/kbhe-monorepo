@@ -46,6 +46,10 @@ static settings_t current_settings;
 
 // Flag indicating if settings have been modified
 static bool settings_dirty = false;
+static bool settings_save_requested = false;
+static bool settings_save_in_progress = false;
+static uint32_t settings_save_snapshot_change_counter = 0u;
+static settings_t settings_save_snapshot;
 // When true, settings_save() is a no-op (inactive/RAM-only profile active)
 static bool settings_ram_only_mode = false;
 static uint32_t settings_change_counter = 0u;
@@ -56,6 +60,8 @@ static char settings_profile_name_cache[SETTINGS_PROFILE_COUNT]
                                       [SETTINGS_PROFILE_NAME_LENGTH + 1u];
 
 #define SETTINGS_AUTOSAVE_DELAY_MS 750u
+#define SETTINGS_REQUEST_SAVE_DELAY_MS 100u
+#define SETTINGS_FLASH_WORDS_PER_STEP 16u
 #define SETTINGS_PROFILE_MASK_ALL ((1u << SETTINGS_PROFILE_COUNT) - 1u)
 
 static uint8_t led_effect_restore_mode = LED_EFFECT_STATIC_MATRIX;
@@ -1221,19 +1227,14 @@ static void settings_set_defaults(void) {
   settings_set_default_keyboard_name(current_settings.keyboard_name,
                                      SETTINGS_KEYBOARD_NAME_LENGTH);
   current_settings.active_profile_index = 0u;
-  current_settings.profile_used_mask = 0x0Fu; /* All 4 profiles active */
+  current_settings.profile_used_mask = 0x01u; /* Only slot 0 active by default */
   memset(current_settings.profiles, 0, sizeof(current_settings.profiles));
-  /* Capture defaults into slot 0 first, then clone to all remaining slots */
+  /* Capture defaults into slot 0; additional slots are created on demand. */
   settings_profile_capture_current_slot(0u);
   settings_sanitize_profile_advanced_layers(&current_settings.profiles[0u]);
-  for (uint8_t i = 1u; i < SETTINGS_PROFILE_COUNT; i++) {
-    current_settings.profiles[i] = current_settings.profiles[0u];
-  }
-  for (uint8_t i = 0u; i < SETTINGS_PROFILE_COUNT; i++) {
-    memset(current_settings.profile_names[i], 0, SETTINGS_PROFILE_NAME_LENGTH);
-    settings_set_default_profile_name(i, current_settings.profile_names[i],
-                                      SETTINGS_PROFILE_NAME_LENGTH);
-  }
+  memset(current_settings.profile_names, 0, sizeof(current_settings.profile_names));
+  settings_set_default_profile_name(0u, current_settings.profile_names[0u],
+                                    SETTINGS_PROFILE_NAME_LENGTH);
   settings_keyboard_name_cache_refresh();
   settings_profile_name_cache_refresh();
   settings_reset_led_effect_restore_state();
@@ -1466,6 +1467,22 @@ bool settings_reset(void) {
 }
 
 bool settings_save(void) {
+  if (settings_save_in_progress) {
+    while (true) {
+      flash_storage_async_result_t step =
+          flash_storage_write_async_step(256u);
+      if (step == FLASH_STORAGE_ASYNC_IN_PROGRESS) {
+        continue;
+      }
+
+      settings_save_in_progress = false;
+      if (step == FLASH_STORAGE_ASYNC_ERROR) {
+        return false;
+      }
+      break;
+    }
+  }
+
   // RAM-only mode: writes stay in RAM and are never persisted to flash.
   if (settings_ram_only_mode) {
     return true;
@@ -1484,18 +1501,87 @@ bool settings_save(void) {
   }
 
   settings_dirty = false;
+  settings_save_requested = false;
   settings_last_seen_change_counter = settings_change_counter;
   return true;
 }
 
+bool settings_request_save(void) {
+  if (!settings_dirty) {
+    settings_save_requested = false;
+    return true;
+  }
+
+  settings_save_requested = true;
+  return true;
+}
+
+static bool settings_start_async_save(void) {
+  if (settings_save_in_progress) {
+    return true;
+  }
+
+  // RAM-only mode: no flash write is scheduled.
+  if (settings_ram_only_mode) {
+    settings_dirty = false;
+    settings_save_requested = false;
+    settings_last_seen_change_counter = settings_change_counter;
+    return true;
+  }
+
+  settings_profile_sync_active_slot();
+  memcpy(&settings_save_snapshot, &current_settings, sizeof(settings_t));
+  settings_save_snapshot.crc32 =
+      crc32_compute(&settings_save_snapshot,
+                    sizeof(settings_t) - sizeof(uint32_t));
+
+  if (!flash_storage_write_async_begin(0u, &settings_save_snapshot,
+                                       sizeof(settings_t))) {
+    return false;
+  }
+
+  settings_save_in_progress = true;
+  settings_save_snapshot_change_counter = settings_change_counter;
+  return true;
+}
+
 void settings_task(uint32_t now_ms) {
+  uint32_t save_delay_ms = SETTINGS_AUTOSAVE_DELAY_MS;
+
   if (settings_change_counter != settings_last_seen_change_counter) {
     settings_last_seen_change_counter = settings_change_counter;
     settings_last_change_ms = now_ms;
     settings_dirty = true;
   }
 
+  if (settings_save_in_progress) {
+    flash_storage_async_result_t step =
+        flash_storage_write_async_step(SETTINGS_FLASH_WORDS_PER_STEP);
+
+    if (step == FLASH_STORAGE_ASYNC_IN_PROGRESS) {
+      return;
+    }
+
+    settings_save_in_progress = false;
+    if (step == FLASH_STORAGE_ASYNC_ERROR) {
+      settings_last_change_ms = now_ms;
+      settings_dirty = true;
+      return;
+    }
+
+    settings_save_requested = false;
+    if (settings_change_counter == settings_save_snapshot_change_counter) {
+      settings_dirty = false;
+      settings_last_seen_change_counter = settings_change_counter;
+      return;
+    }
+
+    settings_last_change_ms = now_ms;
+    settings_dirty = true;
+  }
+
   if (!settings_dirty) {
+    settings_save_requested = false;
     return;
   }
 
@@ -1503,11 +1589,15 @@ void settings_task(uint32_t now_ms) {
     return;
   }
 
-  if ((uint32_t)(now_ms - settings_last_change_ms) < SETTINGS_AUTOSAVE_DELAY_MS) {
+  if (settings_save_requested) {
+    save_delay_ms = SETTINGS_REQUEST_SAVE_DELAY_MS;
+  }
+
+  if ((uint32_t)(now_ms - settings_last_change_ms) < save_delay_ms) {
     return;
   }
 
-  (void)settings_save();
+  (void)settings_start_async_save();
 }
 
 bool settings_has_unsaved_changes(void) { return settings_dirty; }
@@ -1596,10 +1686,12 @@ bool settings_is_ram_only_mode(void) {
 
 void settings_enter_ram_only_mode(void) {
   settings_ram_only_mode = true;
+  settings_save_requested = false;
 }
 
 bool settings_exit_ram_only_mode(void) {
   settings_ram_only_mode = false;
+  settings_save_requested = false;
   if (!settings_load_from_flash()) {
     settings_set_defaults();
     settings_save();
@@ -1867,6 +1959,10 @@ uint8_t settings_get_led_effect_mode(void) {
 bool settings_set_led_effect_mode(uint8_t mode) {
   if (mode >= LED_EFFECT_MAX) {
     return false;
+  }
+
+  if (current_settings.led_effect_mode == mode) {
+    return true;
   }
 
   if (mode == LED_EFFECT_THIRD_PARTY) {

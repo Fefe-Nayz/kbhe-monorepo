@@ -3,20 +3,27 @@ static void effect_typing_heatmap(void) {
   uint8_t floor_brightness = effect_param(3, 48u);
   uint32_t now_ms = HAL_GetTick();
 
-  // decay_speed=168 -> ~25 ms interval (QMK baseline), 255 -> 5 ms (fast), 0 -> 64 ms (slow).
-  uint32_t decay_ms = (decay_speed >= 255u)
-    ? 5u
-    : (uint32_t)(5u + ((uint32_t)(255u - decay_speed) * 59u / 255u));
+  // decay_speed=168 -> ~25 ms interval (QMK baseline), 255 -> 5 ms (fast).
+  // decay_speed=0 means freeze (no decay) by design.
+  uint32_t decay_ms = 0u;
+
+  if (decay_speed > 0u) {
+    decay_ms = (decay_speed >= 255u)
+      ? 5u
+      : (uint32_t)(5u + ((uint32_t)(255u - decay_speed) * 59u / 255u));
+  }
 
   if (mxfx_typing_heat_decay_timer_ms == 0u) {
     mxfx_typing_heat_decay_timer_ms = now_ms;
   }
 
-  while ((uint32_t)(now_ms - mxfx_typing_heat_decay_timer_ms) >= decay_ms) {
-    mxfx_typing_heat_decay_timer_ms += decay_ms;
-    for (uint8_t i = 0u; i < LED_MATRIX_NUM_LEDS; i++) {
-      if (mxfx_typing_heat_energy[i] > 0u) {
-        mxfx_typing_heat_energy[i]--;
+  if (decay_ms > 0u) {
+    while ((uint32_t)(now_ms - mxfx_typing_heat_decay_timer_ms) >= decay_ms) {
+      mxfx_typing_heat_decay_timer_ms += decay_ms;
+      for (uint8_t i = 0u; i < LED_MATRIX_NUM_LEDS; i++) {
+        if (mxfx_typing_heat_energy[i] > 0u) {
+          mxfx_typing_heat_energy[i]--;
+        }
       }
     }
   }

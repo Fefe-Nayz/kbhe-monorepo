@@ -649,6 +649,16 @@ bool settings_reset(void);
 bool settings_save(void);
 
 /**
+ * @brief Request a deferred settings save from the main loop.
+ *
+ * This keeps RAW HID command handlers non-blocking by avoiding direct flash
+ * writes in command context.
+ *
+ * @return true if the request was accepted
+ */
+bool settings_request_save(void);
+
+/**
  * @brief Service deferred autosave work.
  * Call periodically from the main loop.
  * @param now_ms Current HAL tick in milliseconds

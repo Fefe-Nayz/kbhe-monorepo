@@ -69,6 +69,38 @@ bool flash_storage_read(uint32_t offset, void *buf, uint32_t len);
  */
 bool flash_storage_write(uint32_t offset, const void *buf, uint32_t len);
 
+typedef enum {
+	FLASH_STORAGE_ASYNC_IN_PROGRESS = 0,
+	FLASH_STORAGE_ASYNC_DONE = 1,
+	FLASH_STORAGE_ASYNC_ERROR = 2,
+} flash_storage_async_result_t;
+
+/**
+ * @brief Begin an asynchronous snapshot append.
+ *
+ * Call flash_storage_write_async_step() from the main loop until DONE or ERROR.
+ *
+ * @param offset Must be 0 for snapshot writes
+ * @param buf Snapshot buffer to persist (must stay valid until completion)
+ * @param len Snapshot length in bytes
+ * @return true if the async write was started
+ */
+bool flash_storage_write_async_begin(uint32_t offset, const void *buf,
+																		 uint32_t len);
+
+/**
+ * @brief Advance an in-progress asynchronous snapshot append.
+ *
+ * @param max_words Maximum 32-bit words to program in this step (0 -> 1)
+ * @return Async step status (IN_PROGRESS / DONE / ERROR)
+ */
+flash_storage_async_result_t flash_storage_write_async_step(uint16_t max_words);
+
+/**
+ * @brief Check whether an async flash write is currently active.
+ */
+bool flash_storage_write_async_is_busy(void);
+
 /**
  * @brief Check if a region is erased (all 0xFF)
  * @param offset Offset from base address

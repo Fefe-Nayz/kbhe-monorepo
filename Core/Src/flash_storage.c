@@ -25,6 +25,19 @@ static uint32_t latest_record_length = 0u;
 static uint32_t next_write_offset = 0u;
 static uint32_t next_sequence = 1u;
 
+typedef struct {
+  bool busy;
+  uint32_t len;
+  uint32_t payload_size;
+  uint32_t record_offset;
+  uint32_t absolute_addr;
+  uint32_t program_offset;
+  const uint8_t *payload;
+  flash_storage_record_header_t header;
+} flash_storage_async_write_t;
+
+static flash_storage_async_write_t async_write = {0};
+
 //--------------------------------------------------------------------+
 // Internal Helpers
 //--------------------------------------------------------------------+
@@ -81,6 +94,20 @@ static bool flash_storage_program_bytes_locked(uint32_t absolute_addr,
   }
 
   return true;
+}
+
+static uint8_t flash_storage_async_source_byte(uint32_t absolute_offset) {
+  if (absolute_offset < (uint32_t)sizeof(async_write.header)) {
+    const uint8_t *header_bytes = (const uint8_t *)&async_write.header;
+    return header_bytes[absolute_offset];
+  }
+
+  absolute_offset -= (uint32_t)sizeof(async_write.header);
+  if (absolute_offset < async_write.len) {
+    return async_write.payload[absolute_offset];
+  }
+
+  return 0xFFu;
 }
 
 static bool flash_storage_scan_records(void) {
@@ -241,6 +268,113 @@ bool flash_storage_write(uint32_t offset, const void *buf, uint32_t len) {
       record_offset + (uint32_t)sizeof(header) + flash_storage_align4(len);
 
   return true;
+}
+
+bool flash_storage_write_async_begin(uint32_t offset, const void *buf,
+                                     uint32_t len) {
+  uint32_t payload_size = 0u;
+  uint32_t record_offset = 0u;
+  uint32_t absolute_addr = 0u;
+
+  if (async_write.busy) {
+    return false;
+  }
+
+  if (buf == NULL || offset != 0u || len == 0u) {
+    return false;
+  }
+
+  payload_size = flash_storage_align4(len);
+  if ((uint32_t)sizeof(flash_storage_record_header_t) + payload_size >
+      FLASH_STORAGE_SIZE) {
+    return false;
+  }
+
+  if (next_write_offset + (uint32_t)sizeof(flash_storage_record_header_t) +
+          payload_size >
+      FLASH_STORAGE_SIZE) {
+    if (!flash_storage_erase()) {
+      return false;
+    }
+  }
+
+  record_offset = next_write_offset;
+  absolute_addr = FLASH_STORAGE_BASE_ADDR + record_offset;
+
+  memset(&async_write, 0, sizeof(async_write));
+  async_write.busy = true;
+  async_write.len = len;
+  async_write.payload_size = payload_size;
+  async_write.record_offset = record_offset;
+  async_write.absolute_addr = absolute_addr;
+  async_write.payload = (const uint8_t *)buf;
+  async_write.header.magic = FLASH_STORAGE_RECORD_MAGIC;
+  async_write.header.length = len;
+  async_write.header.sequence = next_sequence;
+  async_write.header.crc32 = flash_storage_crc32_compute(buf, len);
+
+  HAL_FLASH_Unlock();
+
+  __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                         FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR |
+                         FLASH_FLAG_ERSERR);
+
+  return true;
+}
+
+flash_storage_async_result_t flash_storage_write_async_step(uint16_t max_words) {
+  uint32_t total_size = 0u;
+
+  if (!async_write.busy) {
+    return FLASH_STORAGE_ASYNC_DONE;
+  }
+
+  if (max_words == 0u) {
+    max_words = 1u;
+  }
+
+  total_size = (uint32_t)sizeof(async_write.header) + async_write.payload_size;
+  while (max_words > 0u && async_write.program_offset < total_size) {
+    uint32_t word = FLASH_EMPTY_VALUE;
+    uint8_t bytes[4] = {0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+    bytes[0] = flash_storage_async_source_byte(async_write.program_offset + 0u);
+    bytes[1] = flash_storage_async_source_byte(async_write.program_offset + 1u);
+    bytes[2] = flash_storage_async_source_byte(async_write.program_offset + 2u);
+    bytes[3] = flash_storage_async_source_byte(async_write.program_offset + 3u);
+    memcpy(&word, bytes, sizeof(word));
+
+    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD,
+                          async_write.absolute_addr + async_write.program_offset,
+                          word) != HAL_OK) {
+      HAL_FLASH_Lock();
+      async_write.busy = false;
+      return FLASH_STORAGE_ASYNC_ERROR;
+    }
+
+    async_write.program_offset += 4u;
+    max_words--;
+  }
+
+  if (async_write.program_offset < total_size) {
+    return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+  }
+
+  HAL_FLASH_Lock();
+
+  latest_record_offset = async_write.record_offset;
+  latest_record_length = async_write.len;
+  next_sequence++;
+  next_write_offset = async_write.record_offset +
+                      (uint32_t)sizeof(async_write.header) +
+                      flash_storage_align4(async_write.len);
+
+  async_write.busy = false;
+  return FLASH_STORAGE_ASYNC_DONE;
+}
+
+bool flash_storage_write_async_is_busy(void) {
+  return async_write.busy;
 }
 
 bool flash_storage_is_erased(uint32_t offset, uint32_t len) {

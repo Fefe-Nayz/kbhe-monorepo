@@ -218,6 +218,22 @@ void led_matrix_get_pixel(uint8_t x, uint8_t y, uint8_t *r, uint8_t *g,
 void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
 
 /**
+ * @brief Begin a batched sequence of pixel updates.
+ *
+ * While batching is active, per-pixel writes update the WS2812 buffer but defer
+ * the final show/latch operation until led_matrix_end_pixel_batch().
+ */
+void led_matrix_begin_pixel_batch(void);
+
+/**
+ * @brief End a batched sequence of pixel updates.
+ *
+ * Flushes one WS2812 show/latch if any pixel was updated while the batch was
+ * active.
+ */
+void led_matrix_end_pixel_batch(void);
+
+/**
  * @brief Clear all pixels (set to black)
  */
 void led_matrix_clear(void);

@@ -16,10 +16,10 @@ The plugin expects firmware with:
 - `CMD_SET_LED_ENABLED (0x61)`
 - `CMD_SET_LED_EFFECT (0x6F)`
 - `CMD_SET_LED_ALL_CHUNK (0x6A)`
-- `CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY (0x7B)`
+- `CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY (0x76)`
 - Effect mode values:
 - `0`: Matrix (software/static)
-- `14`: Third-party live mode
+- `7`: Third-party live mode
 
 ## Install in SignalRGB
 
@@ -31,10 +31,12 @@ The plugin expects firmware with:
 
 ## Behavior
 
-- On Initialize: plugin enables third-party mode (`effect=14`).
+- On Initialize: plugin enables third-party mode (`effect=7`).
 - On Render: plugin sends a full 82-LED frame in chunked RAW HID packets.
 - On Shutdown: plugin asks the firmware to restore the RGB effect that was
   active before SignalRGB enabled third-party live mode.
+- While third-party mode is active, streamed LED chunks are runtime-only and do
+  not persist matrix settings to flash.
 
 ## Layout
 
