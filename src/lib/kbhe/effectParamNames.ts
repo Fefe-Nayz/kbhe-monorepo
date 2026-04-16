@@ -158,19 +158,23 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
   },
   [LEDEffect.COLORBAND_SAT]: {
     0: "Axis Angle",
+    1: "Use Value Channel",
   },
   [LEDEffect.COLORBAND_VAL]: {
     0: "Axis Angle",
+    1: "Use Value Channel",
   },
   [LEDEffect.COLORBAND_PINWHEEL_SAT]: {
     0: "Center X",
     1: "Center Y",
     2: "Reverse Direction",
+    3: "Use Value Channel",
   },
   [LEDEffect.COLORBAND_PINWHEEL_VAL]: {
     0: "Center X",
     1: "Center Y",
     2: "Reverse Direction",
+    3: "Use Value Channel",
   },
   [LEDEffect.COLORBAND_SPIRAL_SAT]: {
     0: "Tightness",
@@ -178,6 +182,7 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
     2: "Center X",
     3: "Center Y",
     4: "Reverse Direction",
+    5: "Use Value Channel",
   },
   [LEDEffect.COLORBAND_SPIRAL_VAL]: {
     0: "Tightness",
@@ -185,6 +190,7 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
     2: "Center X",
     3: "Center Y",
     4: "Reverse Direction",
+    5: "Use Value Channel",
   },
   [LEDEffect.RAINDROPS]: {
     0: "Hue Range",
@@ -198,6 +204,7 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
   [LEDEffect.PIXEL_FLOW]: {
     0: "Hue Range",
     1: "Reverse Direction",
+    2: "Flow Angle",
   },
   [LEDEffect.DIGITAL_RAIN]: {
     0: "Trail Length",
@@ -207,9 +214,41 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
     4: "Hue Bias",
     5: "Flow Angle",
   },
-  [LEDEffect.PIXEL_FRACTAL]: {
-    0: "Saturation",
-    1: "Value",
+  [LEDEffect.SOLID_REACTIVE_WIDE]: {
+    0: "Decay",
+    1: "Spread",
+    2: "Gain",
+    3: "Multi Hit",
+  },
+  [LEDEffect.SOLID_REACTIVE_MULTI_WIDE]: {
+    0: "Decay",
+    1: "Spread",
+    2: "Gain",
+    3: "Multi Hit",
+  },
+  [LEDEffect.SOLID_REACTIVE_CROSS]: {
+    0: "Decay",
+    1: "Spread",
+    2: "Gain",
+    3: "Multi Hit",
+  },
+  [LEDEffect.SOLID_REACTIVE_MULTI_CROSS]: {
+    0: "Decay",
+    1: "Spread",
+    2: "Gain",
+    3: "Multi Hit",
+  },
+  [LEDEffect.SOLID_REACTIVE_NEXUS]: {
+    0: "Decay",
+    1: "Spread",
+    2: "Gain",
+    3: "Multi Hit",
+  },
+  [LEDEffect.SOLID_REACTIVE_MULTI_NEXUS]: {
+    0: "Decay",
+    1: "Spread",
+    2: "Gain",
+    3: "Multi Hit",
   },
   [LEDEffect.TYPING_HEATMAP]: {
     0: "Heat Gain",
@@ -226,6 +265,7 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
     5: "Palette",
     6: "Mode",
     7: "Random Color Per Click",
+    15: "Multi Hit",
   },
   [LEDEffect.MULTI_SPLASH]: {
     0: "Lifetime",
@@ -236,12 +276,15 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
     5: "Palette",
     6: "Mode",
     7: "Random Color Per Click",
+    15: "Multi Hit",
   },
   [LEDEffect.SOLID_SPLASH]: {
     0: "Random Color Per Click",
+    1: "Multi Hit",
   },
   [LEDEffect.SOLID_MULTI_SPLASH]: {
     0: "Random Color Per Click",
+    1: "Multi Hit",
   },
   [LEDEffect.BASS_RIPPLE]: {
     0: "Lifetime",
@@ -254,10 +297,12 @@ export const EFFECT_PARAM_NAMES: Partial<Record<number, Record<number, string>>>
     7: "Random Color Per Beat",
   },
   [LEDEffect.STARLIGHT_DUAL_SAT]: {
-    0: "Saturation Spread",
+    0: "Spread",
+    1: "Hue Mode",
   },
   [LEDEffect.STARLIGHT_DUAL_HUE]: {
-    0: "Hue Spread",
+    0: "Spread",
+    1: "Hue Mode",
   },
   [LEDEffect.HUE_BREATHING]: {
     0: "Hue Swing Range",
@@ -337,6 +382,54 @@ export const EFFECT_PARAM_ENUM_OPTIONS: Partial<Record<number, Record<number, Ef
     5: [
       { value: 0, label: "Custom Color" },
       { value: 1, label: "Rainbow" },
+    ],
+  },
+  [LEDEffect.COLORBAND_SAT]: {
+    1: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Value" },
+    ],
+  },
+  [LEDEffect.COLORBAND_VAL]: {
+    1: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Value" },
+    ],
+  },
+  [LEDEffect.COLORBAND_PINWHEEL_SAT]: {
+    3: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Value" },
+    ],
+  },
+  [LEDEffect.COLORBAND_PINWHEEL_VAL]: {
+    3: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Value" },
+    ],
+  },
+  [LEDEffect.COLORBAND_SPIRAL_SAT]: {
+    5: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Value" },
+    ],
+  },
+  [LEDEffect.COLORBAND_SPIRAL_VAL]: {
+    5: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Value" },
+    ],
+  },
+  [LEDEffect.STARLIGHT_DUAL_SAT]: {
+    1: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Hue" },
+    ],
+  },
+  [LEDEffect.STARLIGHT_DUAL_HUE]: {
+    1: [
+      { value: 0, label: "Saturation" },
+      { value: 1, label: "Hue" },
     ],
   },
 };

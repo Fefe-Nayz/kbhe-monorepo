@@ -39,15 +39,184 @@ import {
   IconFileImport,
   IconFileExport,
   IconRestore,
+  IconSearch,
 } from "@tabler/icons-react";
 
 // ---------------------------------------------------------------------------
 // Effect list — built from LED_EFFECT_NAMES
 // ---------------------------------------------------------------------------
 
+const EFFECT_CANONICAL_ID: Partial<Record<number, number>> = {
+  [LEDEffect.SOLID_REACTIVE_MULTI_WIDE]: LEDEffect.SOLID_REACTIVE_WIDE,
+  [LEDEffect.SOLID_REACTIVE_MULTI_CROSS]: LEDEffect.SOLID_REACTIVE_CROSS,
+  [LEDEffect.SOLID_REACTIVE_MULTI_NEXUS]: LEDEffect.SOLID_REACTIVE_NEXUS,
+  [LEDEffect.MULTI_SPLASH]: LEDEffect.SPLASH,
+  [LEDEffect.SOLID_MULTI_SPLASH]: LEDEffect.SOLID_SPLASH,
+  [LEDEffect.STARLIGHT_DUAL_HUE]: LEDEffect.STARLIGHT_DUAL_SAT,
+  [LEDEffect.COLORBAND_VAL]: LEDEffect.COLORBAND_SAT,
+  [LEDEffect.COLORBAND_PINWHEEL_VAL]: LEDEffect.COLORBAND_PINWHEEL_SAT,
+  [LEDEffect.COLORBAND_SPIRAL_VAL]: LEDEffect.COLORBAND_SPIRAL_SAT,
+};
+
+const HIDDEN_EFFECT_IDS = new Set<number>([
+  LEDEffect.SOLID_REACTIVE_MULTI_WIDE,
+  LEDEffect.SOLID_REACTIVE_MULTI_CROSS,
+  LEDEffect.SOLID_REACTIVE_MULTI_NEXUS,
+  LEDEffect.MULTI_SPLASH,
+  LEDEffect.SOLID_MULTI_SPLASH,
+  LEDEffect.STARLIGHT_DUAL_HUE,
+  LEDEffect.COLORBAND_VAL,
+  LEDEffect.COLORBAND_PINWHEEL_VAL,
+  LEDEffect.COLORBAND_SPIRAL_VAL,
+]);
+
+function canonicalEffectId(id: number): number {
+  return EFFECT_CANONICAL_ID[id] ?? id;
+}
+
 const ALL_EFFECTS = Object.entries(LED_EFFECT_NAMES)
   .map(([idStr, name]) => ({ id: Number(idStr), name }))
+  .filter((effect) => !HIDDEN_EFFECT_IDS.has(effect.id))
   .sort((a, b) => a.id - b.id);
+
+interface EffectCategoryDef {
+  key: string;
+  title: string;
+  ids: number[];
+}
+
+interface EffectCategory {
+  key: string;
+  title: string;
+  effects: Array<{ id: number; name: string }>;
+}
+
+const EFFECT_CATEGORY_DEFS: EffectCategoryDef[] = [
+  {
+    key: "essentials",
+    title: "Essentials",
+    ids: [
+      LEDEffect.NONE,
+      LEDEffect.THIRD_PARTY,
+      LEDEffect.SOLID_COLOR,
+      LEDEffect.ALPHA_MODS,
+      LEDEffect.GRADIENT_UP_DOWN,
+      LEDEffect.GRADIENT_LEFT_RIGHT,
+      LEDEffect.BREATHING,
+    ],
+  },
+  {
+    key: "reactive",
+    title: "Reactive & Typing",
+    ids: [
+      LEDEffect.IMPACT_RAINBOW,
+      LEDEffect.REACTIVE_GHOST,
+      LEDEffect.TYPING_HEATMAP,
+      LEDEffect.SOLID_REACTIVE_SIMPLE,
+      LEDEffect.SOLID_REACTIVE,
+      LEDEffect.SOLID_REACTIVE_WIDE,
+      LEDEffect.SOLID_REACTIVE_CROSS,
+      LEDEffect.SOLID_REACTIVE_NEXUS,
+      LEDEffect.SPLASH,
+      LEDEffect.SOLID_SPLASH,
+    ],
+  },
+  {
+    key: "audio-input",
+    title: "Audio & Input",
+    ids: [
+      LEDEffect.AUDIO_SPECTRUM,
+      LEDEffect.BASS_RIPPLE,
+      LEDEffect.DISTANCE_SENSOR,
+      LEDEffect.KEY_STATE_DEMO,
+    ],
+  },
+  {
+    key: "rainbow-cycles",
+    title: "Rainbow & Cycles",
+    ids: [
+      LEDEffect.BREATHING_RAINBOW,
+      LEDEffect.COLOR_CYCLE,
+      LEDEffect.CYCLE_ALL,
+      LEDEffect.CYCLE_LEFT_RIGHT,
+      LEDEffect.CYCLE_UP_DOWN,
+      LEDEffect.CYCLE_OUT_IN,
+      LEDEffect.CYCLE_PINWHEEL,
+      LEDEffect.CYCLE_SPIRAL,
+      LEDEffect.CYCLE_OUT_IN_DUAL,
+      LEDEffect.RAINBOW_BEACON,
+      LEDEffect.RAINBOW_PINWHEELS,
+      LEDEffect.RAINBOW_MOVING_CHEVRON,
+      LEDEffect.HUE_BREATHING,
+      LEDEffect.HUE_PENDULUM,
+      LEDEffect.HUE_WAVE,
+      LEDEffect.DUAL_BEACON,
+    ],
+  },
+  {
+    key: "colorband",
+    title: "Colorband",
+    ids: [
+      LEDEffect.COLORBAND_SAT,
+      LEDEffect.COLORBAND_VAL,
+      LEDEffect.COLORBAND_PINWHEEL_SAT,
+      LEDEffect.COLORBAND_PINWHEEL_VAL,
+      LEDEffect.COLORBAND_SPIRAL_SAT,
+      LEDEffect.COLORBAND_SPIRAL_VAL,
+    ],
+  },
+  {
+    key: "ambient",
+    title: "Ambient & Particles",
+    ids: [
+      LEDEffect.PLASMA,
+      LEDEffect.FIRE,
+      LEDEffect.OCEAN,
+      LEDEffect.SPARKLE,
+      LEDEffect.RIVERFLOW,
+      LEDEffect.FLOWER_BLOOMING,
+      LEDEffect.RAINDROPS,
+      LEDEffect.JELLYBEAN_RAINDROPS,
+      LEDEffect.PIXEL_RAIN,
+      LEDEffect.PIXEL_FLOW,
+      LEDEffect.PIXEL_FRACTAL,
+      LEDEffect.DIGITAL_RAIN,
+      LEDEffect.STARLIGHT_SMOOTH,
+      LEDEffect.STARLIGHT,
+      LEDEffect.STARLIGHT_DUAL_SAT,
+      LEDEffect.STARLIGHT_DUAL_HUE,
+    ],
+  },
+];
+
+function groupEffectsByCategory(effects: Array<{ id: number; name: string }>): EffectCategory[] {
+  const byId = new Map(effects.map((effect) => [effect.id, effect]));
+  const used = new Set<number>();
+  const categories: EffectCategory[] = [];
+
+  for (const definition of EFFECT_CATEGORY_DEFS) {
+    const items = definition.ids
+      .map((id) => byId.get(id))
+      .filter((effect): effect is { id: number; name: string } => Boolean(effect));
+
+    if (items.length > 0) {
+      categories.push({ key: definition.key, title: definition.title, effects: items });
+      for (const item of items) {
+        used.add(item.id);
+      }
+    }
+  }
+
+  const uncategorized = effects
+    .filter((effect) => !used.has(effect.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (uncategorized.length > 0) {
+    categories.push({ key: "other", title: "Other", effects: uncategorized });
+  }
+
+  return categories;
+}
 
 const MATRIX_PREVIEW_FRAME_MS = 33;
 
@@ -82,7 +251,8 @@ function rgbArrayToPixels(colors: RGBColor[]): number[] {
 }
 
 function effectName(id: number): string {
-  return LED_EFFECT_NAMES[id] ?? `Mode ${id}`;
+  const canonicalId = canonicalEffectId(id);
+  return LED_EFFECT_NAMES[canonicalId] ?? `Mode ${canonicalId}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +378,11 @@ export default function Lighting() {
     );
   }, [effectSearch]);
 
+  const groupedEffects = useMemo(
+    () => groupEffectsByCategory(filteredEffects),
+    [filteredEffects],
+  );
+
   // ---- Queries ----
 
   const enabledQ = useQuery({
@@ -239,6 +414,7 @@ export default function Lighting() {
   });
 
   const currentEffect = effectQ.data ?? LEDEffect.NONE;
+  const currentEffectForSelection = canonicalEffectId(currentEffect);
 
   useEffect(() => {
     setLiveParamValues({});
@@ -956,19 +1132,28 @@ export default function Lighting() {
                 className="h-8"
               />
             </div>
-            {filteredEffects.length === 0 ? (
+            {groupedEffects.length === 0 ? (
               <p className="text-sm text-muted-foreground">No effect matches your search.</p>
             ) : (
               <RadioGroup
-                value={String(effectQ.data ?? currentEffect)}
+                value={String(currentEffectForSelection)}
                 onValueChange={(v: string) => effectMut.mutate(Number(v))}
                 disabled={!connected || effectQ.data == null}
-                className="grid grid-cols-2 gap-x-6 gap-y-1.5"
+                className="space-y-4"
               >
-                {filteredEffects.map((eff) => (
-                  <div key={eff.id} className="flex items-center gap-2">
-                    <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
-                    <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
+                {groupedEffects.map((category) => (
+                  <div key={category.key} className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {category.title}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                      {category.effects.map((eff) => (
+                        <div key={eff.id} className="flex items-center gap-2">
+                          <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
+                          <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </RadioGroup>
