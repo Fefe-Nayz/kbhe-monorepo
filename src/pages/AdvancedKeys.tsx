@@ -14,6 +14,7 @@ import { LayerSelect } from "@/components/layer-select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CommitSlider } from "@/components/ui/commit-slider";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,6 +151,7 @@ export default function AdvancedKeys() {
     touch1: null,
     touch2: null,
   });
+  const [selectedDynamicZone, setSelectedDynamicZone] = useState(0);
 
   const allSettingsQ = useQuery({
     queryKey: queryKeys.keymap.allSettings(),
@@ -611,6 +613,8 @@ export default function AdvancedKeys() {
 
   function renderTapHoldConfig() {
     if (!settings) return null;
+    const holdOnOtherKey = Boolean(settings.tap_hold_options & 0x01);
+    const uppercaseHold = Boolean(settings.tap_hold_options & 0x02);
     return (
       <Tabs defaultValue="bindings" className="w-full">
         <TabsList className="w-full">
@@ -654,6 +658,33 @@ export default function AdvancedKeys() {
                 disabled={!connected}
               />
             </div>
+            <FormRow label="Hold on Other Key Press" description="Trigger hold when another key is pressed">
+              <Switch
+                checked={holdOnOtherKey}
+                disabled={!connected}
+                onCheckedChange={(v) => {
+                  const opts = (settings.tap_hold_options ?? 0);
+                  keyMutation.mutate({ tap_hold_options: v ? opts | 0x01 : opts & ~0x01 });
+                }}
+              />
+            </FormRow>
+            <FormRow label="Uppercase Hold" description="Treat hold as Shift+key">
+              <Switch
+                checked={uppercaseHold}
+                disabled={!connected}
+                onCheckedChange={(v) => {
+                  const opts = (settings.tap_hold_options ?? 0);
+                  keyMutation.mutate({ tap_hold_options: v ? opts | 0x02 : opts & ~0x02 });
+                }}
+              />
+            </FormRow>
+            <FormRow label="Disable KB on Gamepad" description="Suppress keyboard output when gamepad is active">
+              <Switch
+                checked={settings.disable_kb_on_gamepad}
+                disabled={!connected}
+                onCheckedChange={(v) => keyMutation.mutate({ disable_kb_on_gamepad: v })}
+              />
+            </FormRow>
           </div>
         </TabsContent>
         <TabsContent value="tester" className="mt-4">
@@ -701,51 +732,84 @@ export default function AdvancedKeys() {
 
   function renderDynamicConfig() {
     if (!settings) return null;
-    const zoneCount = settings.dynamic_zone_count ?? 1;
+    const zones = settings.dynamic_zones ?? [];
+    const zone = zones[selectedDynamicZone] ?? { end_mm: 4.0, end_mm_tenths: 40, hid_keycode: 0 };
+    const isLastZone = selectedDynamicZone === 3;
+
+    const patchZone = (i: number, patch: Partial<typeof zone>) => {
+      const next = zones.map((z, idx) => (idx === i ? { ...z, ...patch } : z));
+      keyMutation.mutate({ dynamic_zones: next });
+    };
 
     return (
-      <Tabs defaultValue="bindings" className="w-full">
+      <Tabs defaultValue="zones" className="w-full">
         <TabsList className="w-full">
-          <TabsTrigger value="bindings">Zones</TabsTrigger>
+          <TabsTrigger value="zones">Zones</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="tester">Key Tester</TabsTrigger>
         </TabsList>
-        <TabsContent value="bindings" className="mt-4">
+
+        <TabsContent value="zones" className="mt-4">
           <div className="flex flex-col gap-4">
-            <FormRow label="Zone Count">
-              <Select
-                value={String(zoneCount)}
-                items={[1, 2, 3, 4].map((n) => ({ value: String(n), label: String(n) }))}
-                onValueChange={(v) => keyMutation.mutate({ dynamic_zone_count: Number(v) })}
-                disabled={!connected}
-              >
-                <SelectTrigger className="h-8 w-24 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {[1, 2, 3, 4].map((n) => (
-                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </FormRow>
-            {settings.dynamic_zones.slice(0, zoneCount).map((zone, i) => (
-              <SectionCard key={i} title={`Zone ${i + 1}`}>
-                <div className="flex flex-col gap-3">
-                  <DistanceSlider
-                    label={`Zone ${i + 1} Travel End`}
-                    value={zone.end_mm}
-                    onChange={() => {}}
-                    disabled={!connected}
-                  />
-                  <FormRow label={`Zone ${i + 1} Action`}>
-                    <Badge variant="secondary">{keycodeDisplayName(zone.hid_keycode)}</Badge>
-                  </FormRow>
-                </div>
-              </SectionCard>
-            ))}
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md px-3 py-2">
+              Rapid Trigger is automatically disabled for Dynamic Mapping keys. Bottom Out Point controls the "fully pressed" threshold.
+            </p>
+
+            {/* Zone selector */}
+            <div className="flex gap-1">
+              {zones.slice(0, 4).map((z, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedDynamicZone(i)}
+                  className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                    selectedDynamicZone === i
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : z.hid_keycode !== 0
+                      ? "border-green-500/50 bg-green-500/10 text-foreground hover:bg-green-500/20"
+                      : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  Zone {i + 1}
+                  {z.hid_keycode !== 0 && (
+                    <span className="ml-1 opacity-70 hidden sm:inline">
+                      · {keycodeDisplayName(z.hid_keycode)}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Selected zone config */}
+            <div className="flex flex-col gap-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Zone {selectedDynamicZone + 1} Action</span>
+                {zone.hid_keycode !== 0 && (
+                  <Badge variant="secondary">{keycodeDisplayName(zone.hid_keycode)}</Badge>
+                )}
+              </div>
+
+              {!isLastZone && (
+                <DistanceSlider
+                  label="Zone travel end"
+                  value={zone.end_mm}
+                  onChange={(v) => patchZone(selectedDynamicZone, { end_mm: v, end_mm_tenths: Math.round(v * 10) })}
+                  disabled={!connected}
+                />
+              )}
+              {isLastZone && (
+                <p className="text-xs text-muted-foreground">Zone 4 covers travel from Zone 3 end to bottom-out.</p>
+              )}
+
+              <KeycodeAccordion
+                selectedCode={zone.hid_keycode}
+                onSelect={(code) => patchZone(selectedDynamicZone, { hid_keycode: code })}
+                className="max-h-56"
+              />
+            </div>
           </div>
         </TabsContent>
+
         <TabsContent value="performance" className="mt-4">
           <div className="flex flex-col gap-4">
             <DistanceSlider
@@ -754,8 +818,22 @@ export default function AdvancedKeys() {
               onChange={(v) => keyMutation.mutate({ actuation_point_mm: v })}
               disabled={!connected}
             />
+            <DistanceSlider
+              label="Bottom-Out Point"
+              value={settings.dks_bottom_out_point_mm}
+              onChange={(v) => keyMutation.mutate({ dks_bottom_out_point_mm: v })}
+              disabled={!connected}
+            />
+            <FormRow label="Disable KB on Gamepad" description="Suppress keyboard output when gamepad is active">
+              <Switch
+                checked={settings.disable_kb_on_gamepad}
+                disabled={!connected}
+                onCheckedChange={(v) => keyMutation.mutate({ disable_kb_on_gamepad: v })}
+              />
+            </FormRow>
           </div>
         </TabsContent>
+
         <TabsContent value="tester" className="mt-4">
           <KeyTester />
         </TabsContent>
@@ -856,7 +934,7 @@ export default function AdvancedKeys() {
                     void upsertSocdPair(activeKeyIndex, settings.socd_pair, Number(v));
                   }}
                 >
-                  <SelectTrigger className="h-8 w-44 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 w-56 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       {Object.entries(SOCD_RESOLUTIONS).map(([name, value]) => (
@@ -866,7 +944,31 @@ export default function AdvancedKeys() {
                   </SelectContent>
                 </Select>
               </FormRow>
-
+              <FormRow
+                label="Alternative Fully Pressed Behavior"
+                description="Register both key presses when keys are fully pressed simultaneously, bypassing the resolution behavior"
+              >
+                <Switch
+                  checked={settings.socd_fully_pressed_enabled}
+                  disabled={!connected}
+                  onCheckedChange={(v: boolean) => keyMutation.mutate({ socd_fully_pressed_enabled: v })}
+                />
+              </FormRow>
+              {settings.socd_fully_pressed_enabled && (
+                <DistanceSlider
+                  label="Fully Pressed Point"
+                  value={settings.socd_fully_pressed_point_mm}
+                  onChange={(v) => keyMutation.mutate({ socd_fully_pressed_point_mm: v })}
+                  disabled={!connected}
+                />
+              )}
+              <FormRow label="Disable KB on Gamepad" description="Suppress keyboard output when gamepad is active">
+                <Switch
+                  checked={settings.disable_kb_on_gamepad}
+                  disabled={!connected}
+                  onCheckedChange={(v: boolean) => keyMutation.mutate({ disable_kb_on_gamepad: v })}
+                />
+              </FormRow>
             </>
           )}
         </div>

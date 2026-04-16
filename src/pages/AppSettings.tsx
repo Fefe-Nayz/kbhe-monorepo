@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { PageContent } from "@/components/shared/PageLayout";
 import { FormRow, SectionCard } from "@/components/shared/SectionCard";
 import { useTheme } from "@/components/theme-provider";
@@ -13,9 +14,12 @@ import {
 } from "@/components/ui/select";
 import {
   getLaunchOnStartupEnabled,
+  getWindowsMicaEnabled,
   getStartupPreferences,
+  isWindowsMicaSupported,
   setLaunchOnStartupEnabled,
   setStartupPreferences,
+  setWindowsMicaEnabled,
   STARTUP_WINDOW_MODE_OPTIONS,
   type StartupWindowMode,
 } from "@/lib/app-startup";
@@ -40,6 +44,8 @@ export default function AppSettings() {
   const developerMode = useDeviceSession((state) => state.developerMode);
   const setDeveloperMode = useDeviceSession((state) => state.setDeveloperMode);
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const micaSupported = isWindowsMicaSupported();
+  const [micaEnabled, setMicaEnabled] = useState<boolean>(() => getWindowsMicaEnabled());
 
   const startupPrefsQ = useQuery({
     queryKey: APP_QUERY_KEYS.startupPreferences,
@@ -88,25 +94,46 @@ export default function AppSettings() {
           title="Appearance"
           description="Personalize how the configurator looks on this machine."
         >
-          <FormRow
-            label="Theme"
-            description={`Current resolved theme: ${resolvedTheme === "dark" ? "Dark" : "Light"}`}
-          >
-            <Select value={theme} onValueChange={(value) => setTheme(value as ThemeMode)}>
-              <SelectTrigger className="h-8 w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {THEME_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </FormRow>
+          <div className="flex flex-col divide-y">
+            <FormRow
+              label="Theme"
+              description={`Current resolved theme: ${resolvedTheme === "dark" ? "Dark" : "Light"}`}
+            >
+              <Select value={theme} onValueChange={(value) => setTheme(value as ThemeMode)}>
+                <SelectTrigger className="h-8 w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {THEME_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormRow>
+
+            <FormRow
+              label="Windows Mica Sidebar"
+              description={
+                micaSupported
+                  ? "Enable translucent Mica material for the sidebar background"
+                  : "Available only in the Windows Tauri app"
+              }
+            >
+              <Switch
+                checked={micaEnabled}
+                disabled={!micaSupported}
+                onCheckedChange={(value) => {
+                  setWindowsMicaEnabled(value);
+                  setMicaEnabled(value);
+                  toast.success(value ? "Windows Mica enabled." : "Windows Mica disabled.");
+                }}
+              />
+            </FormRow>
+          </div>
         </SectionCard>
 
         <SectionCard

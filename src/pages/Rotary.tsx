@@ -5,11 +5,11 @@ import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { usePageVisible } from "@/hooks/use-page-visible";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
-import { kbheDevice, type RotaryEncoderSettings } from "@/lib/kbhe/device";
+import { kbheDevice, type RotaryEncoderSettings, type RotaryBinding } from "@/lib/kbhe/device";
 import { isVolumeServiceRunning } from "@/lib/kbhe/volume-service";
 import {
   ROTARY_ACTIONS, ROTARY_BUTTON_ACTIONS, ROTARY_RGB_BEHAVIORS, ROTARY_PROGRESS_STYLES,
-  LED_EFFECT_NAMES,
+  LED_EFFECT_NAMES, ROTARY_BINDING_MODES, ROTARY_BINDING_LAYER_MODES, LAYER_COUNT,
 } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
@@ -206,6 +206,113 @@ function RotaryVisual({ settings, livePercent, isActive }: {
   );
 }
 
+
+function BindingEditor({
+  label,
+  binding,
+  connected,
+  onChange,
+}: {
+  label: string;
+  binding: RotaryBinding;
+  connected: boolean;
+  onChange: (b: RotaryBinding) => void;
+}) {
+  return (
+    <div className="flex flex-col divide-y">
+      <FormRow label={`${label} Mode`}>
+        <Select
+          value={String(binding.mode)}
+          disabled={!connected}
+          items={selectItems(ROTARY_BINDING_MODES)}
+          onValueChange={(v) => onChange({ ...binding, mode: Number(v) })}
+        >
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {Object.entries(ROTARY_BINDING_MODES).map(([name, val]) => (
+                <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </FormRow>
+      {binding.mode === ROTARY_BINDING_MODES.Keycode && (
+        <>
+          <FormRow label="Keycode (HID)" description="Raw HID keycode value">
+            <input
+              type="number"
+              min={0}
+              max={65535}
+              value={binding.keycode}
+              disabled={!connected}
+              className="w-24 h-8 rounded-md border border-input bg-background px-2 text-sm"
+              onChange={(e) => onChange({ ...binding, keycode: Number(e.target.value) & 0xffff })}
+            />
+          </FormRow>
+          <FormRow label="Modifier Mask" description="Exact modifier byte (0-255)">
+            <input
+              type="number"
+              min={0}
+              max={255}
+              value={binding.modifier_mask_exact}
+              disabled={!connected}
+              className="w-24 h-8 rounded-md border border-input bg-background px-2 text-sm"
+              onChange={(e) => onChange({ ...binding, modifier_mask_exact: Number(e.target.value) & 0xff })}
+            />
+          </FormRow>
+          <FormRow label="Fallback Keycode" description="Sent when no modifiers are held">
+            <input
+              type="number"
+              min={0}
+              max={65535}
+              value={binding.fallback_no_mod_keycode}
+              disabled={!connected}
+              className="w-24 h-8 rounded-md border border-input bg-background px-2 text-sm"
+              onChange={(e) => onChange({ ...binding, fallback_no_mod_keycode: Number(e.target.value) & 0xffff })}
+            />
+          </FormRow>
+          <FormRow label="Layer Mode">
+            <Select
+              value={String(binding.layer_mode)}
+              disabled={!connected}
+              items={selectItems(ROTARY_BINDING_LAYER_MODES)}
+              onValueChange={(v) => onChange({ ...binding, layer_mode: Number(v) })}
+            >
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {Object.entries(ROTARY_BINDING_LAYER_MODES).map(([name, val]) => (
+                    <SelectItem key={val} value={String(val)}>{name}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormRow>
+          {binding.layer_mode === ROTARY_BINDING_LAYER_MODES.Fixed && (
+            <FormRow label="Layer Index">
+              <Select
+                value={String(binding.layer_index)}
+                disabled={!connected}
+                items={Array.from({ length: LAYER_COUNT }, (_, i) => ({ value: String(i), label: String(i) }))}
+                onValueChange={(v) => onChange({ ...binding, layer_index: Number(v) })}
+              >
+                <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {Array.from({ length: LAYER_COUNT }, (_, i) => (
+                      <SelectItem key={i} value={String(i)}>{i}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormRow>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function Rotary() {
   const { status } = useDeviceSession();
@@ -418,6 +525,38 @@ export default function Rotary() {
                       </SelectContent>
                     </Select>
                   </FormRow>
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Key Bindings" description="Custom keycode bindings for CW, CCW and click">
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">CW Binding</p>
+                    <BindingEditor
+                      label="CW"
+                      binding={s.cw_binding}
+                      connected={connected}
+                      onChange={(b) => write({ cw_binding: b })}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">CCW Binding</p>
+                    <BindingEditor
+                      label="CCW"
+                      binding={s.ccw_binding}
+                      connected={connected}
+                      onChange={(b) => write({ ccw_binding: b })}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Click Binding</p>
+                    <BindingEditor
+                      label="Click"
+                      binding={s.click_binding}
+                      connected={connected}
+                      onChange={(b) => write({ click_binding: b })}
+                    />
+                  </div>
                 </div>
               </SectionCard>
 

@@ -7,6 +7,10 @@ export interface StartupPreferences {
   startupMode: StartupWindowMode;
 }
 
+const WINDOWS_MICA_STORAGE_KEY = "kbhe-windows-mica-enabled";
+const WINDOWS_MICA_CLASS = "windows-mica";
+const DEFAULT_WINDOWS_MICA_ENABLED = true;
+
 const DEFAULT_STARTUP_PREFERENCES: StartupPreferences = {
   startupMode: "normal",
 };
@@ -76,4 +80,44 @@ export async function signalFrontendReady(): Promise<void> {
   } catch {
     // Best effort: splash fallback timer in Rust will still recover.
   }
+}
+
+function isWindowsPlatform(): boolean {
+  const userAgentData = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData;
+  const platform = userAgentData?.platform ?? navigator.platform ?? "";
+  return /win/i.test(platform) || /windows/i.test(navigator.userAgent);
+}
+
+export function isWindowsMicaSupported(): boolean {
+  return isTauri() && isWindowsPlatform();
+}
+
+export function getWindowsMicaEnabled(): boolean {
+  if (!isWindowsMicaSupported()) {
+    return false;
+  }
+
+  const stored = localStorage.getItem(WINDOWS_MICA_STORAGE_KEY);
+  if (stored == null) {
+    return DEFAULT_WINDOWS_MICA_ENABLED;
+  }
+
+  return stored === "true";
+}
+
+function applyWindowsMicaClass(enabled: boolean): void {
+  document.documentElement.classList.toggle(WINDOWS_MICA_CLASS, isWindowsMicaSupported() && enabled);
+}
+
+export function setWindowsMicaEnabled(enabled: boolean): void {
+  if (!isWindowsMicaSupported()) {
+    return;
+  }
+
+  localStorage.setItem(WINDOWS_MICA_STORAGE_KEY, String(enabled));
+  applyWindowsMicaClass(enabled);
+}
+
+export function applyWindowsMicaStyling(): void {
+  applyWindowsMicaClass(getWindowsMicaEnabled());
 }

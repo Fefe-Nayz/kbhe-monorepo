@@ -1,3 +1,4 @@
+mod audio;
 mod commands;
 mod startup;
 mod volume;
@@ -135,10 +136,12 @@ pub fn run() {
             commands::kbhe_wait_for_disconnect,
             commands::kbhe_detect_bootloader_presence,
             commands::kbhe_get_os_key_variants,
+            commands::kbhe_flash_firmware,
             kbhe_frontend_ready,
             startup::kbhe_get_startup_preferences,
             startup::kbhe_set_startup_preferences,
             volume::kbhe_get_system_volume,
+            audio::kbhe_get_audio_bands,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 const KBHE_VID: u16 = 0x9172;
 const KBHE_APP_PID: u16 = 0x0002;
@@ -684,4 +684,351 @@ fn get_os_key_variants_impl() -> Result<HashMap<String, KbheOsKeyVariants>, Stri
 #[tauri::command]
 pub fn kbhe_get_os_key_variants() -> Result<HashMap<String, KbheOsKeyVariants>, String> {
     get_os_key_variants_impl()
+}
+
+// ---------------------------------------------------------------------------
+// Firmware flash
+// ---------------------------------------------------------------------------
+
+const UPDATER_CMD_HELLO: u8 = 0x01;
+const UPDATER_CMD_BEGIN: u8 = 0x02;
+const UPDATER_CMD_DATA: u8 = 0x03;
+const UPDATER_CMD_FINISH: u8 = 0x04;
+const UPDATER_CMD_ABORT: u8 = 0x05;
+const UPDATER_CMD_BOOT: u8 = 0x06;
+const UPDATER_STATUS_OK: u8 = 0x00;
+const APP_CMD_ENTER_BOOTLOADER: u8 = 0x02;
+const DATA_CHUNK_SIZE: usize = 56;
+const UPDATER_PROTOCOL_VERSION: u16 = 0x0001;
+/// Device presence poll interval (matches Python DEVICE_POLL_DELAY_S = 0.02)
+const DEVICE_POLL_MS: u64 = 20;
+
+fn crc32_compute(data: &[u8]) -> u32 {
+    let mut crc = 0xFFFF_FFFFu32;
+    for &byte in data {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
+        }
+    }
+    crc ^ 0xFFFF_FFFF
+}
+
+fn build_updater_write_buf(
+    command: u8,
+    sequence: u8,
+    offset: u32,
+    payload: &[u8],
+) -> [u8; KBHE_PACKET_SIZE + 1] {
+    let mut buf = [0u8; KBHE_PACKET_SIZE + 1];
+    buf[0] = 0; // report ID
+    buf[1] = command;
+    buf[2] = sequence;
+    buf[3] = 0;
+    buf[4] = payload.len() as u8;
+    buf[5..9].copy_from_slice(&offset.to_le_bytes());
+    if !payload.is_empty() {
+        buf[9..9 + payload.len()].copy_from_slice(payload);
+    }
+    buf
+}
+
+struct UpdaterResponse {
+    status: u8,
+    offset: u32,
+    payload: Vec<u8>,
+}
+
+fn updater_transact(
+    device: &HidDevice,
+    command: u8,
+    sequence: u8,
+    offset: u32,
+    payload: &[u8],
+    retries: u32,
+    timeout_ms: u64,
+) -> Result<UpdaterResponse, String> {
+    let write_buf = build_updater_write_buf(command, sequence, offset, payload);
+
+    for attempt in 0..retries {
+        device.write(&write_buf).map_err(|e| e.to_string())?;
+
+        let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+        let mut rbuf = [0u8; KBHE_PACKET_SIZE];
+
+        while Instant::now() < deadline {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            let t = i32::try_from(remaining.as_millis().max(1)).unwrap_or(i32::MAX);
+            let n = device
+                .read_timeout(&mut rbuf, t)
+                .map_err(|e| e.to_string())?;
+            if n > 0 && rbuf[0] == command {
+                let status = rbuf[2];
+                let length = rbuf[3] as usize;
+                let resp_offset =
+                    u32::from_le_bytes([rbuf[4], rbuf[5], rbuf[6], rbuf[7]]);
+                let payload_end = (8 + length.min(DATA_CHUNK_SIZE)).min(n.max(8));
+                let resp_payload = rbuf[8..payload_end].to_vec();
+                return Ok(UpdaterResponse {
+                    status,
+                    offset: resp_offset,
+                    payload: resp_payload,
+                });
+            }
+        }
+
+        if attempt + 1 < retries {
+            // will retry
+        }
+    }
+
+    Err(format!(
+        "updater did not respond to command 0x{command:02X} after {retries} attempts"
+    ))
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashProgress {
+    pub phase: String,
+    pub bytes_done: u32,
+    pub total_bytes: u32,
+    pub percent: u8,
+}
+
+fn emit_flash_progress(app: &AppHandle, phase: &str, bytes_done: u32, total_bytes: u32) {
+    let percent = if total_bytes > 0 {
+        ((bytes_done as u64 * 100) / total_bytes as u64) as u8
+    } else {
+        0
+    };
+    let _ = app.emit(
+        "kbhe_flash_progress",
+        FlashProgress {
+            phase: phase.to_string(),
+            bytes_done,
+            total_bytes,
+            percent,
+        },
+    );
+}
+
+fn find_updater_device() -> Result<Option<KbheHidDeviceInfo>, String> {
+    find_first_device(KbheDeviceKind::Updater)
+}
+
+fn find_runtime_device() -> Result<Option<KbheHidDeviceInfo>, String> {
+    find_first_device(KbheDeviceKind::Runtime)
+}
+
+fn wait_for_device_kind(
+    find_fn: impl Fn() -> Result<Option<KbheHidDeviceInfo>, String>,
+    timeout_ms: u64,
+) -> Result<KbheHidDeviceInfo, String> {
+    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    loop {
+        if let Some(dev) = find_fn()? {
+            return Ok(dev);
+        }
+        if Instant::now() >= deadline {
+            return Err("timed out waiting for device".to_string());
+        }
+        std::thread::sleep(Duration::from_millis(DEVICE_POLL_MS));
+    }
+}
+
+fn wait_for_device_absent(
+    find_fn: impl Fn() -> Result<Option<KbheHidDeviceInfo>, String>,
+    timeout_ms: u64,
+) -> Result<(), String> {
+    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    loop {
+        if find_fn()?.is_none() {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err("timed out waiting for device to disconnect".to_string());
+        }
+        std::thread::sleep(Duration::from_millis(DEVICE_POLL_MS));
+    }
+}
+
+#[tauri::command]
+pub fn kbhe_flash_firmware(
+    firmware_path: String,
+    firmware_version: Option<u16>,
+    app: AppHandle,
+    state: State<'_, KbheTransportState>,
+) -> Result<(), String> {
+    let firmware =
+        std::fs::read(&firmware_path).map_err(|e| format!("failed to read firmware: {e}"))?;
+    if firmware.is_empty() {
+        return Err("firmware file is empty".to_string());
+    }
+
+    let aligned_len = (firmware.len() + 3) & !3;
+    let mut padded = firmware.clone();
+    padded.resize(aligned_len, 0xFF);
+
+    let image_crc32 = crc32_compute(&firmware);
+    let fw_version = firmware_version.unwrap_or(0);
+    let total = firmware.len() as u32;
+
+    emit_flash_progress(&app, "connecting", 0, total);
+
+    // Request bootloader from runtime device if not already in updater mode
+    if find_updater_device()?.is_none() {
+        // Drop any existing state connection first
+        {
+            let mut active = lock_active(&state)?;
+            *active = None;
+        }
+
+        // Open a fresh connection to the runtime device and send ENTER_BOOTLOADER.
+        // This works whether or not the TypeScript side already disconnected — we
+        // always enumerate from scratch so we're not relying on state.active.
+        if let Some(runtime_info) = find_runtime_device()? {
+            if let Ok(runtime_device) = open_device_by_path(&runtime_info.path) {
+                let mut report = [0u8; KBHE_PACKET_SIZE + 1];
+                report[1] = APP_CMD_ENTER_BOOTLOADER;
+                let _ = runtime_device.write(&report);
+                let mut tmp = [0u8; KBHE_PACKET_SIZE];
+                let _ = runtime_device.read_timeout(&mut tmp, 500);
+                // runtime_device dropped here — HID handle released before
+                // the device re-enumerates as updater
+            }
+        }
+
+        // Wait for runtime device to disconnect
+        let _ = wait_for_device_absent(find_runtime_device, 5_000);
+    }
+
+    // Wait for updater device
+    let updater_info = wait_for_device_kind(find_updater_device, 8_000)
+        .map_err(|_| "updater device not found after requesting bootloader mode".to_string())?;
+
+    let device = open_device_by_path(&updater_info.path)?;
+
+    let result = flash_with_device(&device, &firmware, &padded, image_crc32, fw_version, &app, total);
+
+    if result.is_err() {
+        // Best-effort ABORT
+        let abort_buf = build_updater_write_buf(UPDATER_CMD_ABORT, 0xFF, 0, &[]);
+        let _ = device.write(&abort_buf);
+    }
+
+    result?;
+
+    // Wait for updater to disconnect then app to come back
+    let _ = wait_for_device_absent(find_updater_device, 10_000);
+    wait_for_device_kind(find_runtime_device, 15_000)
+        .map_err(|_| "application did not come back after flashing".to_string())?;
+
+    emit_flash_progress(&app, "done", total, total);
+    Ok(())
+}
+
+fn flash_with_device(
+    device: &HidDevice,
+    firmware: &[u8],
+    padded: &[u8],
+    image_crc32: u32,
+    fw_version: u16,
+    app: &AppHandle,
+    total: u32,
+) -> Result<(), String> {
+    let mut seq = 1u8;
+
+    // HELLO
+    emit_flash_progress(app, "hello", 0, total);
+    let hello = updater_transact(device, UPDATER_CMD_HELLO, seq, 0, &[], 5, 3_000)?;
+    if hello.status != UPDATER_STATUS_OK {
+        return Err(format!("HELLO failed: status 0x{:02X}", hello.status));
+    }
+    if hello.payload.len() >= 20 {
+        let proto = u16::from_le_bytes([hello.payload[0], hello.payload[1]]);
+        if proto != UPDATER_PROTOCOL_VERSION {
+            return Err(format!(
+                "unsupported updater protocol 0x{proto:04X}, expected 0x{UPDATER_PROTOCOL_VERSION:04X}"
+            ));
+        }
+        let max_size = u32::from_le_bytes([
+            hello.payload[8],
+            hello.payload[9],
+            hello.payload[10],
+            hello.payload[11],
+        ]);
+        if max_size > 0 && firmware.len() as u32 > max_size {
+            return Err(format!(
+                "firmware is too large ({} bytes), updater max is {max_size} bytes",
+                firmware.len()
+            ));
+        }
+    }
+
+    // BEGIN: <IIHH> = firmware_len, crc32, fw_version, 0
+    seq = seq.wrapping_add(1);
+    emit_flash_progress(app, "begin", 0, total);
+    let mut begin_payload = [0u8; 12];
+    begin_payload[0..4].copy_from_slice(&(firmware.len() as u32).to_le_bytes());
+    begin_payload[4..8].copy_from_slice(&image_crc32.to_le_bytes());
+    begin_payload[8..10].copy_from_slice(&fw_version.to_le_bytes());
+    let begin = updater_transact(device, UPDATER_CMD_BEGIN, seq, 0, &begin_payload, 5, 3_000)?;
+    if begin.status != UPDATER_STATUS_OK {
+        return Err(format!("BEGIN failed: status 0x{:02X}", begin.status));
+    }
+
+    // DATA chunks
+    let mut offset = 0usize;
+    let mut last_percent = u8::MAX;
+    while offset < padded.len() {
+        let end = (offset + DATA_CHUNK_SIZE).min(padded.len());
+        let chunk = &padded[offset..end];
+        seq = seq.wrapping_add(1);
+        let resp = updater_transact(device, UPDATER_CMD_DATA, seq, offset as u32, chunk, 5, 3_000)?;
+        if resp.status != UPDATER_STATUS_OK {
+            return Err(format!(
+                "DATA failed at offset 0x{offset:08X}: status 0x{:02X}",
+                resp.status
+            ));
+        }
+        let next_offset = resp.offset as usize;
+        if next_offset != offset + chunk.len() {
+            return Err(format!(
+                "offset mismatch: updater acked 0x{next_offset:08X}, expected 0x{:08X}",
+                offset + chunk.len()
+            ));
+        }
+        offset = next_offset;
+
+        let progress = (offset.min(firmware.len()) as u32).min(total);
+        let percent = if total > 0 {
+            ((progress as u64 * 100) / total as u64) as u8
+        } else {
+            100
+        };
+        if percent != last_percent {
+            emit_flash_progress(app, "flashing", progress, total);
+            last_percent = percent;
+        }
+    }
+
+    // FINISH
+    seq = seq.wrapping_add(1);
+    emit_flash_progress(app, "finish", total, total);
+    let finish = updater_transact(device, UPDATER_CMD_FINISH, seq, 0, &[], 5, 5_000)?;
+    if finish.status != UPDATER_STATUS_OK {
+        return Err(format!("FINISH failed: status 0x{:02X}", finish.status));
+    }
+
+    // BOOT (device may not respond — best effort)
+    seq = seq.wrapping_add(1);
+    emit_flash_progress(app, "boot", total, total);
+    let _ = updater_transact(device, UPDATER_CMD_BOOT, seq, 0, &[], 3, 2_000);
+
+    Ok(())
 }

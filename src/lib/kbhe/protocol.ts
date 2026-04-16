@@ -14,7 +14,17 @@ export const LED_BYTES_PER_CHUNK = 60;
 export const LED_MATRIX_SIZE = KEY_COUNT;
 export const LED_MATRIX_WIDTH = 8;
 export const LED_MATRIX_HEIGHT = 8;
-export const LED_EFFECT_PARAM_COUNT = 6;
+export const LED_EFFECT_PARAM_COUNT = 16;
+export const LED_EFFECT_PARAM_COLOR_R = 8;
+export const LED_EFFECT_PARAM_COLOR_G = 9;
+export const LED_EFFECT_PARAM_COLOR_B = 10;
+export const LED_EFFECT_PARAM_COLOR2_R = 11;
+export const LED_EFFECT_PARAM_COLOR2_G = 12;
+export const LED_EFFECT_PARAM_COLOR2_B = 13;
+export const LED_EFFECT_PARAM_SPEED = 14;
+export const LED_AUDIO_SPECTRUM_BAND_COUNT = 16;
+export const SETTINGS_PROFILE_COUNT = 4;
+export const SETTINGS_PROFILE_NAME_LENGTH = 16;
 export const FILTER_DEFAULT_ENABLED = true;
 export const FILTER_DEFAULT_NOISE_BAND = 30;
 export const FILTER_DEFAULT_ALPHA_MIN_DENOM = 32;
@@ -49,6 +59,8 @@ export enum Command {
   GET_DEVICE_INFO = 0x2b,
   GET_KEYBOARD_NAME = 0x2c,
   SET_KEYBOARD_NAME = 0x2d,
+  COPY_PROFILE_SLOT = 0x2e,
+  RESET_PROFILE_SLOT = 0x2f,
 
   GET_KEY_SETTINGS = 0x40,
   SET_KEY_SETTINGS = 0x41,
@@ -63,8 +75,6 @@ export enum Command {
   SET_KEY_CURVE = 0x4a,
   GET_KEY_GAMEPAD_MAP = 0x4b,
   SET_KEY_GAMEPAD_MAP = 0x4c,
-  GET_GAMEPAD_WITH_KB = 0x4d,
-  SET_GAMEPAD_WITH_KB = 0x4e,
   GET_CALIBRATION_MAX = 0x4f,
   SET_CALIBRATION_MAX = 0x50,
   GUIDED_CALIBRATION_START = 0x51,
@@ -75,6 +85,13 @@ export enum Command {
   GET_LAYER_KEYCODE = 0x56,
   SET_LAYER_KEYCODE = 0x57,
   RESET_KEY_TRIGGER_SETTINGS = 0x58,
+  GET_ROTARY_STATE = 0x59,
+  GET_ACTIVE_PROFILE = 0x5a,
+  SET_ACTIVE_PROFILE = 0x5b,
+  GET_PROFILE_NAME = 0x5c,
+  SET_PROFILE_NAME = 0x5d,
+  CREATE_PROFILE = 0x5e,
+  DELETE_PROFILE = 0x5f,
 
   GET_LED_ENABLED = 0x60,
   SET_LED_ENABLED = 0x61,
@@ -92,18 +109,16 @@ export enum Command {
   LED_TEST_RAINBOW = 0x6d,
   GET_LED_EFFECT = 0x6e,
   SET_LED_EFFECT = 0x6f,
-  GET_LED_EFFECT_SPEED = 0x70,
-  SET_LED_EFFECT_SPEED = 0x71,
-  SET_LED_EFFECT_COLOR = 0x72,
-  GET_LED_FPS_LIMIT = 0x73,
-  SET_LED_FPS_LIMIT = 0x74,
-  GET_LED_DIAGNOSTIC = 0x75,
-  SET_LED_DIAGNOSTIC = 0x76,
-  GET_LED_EFFECT_PARAMS = 0x77,
-  SET_LED_EFFECT_PARAMS = 0x78,
-  SET_LED_VOLUME_OVERLAY = 0x79,
-  CLEAR_LED_VOLUME_OVERLAY = 0x7a,
-  GET_LED_EFFECT_COLOR = 0x7c,
+  GET_LED_FPS_LIMIT = 0x70,
+  SET_LED_FPS_LIMIT = 0x71,
+  GET_LED_EFFECT_PARAMS = 0x72,
+  SET_LED_EFFECT_PARAMS = 0x73,
+  SET_LED_VOLUME_OVERLAY = 0x74,
+  CLEAR_LED_VOLUME_OVERLAY = 0x75,
+  RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x76,
+  GET_LED_EFFECT_SCHEMA = 0x77,
+  SET_LED_AUDIO_SPECTRUM = 0x78,
+  CLEAR_LED_AUDIO_SPECTRUM = 0x79,
 
   GET_FILTER_ENABLED = 0x80,
   SET_FILTER_ENABLED = 0x81,
@@ -132,42 +147,136 @@ export enum Status {
 }
 
 export enum LEDEffect {
-  MATRIX = 0,
-  RAINBOW = 1,
-  BREATHING = 2,
-  STATIC_RAINBOW = 3,
-  SOLID = 4,
-  PLASMA = 5,
-  FIRE = 6,
-  OCEAN = 7,
-  MATRIX_RAIN = 8,
-  SPARKLE = 9,
-  BREATHING_RAINBOW = 10,
-  SPIRAL = 11,
-  COLOR_CYCLE = 12,
-  REACTIVE = 13,
-  THIRD_PARTY = 14,
-  DISTANCE_SENSOR = 15,
-  NONE = MATRIX,
+  NONE = 0,
+  PLASMA = 1,
+  FIRE = 2,
+  OCEAN = 3,
+  SPARKLE = 4,
+  BREATHING_RAINBOW = 5,
+  COLOR_CYCLE = 6,
+  THIRD_PARTY = 7,
+  DISTANCE_SENSOR = 8,
+  IMPACT_RAINBOW = 9,
+  REACTIVE_GHOST = 10,
+  AUDIO_SPECTRUM = 11,
+  KEY_STATE_DEMO = 12,
+  CYCLE_PINWHEEL = 13,
+  CYCLE_SPIRAL = 14,
+  CYCLE_OUT_IN_DUAL = 15,
+  RAINBOW_BEACON = 16,
+  RAINBOW_PINWHEELS = 17,
+  RAINBOW_MOVING_CHEVRON = 18,
+  HUE_BREATHING = 19,
+  HUE_PENDULUM = 20,
+  HUE_WAVE = 21,
+  RIVERFLOW = 22,
+  SOLID_COLOR = 23,
+  ALPHA_MODS = 24,
+  GRADIENT_UP_DOWN = 25,
+  GRADIENT_LEFT_RIGHT = 26,
+  BREATHING = 27,
+  COLORBAND_SAT = 28,
+  COLORBAND_VAL = 29,
+  COLORBAND_PINWHEEL_SAT = 30,
+  COLORBAND_PINWHEEL_VAL = 31,
+  COLORBAND_SPIRAL_SAT = 32,
+  COLORBAND_SPIRAL_VAL = 33,
+  CYCLE_ALL = 34,
+  CYCLE_LEFT_RIGHT = 35,
+  CYCLE_UP_DOWN = 36,
+  CYCLE_OUT_IN = 37,
+  DUAL_BEACON = 38,
+  FLOWER_BLOOMING = 39,
+  RAINDROPS = 40,
+  JELLYBEAN_RAINDROPS = 41,
+  PIXEL_RAIN = 42,
+  PIXEL_FLOW = 43,
+  PIXEL_FRACTAL = 44,
+  TYPING_HEATMAP = 45,
+  DIGITAL_RAIN = 46,
+  SOLID_REACTIVE_SIMPLE = 47,
+  SOLID_REACTIVE = 48,
+  SOLID_REACTIVE_WIDE = 49,
+  SOLID_REACTIVE_CROSS = 50,
+  SOLID_REACTIVE_NEXUS = 51,
+  SPLASH = 52,
+  SOLID_SPLASH = 53,
+  STARLIGHT_SMOOTH = 54,
+  STARLIGHT = 55,
+  STARLIGHT_DUAL_SAT = 56,
+  STARLIGHT_DUAL_HUE = 57,
+  SOLID_REACTIVE_MULTI_WIDE = 58,
+  SOLID_REACTIVE_MULTI_CROSS = 59,
+  SOLID_REACTIVE_MULTI_NEXUS = 60,
+  MULTI_SPLASH = 61,
+  SOLID_MULTI_SPLASH = 62,
+  MATRIX = LEDEffect.NONE,
 }
 
 export const LED_EFFECT_NAMES: Record<number, string> = {
-  [LEDEffect.MATRIX]: "Matrix (Software)",
-  [LEDEffect.RAINBOW]: "Rainbow Wave",
-  [LEDEffect.BREATHING]: "Breathing",
-  [LEDEffect.STATIC_RAINBOW]: "Static Rainbow",
-  [LEDEffect.SOLID]: "Solid Color",
+  [LEDEffect.NONE]: "Matrix (Software)",
   [LEDEffect.PLASMA]: "Plasma",
   [LEDEffect.FIRE]: "Fire",
   [LEDEffect.OCEAN]: "Ocean Waves",
-  [LEDEffect.MATRIX_RAIN]: "Matrix Rain",
   [LEDEffect.SPARKLE]: "Sparkle",
   [LEDEffect.BREATHING_RAINBOW]: "Breathing Rainbow",
-  [LEDEffect.SPIRAL]: "Spiral",
   [LEDEffect.COLOR_CYCLE]: "Color Cycle",
-  [LEDEffect.REACTIVE]: "Reactive",
   [LEDEffect.THIRD_PARTY]: "Third-Party Live",
   [LEDEffect.DISTANCE_SENSOR]: "Sensor Distance",
+  [LEDEffect.IMPACT_RAINBOW]: "Impact Rainbow",
+  [LEDEffect.REACTIVE_GHOST]: "Reactive Ghost",
+  [LEDEffect.AUDIO_SPECTRUM]: "Audio Spectrum",
+  [LEDEffect.KEY_STATE_DEMO]: "Key State Demo",
+  [LEDEffect.CYCLE_PINWHEEL]: "Cycle Pinwheel",
+  [LEDEffect.CYCLE_SPIRAL]: "Cycle Spiral",
+  [LEDEffect.CYCLE_OUT_IN_DUAL]: "Cycle Out-In Dual",
+  [LEDEffect.RAINBOW_BEACON]: "Rainbow Beacon",
+  [LEDEffect.RAINBOW_PINWHEELS]: "Rainbow Pinwheels",
+  [LEDEffect.RAINBOW_MOVING_CHEVRON]: "Rainbow Chevron",
+  [LEDEffect.HUE_BREATHING]: "Hue Breathing",
+  [LEDEffect.HUE_PENDULUM]: "Hue Pendulum",
+  [LEDEffect.HUE_WAVE]: "Hue Wave",
+  [LEDEffect.RIVERFLOW]: "Riverflow",
+  [LEDEffect.SOLID_COLOR]: "Solid Color",
+  [LEDEffect.ALPHA_MODS]: "Alpha Mods",
+  [LEDEffect.GRADIENT_UP_DOWN]: "Gradient (Top-Bottom)",
+  [LEDEffect.GRADIENT_LEFT_RIGHT]: "Gradient (Left-Right)",
+  [LEDEffect.BREATHING]: "Breathing",
+  [LEDEffect.COLORBAND_SAT]: "Colorband Sat",
+  [LEDEffect.COLORBAND_VAL]: "Colorband Val",
+  [LEDEffect.COLORBAND_PINWHEEL_SAT]: "Colorband Pinwheel Sat",
+  [LEDEffect.COLORBAND_PINWHEEL_VAL]: "Colorband Pinwheel Val",
+  [LEDEffect.COLORBAND_SPIRAL_SAT]: "Colorband Spiral Sat",
+  [LEDEffect.COLORBAND_SPIRAL_VAL]: "Colorband Spiral Val",
+  [LEDEffect.CYCLE_ALL]: "Cycle All",
+  [LEDEffect.CYCLE_LEFT_RIGHT]: "Cycle Left-Right",
+  [LEDEffect.CYCLE_UP_DOWN]: "Cycle Up-Down",
+  [LEDEffect.CYCLE_OUT_IN]: "Cycle Out-In",
+  [LEDEffect.DUAL_BEACON]: "Dual Beacon",
+  [LEDEffect.FLOWER_BLOOMING]: "Flower Blooming",
+  [LEDEffect.RAINDROPS]: "Raindrops",
+  [LEDEffect.JELLYBEAN_RAINDROPS]: "Jellybean Raindrops",
+  [LEDEffect.PIXEL_RAIN]: "Pixel Rain",
+  [LEDEffect.PIXEL_FLOW]: "Pixel Flow",
+  [LEDEffect.PIXEL_FRACTAL]: "Pixel Fractal",
+  [LEDEffect.TYPING_HEATMAP]: "Typing Heatmap",
+  [LEDEffect.DIGITAL_RAIN]: "Digital Rain",
+  [LEDEffect.SOLID_REACTIVE_SIMPLE]: "Solid Reactive Simple",
+  [LEDEffect.SOLID_REACTIVE]: "Solid Reactive",
+  [LEDEffect.SOLID_REACTIVE_WIDE]: "Solid Reactive Wide",
+  [LEDEffect.SOLID_REACTIVE_CROSS]: "Solid Reactive Cross",
+  [LEDEffect.SOLID_REACTIVE_NEXUS]: "Solid Reactive Nexus",
+  [LEDEffect.SPLASH]: "Splash",
+  [LEDEffect.SOLID_SPLASH]: "Solid Splash",
+  [LEDEffect.STARLIGHT_SMOOTH]: "Starlight Smooth",
+  [LEDEffect.STARLIGHT]: "Starlight",
+  [LEDEffect.STARLIGHT_DUAL_SAT]: "Starlight Dual (Sat)",
+  [LEDEffect.STARLIGHT_DUAL_HUE]: "Starlight Dual (Hue)",
+  [LEDEffect.SOLID_REACTIVE_MULTI_WIDE]: "Solid Reactive Multi Wide",
+  [LEDEffect.SOLID_REACTIVE_MULTI_CROSS]: "Solid Reactive Multi Cross",
+  [LEDEffect.SOLID_REACTIVE_MULTI_NEXUS]: "Solid Reactive Multi Nexus",
+  [LEDEffect.MULTI_SPLASH]: "Multi Splash",
+  [LEDEffect.SOLID_MULTI_SPLASH]: "Solid Multi Splash",
 };
 
 export const GAMEPAD_AXES = {
@@ -256,6 +365,9 @@ export const ROTARY_PROGRESS_STYLES = {
 export const SOCD_RESOLUTIONS = {
   "Last Input Wins": 0,
   "Most Pressed Wins": 1,
+  "Absolute Priority (Key 1)": 2,
+  "Absolute Priority (Key 2)": 3,
+  "Neutral": 4,
 } as const;
 
 export const LAYER_NAMES: Record<number, string> = {
@@ -537,6 +649,24 @@ export function formatFirmwareVersion(version: number): string {
   return `${major}.${minor}`;
 }
 
+export const ROTARY_BINDING_MODES = {
+  Internal: 0,
+  Keycode: 1,
+} as const;
+
+export const ROTARY_BINDING_LAYER_MODES = {
+  Active: 0,
+  Fixed: 1,
+} as const;
+
+export const LED_PARAM_TYPES = {
+  NONE: 0,
+  U8: 1,
+  BOOL: 2,
+  HUE: 3,
+  COLOR: 4,
+} as const;
+
 export function invertMap(record: Record<string, number>): Record<number, string> {
   return Object.fromEntries(Object.entries(record).map(([key, value]) => [value, key]));
 }
@@ -552,3 +682,5 @@ export const ROTARY_BUTTON_ACTION_NAMES = invertMap(ROTARY_BUTTON_ACTIONS);
 export const ROTARY_RGB_BEHAVIOR_NAMES = invertMap(ROTARY_RGB_BEHAVIORS);
 export const ROTARY_PROGRESS_STYLE_NAMES = invertMap(ROTARY_PROGRESS_STYLES);
 export const SOCD_RESOLUTION_NAMES = invertMap(SOCD_RESOLUTIONS);
+export const ROTARY_BINDING_MODE_NAMES = invertMap(ROTARY_BINDING_MODES);
+export const ROTARY_BINDING_LAYER_MODE_NAMES = invertMap(ROTARY_BINDING_LAYER_MODES);

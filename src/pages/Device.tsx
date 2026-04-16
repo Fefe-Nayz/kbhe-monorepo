@@ -79,10 +79,6 @@ export default function Device() {
       switch (key) {
         case "keyboard": {
           await kbheDevice.setKeyboardEnabled(value);
-          // Keep keyboard output strictly disabled in all modes.
-          if (!value) {
-            await kbheDevice.setGamepadWithKeyboard(false);
-          }
           break;
         }
         case "gamepad": await kbheDevice.setGamepadEnabled(value); break;

@@ -141,3 +141,36 @@
         @apply font-sans;
     }
 }
+
+html.windows-mica {
+    --mica-sidebar-surface: transparent;
+    --mica-sidebar-border: transparent;
+    --sidebar-accent: oklch(0.97 0 0 / 46%);
+}
+
+html.windows-mica.dark {
+    --mica-sidebar-surface: transparent;
+    --mica-sidebar-border: transparent;
+    --sidebar-accent: oklch(0.269 0 0 / 52%);
+}
+
+html.windows-mica body,
+html.windows-mica #root,
+html.windows-mica [data-slot="sidebar-wrapper"] {
+    background-color: transparent;
+}
+
+html.windows-mica [data-slot="sidebar-gap"],
+html.windows-mica [data-slot="sidebar-container"].app-mica-sidebar {
+    background: transparent;
+}
+
+html.windows-mica [data-slot="sidebar-container"].app-mica-sidebar [data-slot="sidebar-inner"] {
+    background-color: transparent;
+    border: none;
+    border-radius: calc(var(--radius) + 2px);
+    overflow: clip;
+    box-shadow: none;
+    backdrop-filter: saturate(140%) blur(24px);
+    -webkit-backdrop-filter: saturate(140%) blur(24px);
+}

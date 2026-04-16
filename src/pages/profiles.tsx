@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useProfileStore } from "@/stores/profileStore";
 import { useKeyboardStore } from "@/stores/keyboard-store";
+import { useDeviceSession } from "@/lib/kbhe/session";
+import { kbheDevice } from "@/lib/kbhe/device";
+import { SETTINGS_PROFILE_COUNT } from "@/lib/kbhe/protocol";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SectionCard } from "@/components/shared/SectionCard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,9 +35,215 @@ import {
   IconDotsVertical,
   IconRefresh,
   IconPencil,
+  IconDeviceFloppy,
+  IconRotate,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { PageContent } from "@/components/shared/PageLayout";
+
+// ---------------------------------------------------------------------------
+// Firmware profiles section
+// ---------------------------------------------------------------------------
+
+function FirmwareProfiles() {
+  const { status } = useDeviceSession();
+  const connected = status === "connected";
+  const qc = useQueryClient();
+  const [renameSlot, setRenameSlot] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [resetSlot, setResetSlot] = useState<number | null>(null);
+
+  const activeQ = useQuery({
+    queryKey: ["fw", "activeProfile"],
+    queryFn: () => kbheDevice.getActiveProfile(),
+    enabled: connected,
+  });
+
+  const namesQ = useQuery({
+    queryKey: ["fw", "profileNames"],
+    queryFn: async () => {
+      const results = [];
+      for (let i = 0; i < SETTINGS_PROFILE_COUNT; i++) {
+        results.push(await kbheDevice.getProfileName(i));
+      }
+      return results;
+    },
+    enabled: connected,
+    staleTime: 10_000,
+  });
+
+  const activateMut = useMutation({
+    mutationFn: (index: number) => kbheDevice.setActiveProfile(index),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["fw"] });
+      toast.success("Firmware profile activated");
+    },
+    onError: () => toast.error("Failed to activate firmware profile"),
+  });
+
+  const renameMut = useMutation({
+    mutationFn: ({ index, name }: { index: number; name: string }) =>
+      kbheDevice.setProfileName(index, name),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["fw", "profileNames"] });
+      setRenameSlot(null);
+      toast.success("Profile renamed");
+    },
+    onError: () => toast.error("Failed to rename profile"),
+  });
+
+  const resetMut = useMutation({
+    mutationFn: (index: number) => kbheDevice.resetProfileSlot(index),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["fw"] });
+      setResetSlot(null);
+      toast.success("Profile slot reset to defaults");
+    },
+    onError: () => toast.error("Failed to reset profile slot"),
+  });
+
+  const activeIndex = activeQ.data?.profile_index ?? -1;
+  const usedMask = activeQ.data?.profile_used_mask ?? 0;
+  const isUsed = (i: number) => Boolean(usedMask & (1 << i));
+  const slotName = (i: number) => namesQ.data?.[i]?.name || `Slot ${i + 1}`;
+  const loading = activeQ.isLoading || namesQ.isLoading;
+
+  return (
+    <SectionCard
+      title="Firmware Profiles"
+      description="Profiles stored in the keyboard's flash memory. Up to 4 slots."
+    >
+      {!connected ? (
+        <p className="text-sm text-muted-foreground">Connect a keyboard to manage firmware profiles.</p>
+      ) : loading ? (
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: SETTINGS_PROFILE_COUNT }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: SETTINGS_PROFILE_COUNT }).map((_, i) => {
+            const active = i === activeIndex;
+            const used = isUsed(i);
+            return (
+              <div
+                key={i}
+                className={`flex items-center justify-between rounded-lg border px-3 py-2 transition-colors ${
+                  active ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-medium">{slotName(i)}</span>
+                  {active && (
+                    <Badge className="gap-1 text-[10px]">
+                      <IconCheck className="size-3" /> Active
+                    </Badge>
+                  )}
+                  {!used && !active && (
+                    <Badge variant="outline" className="text-[10px]">Empty</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  {!active && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      disabled={activateMut.isPending}
+                      onClick={() => activateMut.mutate(i)}
+                    >
+                      <IconDeviceFloppy className="size-3" />
+                      Activate
+                    </Button>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={
+                      <Button variant="ghost" size="icon" className="size-7">
+                        <IconDotsVertical className="size-4" />
+                        <span className="sr-only">Slot actions</span>
+                      </Button>
+                    } />
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => { setRenameSlot(i); setRenameValue(slotName(i)); }}>
+                        <IconPencil className="size-4" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" onClick={() => setResetSlot(i)}>
+                        <IconRotate className="size-4" />
+                        Reset to Defaults
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Rename dialog */}
+      <Dialog open={renameSlot !== null} onOpenChange={() => setRenameSlot(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Slot {renameSlot !== null ? renameSlot + 1 : ""}</DialogTitle>
+          </DialogHeader>
+          <Input
+            placeholder="Profile name…"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && renameSlot !== null && renameValue.trim()) {
+                renameMut.mutate({ index: renameSlot, name: renameValue.trim() });
+              }
+            }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameSlot(null)}>Cancel</Button>
+            <Button
+              disabled={!renameValue.trim() || renameMut.isPending}
+              onClick={() => {
+                if (renameSlot !== null && renameValue.trim()) {
+                  renameMut.mutate({ index: renameSlot, name: renameValue.trim() });
+                }
+              }}
+            >
+              <IconPencil className="size-4 mr-1" />Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset dialog */}
+      <Dialog open={resetSlot !== null} onOpenChange={() => setResetSlot(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Slot {resetSlot !== null ? resetSlot + 1 : ""}?</DialogTitle>
+            <DialogDescription>
+              This will erase all settings in this firmware profile slot and restore defaults. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetSlot(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={resetMut.isPending}
+              onClick={() => { if (resetSlot !== null) resetMut.mutate(resetSlot); }}
+            >
+              <IconRotate className="size-4 mr-1" />Reset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SectionCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
 
 export default function Profiles() {
   const profiles = useProfileStore((s) => s.profiles);
@@ -114,6 +326,9 @@ export default function Profiles() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <PageContent>
+        <FirmwareProfiles />
+
+        <SectionCard title="Software Profiles" description="Configurator key-layout presets stored locally on this PC.">
         <div className="grid grid-cols-2 gap-4">
             {profiles.map((profile) => {
               const isActive = selectedProfile?.name === profile.name;
@@ -221,6 +436,7 @@ export default function Profiles() {
               No profiles yet. Create one to get started.
             </div>
           )}
+        </SectionCard>
       </PageContent>
 
       <input

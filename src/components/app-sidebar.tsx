@@ -173,7 +173,7 @@ export function AppSidebar({ variant = "inset" }: AppSidebarProps) {
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   return (
-    <Sidebar variant={variant} collapsible="icon">
+    <Sidebar variant={variant} collapsible="icon" className="app-mica-sidebar">
       <SidebarHeader className="pb-1">
         <KeyboardMenu />
       </SidebarHeader>

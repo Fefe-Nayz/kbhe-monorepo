@@ -479,11 +479,7 @@ export default function Gamepad() {
                       disabled={!connected || gamepadQ.isLoading}
                       onCheckedChange={(v) => {
                         if (!gs) return;
-                        gamepadMutation.mutate({
-                          ...gs,
-                          reactive_stick: v,
-                          snappy_mode: v,
-                        });
+                        gamepadMutation.mutate({ ...gs, reactive_stick: v });
                       }}
                     />
                   </FormRow>

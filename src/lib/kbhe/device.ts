@@ -21,10 +21,17 @@ import {
   KEY_STATES_PER_CHUNK,
   LED_BYTES_PER_CHUNK,
   LED_EFFECT_PARAM_COUNT,
+  LED_EFFECT_PARAM_COLOR_R,
+  LED_EFFECT_PARAM_COLOR_G,
+  LED_EFFECT_PARAM_COLOR_B,
+  LED_EFFECT_PARAM_SPEED,
+  LED_AUDIO_SPECTRUM_BAND_COUNT,
+  SETTINGS_PROFILE_NAME_LENGTH,
   LAYER_COUNT,
   Status,
   u16le,
   u32le,
+  pushU16,
 } from "./protocol";
 import { invoke } from "@tauri-apps/api/core";
 import { KbheCommander, kbheCommander } from "./commander";
@@ -43,6 +50,8 @@ export interface DynamicZone {
 
 export interface KeySettings {
   key_index: number;
+  profile_index: number;
+  layer_index: number;
   hid_keycode: number;
   actuation_point_mm: number;
   release_point_mm: number;
@@ -54,9 +63,13 @@ export interface KeySettings {
   continuous_rapid_trigger: boolean;
   behavior_mode: number;
   hold_threshold_ms: number;
-  dynamic_zone_count: number;
   secondary_hid_keycode: number;
   dynamic_zones: DynamicZone[];
+  tap_hold_options: number;
+  dks_bottom_out_point_mm: number;
+  socd_fully_pressed_enabled: boolean;
+  socd_fully_pressed_point_mm: number;
+  disable_kb_on_gamepad: boolean;
 }
 
 export interface GamepadCurvePoint {
@@ -66,16 +79,21 @@ export interface GamepadCurvePoint {
 }
 
 export interface GamepadSettings {
-  radial_deadzone: number;
   deadzone: number;
   keyboard_routing: number;
-  keep_keyboard_output: boolean;
-  mapped_keys_replace_keyboard: boolean;
   square_mode: boolean;
   reactive_stick: boolean;
-  snappy_mode: boolean;
   api_mode: number;
   curve_points: GamepadCurvePoint[];
+}
+
+export interface RotaryBinding {
+  mode: number;             // 0=internal, 1=keycode
+  keycode: number;
+  modifier_mask_exact: number;
+  fallback_no_mod_keycode: number;
+  layer_mode: number;       // 0=active, 1=fixed
+  layer_index: number;
 }
 
 export interface RotaryEncoderSettings {
@@ -89,6 +107,35 @@ export interface RotaryEncoderSettings {
   progress_style: number;
   progress_effect_mode: number;
   progress_color: [number, number, number];
+  cw_binding: RotaryBinding;
+  ccw_binding: RotaryBinding;
+  click_binding: RotaryBinding;
+}
+
+export interface RotaryState {
+  button_pressed: boolean;
+  last_direction: number;  // -1, 0, or 1
+  step_counter: number;
+}
+
+export interface ProfileInfo {
+  profile_index: number;
+  profile_used_mask: number;
+  name?: string;
+}
+
+export interface LedParamDesc {
+  id: number;
+  type: number;
+  min: number;
+  max: number;
+  default_val: number;
+  step: number;
+}
+
+export interface LedEffectSchema {
+  effect_mode: number;
+  descriptors: LedParamDesc[];
 }
 
 export interface CalibrationSettings {
@@ -299,7 +346,7 @@ export class KBHEDevice {
 
   private sanitizeSocdResolution(value: unknown): number {
     const normalized = Number(value);
-    return normalized === 0 || normalized === 1 ? normalized : 0;
+    return normalized >= 0 && normalized <= 4 ? normalized : 0;
   }
 
   private sanitizeKeyBehaviorMode(value: unknown): number {
@@ -709,63 +756,54 @@ export class KBHEDevice {
     return pixels.slice(0, totalSize);
   }
 
-  async getKeySettings(keyIndex: number): Promise<KeySettings | null> {
-    const response = await this.sendCommand(Command.GET_KEY_SETTINGS, [0, keyIndex]);
-    if (response && response.length >= 12 && response[1] === Status.OK) {
-      const hasLegacyRapidActivation =
-        response.length >= 14 && response[10] > 3 && this.sanitizeSocdResolution(response[11]) === response[11];
-      const rapidTriggerPressIndex = hasLegacyRapidActivation ? 8 : 7;
-      const rapidTriggerReleaseIndex = hasLegacyRapidActivation ? 9 : 8;
-      const socdPairIndex = hasLegacyRapidActivation ? 10 : 9;
-      const socdResolutionIndex = hasLegacyRapidActivation ? 11 : 10;
-      const rapidIndex = hasLegacyRapidActivation ? 12 : 11;
-      const disableIndex = hasLegacyRapidActivation ? 13 : 12;
-      const continuousIndex = disableIndex + 1;
-      const behaviorIndex = continuousIndex + 1;
-      const holdIndex = behaviorIndex + 1;
-      const zoneCountIndex = holdIndex + 1;
-      const secondaryIndex = zoneCountIndex + 1;
-      const dynamicZoneStart = secondaryIndex + 2;
-      const primaryKeycode = this.unpackU16(response, 3);
+  async getKeySettings(keyIndex: number, profileIndex = 0, layerIndex = 0): Promise<KeySettings | null> {
+    const response = await this.sendCommand(Command.GET_KEY_SETTINGS, [0, keyIndex, profileIndex, layerIndex]);
+    if (response && response.length >= 16 && response[1] === Status.OK) {
+      // New packet layout:
+      // [0]=cmd, [1]=status, [2]=key_index, [3]=profile_index, [4]=layer_index,
+      // [5-6]=hid_keycode (u16 LE), [7]=actuation, [8]=release, [9]=rt_press, [10]=rt_release,
+      // [11]=socd_pair, [12]=socd_resolution, [13]=rapid_trigger_enabled,
+      // [14]=disable_kb_on_gamepad, [15]=continuous_rapid_trigger, [16]=behavior_mode,
+      // [17]=hold_threshold_10ms, [18-19]=secondary_hid_keycode,
+      // [20]=dz0.end, [21-22]=dz0.keycode, [23]=dz1.end, [24-25]=dz1.keycode,
+      // [26]=dz2.end, [27-28]=dz2.keycode, [29]=dz3.end, [30-31]=dz3.keycode,
+      // [32]=tap_hold_options, [33]=dks_bottom_out_point, [34]=socd_fully_pressed_enabled,
+      // [35]=socd_fully_pressed_point
+      const primaryKeycode = this.unpackU16(response, 5);
       let dynamicZones = this.defaultDynamicZones(primaryKeycode);
 
-      if (response.length >= dynamicZoneStart + 12) {
+      if (response.length >= 32) {
         dynamicZones = this.sanitizeDynamicZones(
           Array.from({ length: 4 }, (_, index) => ({
-            end_mm_tenths: response[dynamicZoneStart + index * 3] ?? 0,
-            hid_keycode: this.unpackU16(response, dynamicZoneStart + 1 + index * 3),
+            end_mm_tenths: response[20 + index * 3] ?? 0,
+            hid_keycode: this.unpackU16(response, 21 + index * 3),
           })),
           primaryKeycode,
         );
       }
 
       return {
-        key_index: response[2],
+        key_index: response[2] ?? keyIndex,
+        profile_index: response[3] ?? profileIndex,
+        layer_index: response[4] ?? layerIndex,
         hid_keycode: primaryKeycode,
-        actuation_point_mm: response[5] / 10.0,
-        release_point_mm: response[6] / 10.0,
-        rapid_trigger_press: response[rapidTriggerPressIndex] / 100.0,
-        rapid_trigger_release: response[rapidTriggerReleaseIndex] / 100.0,
-        socd_pair: response[socdPairIndex] !== 255 ? response[socdPairIndex] : null,
-        socd_resolution:
-          response.length > socdResolutionIndex
-            ? this.sanitizeSocdResolution(response[socdResolutionIndex])
-            : 0,
-        rapid_trigger_enabled: Boolean(response[rapidIndex]),
-        continuous_rapid_trigger:
-          response.length > continuousIndex ? Boolean(response[continuousIndex]) : false,
-        behavior_mode:
-          response.length > behaviorIndex
-            ? this.sanitizeKeyBehaviorMode(response[behaviorIndex])
-            : KEY_BEHAVIORS.Normal,
-        hold_threshold_ms: response.length > holdIndex ? response[holdIndex] * 10 : 200,
-        dynamic_zone_count:
-          response.length > zoneCountIndex
-            ? Math.max(1, Math.min(4, response[zoneCountIndex]))
-            : 1,
-        secondary_hid_keycode:
-          response.length > secondaryIndex + 1 ? this.unpackU16(response, secondaryIndex) : 0,
+        actuation_point_mm: (response[7] ?? 20) / 10.0,
+        release_point_mm: (response[8] ?? 18) / 10.0,
+        rapid_trigger_press: (response[9] ?? 30) / 100.0,
+        rapid_trigger_release: (response[10] ?? 30) / 100.0,
+        socd_pair: (response[11] ?? 255) !== 255 ? (response[11] ?? 255) : null,
+        socd_resolution: this.sanitizeSocdResolution(response[12] ?? 0),
+        rapid_trigger_enabled: Boolean(response[13]),
+        disable_kb_on_gamepad: Boolean(response[14]),
+        continuous_rapid_trigger: Boolean(response[15]),
+        behavior_mode: this.sanitizeKeyBehaviorMode(response[16] ?? KEY_BEHAVIORS.Normal),
+        hold_threshold_ms: (response[17] ?? 20) * 10,
+        secondary_hid_keycode: response.length >= 20 ? this.unpackU16(response, 18) : 0,
         dynamic_zones: dynamicZones,
+        tap_hold_options: response[32] ?? 0,
+        dks_bottom_out_point_mm: (response[33] ?? 40) / 10.0,
+        socd_fully_pressed_enabled: Boolean(response[34]),
+        socd_fully_pressed_point_mm: (response[35] ?? 40) / 10.0,
       };
     }
     return null;
@@ -836,7 +874,6 @@ export class KBHEDevice {
       behavior_mode: KEY_BEHAVIORS.Normal,
       hold_threshold_ms: 200,
       secondary_hid_keycode: 0,
-      dynamic_zone_count: 1,
       dynamic_zones: this.defaultDynamicZones(hidKeycode),
     } as Partial<KeySettings>);
   }
@@ -845,11 +882,17 @@ export class KBHEDevice {
     const hidKeycode = Number(settings.hid_keycode ?? 0x14);
     const dynamicZones = this.sanitizeDynamicZones(settings.dynamic_zones, hidKeycode);
     const secondaryKeycode = Number(settings.secondary_hid_keycode ?? 0);
-    const payload = [
+    const profileIndex = Math.trunc(settings.profile_index ?? 0) & 0xff;
+    const layerIndex = Math.trunc(settings.layer_index ?? 0) & 0xff;
+
+    const payload: number[] = [
       0,
       Math.trunc(keyIndex) & 0xff,
-      hidKeycode & 0xff,
-      (hidKeycode >> 8) & 0xff,
+      profileIndex,
+      layerIndex,
+    ];
+    pushU16(payload, hidKeycode);
+    payload.push(
       Math.max(1, Math.min(255, Math.round((settings.actuation_point_mm ?? 2.0) * 10))),
       Math.max(0, Math.min(255, Math.round((settings.release_point_mm ?? 1.8) * 10))),
       Math.max(0, Math.min(255, Math.round((settings.rapid_trigger_press ?? 0.3) * 100))),
@@ -857,18 +900,24 @@ export class KBHEDevice {
       Math.trunc(settings.socd_pair ?? 255) & 0xff,
       this.sanitizeSocdResolution(settings.socd_resolution ?? 0),
       settings.rapid_trigger_enabled ? 1 : 0,
-      0,
+      settings.disable_kb_on_gamepad ? 1 : 0,
       settings.continuous_rapid_trigger ? 1 : 0,
       this.sanitizeKeyBehaviorMode(settings.behavior_mode ?? KEY_BEHAVIORS.Normal),
       Math.max(1, Math.min(255, Math.round((settings.hold_threshold_ms ?? 200) / 10.0))),
-      Math.max(1, Math.min(4, Math.trunc(settings.dynamic_zone_count ?? 1))),
-      secondaryKeycode & 0xff,
-      (secondaryKeycode >> 8) & 0xff,
-    ];
+    );
+    pushU16(payload, secondaryKeycode);
 
     for (const zone of dynamicZones) {
-      payload.push(zone.end_mm_tenths & 0xff, zone.hid_keycode & 0xff, (zone.hid_keycode >> 8) & 0xff);
+      payload.push(zone.end_mm_tenths & 0xff);
+      pushU16(payload, zone.hid_keycode);
     }
+
+    payload.push(
+      Math.trunc(settings.tap_hold_options ?? 0) & 0xff,
+      Math.max(1, Math.min(255, Math.round((settings.dks_bottom_out_point_mm ?? 4.0) * 10))),
+      settings.socd_fully_pressed_enabled ? 1 : 0,
+      Math.max(1, Math.min(255, Math.round((settings.socd_fully_pressed_point_mm ?? 4.0) * 10))),
+    );
 
     const response = await this.sendCommand(Command.SET_KEY_SETTINGS, payload);
     return !!response && response.length >= 2 && response[1] === Status.OK;
@@ -907,6 +956,8 @@ export class KBHEDevice {
         const flags = response[offset + flagsIndex] ?? 0;
         keys.push({
           key_index: startIndex + index,
+          profile_index: 0,
+          layer_index: 0,
           hid_keycode: hidKeycode,
           actuation_point_mm: response[offset + 2] / 10.0,
           release_point_mm: response[offset + 3] / 10.0,
@@ -922,8 +973,12 @@ export class KBHEDevice {
           behavior_mode: KEY_BEHAVIORS.Normal,
           hold_threshold_ms: 200,
           secondary_hid_keycode: 0,
-          dynamic_zone_count: 1,
           dynamic_zones: this.defaultDynamicZones(hidKeycode),
+          tap_hold_options: 0,
+          dks_bottom_out_point_mm: 4.0,
+          socd_fully_pressed_enabled: false,
+          socd_fully_pressed_point_mm: 4.0,
+          disable_kb_on_gamepad: false,
         });
       }
 
@@ -935,34 +990,29 @@ export class KBHEDevice {
 
   async getGamepadSettings(): Promise<GamepadSettings | null> {
     const response = await this.sendCommand(Command.GET_GAMEPAD_SETTINGS);
-    if (response && response.length >= 18 && response[1] === Status.OK) {
-      const routing = this.sanitizeGamepadRouting(response[3]);
-      let apiMode: number = GAMEPAD_API_MODES["HID (DirectInput)"];
+    if (response && response.length >= 14 && response[1] === Status.OK) {
+      // New layout (radial_deadzone removed):
+      // [2]=keyboard_routing, [3]=square_mode, [4]=reactive_stick, [5]=api_mode,
+      // [6+]=curve points (3 bytes each: x01mm lo, x01mm hi, y)
+      const routing = this.sanitizeGamepadRouting(response[2]);
+      const squareMode = Boolean(response[3]);
+      const reactiveStick = Boolean(response[4]);
+      const apiMode = this.sanitizeGamepadApiMode(response[5]);
       let offset = 6;
-
-      if (response.length >= 19) {
-        apiMode = this.sanitizeGamepadApiMode(response[6]);
-        offset = 7;
-      }
 
       const points: GamepadCurvePoint[] = [];
       for (let index = 0; index < GAMEPAD_CURVE_POINT_COUNT; index += 1) {
         const x01mm = this.unpackU16(response, offset);
-        const y = response[offset + 2];
+        const y = response[offset + 2] ?? 0;
         points.push({ x_01mm: x01mm, x_mm: x01mm / 100.0, y });
         offset += 3;
       }
       const deadzone = this.gamepadCurveStartDeadzone(points);
       return {
-        radial_deadzone: deadzone,
         deadzone,
         keyboard_routing: routing,
-        keep_keyboard_output: routing !== GAMEPAD_KEYBOARD_ROUTING.Disabled,
-        mapped_keys_replace_keyboard:
-          routing === GAMEPAD_KEYBOARD_ROUTING["Unmapped Only"],
-        square_mode: Boolean(response[4]),
-        reactive_stick: Boolean(response[5]),
-        snappy_mode: Boolean(response[5]),
+        square_mode: squareMode,
+        reactive_stick: reactiveStick,
         api_mode: apiMode,
         curve_points: this.sanitizeGamepadCurvePoints(points),
       };
@@ -970,39 +1020,7 @@ export class KBHEDevice {
     return null;
   }
 
-  async setGamepadSettings(
-    settingsOrDeadzone: Partial<GamepadSettings> | number,
-    _curveType?: never,
-    squareMode?: boolean,
-    snappyMode?: boolean,
-  ): Promise<boolean> {
-    let settings: Partial<GamepadSettings>;
-
-    if (typeof settingsOrDeadzone === "object") {
-      settings = { ...settingsOrDeadzone };
-    } else {
-      const existing: Partial<GamepadSettings> = (await this.getGamepadSettings()) ?? {};
-      let points = this.sanitizeGamepadCurvePoints(
-        existing.curve_points ?? this.defaultGamepadCurvePoints(),
-      );
-      if (points.length > 0) {
-        points[0].x_01mm = Math.round(
-          Math.max(0, Math.min(255, Math.trunc(settingsOrDeadzone))) *
-            ((GAMEPAD_CURVE_MAX_DISTANCE_MM * 100.0) / 255.0),
-        );
-        points[0].x_mm = points[0].x_01mm / 100.0;
-        points = this.sanitizeGamepadCurvePoints(points);
-      }
-      settings = {
-        radial_deadzone: Math.trunc(settingsOrDeadzone),
-        keyboard_routing:
-          existing.keyboard_routing ?? GAMEPAD_KEYBOARD_ROUTING["All Keys"],
-        square_mode: Boolean(squareMode),
-        reactive_stick: Boolean(snappyMode),
-        curve_points: points,
-      };
-    }
-
+  async setGamepadSettings(settings: Partial<GamepadSettings>): Promise<boolean> {
     const routing = this.sanitizeGamepadRouting(
       settings.keyboard_routing ?? GAMEPAD_KEYBOARD_ROUTING["All Keys"],
     );
@@ -1010,14 +1028,12 @@ export class KBHEDevice {
       settings.api_mode ?? GAMEPAD_API_MODES["HID (DirectInput)"],
     );
     const points = this.sanitizeGamepadCurvePoints(settings.curve_points);
-    const deadzone = this.gamepadCurveStartDeadzone(points);
 
     const payload = [
       0,
-      deadzone,
       routing,
       settings.square_mode ? 1 : 0,
-      settings.reactive_stick || settings.snappy_mode ? 1 : 0,
+      settings.reactive_stick ? 1 : 0,
       apiMode,
     ];
     for (const point of points) {
@@ -1028,21 +1044,56 @@ export class KBHEDevice {
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
+  private defaultRotaryBinding(): RotaryBinding {
+    return { mode: 0, keycode: 0, modifier_mask_exact: 0, fallback_no_mod_keycode: 0, layer_mode: 0, layer_index: 0 };
+  }
+
+  private parseRotaryBinding(response: Uint8Array, offset: number): RotaryBinding {
+    return {
+      mode: response[offset] ?? 0,
+      keycode: u16le(response, offset + 1),
+      modifier_mask_exact: response[offset + 3] ?? 0,
+      fallback_no_mod_keycode: u16le(response, offset + 4),
+      layer_mode: response[offset + 6] ?? 0,
+      layer_index: response[offset + 7] ?? 0,
+    };
+  }
+
+  private pushRotaryBinding(payload: number[], binding: RotaryBinding): void {
+    payload.push(binding.mode & 0xff);
+    pushU16(payload, binding.keycode);
+    payload.push(binding.modifier_mask_exact & 0xff);
+    pushU16(payload, binding.fallback_no_mod_keycode);
+    payload.push(binding.layer_mode & 0xff, binding.layer_index & 0xff);
+  }
+
   async getRotaryEncoderSettings(): Promise<RotaryEncoderSettings | null> {
     const response = await this.sendCommand(Command.GET_ROTARY_ENCODER_SETTINGS);
     if (response && response.length >= 14 && response[1] === Status.OK) {
-      return {
-        rotation_action: response[2],
-        button_action: response[3],
-        sensitivity: response[4],
-        step_size: response[5],
+      const base = {
+        rotation_action: response[2] ?? 0,
+        button_action: response[3] ?? 0,
+        sensitivity: response[4] ?? 1,
+        step_size: response[5] ?? 1,
         invert_direction: Boolean(response[6]),
-        rgb_behavior: response[7],
-        rgb_effect_mode: response[8],
-        progress_style: response[9],
-        progress_effect_mode: response[10],
-        progress_color: [response[11], response[12], response[13]],
+        rgb_behavior: response[7] ?? 0,
+        rgb_effect_mode: response[8] ?? 0,
+        progress_style: response[9] ?? 0,
+        progress_effect_mode: response[10] ?? 0,
+        progress_color: [response[11] ?? 0, response[12] ?? 0, response[13] ?? 0] as [number, number, number],
+        cw_binding: this.defaultRotaryBinding(),
+        ccw_binding: this.defaultRotaryBinding(),
+        click_binding: this.defaultRotaryBinding(),
       };
+
+      // Parse bindings if response is long enough (14 base + 8 bytes each = 38 total)
+      if (response.length >= 38) {
+        base.cw_binding = this.parseRotaryBinding(response, 14);
+        base.ccw_binding = this.parseRotaryBinding(response, 22);
+        base.click_binding = this.parseRotaryBinding(response, 30);
+      }
+
+      return base;
     }
     return null;
   }
@@ -1052,7 +1103,7 @@ export class KBHEDevice {
     while (progressColor.length < 3) {
       progressColor.push(0);
     }
-    const response = await this.sendCommand(Command.SET_ROTARY_ENCODER_SETTINGS, [
+    const payload: number[] = [
       0,
       Math.trunc(settings.rotation_action ?? 0) & 0xff,
       Math.trunc(settings.button_action ?? 0) & 0xff,
@@ -1066,7 +1117,16 @@ export class KBHEDevice {
       progressColor[0] & 0xff,
       progressColor[1] & 0xff,
       progressColor[2] & 0xff,
-    ]);
+    ];
+
+    const cwBinding = settings.cw_binding ?? this.defaultRotaryBinding();
+    const ccwBinding = settings.ccw_binding ?? this.defaultRotaryBinding();
+    const clickBinding = settings.click_binding ?? this.defaultRotaryBinding();
+    this.pushRotaryBinding(payload, cwBinding);
+    this.pushRotaryBinding(payload, ccwBinding);
+    this.pushRotaryBinding(payload, clickBinding);
+
+    const response = await this.sendCommand(Command.SET_ROTARY_ENCODER_SETTINGS, payload);
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
@@ -1303,19 +1363,6 @@ export class KBHEDevice {
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
-  async getGamepadWithKeyboard(): Promise<boolean | null> {
-    const response = await this.sendCommand(Command.GET_GAMEPAD_WITH_KB);
-    if (response && response.length >= 3 && response[1] === Status.OK) {
-      return response[2] !== 0;
-    }
-    return null;
-  }
-
-  async setGamepadWithKeyboard(enabled: boolean): Promise<boolean> {
-    const response = await this.sendCommand(Command.SET_GAMEPAD_WITH_KB, [0, enabled ? 1 : 0]);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
-  }
-
   async getLedEffect(): Promise<number | null> {
     const response = await this.sendCommand(Command.GET_LED_EFFECT);
     if (response && response.length >= 3 && response[1] === Status.OK) {
@@ -1330,36 +1377,56 @@ export class KBHEDevice {
   }
 
   async getLedEffectSpeed(): Promise<number | null> {
-    const response = await this.sendCommand(Command.GET_LED_EFFECT_SPEED);
-    if (response && response.length >= 3 && response[1] === Status.OK) {
-      return response[2];
-    }
-    return null;
+    const effect = await this.getLedEffect();
+    if (effect == null) return null;
+    const params = await this.getLedEffectParams(effect);
+    if (!params) return null;
+    return params[LED_EFFECT_PARAM_SPEED] ?? null;
   }
 
   async setLedEffectSpeed(speed: number): Promise<boolean> {
-    const response = await this.sendCommand(Command.SET_LED_EFFECT_SPEED, [0, speed]);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
+    const effect = await this.getLedEffect();
+    if (effect == null) return false;
+    const params = await this.getLedEffectParams(effect);
+    if (!params) return false;
+    const newParams = [...params];
+    while (newParams.length <= LED_EFFECT_PARAM_SPEED) newParams.push(0);
+    newParams[LED_EFFECT_PARAM_SPEED] = speed & 0xff;
+    return this.setLedEffectParams(effect, newParams).then((r) => r !== null && r);
   }
 
   async setLedEffectColor(r: number, g: number, b: number): Promise<boolean> {
-    const response = await this.sendCommand(Command.SET_LED_EFFECT_COLOR, [0, r, g, b]);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
+    const effect = await this.getLedEffect();
+    if (effect == null) return false;
+    const params = await this.getLedEffectParams(effect);
+    if (!params) return false;
+    const newParams = [...params];
+    while (newParams.length <= LED_EFFECT_PARAM_COLOR_B) newParams.push(0);
+    newParams[LED_EFFECT_PARAM_COLOR_R] = r & 0xff;
+    newParams[LED_EFFECT_PARAM_COLOR_G] = g & 0xff;
+    newParams[LED_EFFECT_PARAM_COLOR_B] = b & 0xff;
+    return this.setLedEffectParams(effect, newParams).then((ok) => ok !== null && ok);
   }
 
   async getLedEffectColor(): Promise<[number, number, number] | null> {
-    const response = await this.sendCommand(Command.GET_LED_EFFECT_COLOR);
-    if (response && response.length >= 5 && response[1] === Status.OK) {
-      return [response[2], response[3], response[4]];
-    }
-    return null;
+    const effect = await this.getLedEffect();
+    if (effect == null) return null;
+    const params = await this.getLedEffectParams(effect);
+    if (!params) return null;
+    return [
+      params[LED_EFFECT_PARAM_COLOR_R] ?? 255,
+      params[LED_EFFECT_PARAM_COLOR_G] ?? 0,
+      params[LED_EFFECT_PARAM_COLOR_B] ?? 0,
+    ];
   }
 
   async getLedEffectParams(effectMode: number): Promise<number[] | null> {
     const response = await this.sendCommand(Command.GET_LED_EFFECT_PARAMS, [0, effectMode & 0xff]);
     if (response && response.length >= 4 && response[1] === Status.OK) {
-      const count = Math.min(response[3], LED_EFFECT_PARAM_COUNT, Math.max(0, response.length - 4));
-      return Array.from(response.slice(4, 4 + count));
+      const count = Math.min(response[3] ?? LED_EFFECT_PARAM_COUNT, LED_EFFECT_PARAM_COUNT, Math.max(0, response.length - 4));
+      const params = Array.from(response.slice(4, 4 + count));
+      while (params.length < LED_EFFECT_PARAM_COUNT) params.push(0);
+      return params;
     }
     return null;
   }
@@ -1390,17 +1457,177 @@ export class KBHEDevice {
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
-  async getLedDiagnostic(): Promise<number | null> {
-    const response = await this.sendCommand(Command.GET_LED_DIAGNOSTIC);
-    if (response && response.length >= 3 && response[1] === Status.OK) {
-      return response[2];
+  async restoreLedEffectBeforeThirdParty(): Promise<boolean> {
+    const response = await this.sendCommand(Command.RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  async getLedEffectSchema(effectMode: number): Promise<LedEffectSchema | null> {
+    const allDescriptors: LedParamDesc[] = [];
+    let chunkIndex = 0;
+    let totalChunks = 1;
+
+    while (chunkIndex < totalChunks) {
+      const response = await this.sendCommand(Command.GET_LED_EFFECT_SCHEMA, [0, effectMode & 0xff, chunkIndex]);
+      if (!response || response.length < 6 || response[1] !== Status.OK) {
+        return null;
+      }
+      const returnedEffect = response[2];
+      if (returnedEffect !== effectMode) return null;
+      totalChunks = response[4] ?? 1;
+      const totalActive = response[5] ?? 0;
+      const descriptorBytes = response.slice(6);
+      const descriptorCount = Math.floor(descriptorBytes.length / 6);
+
+      for (let i = 0; i < descriptorCount && allDescriptors.length < totalActive; i++) {
+        const base = i * 6;
+        allDescriptors.push({
+          id: descriptorBytes[base] ?? 0,
+          type: descriptorBytes[base + 1] ?? 0,
+          min: descriptorBytes[base + 2] ?? 0,
+          max: descriptorBytes[base + 3] ?? 255,
+          default_val: descriptorBytes[base + 4] ?? 0,
+          step: descriptorBytes[base + 5] ?? 1,
+        });
+      }
+
+      chunkIndex += 1;
+    }
+
+    return { effect_mode: effectMode, descriptors: allDescriptors };
+  }
+
+  async setAudioSpectrum(bands: number[], impactLevel: number): Promise<boolean> {
+    const bandCount = Math.min(bands.length, LED_AUDIO_SPECTRUM_BAND_COUNT);
+    const bandBytes = bands.slice(0, bandCount).map((b) => b & 0xff);
+    while (bandBytes.length < LED_AUDIO_SPECTRUM_BAND_COUNT) bandBytes.push(0);
+    const response = await this.sendCommand(Command.SET_LED_AUDIO_SPECTRUM, [
+      0,
+      bandCount & 0xff,
+      ...bandBytes,
+      impactLevel & 0xff,
+    ]);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  async clearAudioSpectrum(): Promise<boolean> {
+    const response = await this.sendCommand(Command.CLEAR_LED_AUDIO_SPECTRUM);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  async getRotaryState(): Promise<RotaryState | null> {
+    const response = await this.sendCommand(Command.GET_ROTARY_STATE);
+    if (response && response.length >= 8 && response[1] === Status.OK) {
+      const lastDir = response[3] ?? 0;
+      return {
+        button_pressed: Boolean(response[2]),
+        last_direction: lastDir > 127 ? lastDir - 256 : lastDir,
+        step_counter: u32le(response, 4),
+      };
     }
     return null;
   }
 
-  async setLedDiagnostic(mode: number): Promise<boolean> {
-    const response = await this.sendCommand(Command.SET_LED_DIAGNOSTIC, [0, mode]);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
+  private encodeProfileName(name: string): number[] {
+    const chars = Array.from(name)
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        return code >= 0x20 && code <= 0x7e;
+      })
+      .slice(0, SETTINGS_PROFILE_NAME_LENGTH);
+    const bytes = Array.from({ length: SETTINGS_PROFILE_NAME_LENGTH }, () => 0);
+    chars.forEach((char, index) => {
+      bytes[index] = char.charCodeAt(0);
+    });
+    return bytes;
+  }
+
+  async getActiveProfile(): Promise<ProfileInfo | null> {
+    const response = await this.sendCommand(Command.GET_ACTIVE_PROFILE);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        profile_index: response[2] ?? 0,
+        profile_used_mask: response[3] ?? 0,
+      };
+    }
+    return null;
+  }
+
+  async setActiveProfile(profileIndex: number): Promise<ProfileInfo | null> {
+    const response = await this.sendCommand(Command.SET_ACTIVE_PROFILE, [0, profileIndex & 0xff], 500);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        profile_index: response[2] ?? 0,
+        profile_used_mask: response[3] ?? 0,
+      };
+    }
+    return null;
+  }
+
+  async getProfileName(profileIndex: number): Promise<{ name: string; profile_used_mask: number } | null> {
+    const response = await this.sendCommand(Command.GET_PROFILE_NAME, [0, profileIndex & 0xff]);
+    if (response && response.length >= 20 && response[1] === Status.OK) {
+      return {
+        profile_used_mask: response[3] ?? 0,
+        name: this.decodeCString(response, 4, SETTINGS_PROFILE_NAME_LENGTH),
+      };
+    }
+    return null;
+  }
+
+  async setProfileName(profileIndex: number, name: string): Promise<{ name: string } | null> {
+    const payload = [0, profileIndex & 0xff, ...this.encodeProfileName(name)];
+    const response = await this.sendCommand(Command.SET_PROFILE_NAME, payload, 500);
+    if (response && response.length >= 20 && response[1] === Status.OK) {
+      return { name: this.decodeCString(response, 4, SETTINGS_PROFILE_NAME_LENGTH) };
+    }
+    return null;
+  }
+
+  async createProfile(name?: string): Promise<ProfileInfo | null> {
+    const payload: number[] = [0, ...(name ? this.encodeProfileName(name) : new Array(SETTINGS_PROFILE_NAME_LENGTH).fill(0))];
+    const response = await this.sendCommand(Command.CREATE_PROFILE, payload, 500);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        profile_index: response[2] ?? 0,
+        profile_used_mask: response[3] ?? 0,
+        name: name,
+      };
+    }
+    return null;
+  }
+
+  async deleteProfile(profileIndex: number): Promise<ProfileInfo | null> {
+    const response = await this.sendCommand(Command.DELETE_PROFILE, [0, profileIndex & 0xff], 500);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        profile_index: response[2] ?? 0,
+        profile_used_mask: response[3] ?? 0,
+      };
+    }
+    return null;
+  }
+
+  async copyProfileSlot(sourceIndex: number, targetIndex: number): Promise<ProfileInfo | null> {
+    const response = await this.sendCommand(Command.COPY_PROFILE_SLOT, [0, sourceIndex & 0xff, targetIndex & 0xff], 1000);
+    if (response && response.length >= 5 && response[1] === Status.OK) {
+      return {
+        profile_index: response[3] ?? targetIndex,
+        profile_used_mask: response[4] ?? 0,
+      };
+    }
+    return null;
+  }
+
+  async resetProfileSlot(profileIndex: number): Promise<ProfileInfo | null> {
+    const response = await this.sendCommand(Command.RESET_PROFILE_SLOT, [0, profileIndex & 0xff], 500);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        profile_index: response[2] ?? 0,
+        profile_used_mask: response[3] ?? 0,
+      };
+    }
+    return null;
   }
 
   async getFilterEnabled(): Promise<boolean | null> {

@@ -4,10 +4,11 @@ import { queryClient } from "@/lib/query/queryClient";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/AppShell";
 import { Toaster } from "@/components/ui/sonner";
-import { signalFrontendReady } from "@/lib/app-startup";
+import { applyWindowsMicaStyling, signalFrontendReady } from "@/lib/app-startup";
 
 export default function App() {
   useEffect(() => {
+    applyWindowsMicaStyling();
     void signalFrontendReady();
   }, []);
 

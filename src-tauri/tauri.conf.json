@@ -15,7 +15,13 @@
         "label": "main",
         "title": "KBHE Configurator",
         "visible": false,
-        "backgroundColor": "#0F172A",
+        "backgroundColor": "#00000000",
+        "transparent": true,
+        "windowEffects": {
+          "effects": [
+            "mica"
+          ]
+        },
         "width": 1280,
         "height": 720,
         "minWidth": 1024,

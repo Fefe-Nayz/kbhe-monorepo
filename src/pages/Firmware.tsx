@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { isTauri } from "@tauri-apps/api/core";
+import { isTauri, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as tauriOpen } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
@@ -55,6 +56,7 @@ export default function Firmware() {
 
   const [firmwareBytes, setFirmwareBytes] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [filePath, setFilePath] = useState<string | null>(null);
   const [fileVersion, setFileVersion] = useState<FirmwareResolveResult | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [flashState, setFlashState] = useState<FlashState>("idle");
@@ -72,7 +74,7 @@ export default function Firmware() {
     setFlashLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   }, []);
 
-  const processSelectedFirmware = useCallback((bytes: Uint8Array, name: string) => {
+  const processSelectedFirmware = useCallback((bytes: Uint8Array, name: string, path?: string | null) => {
     setFileError(null);
     setFileVersion(null);
     setFlashState("idle");
@@ -81,6 +83,7 @@ export default function Firmware() {
 
     setFirmwareBytes(bytes);
     setFileName(name);
+    setFilePath(path ?? null);
 
     try {
       const versionInfo = resolveFirmwareVersion(bytes);
@@ -152,7 +155,7 @@ export default function Firmware() {
 
     try {
       const bytes = await readFile(droppedPath);
-      processSelectedFirmware(new Uint8Array(bytes), name);
+      processSelectedFirmware(new Uint8Array(bytes), name, droppedPath);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setFileError(msg);
@@ -205,7 +208,7 @@ export default function Firmware() {
 
       const bytes = await readFile(filePath);
       const name = filePath.split(/[\\/]/).pop() ?? filePath;
-      processSelectedFirmware(new Uint8Array(bytes), name);
+      processSelectedFirmware(new Uint8Array(bytes), name, filePath);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setFileError(msg);
@@ -327,12 +330,12 @@ export default function Firmware() {
       try {
         if (droppedPath) {
           const bytes = await readFile(droppedPath);
-          processSelectedFirmware(new Uint8Array(bytes), droppedName);
+          processSelectedFirmware(new Uint8Array(bytes), droppedName, droppedPath);
           return;
         }
 
         const bytes = new Uint8Array(await dropped.arrayBuffer());
-        processSelectedFirmware(bytes, droppedName);
+        processSelectedFirmware(bytes, droppedName, null);
         return;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -364,14 +367,64 @@ export default function Firmware() {
     try {
       appendLog("Preparing flash session...");
       await DeviceSessionManager.disconnect();
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
 
-      const finalVersion = await kbheFirmware.flashFirmware(firmwareBytes, {
-        timeoutMs: timeoutSec * 1000,
-        retries,
-        onLog: appendLog,
-        onProgress: ({ percent }) => setFlashProgress(percent),
-      });
+      let finalVersion: number;
+
+      if (filePath && isTauri()) {
+        // Native fast path: entire flash loop runs in Rust (no IPC per packet)
+        const { version: resolvedVersion } = resolveFirmwareVersion(firmwareBytes, fileVersion?.version);
+
+        const phaseLabels: Record<string, string> = {
+          connecting: "Entering bootloader mode…",
+          hello: "Handshaking with bootloader…",
+          begin: "Starting firmware transfer…",
+          finish: "Verifying firmware…",
+          boot: "Rebooting device…",
+        };
+
+        let lastPhase = "";
+        let lastPercent = -1;
+
+        const unlisten = await listen<{
+          phase: string;
+          bytesDone: number;
+          totalBytes: number;
+          percent: number;
+        }>("kbhe_flash_progress", ({ payload }) => {
+          if (payload.phase !== "flashing" && payload.phase !== lastPhase) {
+            const label = phaseLabels[payload.phase];
+            if (label) appendLog(label);
+            lastPhase = payload.phase;
+          }
+          if (payload.phase === "flashing" && payload.percent !== lastPercent) {
+            if (payload.percent % 5 === 0 || payload.percent === 100) {
+              appendLog(`Flashing: ${payload.bytesDone}/${payload.totalBytes} bytes (${payload.percent}%)`);
+            }
+            setFlashProgress(payload.percent);
+            lastPercent = payload.percent;
+          }
+        });
+
+        try {
+          await invoke("kbhe_flash_firmware", {
+            firmwarePath: filePath,
+            firmwareVersion: resolvedVersion,
+          });
+        } finally {
+          unlisten();
+        }
+
+        finalVersion = resolvedVersion;
+      } else {
+        // Fallback: TypeScript-based flash (browser or no file path)
+        finalVersion = await kbheFirmware.flashFirmware(firmwareBytes, {
+          timeoutMs: timeoutSec * 1000,
+          retries,
+          onLog: appendLog,
+          onProgress: ({ percent }) => setFlashProgress(percent),
+        });
+      }
 
       appendLog(`Flash complete! Version: ${formatFirmwareVersion(finalVersion)}`);
       setFlashState("success");
@@ -380,8 +433,8 @@ export default function Firmware() {
       appendLog(`Error: ${msg}`);
       setFlashState("error");
     } finally {
-      appendLog("Reconnecting device session...");
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      appendLog("Reconnecting device session…");
+      await new Promise<void>((resolve) => setTimeout(resolve, 1200));
       try {
         await DeviceSessionManager.connect();
         appendLog("Reconnected successfully.");
@@ -390,7 +443,7 @@ export default function Firmware() {
         appendLog(`Reconnect failed: ${reconnectMsg}`);
       }
     }
-  }, [firmwareBytes, timeoutSec, retries, appendLog]);
+  }, [firmwareBytes, filePath, fileVersion, timeoutSec, retries, appendLog]);
 
   const fileSizeKb = firmwareBytes ? (firmwareBytes.length / 1024).toFixed(1) : null;
   const canFlash = connected && !!firmwareBytes && flashState !== "flashing";
@@ -501,6 +554,7 @@ export default function Firmware() {
                       onClick={() => {
                         setFirmwareBytes(null);
                         setFileName(null);
+                        setFilePath(null);
                         setFileVersion(null);
                         setFileError(null);
                         setFlashState("idle");
