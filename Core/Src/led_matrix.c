@@ -940,6 +940,11 @@ static void update_ws2812(void) {
 
   now_ms = HAL_GetTick();
   if (!led_matrix_should_drive_output(now_ms)) {
+    // WS2812 keeps the previous frame latched until a new one is sent.
+    // When output becomes fully disabled (e.g. Caps Lock overlay turns off),
+    // push an explicit black frame so stale indicator pixels are cleared.
+    zeroLedValues(&led_ws2812_handle);
+    ws2812_show(&led_ws2812_handle);
     return;
   }
 
