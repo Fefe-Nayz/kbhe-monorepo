@@ -58,6 +58,8 @@ typedef enum {
   CMD_GET_RAM_ONLY_MODE = 0x32,         // Get RAM-only mode state
   CMD_SET_RAM_ONLY_MODE = 0x33,         // Enter/exit RAM-only mode (suppress flash saves)
   CMD_RELOAD_SETTINGS_FROM_FLASH = 0x34, // Exit RAM-only and reload last-saved settings
+  CMD_GET_TRIGGER_CHATTER_GUARD = 0x35, // Get anti-chatter guard runtime setting
+  CMD_SET_TRIGGER_CHATTER_GUARD = 0x36, // Set anti-chatter guard runtime setting
 
   // Key settings commands (0x40 - 0x5F)
   CMD_GET_KEY_SETTINGS = 0x40,
@@ -120,6 +122,8 @@ typedef enum {
   CMD_SET_LED_AUDIO_SPECTRUM = 0x78, // Push host audio spectrum payload
   CMD_CLEAR_LED_AUDIO_SPECTRUM = 0x79, // Clear host audio spectrum state
   CMD_SET_LED_ALPHA_MASK = 0x7A, // Set/clear alpha mask (len + bitmask bytes)
+  CMD_GET_LED_IDLE_OPTIONS = 0x7B, // Get LED idle timeout and idle policies
+  CMD_SET_LED_IDLE_OPTIONS = 0x7C, // Set LED idle timeout and idle policies
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
@@ -231,6 +235,14 @@ typedef struct __attribute__((packed)) {
   uint8_t tick_rate;
   uint8_t reserved[61];
 } hid_packet_tick_rate_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t enabled;
+  uint8_t duration_ms;
+  uint8_t reserved[60];
+} hid_packet_trigger_chatter_guard_t;
 
 /**
  * @brief Key settings packet (for single key)
@@ -595,6 +607,15 @@ typedef struct __attribute__((packed)) {
   uint8_t reserved[61];
 } hid_packet_led_brightness_t;
 
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t idle_timeout_seconds; // 0 disables idle auto-off
+  uint8_t allow_system_when_disabled;
+  uint8_t third_party_stream_counts_as_activity;
+  uint8_t reserved[59];
+} hid_packet_led_idle_options_t;
+
 /**
  * @brief LED fill packet
  */
@@ -642,7 +663,8 @@ typedef struct __attribute__((packed)) {
   uint8_t axis;      // gamepad_axis_t (0=none, 1=LX, 2=LY, etc.)
   uint8_t direction; // 0=positive, 1=negative
   uint8_t button;    // gamepad_button_t (0=none, 1=A, 2=B, etc.)
-  uint8_t reserved[58];
+  uint8_t layer_mask; // Bitmask of active layers (bit0..bit3), 0 => all
+  uint8_t reserved[57];
 } hid_packet_key_gamepad_map_t;
 
 //--------------------------------------------------------------------+

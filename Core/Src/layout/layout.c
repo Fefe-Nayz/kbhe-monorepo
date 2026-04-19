@@ -330,6 +330,7 @@ static bool layout_gamepad_axis_from_keycode(uint16_t keycode, uint8_t *axis,
 static bool layout_should_emit_keyboard_for_key(uint8_t key) {
   const settings_key_t *settings_key = NULL;
   const settings_gamepad_t *gamepad = NULL;
+  uint8_t active_layer = layout_get_active_layer_top();
 
   // Keyboard master switch always has priority over routing modes.
   if (!settings_is_keyboard_enabled()) {
@@ -341,7 +342,8 @@ static bool layout_should_emit_keyboard_for_key(uint8_t key) {
   }
 
   settings_key = settings_get_key(key);
-  if (settings_key != NULL && settings_key->disable_kb_on_gamepad) {
+  if (settings_key != NULL && settings_key->disable_kb_on_gamepad &&
+      settings_is_key_mapped_to_gamepad_on_layer(key, active_layer)) {
     return false;
   }
 
@@ -354,7 +356,7 @@ static bool layout_should_emit_keyboard_for_key(uint8_t key) {
   case GAMEPAD_KEYBOARD_ROUTING_DISABLED:
     return false;
   case GAMEPAD_KEYBOARD_ROUTING_UNMAPPED_ONLY:
-    return !settings_is_key_mapped_to_gamepad(key);
+    return !settings_is_key_mapped_to_gamepad_on_layer(key, active_layer);
   case GAMEPAD_KEYBOARD_ROUTING_ALL_KEYS:
   default:
     return true;

@@ -11,7 +11,7 @@ This folder contains a SignalRGB device plugin for the KBHE keyboard RAW HID int
 The plugin expects firmware with:
 
 - VID/PID: `0x9172 / 0x0002`
-- RAW HID endpoint: interface `1`, usage page `0xFF00`
+- RAW HID endpoint: interface `1`, usage `0x0001`, usage page `0xFF00` (collection may appear as `0x0001` or `0x0000` depending host metadata)
 - LED commands:
 - `CMD_SET_LED_ENABLED (0x61)`
 - `CMD_SET_LED_EFFECT (0x6F)`
@@ -33,10 +33,22 @@ The plugin expects firmware with:
 
 - On Initialize: plugin enables third-party mode (`effect=7`).
 - On Render: plugin sends a full 82-LED frame in chunked RAW HID packets.
-- On Shutdown: plugin asks the firmware to restore the RGB effect that was
-  active before SignalRGB enabled third-party live mode.
+- On Shutdown: plugin first applies `Shutdown Color`.
+- Shutdown mode:
+- `SignalRGB`: keep `Shutdown Color` active.
+- `Hardware` (default): after applying `Shutdown Color`, restore the RGB
+  effect that was active before SignalRGB enabled third-party live mode.
 - While third-party mode is active, streamed LED chunks are runtime-only and do
   not persist matrix settings to flash.
+
+## Troubleshooting
+
+- If SignalRGB shows two KBHE entries and one does not work, it is usually the
+  HID gamepad collection being picked instead of RAW HID.
+- The plugin now binds RAW HID only when that endpoint is actually validated on
+  the current instance, avoiding `set_endpoint` loops on non-RAW entries.
+- If a ghost entry still appears, keep the working entry enabled and disable the
+  non-working one in SignalRGB.
 
 ## Layout
 

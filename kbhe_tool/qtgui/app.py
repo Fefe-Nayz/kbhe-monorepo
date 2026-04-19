@@ -35,6 +35,7 @@ from .pages import (
     TravelPage,
 )
 from .session import AppSession
+from .app_prefs import AppPreferences
 from .theme import apply_app_style, current_theme_mode
 from .widgets import StatusPill, make_primary_button, make_secondary_button
 from ..windows_volume import (
@@ -75,6 +76,7 @@ class KBHEQtMainWindow(QMainWindow):
 
         super().__init__()
         self.session = AppSession(device)
+        self.app_prefs = AppPreferences()
         self.active_page_id: str | None = None
         self.theme_mode = current_theme_mode()
         self.nav_buttons: dict[str, QPushButton] = {}
@@ -100,6 +102,7 @@ class KBHEQtMainWindow(QMainWindow):
         self._on_selected_key_changed(self.session.selected_key)
         self._on_live_settings_changed(self.session.live_enabled, self.session.live_interval_ms)
         self.session.refresh_snapshot()
+        self._apply_pending_led_restore_if_needed()
         self.show_page("overview")
         self.volume_timer.start()
 
@@ -476,6 +479,79 @@ class KBHEQtMainWindow(QMainWindow):
     def set_status(self, message: str, level: str = "info") -> None:
         self.session.set_status(message, level)
 
+    def get_close_effect_enabled(self) -> bool:
+        return bool(self.app_prefs.close_effect_enabled)
+
+    def set_close_effect_enabled(self, enabled: bool) -> None:
+        self.app_prefs.set_close_effect_enabled(bool(enabled))
+
+    def get_close_effect_mode(self) -> int:
+        return int(self.app_prefs.close_effect_mode)
+
+    def set_close_effect_mode(self, mode: int) -> None:
+        self.app_prefs.set_close_effect_mode(int(mode))
+
+    def get_restore_previous_effect_on_startup(self) -> bool:
+        return bool(self.app_prefs.restore_previous_on_startup)
+
+    def set_restore_previous_effect_on_startup(self, enabled: bool) -> None:
+        self.app_prefs.set_restore_previous_on_startup(bool(enabled))
+
+    def _apply_pending_led_restore_if_needed(self) -> None:
+        if not self.app_prefs.restore_previous_on_startup:
+            return
+        pending = self.app_prefs.get_pending_restore()
+        if pending is None or not self.session.connected:
+            return
+
+        mode, params = pending
+        try:
+            if params is not None:
+                self.session.device.set_led_effect_params(mode, params)
+            if not self.session.device.set_led_effect(mode):
+                raise RuntimeError("device rejected LED effect restore")
+            self.app_prefs.clear_pending_restore()
+            self.session.set_status("Restored the previous LED effect from the last app close.", "info")
+            self.session.refresh_snapshot()
+        except Exception as exc:
+            self.session.set_status(f"Failed to restore previous LED effect: {exc}", "warning")
+
+    def _apply_close_effect_before_exit(self) -> None:
+        if not self.app_prefs.close_effect_enabled or not self.session.connected:
+            return
+
+        target_mode = int(self.app_prefs.close_effect_mode)
+        try:
+            previous_mode = self.session.device.get_led_effect()
+            should_store_restore = (
+                self.app_prefs.restore_previous_on_startup
+                and previous_mode is not None
+                and int(previous_mode) != target_mode
+            )
+
+            previous_params = None
+            if should_store_restore:
+                previous_params = self.session.device.get_led_effect_params(previous_mode)
+
+            try:
+                self.session.device.led_clear_volume_overlay()
+            except Exception:
+                pass
+            try:
+                self.session.device.led_clear_audio_spectrum()
+            except Exception:
+                pass
+
+            if not self.session.device.set_led_effect(target_mode):
+                return
+
+            if should_store_restore:
+                self.app_prefs.set_pending_restore(int(previous_mode), previous_params)
+            else:
+                self.app_prefs.clear_pending_restore()
+        except Exception:
+            pass
+
     # ------------------------------------------------------------------
     # Theme switching
     # ------------------------------------------------------------------
@@ -499,6 +575,7 @@ class KBHEQtMainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         self.live_timer.stop()
         self.volume_timer.stop()
+        self._apply_close_effect_before_exit()
         if self.session.connected:
             try:
                 self.session.device.led_clear_volume_overlay()

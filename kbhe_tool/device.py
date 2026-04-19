@@ -8,6 +8,8 @@ from .protocol import (
     ADVANCED_TICK_RATE_DEFAULT,
     ADVANCED_TICK_RATE_MAX,
     ADVANCED_TICK_RATE_MIN,
+    TRIGGER_CHATTER_GUARD_DEFAULT_MS,
+    TRIGGER_CHATTER_GUARD_MAX_MS,
     CALIBRATION_VALUES_PER_CHUNK,
     Command,
     GAMEPAD_API_MODES,
@@ -170,6 +172,14 @@ class KBHEDevice:
         except Exception:
             return int(ADVANCED_TICK_RATE_DEFAULT)
         return max(int(ADVANCED_TICK_RATE_MIN), min(int(ADVANCED_TICK_RATE_MAX), value))
+
+    @staticmethod
+    def _sanitize_trigger_chatter_guard_duration(value):
+        try:
+            value = int(value)
+        except Exception:
+            return int(TRIGGER_CHATTER_GUARD_DEFAULT_MS)
+        return max(0, min(int(TRIGGER_CHATTER_GUARD_MAX_MS), value))
 
     @staticmethod
     def _default_dynamic_zones(primary_keycode=0x14):
@@ -561,6 +571,23 @@ class KBHEDevice:
         value = self._sanitize_advanced_tick_rate(tick_rate)
         data = [0, value]
         resp = self.send_command(Command.SET_ADVANCED_TICK_RATE, data, timeout_ms=300)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def get_trigger_chatter_guard(self):
+        """Get persisted anti-chatter guard setting for the active profile."""
+        resp = self.send_command(Command.GET_TRIGGER_CHATTER_GUARD)
+        if resp and len(resp) >= 4 and resp[1] == Status.OK:
+            return {
+                'enabled': bool(resp[2]),
+                'duration_ms': int(resp[3]),
+            }
+        return None
+
+    def set_trigger_chatter_guard(self, enabled, duration_ms):
+        """Set persisted anti-chatter guard setting for the active profile."""
+        duration = self._sanitize_trigger_chatter_guard_duration(duration_ms)
+        data = [0, 1 if enabled else 0, duration]
+        resp = self.send_command(Command.SET_TRIGGER_CHATTER_GUARD, data, timeout_ms=300)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def save_settings(self):

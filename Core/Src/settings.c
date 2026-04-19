@@ -63,6 +63,9 @@ static char settings_profile_name_cache[SETTINGS_PROFILE_COUNT]
 #define SETTINGS_REQUEST_SAVE_DELAY_MS 100u
 #define SETTINGS_FLASH_WORDS_PER_STEP 16u
 #define SETTINGS_PROFILE_MASK_ALL ((1u << SETTINGS_PROFILE_COUNT) - 1u)
+#define SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_DURATION_INDEX 0u
+#define SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_ENABLED_INDEX 1u
+#define SETTINGS_LED_META_LED_IDLE_TIMEOUT_SECONDS_INDEX 2u
 
 static uint8_t led_effect_restore_mode = LED_EFFECT_STATIC_MATRIX;
 static bool led_effect_restore_valid = false;
@@ -182,7 +185,8 @@ static void settings_gamepad_sanitize_mapping(settings_gamepad_mapping_t *mappin
     mapping->button = GAMEPAD_BUTTON_NONE;
   }
 
-  mapping->reserved = 0u;
+  settings_gamepad_mapping_set_layer_mask(
+      mapping, settings_gamepad_mapping_get_layer_mask(mapping));
 }
 
 static void settings_default_key_advanced(settings_key_advanced_t *advanced,
@@ -324,9 +328,184 @@ static uint8_t settings_sanitize_advanced_tick_rate(uint8_t tick_rate) {
   return tick_rate;
 }
 
-static void settings_sanitize_options(settings_options_t *options) {
-  settings_options_t defaults = SETTINGS_DEFAULT_OPTIONS;
+static uint8_t
+settings_sanitize_trigger_chatter_guard_duration(uint8_t duration_ms) {
+  if (duration_ms > SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS) {
+    return SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS;
+  }
 
+  return duration_ms;
+}
+
+static uint8_t
+settings_sanitize_trigger_chatter_guard_enabled_raw(uint8_t enabled_raw) {
+  if (enabled_raw > 1u) {
+    return (uint8_t)(SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED ? 1u : 0u);
+  }
+
+  return enabled_raw;
+}
+
+static uint8_t settings_sanitize_led_idle_timeout_seconds(
+    uint8_t timeout_seconds) {
+  if (timeout_seconds > SETTINGS_LED_IDLE_TIMEOUT_MAX_SECONDS) {
+    return SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS;
+  }
+
+  return timeout_seconds;
+}
+
+static void settings_write_trigger_chatter_guard_to_led(settings_led_t *led,
+                                                        bool enabled,
+                                                        uint8_t duration_ms) {
+  if (led == NULL) {
+    return;
+  }
+
+  led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_DURATION_INDEX] =
+      settings_sanitize_trigger_chatter_guard_duration(duration_ms);
+  led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_ENABLED_INDEX] =
+      enabled ? 1u : 0u;
+}
+
+static void settings_read_trigger_chatter_guard_from_led(
+    const settings_led_t *led, bool *enabled, uint8_t *duration_ms) {
+  uint8_t enabled_raw =
+      (uint8_t)(SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED ? 1u : 0u);
+  uint8_t duration_raw = SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS;
+
+  if (led != NULL) {
+    enabled_raw =
+        led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_ENABLED_INDEX];
+    duration_raw =
+        led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_DURATION_INDEX];
+  }
+
+  enabled_raw = settings_sanitize_trigger_chatter_guard_enabled_raw(enabled_raw);
+  duration_raw = settings_sanitize_trigger_chatter_guard_duration(duration_raw);
+
+  if (enabled != NULL) {
+    *enabled = enabled_raw != 0u;
+  }
+
+  if (duration_ms != NULL) {
+    *duration_ms = duration_raw;
+  }
+}
+
+static void settings_sanitize_trigger_chatter_guard_storage(settings_led_t *led) {
+  bool enabled = false;
+  uint8_t duration_ms = SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS;
+
+  if (led == NULL) {
+    return;
+  }
+
+  settings_read_trigger_chatter_guard_from_led(led, &enabled, &duration_ms);
+  settings_write_trigger_chatter_guard_to_led(led, enabled, duration_ms);
+}
+
+static uint8_t
+settings_read_led_idle_timeout_seconds_from_led(const settings_led_t *led) {
+  if (led == NULL) {
+    return SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS;
+  }
+
+  return settings_sanitize_led_idle_timeout_seconds(
+      led->reserved[SETTINGS_LED_META_LED_IDLE_TIMEOUT_SECONDS_INDEX]);
+}
+
+static void settings_write_led_idle_timeout_seconds_to_led(settings_led_t *led,
+                                                           uint8_t timeout_seconds) {
+  if (led == NULL) {
+    return;
+  }
+
+  led->reserved[SETTINGS_LED_META_LED_IDLE_TIMEOUT_SECONDS_INDEX] =
+      settings_sanitize_led_idle_timeout_seconds(timeout_seconds);
+}
+
+static void settings_sanitize_led_idle_timeout_storage(settings_led_t *led) {
+  uint8_t timeout_seconds = SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS;
+
+  if (led == NULL) {
+    return;
+  }
+
+  timeout_seconds = settings_read_led_idle_timeout_seconds_from_led(led);
+  settings_write_led_idle_timeout_seconds_to_led(led, timeout_seconds);
+}
+
+static bool settings_options_led_system_when_disabled(
+    const settings_options_t *options) {
+  uint8_t reserved = 0u;
+
+  if (options == NULL) {
+    return SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED != 0u;
+  }
+
+  reserved = (uint8_t)(options->reserved &
+                       SETTINGS_OPTIONS_RESERVED_LED_SYSTEM_WHEN_DISABLED_MASK);
+  return reserved != 0u;
+}
+
+static bool settings_options_led_idle_third_party_stream_activity(
+    const settings_options_t *options) {
+  uint8_t reserved = 0u;
+
+  if (options == NULL) {
+    return SETTINGS_DEFAULT_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY != 0u;
+  }
+
+  reserved =
+      (uint8_t)(options->reserved &
+                SETTINGS_OPTIONS_RESERVED_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_MASK);
+  return reserved != 0u;
+}
+
+static void settings_options_set_led_system_when_disabled(
+    settings_options_t *options, bool enabled) {
+  uint8_t reserved = 0u;
+
+  if (options == NULL) {
+    return;
+  }
+
+  reserved = (uint8_t)(options->reserved & SETTINGS_OPTIONS_RESERVED_ALLOWED_MASK);
+  if (enabled) {
+    reserved = (uint8_t)(reserved |
+                         SETTINGS_OPTIONS_RESERVED_LED_SYSTEM_WHEN_DISABLED_MASK);
+  } else {
+    reserved = (uint8_t)(reserved &
+                         (uint8_t)~SETTINGS_OPTIONS_RESERVED_LED_SYSTEM_WHEN_DISABLED_MASK);
+  }
+
+  options->reserved = reserved;
+}
+
+static void settings_options_set_led_idle_third_party_stream_activity(
+    settings_options_t *options, bool enabled) {
+  uint8_t reserved = 0u;
+
+  if (options == NULL) {
+    return;
+  }
+
+  reserved = (uint8_t)(options->reserved & SETTINGS_OPTIONS_RESERVED_ALLOWED_MASK);
+  if (enabled) {
+    reserved =
+        (uint8_t)(reserved |
+                  SETTINGS_OPTIONS_RESERVED_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_MASK);
+  } else {
+    reserved =
+        (uint8_t)(reserved &
+                  (uint8_t)~SETTINGS_OPTIONS_RESERVED_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_MASK);
+  }
+
+  options->reserved = reserved;
+}
+
+static void settings_sanitize_options(settings_options_t *options) {
   if (options == NULL) {
     return;
   }
@@ -341,9 +520,13 @@ static void settings_sanitize_options(settings_options_t *options) {
     options->led_thermal_protection_enabled = 1u;
   }
 
-  if (options->reserved != 0u) {
-    options->reserved = defaults.reserved;
-  }
+  options->reserved =
+      (uint8_t)(options->reserved & SETTINGS_OPTIONS_RESERVED_ALLOWED_MASK);
+
+  settings_options_set_led_system_when_disabled(
+      options, settings_options_led_system_when_disabled(options));
+    settings_options_set_led_idle_third_party_stream_activity(
+      options, settings_options_led_idle_third_party_stream_activity(options));
 }
 
 static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) {
@@ -767,6 +950,11 @@ static void settings_populate_profile_defaults(settings_profile_t *profile) {
   profile->filter_alpha_min = FILTER_DEFAULT_ALPHA_MIN_DENOM;
   profile->filter_alpha_max = FILTER_DEFAULT_ALPHA_MAX_DENOM;
   profile->advanced_tick_rate = SETTINGS_DEFAULT_ADVANCED_TICK_RATE;
+  settings_write_trigger_chatter_guard_to_led(
+      &profile->led, SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED != 0u,
+      SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS);
+    settings_write_led_idle_timeout_seconds_to_led(
+      &profile->led, SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS);
 
   settings_default_rotary_encoder(&default_rotary);
   profile->rotary = default_rotary;
@@ -863,6 +1051,9 @@ static void settings_profile_sync_active_slot(void) {
 
 static void settings_apply_runtime_from_current_profile(void) {
   uint8_t effect_mode = current_settings.led_effect_mode;
+  bool chatter_guard_enabled = false;
+  uint8_t chatter_guard_duration_ms = 0u;
+  uint8_t led_idle_timeout_seconds = 0u;
 
   if (effect_mode >= LED_EFFECT_MAX) {
     effect_mode = (uint8_t)LED_EFFECT_SOLID_COLOR;
@@ -876,8 +1067,16 @@ static void settings_apply_runtime_from_current_profile(void) {
   led_matrix_set_brightness(current_settings.led.brightness);
   led_matrix_set_raw_data(current_settings.led.pixels);
   led_matrix_set_enabled(current_settings.options.led_enabled != 0u);
+  led_matrix_set_allow_system_indicators_when_disabled(
+      settings_options_led_system_when_disabled(&current_settings.options));
+    led_matrix_set_idle_third_party_stream_counts_as_activity(
+      settings_options_led_idle_third_party_stream_activity(
+        &current_settings.options));
+  led_idle_timeout_seconds =
+      settings_read_led_idle_timeout_seconds_from_led(&current_settings.led);
+  led_matrix_set_idle_timeout_seconds(led_idle_timeout_seconds);
 
-    led_matrix_set_effect((led_effect_mode_t)effect_mode);
+  led_matrix_set_effect((led_effect_mode_t)effect_mode);
   led_matrix_set_effect_params(
       current_settings.led_effect_params[effect_mode]);
   settings_sync_led_effect_speed_cache();
@@ -888,6 +1087,10 @@ static void settings_apply_runtime_from_current_profile(void) {
                     current_settings.filter_alpha_max);
   filter_set_enabled(current_settings.filter_enabled != 0u);
   trigger_reload_settings();
+  settings_read_trigger_chatter_guard_from_led(
+      &current_settings.led, &chatter_guard_enabled, &chatter_guard_duration_ms);
+  (void)trigger_set_chatter_guard(chatter_guard_enabled,
+                                  chatter_guard_duration_ms);
   settings_reset_led_effect_restore_state();
 }
 
@@ -1204,6 +1407,12 @@ static void settings_set_defaults(void) {
   current_settings.options.nkro_enabled = 1;
   current_settings.options.led_thermal_protection_enabled = 1;
   current_settings.options.reserved = 0u;
+    settings_options_set_led_system_when_disabled(
+      &current_settings.options,
+      SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED != 0u);
+    settings_options_set_led_idle_third_party_stream_activity(
+      &current_settings.options,
+      SETTINGS_DEFAULT_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY != 0u);
 
   // Default per-key settings follow the physical keyboard layout.
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
@@ -1245,6 +1454,12 @@ static void settings_set_defaults(void) {
   current_settings.filter_alpha_min = FILTER_DEFAULT_ALPHA_MIN_DENOM;
   current_settings.filter_alpha_max = FILTER_DEFAULT_ALPHA_MAX_DENOM;
   current_settings.advanced_tick_rate = SETTINGS_DEFAULT_ADVANCED_TICK_RATE;
+  settings_write_trigger_chatter_guard_to_led(
+      &current_settings.led,
+      SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED != 0u,
+      SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS);
+    settings_write_led_idle_timeout_seconds_to_led(
+      &current_settings.led, SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS);
 
   settings_default_rotary_encoder(&default_rotary);
   current_settings.rotary = default_rotary;
@@ -1363,6 +1578,8 @@ static bool settings_load_from_flash(void) {
     settings_sync_led_effect_speed_cache();
     current_settings.advanced_tick_rate = settings_sanitize_advanced_tick_rate(
         current_settings.advanced_tick_rate);
+    settings_sanitize_trigger_chatter_guard_storage(&current_settings.led);
+    settings_sanitize_led_idle_timeout_storage(&current_settings.led);
 
     settings_profile_capture_current_slot(profile_index);
     settings_sanitize_profile_advanced_layers(
@@ -1494,6 +1711,11 @@ bool settings_set_options(settings_options_t options) {
 
   gamepad_hid_set_enabled(current_settings.options.gamepad_enabled != 0u);
   gamepad_hid_reload_settings();
+  led_matrix_set_allow_system_indicators_when_disabled(
+      settings_options_led_system_when_disabled(&current_settings.options));
+  led_matrix_set_idle_third_party_stream_counts_as_activity(
+      settings_options_led_idle_third_party_stream_activity(
+          &current_settings.options));
   settings_mark_dirty();
   return true;
 }
@@ -1675,6 +1897,24 @@ bool settings_set_advanced_tick_rate(uint8_t tick_rate) {
   current_settings.advanced_tick_rate =
       settings_sanitize_advanced_tick_rate(tick_rate);
   trigger_reload_settings();
+  settings_mark_dirty();
+  return true;
+}
+
+void settings_get_trigger_chatter_guard(bool *enabled, uint8_t *duration_ms) {
+  settings_read_trigger_chatter_guard_from_led(&current_settings.led, enabled,
+                                               duration_ms);
+}
+
+bool settings_set_trigger_chatter_guard(bool enabled, uint8_t duration_ms) {
+  if (duration_ms > SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS) {
+    return false;
+  }
+
+  duration_ms = settings_sanitize_trigger_chatter_guard_duration(duration_ms);
+  settings_write_trigger_chatter_guard_to_led(&current_settings.led, enabled,
+                                              duration_ms);
+  (void)trigger_set_chatter_guard(enabled, duration_ms);
   settings_mark_dirty();
   return true;
 }
@@ -1947,6 +2187,48 @@ bool settings_is_led_enabled(void) {
 bool settings_set_led_enabled(bool enabled) {
   current_settings.options.led_enabled = enabled ? 1 : 0;
   led_matrix_set_enabled(enabled);
+  settings_mark_dirty();
+  return true;
+}
+
+uint8_t settings_get_led_idle_timeout_seconds(void) {
+  return settings_read_led_idle_timeout_seconds_from_led(&current_settings.led);
+}
+
+bool settings_set_led_idle_timeout_seconds(uint8_t timeout_seconds) {
+  if (timeout_seconds > SETTINGS_LED_IDLE_TIMEOUT_MAX_SECONDS) {
+    return false;
+  }
+
+  timeout_seconds = settings_sanitize_led_idle_timeout_seconds(timeout_seconds);
+  settings_write_led_idle_timeout_seconds_to_led(&current_settings.led,
+                                                 timeout_seconds);
+  led_matrix_set_idle_timeout_seconds(timeout_seconds);
+  settings_mark_dirty();
+  return true;
+}
+
+bool settings_is_led_system_indicators_allowed_when_disabled(void) {
+  return settings_options_led_system_when_disabled(&current_settings.options);
+}
+
+bool settings_set_led_system_indicators_allowed_when_disabled(bool enabled) {
+  settings_options_set_led_system_when_disabled(&current_settings.options,
+                                                enabled);
+  led_matrix_set_allow_system_indicators_when_disabled(enabled);
+  settings_mark_dirty();
+  return true;
+}
+
+bool settings_is_led_idle_third_party_stream_counts_as_activity(void) {
+  return settings_options_led_idle_third_party_stream_activity(
+      &current_settings.options);
+}
+
+bool settings_set_led_idle_third_party_stream_counts_as_activity(bool enabled) {
+  settings_options_set_led_idle_third_party_stream_activity(
+      &current_settings.options, enabled);
+  led_matrix_set_idle_third_party_stream_counts_as_activity(enabled);
   settings_mark_dirty();
   return true;
 }
@@ -2602,4 +2884,21 @@ bool settings_is_key_mapped_to_gamepad(uint8_t key_index) {
   mapping = &current_settings.keys[key_index].gamepad_map;
   return mapping->axis != (uint8_t)GAMEPAD_AXIS_NONE ||
          mapping->button != (uint8_t)GAMEPAD_BUTTON_NONE;
+}
+
+bool settings_is_key_mapped_to_gamepad_on_layer(uint8_t key_index,
+                                                uint8_t layer_index) {
+  const settings_gamepad_mapping_t *mapping = NULL;
+
+  if (key_index >= NUM_KEYS || layer_index >= SETTINGS_LAYER_COUNT) {
+    return false;
+  }
+
+  mapping = &current_settings.keys[key_index].gamepad_map;
+  if (mapping->axis == (uint8_t)GAMEPAD_AXIS_NONE &&
+      mapping->button == (uint8_t)GAMEPAD_BUTTON_NONE) {
+    return false;
+  }
+
+  return settings_gamepad_mapping_is_active_on_layer(mapping, layer_index);
 }

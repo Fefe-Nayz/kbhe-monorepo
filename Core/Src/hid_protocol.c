@@ -394,6 +394,39 @@ static void cmd_set_advanced_tick_rate(const uint8_t *in, uint8_t *out) {
   resp->tick_rate = settings_get_advanced_tick_rate();
 }
 
+static void cmd_get_trigger_chatter_guard(const uint8_t *in, uint8_t *out) {
+  hid_packet_trigger_chatter_guard_t *resp =
+      (hid_packet_trigger_chatter_guard_t *)out;
+  bool enabled = false;
+  uint8_t duration_ms = 0u;
+  (void)in;
+
+  settings_get_trigger_chatter_guard(&enabled, &duration_ms);
+
+  resp->command_id = CMD_GET_TRIGGER_CHATTER_GUARD;
+  resp->status = HID_RESP_OK;
+  resp->enabled = enabled ? 1u : 0u;
+  resp->duration_ms = duration_ms;
+}
+
+static void cmd_set_trigger_chatter_guard(const uint8_t *in, uint8_t *out) {
+  const hid_packet_trigger_chatter_guard_t *req =
+      (const hid_packet_trigger_chatter_guard_t *)in;
+  hid_packet_trigger_chatter_guard_t *resp =
+      (hid_packet_trigger_chatter_guard_t *)out;
+  bool enabled = false;
+  uint8_t duration_ms = 0u;
+  bool success =
+      settings_set_trigger_chatter_guard(req->enabled != 0u, req->duration_ms);
+
+  settings_get_trigger_chatter_guard(&enabled, &duration_ms);
+
+  resp->command_id = CMD_SET_TRIGGER_CHATTER_GUARD;
+  resp->status = success ? HID_RESP_OK : HID_RESP_INVALID_PARAM;
+  resp->enabled = enabled ? 1u : 0u;
+  resp->duration_ms = duration_ms;
+}
+
 static void cmd_get_device_info(const uint8_t *in, uint8_t *out) {
   hid_packet_device_info_t *resp = (hid_packet_device_info_t *)out;
   const char *name = settings_get_keyboard_name();
@@ -1509,6 +1542,7 @@ static void cmd_get_key_gamepad_map(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_gamepad_map_t *req =
       (const hid_packet_key_gamepad_map_t *)in;
   hid_packet_key_gamepad_map_t *resp = (hid_packet_key_gamepad_map_t *)out;
+  const settings_gamepad_mapping_t *mapping = NULL;
 
   resp->command_id = CMD_GET_KEY_GAMEPAD_MAP;
 
@@ -1518,20 +1552,21 @@ static void cmd_get_key_gamepad_map(const uint8_t *in, uint8_t *out) {
     return;
   }
 
-  const settings_gamepad_mapping_t *mapping =
-      settings_get_key_gamepad_mapping(key_index);
+  mapping = settings_get_key_gamepad_mapping(key_index);
 
   resp->status = HID_RESP_OK;
   resp->key_index = key_index;
   resp->axis = mapping->axis;
   resp->direction = mapping->direction;
   resp->button = mapping->button;
+  resp->layer_mask = settings_gamepad_mapping_get_layer_mask(mapping);
 }
 
 static void cmd_set_key_gamepad_map(const uint8_t *in, uint8_t *out) {
   const hid_packet_key_gamepad_map_t *req =
       (const hid_packet_key_gamepad_map_t *)in;
   hid_packet_key_gamepad_map_t *resp = (hid_packet_key_gamepad_map_t *)out;
+  const settings_gamepad_mapping_t *applied = NULL;
 
   resp->command_id = CMD_SET_KEY_GAMEPAD_MAP;
 
@@ -1545,15 +1580,21 @@ static void cmd_set_key_gamepad_map(const uint8_t *in, uint8_t *out) {
   mapping.axis = req->axis;
   mapping.direction = req->direction;
   mapping.button = req->button;
-  mapping.reserved = 0;
+  settings_gamepad_mapping_set_layer_mask(&mapping, req->layer_mask);
 
-  settings_set_key_gamepad_mapping(key_index, &mapping);
+  if (!settings_set_key_gamepad_mapping(key_index, &mapping)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  applied = settings_get_key_gamepad_mapping(key_index);
 
   resp->status = HID_RESP_OK;
   resp->key_index = key_index;
-  resp->axis = req->axis;
-  resp->direction = req->direction;
-  resp->button = req->button;
+  resp->axis = applied->axis;
+  resp->direction = applied->direction;
+  resp->button = applied->button;
+  resp->layer_mask = settings_gamepad_mapping_get_layer_mask(applied);
 }
 
 //--------------------------------------------------------------------+
@@ -2091,6 +2132,46 @@ static void cmd_set_led_alpha_mask(const uint8_t *in, uint8_t *out) {
   resp->payload[0] = mask_len;
 }
 
+static void cmd_get_led_idle_options(const uint8_t *in, uint8_t *out) {
+  hid_packet_led_idle_options_t *resp = (hid_packet_led_idle_options_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_GET_LED_IDLE_OPTIONS;
+  resp->status = HID_RESP_OK;
+  resp->idle_timeout_seconds = settings_get_led_idle_timeout_seconds();
+  resp->allow_system_when_disabled =
+      settings_is_led_system_indicators_allowed_when_disabled() ? 1u : 0u;
+    resp->third_party_stream_counts_as_activity =
+      settings_is_led_idle_third_party_stream_counts_as_activity() ? 1u : 0u;
+}
+
+static void cmd_set_led_idle_options(const uint8_t *in, uint8_t *out) {
+  const hid_packet_led_idle_options_t *req =
+      (const hid_packet_led_idle_options_t *)in;
+  hid_packet_led_idle_options_t *resp = (hid_packet_led_idle_options_t *)out;
+  bool ok_timeout = false;
+  bool ok_policy = false;
+  bool ok_third_party_activity = false;
+
+  ok_timeout =
+      settings_set_led_idle_timeout_seconds(req->idle_timeout_seconds);
+  ok_policy = settings_set_led_system_indicators_allowed_when_disabled(
+      req->allow_system_when_disabled != 0u);
+    ok_third_party_activity =
+      settings_set_led_idle_third_party_stream_counts_as_activity(
+        req->third_party_stream_counts_as_activity != 0u);
+
+  resp->command_id = CMD_SET_LED_IDLE_OPTIONS;
+    resp->status = (ok_timeout && ok_policy && ok_third_party_activity)
+             ? HID_RESP_OK
+             : HID_RESP_INVALID_PARAM;
+  resp->idle_timeout_seconds = settings_get_led_idle_timeout_seconds();
+  resp->allow_system_when_disabled =
+      settings_is_led_system_indicators_allowed_when_disabled() ? 1u : 0u;
+    resp->third_party_stream_counts_as_activity =
+      settings_is_led_idle_third_party_stream_counts_as_activity() ? 1u : 0u;
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Filter Commands
 //--------------------------------------------------------------------+
@@ -2512,6 +2593,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_set_advanced_tick_rate(in_packet, out_packet);
     break;
 
+  case CMD_GET_TRIGGER_CHATTER_GUARD:
+    cmd_get_trigger_chatter_guard(in_packet, out_packet);
+    break;
+
+  case CMD_SET_TRIGGER_CHATTER_GUARD:
+    cmd_set_trigger_chatter_guard(in_packet, out_packet);
+    break;
+
   case CMD_GET_DEVICE_INFO:
     cmd_get_device_info(in_packet, out_packet);
     break;
@@ -2776,6 +2865,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_LED_ALPHA_MASK:
     cmd_set_led_alpha_mask(in_packet, out_packet);
+    break;
+
+  case CMD_GET_LED_IDLE_OPTIONS:
+    cmd_get_led_idle_options(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_IDLE_OPTIONS:
+    cmd_set_led_idle_options(in_packet, out_packet);
     break;
 
   // Filter commands

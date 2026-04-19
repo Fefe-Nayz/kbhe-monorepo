@@ -74,3 +74,7 @@ uint16_t trigger_get_distance_01mm(uint8_t key);
 void trigger_reload_settings(void);
 
 void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings);
+
+bool trigger_set_chatter_guard(bool enabled, uint8_t duration_ms);
+
+void trigger_get_chatter_guard(bool *enabled, uint8_t *duration_ms);

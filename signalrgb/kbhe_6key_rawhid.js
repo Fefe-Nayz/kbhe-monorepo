@@ -4,7 +4,8 @@
 // - CMD_SET_LED_ALL_CHUNK (0x6A)
 // - CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY (0x76)
 // - LED_EFFECT_THIRD_PARTY mode = 7
-// - RAW HID endpoint on interface 1 / usage_page 0xFF00
+// - RAW HID endpoint signature: interface 1, usage 0x0001, usage_page 0xFF00,
+//   collection commonly 0x0001 (application), some hosts report 0x0000
 
 const CMD_SET_LED_ENABLED = 0x61;
 const CMD_SET_LED_EFFECT = 0x6F;
@@ -12,6 +13,11 @@ const CMD_SET_LED_ALL_CHUNK = 0x6A;
 const CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY = 0x76;
 
 const LED_EFFECT_THIRD_PARTY = 7;
+
+const RAW_HID_INTERFACE = 1;
+const RAW_HID_USAGE = 0x0001;
+const RAW_HID_USAGE_PAGE = 0xff00;
+const RAW_HID_COLLECTIONS = [0x0001, 0x0000];
 
 const PACKET_SIZE = 64;
 const WRITE_SIZE = 65; // report id + 64-byte payload
@@ -115,9 +121,16 @@ const vLedPositions = KEY_LAYOUT.map((key) => [
 const ledIndexMap = KEY_LAYOUT.map((_key, index) => index);
 
 let frame = new Array(LED_BYTES).fill(0);
+let hasValidatedRawEndpoint = false;
+let streamActive = false;
+
+/* global
+shutdownMode:readonly
+shutdownColor:readonly
+*/
 
 export function Name() {
-  return "KBHE 82-Key";
+  return "KBHE RAW HID";
 }
 
 export function Publisher() {
@@ -133,7 +146,37 @@ export function ProductId() {
 }
 
 export function Type() {
-  return "hid";
+  return "Hid";
+}
+
+export function DeviceType() {
+  return "keyboard";
+}
+
+export function ControllableParameters() {
+  return [
+    {
+      property: "shutdownMode",
+      group: "lighting",
+      label: "Shutdown Mode",
+      description:
+        "Choose whether shutdown keeps a SignalRGB color or restores previous hardware effect",
+      type: "combobox",
+      values: ["SignalRGB", "Hardware"],
+      default: "Hardware",
+    },
+    {
+      property: "shutdownColor",
+      group: "lighting",
+      label: "Shutdown Color",
+      description:
+        "This color is applied to the device when SignalRGB or the system shuts down",
+      min: "0",
+      max: "360",
+      type: "color",
+      default: "#000000",
+    },
+  ];
 }
 
 export function Size() {
@@ -156,8 +199,64 @@ export function LedPositions() {
   return vLedPositions;
 }
 
+function isRawHidEndpoint(endpoint) {
+  if (!endpoint) {
+    return false;
+  }
+
+  const endpointPath = String(
+    endpoint.path || endpoint.device_path || endpoint.hid_path || "",
+  );
+
+  const collectionMatches =
+    RAW_HID_COLLECTIONS.includes(endpoint.collection) ||
+    endpoint.collection === undefined ||
+    endpoint.collection === null;
+
+  const pathMatches =
+    endpointPath.length === 0 || /&IG_01\\/i.test(endpointPath);
+
+  return (
+    endpoint.interface === RAW_HID_INTERFACE &&
+    endpoint.usage === RAW_HID_USAGE &&
+    endpoint.usage_page === RAW_HID_USAGE_PAGE &&
+    collectionMatches &&
+    pathMatches
+  );
+}
+
 export function Validate(endpoint) {
-  return endpoint.interface === 1 && endpoint.usage_page === 0xff00;
+  const valid = isRawHidEndpoint(endpoint);
+  if (valid) {
+    hasValidatedRawEndpoint = true;
+  }
+  return valid;
+}
+
+function bindRawEndpoint() {
+  if (!hasValidatedRawEndpoint) {
+    return false;
+  }
+
+  if (typeof device.getHidEndpoints === "function") {
+    const endpoints = device.getHidEndpoints();
+    const match = endpoints.find((endpoint) => isRawHidEndpoint(endpoint));
+
+    if (match && typeof device.set_endpoint === "function") {
+      device.set_endpoint(
+        match.interface,
+        match.usage,
+        match.usage_page,
+        match.collection,
+      );
+      return true;
+    }
+  }
+
+  // If we reached this point with a validated endpoint, the runtime already
+  // selected it during Validate(); forcing set_endpoint here can target an
+  // unopened interface on ghost/gamepad instances.
+  return true;
 }
 
 function sendCommand(commandId, payload) {
@@ -181,6 +280,38 @@ function setThirdPartyMode() {
 
 function restoreEffectBeforeThirdParty() {
   sendCommand(CMD_RESTORE_LED_EFFECT_BEFORE_THIRD_PARTY, []);
+}
+
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) {
+    return [0, 0, 0];
+  }
+
+  return [
+    parseInt(result[1], 16),
+    parseInt(result[2], 16),
+    parseInt(result[3], 16),
+  ];
+}
+
+function fillFrameSolid(r, g, b) {
+  for (let i = 0; i < LED_COUNT; i++) {
+    const base = i * 3;
+    frame[base + 0] = r & 0xff;
+    frame[base + 1] = g & 0xff;
+    frame[base + 2] = b & 0xff;
+  }
+}
+
+function applyShutdownColor(systemSuspending) {
+  const configuredColor =
+    typeof shutdownColor === "string" ? shutdownColor : "#000000";
+  const colorHex = systemSuspending ? "#000000" : configuredColor;
+  const [r, g, b] = hexToRgb(colorHex);
+
+  fillFrameSolid(r, g, b);
+  pushFrame();
 }
 
 function collectFrameFromCanvas() {
@@ -215,16 +346,42 @@ function pushFrame() {
 }
 
 export function Initialize() {
+  streamActive = bindRawEndpoint();
+  if (!streamActive) {
+    return;
+  }
+
   setThirdPartyMode();
   device.clearReadBuffer();
 }
 
 export function Render() {
+  if (!streamActive) {
+    return;
+  }
+
   collectFrameFromCanvas();
   pushFrame();
   device.pause(1);
 }
 
-export function Shutdown(_SystemSuspending) {
+export function Shutdown(SystemSuspending) {
+  if (!streamActive) {
+    return;
+  }
+
+  // Match common official plugin behavior: write shutdown color first.
+  setThirdPartyMode();
+  applyShutdownColor(SystemSuspending);
+  device.pause(10);
+
+  if (SystemSuspending) {
+    return;
+  }
+
+  if (typeof shutdownMode === "string" && shutdownMode === "SignalRGB") {
+    return;
+  }
+
   restoreEffectBeforeThirdParty();
 }

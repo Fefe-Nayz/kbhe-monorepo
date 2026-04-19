@@ -18,11 +18,20 @@ static key_trigger_settings_t key_trigger_settings[NUM_KEYS];
 
 static key_rapid_trigger_data_t key_rapid_trigger_states[NUM_KEYS];
 static key_behavior_runtime_t key_behavior_states[NUM_KEYS];
+typedef struct {
+    uint32_t last_transition_ms;
+    bool has_transition;
+} key_transition_guard_t;
+static key_transition_guard_t key_transition_guards[NUM_KEYS];
 
 static key_state_e key_states[NUM_KEYS];
 static bool keyboard_blocked_for_calibration = false;
 static bool trigger_non_tap_hold_press_event = false;
 static uint8_t trigger_active_layer_cache = 0xFFu;
+static uint8_t trigger_chatter_guard_enabled =
+    (uint8_t)(SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED ? 1u : 0u);
+static uint8_t trigger_chatter_guard_duration_ms =
+    (uint8_t)SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS;
 
 #define TRIGGER_DEFERRED_QUEUE_SIZE 32u
 _Static_assert((TRIGGER_DEFERRED_QUEUE_SIZE &
@@ -59,6 +68,42 @@ typedef enum {
 static trigger_deferred_action_t trigger_deferred_queue[TRIGGER_DEFERRED_QUEUE_SIZE];
 static uint8_t trigger_deferred_head = 0u;
 static uint8_t trigger_deferred_size = 0u;
+
+static inline uint8_t trigger_chatter_guard_sanitize_duration(uint8_t duration_ms) {
+    if (duration_ms > SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS) {
+        return SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS;
+    }
+
+    return duration_ms;
+}
+
+static void trigger_transition_guard_reset_all(void) {
+    for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+        key_transition_guards[key].last_transition_ms = 0u;
+        key_transition_guards[key].has_transition = false;
+    }
+}
+
+static inline bool trigger_transition_guard_allows(uint8_t key, uint32_t now_ms) {
+    const key_transition_guard_t *guard = &key_transition_guards[key];
+
+    if (!trigger_chatter_guard_enabled ||
+        trigger_chatter_guard_duration_ms == 0u) {
+        return true;
+    }
+
+    if (!guard->has_transition) {
+        return true;
+    }
+
+    return (uint32_t)(now_ms - guard->last_transition_ms) >=
+           trigger_chatter_guard_duration_ms;
+}
+
+static inline void trigger_transition_guard_mark(uint8_t key, uint32_t now_ms) {
+    key_transition_guards[key].last_transition_ms = now_ms;
+    key_transition_guards[key].has_transition = true;
+}
 
 static inline bool is_below_actuation_point(int16_t distance, uint16_t actuation_point) {
     return distance >= actuation_point;
@@ -466,31 +511,51 @@ static void trigger_reset_runtime_state(bool release_keyboard_reports) {
         reset_rapid_trigger_extremums(key, current_distance);
         memset(&key_behavior_states[key], 0, sizeof(key_behavior_states[key]));
         key_behavior_states[key].active_keycode = KC_NO;
+        key_transition_guards[key].last_transition_ms = 0u;
+        key_transition_guards[key].has_transition = false;
     }
 
     trigger_non_tap_hold_press_event = false;
 }
 
-static inline void press_key(uint8_t key, int16_t current_distance,
+static inline bool press_key(uint8_t key, int16_t current_distance,
                              uint32_t now_ms) {
-    if (key_states[key] == RELEASED) {
-        key_states[key] = PRESSED;
-        trigger_behavior_on_press(key, current_distance, now_ms);
-        if (key_trigger_settings[key].behavior_mode != KEY_BEHAVIOR_TAP_HOLD) {
-            trigger_non_tap_hold_press_event = true;
-        }
-        led_matrix_key_event(key, true);
-        socd_on_press(key);
+    if (key_states[key] != RELEASED) {
+        return false;
     }
+
+    if (!trigger_transition_guard_allows(key, now_ms)) {
+        return false;
+    }
+
+    key_states[key] = PRESSED;
+    trigger_behavior_on_press(key, current_distance, now_ms);
+    if (key_trigger_settings[key].behavior_mode != KEY_BEHAVIOR_TAP_HOLD) {
+        trigger_non_tap_hold_press_event = true;
+    }
+    led_matrix_key_event(key, true);
+    socd_on_press(key);
+    trigger_transition_guard_mark(key, now_ms);
+
+    return true;
 }
 
-static inline void release_key(uint8_t key) {
-    if (key_states[key] == PRESSED) {
-        trigger_behavior_on_release(key);
-        led_matrix_key_event(key, false);
-        key_states[key] = RELEASED;
-        socd_on_release(key);
+static inline bool release_key(uint8_t key, uint32_t now_ms) {
+    if (key_states[key] != PRESSED) {
+        return false;
     }
+
+    if (!trigger_transition_guard_allows(key, now_ms)) {
+        return false;
+    }
+
+    trigger_behavior_on_release(key);
+    led_matrix_key_event(key, false);
+    key_states[key] = RELEASED;
+    socd_on_release(key);
+    trigger_transition_guard_mark(key, now_ms);
+
+    return true;
 }
 
 static inline void handle_rapid_trigger(uint8_t key, int16_t current_distance,
@@ -517,8 +582,9 @@ static inline void handle_rapid_trigger(uint8_t key, int16_t current_distance,
             int16_t press_sensitivity = (int16_t)settings->rapid_trigger_press_sensitivity;
 
             if (distance_from_min_top >= press_sensitivity) {
-                press_key(key, current_distance, now_ms);
-                reset_rapid_trigger_extremums(key, current_distance);
+                if (press_key(key, current_distance, now_ms)) {
+                    reset_rapid_trigger_extremums(key, current_distance);
+                }
             }
         }
     } else {
@@ -531,8 +597,9 @@ static inline void handle_rapid_trigger(uint8_t key, int16_t current_distance,
             int16_t distance_from_max_bottom = rt_data->max_bottom_distance - current_distance;
 
             if (distance_from_max_bottom >= release_sensitivity) {
-                release_key(key);
-                reset_rapid_trigger_extremums(key, current_distance);
+                if (release_key(key, now_ms)) {
+                    reset_rapid_trigger_extremums(key, current_distance);
+                }
             }
         }
     }
@@ -550,29 +617,30 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
     if (settings->behavior_mode == KEY_BEHAVIOR_DYNAMIC) {
         if (key_states[key] == RELEASED) {
             if (is_below_actuation_point(current_distance, actuation_point)) {
-                press_key(key, current_distance, now_ms);
+                (void)press_key(key, current_distance, now_ms);
             }
         } else {
             if (!is_above_release_point(current_distance, release_point)) {
-                release_key(key);
+                (void)release_key(key, now_ms);
             }
         }
     } else if (!settings->is_rapid_trigger_enabled) {
         if (key_states[key] == RELEASED) {
             if (is_below_actuation_point(current_distance, actuation_point)) {
-                press_key(key, current_distance, now_ms);
+                (void)press_key(key, current_distance, now_ms);
             }
         } else {
             if (!is_above_release_point(current_distance, release_point)) {
-                release_key(key);
+                (void)release_key(key, now_ms);
             }
         }
     } else if (!settings->continuous_rapid_trigger) {
         if (key_states[key] == PRESSED &&
             !is_above_release_point(current_distance, release_point)) {
-            release_key(key);
-            reset_rapid_trigger_extremums(key, current_distance);
-            rt_data->last_distance = current_distance;
+            if (release_key(key, now_ms)) {
+                reset_rapid_trigger_extremums(key, current_distance);
+                rt_data->last_distance = current_distance;
+            }
         } else if (key_states[key] == RELEASED &&
                    !is_below_actuation_point(current_distance, actuation_point)) {
             rt_data->last_distance = current_distance;
@@ -597,16 +665,17 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
 
         if (key_states[key] == PRESSED &&
             !is_above_release_point(current_distance, release_point)) {
-            release_key(key);
-            reset_rapid_trigger_extremums(key, current_distance);
-            rt_data->last_distance = current_distance;
+            if (release_key(key, now_ms)) {
+                reset_rapid_trigger_extremums(key, current_distance);
+                rt_data->last_distance = current_distance;
+            }
         } else {
             handle_rapid_trigger(key, current_distance, settings, now_ms);
         }
 
         if (current_distance <= 0) {
             if (key_states[key] == PRESSED) {
-                release_key(key);
+                (void)release_key(key, now_ms);
             }
             if (key_states[key] == RELEASED) {
                 rt_data->continuous_armed = false;
@@ -717,9 +786,36 @@ uint16_t trigger_get_distance_01mm(uint8_t key) {
     return (uint16_t)((um + 5) / 10);
 }
 
+bool trigger_set_chatter_guard(bool enabled, uint8_t duration_ms) {
+    if (duration_ms > SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS) {
+        return false;
+    }
+
+    trigger_chatter_guard_enabled = enabled ? 1u : 0u;
+    trigger_chatter_guard_duration_ms =
+        trigger_chatter_guard_sanitize_duration(duration_ms);
+    trigger_transition_guard_reset_all();
+
+    return true;
+}
+
+void trigger_get_chatter_guard(bool *enabled, uint8_t *duration_ms) {
+    if (enabled != NULL) {
+        *enabled = trigger_chatter_guard_enabled != 0u;
+    }
+
+    if (duration_ms != NULL) {
+        *duration_ms = trigger_chatter_guard_duration_ms;
+    }
+}
+
 void trigger_init() {
     trigger_deferred_clear();
-        trigger_active_layer_cache = 0xFFu;
+    trigger_active_layer_cache = 0xFFu;
+    trigger_chatter_guard_enabled =
+        (uint8_t)(SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED ? 1u : 0u);
+    trigger_chatter_guard_duration_ms =
+        trigger_chatter_guard_sanitize_duration((uint8_t)SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS);
 
     for (int i = 0; i < NUM_KEYS; i++) {
         key_trigger_settings[i].primary_keycode = KC_NO;
@@ -752,6 +848,8 @@ void trigger_init() {
         // Initialize key states
         key_states[i] = RELEASED;
     }
+
+    trigger_transition_guard_reset_all();
 }
 
 void trigger_task() {

@@ -38,6 +38,13 @@ static uint8_t current_brightness = LED_BRIGHTNESS_DEFAULT;
 
 // Enabled state
 static bool display_enabled = true;
+static bool idle_sleep_active = false;
+static uint8_t idle_timeout_seconds = SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS;
+static bool allow_system_indicators_when_disabled =
+  SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED != 0u;
+static bool idle_third_party_stream_counts_as_activity =
+  SETTINGS_DEFAULT_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY != 0u;
+static uint32_t last_activity_ms = 0u;
 
 // Initialized flag
 static bool initialized = false;
@@ -262,6 +269,9 @@ static void effect_multi_splash(void);
 static void effect_solid_multi_splash(void);
 
 static void reactive_tick_simulation(uint16_t delta_ms);
+static void led_matrix_mark_activity(uint32_t now_ms);
+static void led_matrix_mark_third_party_stream_activity(void);
+static void led_matrix_apply_idle_state(uint32_t now_ms);
 static void led_matrix_rgb_to_hsv(uint8_t r, uint8_t g, uint8_t b,
                                   uint8_t *h, uint8_t *s, uint8_t *v);
 
@@ -859,17 +869,45 @@ static bool volume_overlay_color_for_index(uint8_t index, uint32_t now_ms,
   return true;
 }
 
+static inline bool led_matrix_full_output_enabled(void) {
+  return display_enabled && !idle_sleep_active;
+}
+
+static bool led_matrix_system_overlay_enabled(uint32_t now_ms) {
+  if (!allow_system_indicators_when_disabled) {
+    return false;
+  }
+
+  if (volume_overlay_is_expired(now_ms)) {
+    volume_overlay_active = false;
+  }
+
+  return volume_overlay_active || led_indicator_is_caps_lock();
+}
+
+static inline bool led_matrix_should_drive_output(uint32_t now_ms) {
+  return led_matrix_full_output_enabled() ||
+         led_matrix_system_overlay_enabled(now_ms);
+}
+
 /**
  * @brief Push one runtime pixel to WS2812 buffer
  */
 static inline void push_runtime_pixel_to_ws2812_at(uint8_t index,
                                                    uint32_t now_ms) {
+  bool full_output = led_matrix_full_output_enabled();
   uint8_t physical_index = LOGICAL_LED_INDEX_TO_PHYSICAL_LED_INDEX[index];
   const uint8_t *source_frame =
       output_override_active ? pixels_output_override : pixels_runtime;
   uint8_t source_r = source_frame[index * 3 + 0];
   uint8_t source_g = source_frame[index * 3 + 1];
   uint8_t source_b = source_frame[index * 3 + 2];
+
+  if (!full_output) {
+    source_r = 0u;
+    source_g = 0u;
+    source_b = 0u;
+  }
 
   if (volume_overlay_color_for_index(index, now_ms, &source_r, &source_g,
                                      &source_b)) {
@@ -894,11 +932,18 @@ static inline void push_runtime_pixel_to_ws2812(uint8_t index) {
  * @brief Update ws2812 driver with current pixel data
  */
 static void update_ws2812(void) {
-  if (!initialized || !display_enabled)
+  uint32_t now_ms = 0u;
+
+  if (!initialized) {
     return;
+  }
+
+  now_ms = HAL_GetTick();
+  if (!led_matrix_should_drive_output(now_ms)) {
+    return;
+  }
 
   // Apply brightness and copy to WS2812 buffer
-  uint32_t now_ms = HAL_GetTick();
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     push_runtime_pixel_to_ws2812_at(i, now_ms);
   }
@@ -1134,6 +1179,13 @@ bool led_matrix_init(void *htim, uint32_t channel) {
   // Reset brightness
   current_brightness = LED_BRIGHTNESS_DEFAULT;
   display_enabled = true;
+  idle_sleep_active = false;
+  idle_timeout_seconds = SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS;
+  allow_system_indicators_when_disabled =
+      SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED != 0u;
+    idle_third_party_stream_counts_as_activity =
+      SETTINGS_DEFAULT_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY != 0u;
+  last_activity_ms = HAL_GetTick();
   initialized = true;
   last_sim_tick = 0;
   pixel_batch_depth = 0u;
@@ -1155,6 +1207,9 @@ void led_matrix_set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g,
 }
 
 void led_matrix_begin_pixel_batch(void) {
+  if (pixel_batch_depth == 0u) {
+    led_matrix_mark_third_party_stream_activity();
+  }
   pixel_batch_depth++;
 }
 
@@ -1221,6 +1276,9 @@ void led_matrix_set_pixel_idx(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
   if (current_effect == LED_EFFECT_THIRD_PARTY) {
     // Third-party live mode: keep runtime editable externally, do not alter
     // persisted matrix pattern.
+    if (pixel_batch_depth == 0u) {
+      led_matrix_mark_third_party_stream_activity();
+    }
     pixels_runtime[index * 3 + 0] = r;
     pixels_runtime[index * 3 + 1] = g;
     pixels_runtime[index * 3 + 2] = b;
@@ -1259,6 +1317,7 @@ void led_matrix_clear(void) {
   }
 
   if (current_effect == LED_EFFECT_THIRD_PARTY) {
+    led_matrix_mark_third_party_stream_activity();
     memset(pixels_runtime, 0, sizeof(pixels_runtime));
     if (initialized && display_enabled) {
       zeroLedValues(&led_ws2812_handle);
@@ -1288,9 +1347,51 @@ void led_matrix_set_brightness(uint8_t brightness) {
 uint8_t led_matrix_get_brightness(void) { return current_brightness; }
 
 void led_matrix_set_enabled(bool enabled) {
+  uint32_t now_ms = HAL_GetTick();
+
   display_enabled = enabled;
+  idle_sleep_active = false;
 
   if (initialized) {
+    if (enabled) {
+      last_activity_ms = now_ms;
+      update_ws2812();
+    } else {
+      if (led_matrix_system_overlay_enabled(now_ms)) {
+        update_ws2812();
+      } else {
+        zeroLedValues(&led_ws2812_handle);
+        ws2812_show(&led_ws2812_handle);
+      }
+    }
+  }
+}
+
+bool led_matrix_is_enabled(void) { return display_enabled; }
+
+void led_matrix_set_idle_timeout_seconds(uint8_t timeout_seconds) {
+  idle_timeout_seconds = timeout_seconds;
+
+  if (idle_timeout_seconds == 0u && idle_sleep_active) {
+    idle_sleep_active = false;
+    if (initialized && display_enabled) {
+      update_ws2812();
+    }
+  } else if (initialized) {
+    led_matrix_apply_idle_state(HAL_GetTick());
+  }
+}
+
+uint8_t led_matrix_get_idle_timeout_seconds(void) { return idle_timeout_seconds; }
+
+void led_matrix_set_allow_system_indicators_when_disabled(bool enabled) {
+  allow_system_indicators_when_disabled = enabled;
+
+  if (!initialized) {
+    return;
+  }
+
+  if (!display_enabled || idle_sleep_active) {
     if (enabled) {
       update_ws2812();
     } else {
@@ -1300,7 +1401,21 @@ void led_matrix_set_enabled(bool enabled) {
   }
 }
 
-bool led_matrix_is_enabled(void) { return display_enabled; }
+bool led_matrix_is_system_indicators_allowed_when_disabled(void) {
+  return allow_system_indicators_when_disabled;
+}
+
+void led_matrix_set_idle_third_party_stream_counts_as_activity(bool enabled) {
+  idle_third_party_stream_counts_as_activity = enabled;
+}
+
+bool led_matrix_is_idle_third_party_stream_counts_as_activity(void) {
+  return idle_third_party_stream_counts_as_activity;
+}
+
+void led_matrix_notify_user_activity(void) {
+  led_matrix_mark_activity(HAL_GetTick());
+}
 
 void led_matrix_update(void) { update_ws2812(); }
 
@@ -1548,6 +1663,8 @@ void led_matrix_key_event(uint8_t key_index, bool pressed) {
     return;
   }
 
+  led_matrix_mark_activity(HAL_GetTick());
+
   mxfx_reactive_record_hit(key_index);
 
   uint8_t anchor_hue = 0u;
@@ -1773,12 +1890,67 @@ static void reactive_tick_simulation(uint16_t delta_ms) {
   }
 }
 
+static void led_matrix_mark_activity(uint32_t now_ms) {
+  last_activity_ms = now_ms;
+
+  if (idle_sleep_active) {
+    idle_sleep_active = false;
+    if (initialized && display_enabled) {
+      update_ws2812();
+    }
+  }
+}
+
+static void led_matrix_mark_third_party_stream_activity(void) {
+  if (idle_third_party_stream_counts_as_activity &&
+      current_effect == LED_EFFECT_THIRD_PARTY) {
+    led_matrix_mark_activity(HAL_GetTick());
+  }
+}
+
+static void led_matrix_apply_idle_state(uint32_t now_ms) {
+  uint32_t idle_timeout_ms = 0u;
+
+  if (!display_enabled) {
+    idle_sleep_active = false;
+    return;
+  }
+
+  if (idle_timeout_seconds == 0u) {
+    if (idle_sleep_active) {
+      idle_sleep_active = false;
+      if (initialized) {
+        update_ws2812();
+      }
+    }
+    return;
+  }
+
+  idle_timeout_ms = (uint32_t)idle_timeout_seconds * 1000u;
+  if (!idle_sleep_active &&
+      (uint32_t)(now_ms - last_activity_ms) >= idle_timeout_ms) {
+    idle_sleep_active = true;
+    if (initialized) {
+      if (led_matrix_system_overlay_enabled(now_ms)) {
+        update_ws2812();
+      } else {
+        zeroLedValues(&led_ws2812_handle);
+        ws2812_show(&led_ws2812_handle);
+      }
+    }
+  }
+}
+
 void led_matrix_set_progress_overlay(uint8_t level) {
+  uint32_t now_ms = HAL_GetTick();
+
+  led_matrix_mark_activity(now_ms);
   volume_overlay_active = true;
   volume_overlay_level = level;
-  volume_overlay_expire_ms = HAL_GetTick() + 1200u;
+  volume_overlay_expire_ms = now_ms + 1200u;
 
-  if (initialized && display_enabled) {
+  if (initialized &&
+      (led_matrix_full_output_enabled() || allow_system_indicators_when_disabled)) {
     update_ws2812();
   }
 }
@@ -1786,7 +1958,8 @@ void led_matrix_set_progress_overlay(uint8_t level) {
 void led_matrix_clear_progress_overlay(void) {
   volume_overlay_active = false;
 
-  if (initialized && display_enabled) {
+  if (initialized &&
+      (led_matrix_full_output_enabled() || allow_system_indicators_when_disabled)) {
     update_ws2812();
   }
 }
@@ -2000,13 +2173,24 @@ void led_matrix_clear_output_override_frame(void) {
 #include "led_effects/effect_bass_ripple.inc"
 
 void led_matrix_effect_tick(uint32_t tick) {
-  if (!initialized || !display_enabled) {
+  if (!initialized) {
     return;
   }
 
+  led_matrix_apply_idle_state(tick);
+
   if (volume_overlay_is_expired(tick)) {
     volume_overlay_active = false;
-    update_ws2812();
+    if (led_matrix_should_drive_output(tick)) {
+      update_ws2812();
+    } else {
+      zeroLedValues(&led_ws2812_handle);
+      ws2812_show(&led_ws2812_handle);
+    }
+  }
+
+  if (!led_matrix_full_output_enabled()) {
+    return;
   }
 
   // Calculate time deltas

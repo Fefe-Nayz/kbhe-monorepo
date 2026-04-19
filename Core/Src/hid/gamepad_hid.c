@@ -1,5 +1,6 @@
 #include "hid/gamepad_hid.h"
 
+#include "layout/layout.h"
 #include "settings.h"
 #include "trigger/trigger.h"
 #include "usb_descriptors.h"
@@ -383,6 +384,7 @@ void gamepad_hid_refresh_state(void) {
   gamepad_report_t next_report = gamepad_neutral_report();
   uint8_t positive[GAMEPAD_AXIS_TRIGGER_R + 1u] = {0};
   uint8_t negative[GAMEPAD_AXIS_TRIGGER_R + 1u] = {0};
+  uint8_t active_layer = layout_get_active_layer_top();
   int16_t left_x = 0;
   int16_t left_y = 0;
   int16_t right_x = 0;
@@ -397,6 +399,10 @@ void gamepad_hid_refresh_state(void) {
     const settings_gamepad_mapping_t *mapping = &cached_mappings[key];
     uint16_t distance_01mm = 0u;
     uint8_t analog_value = 0u;
+
+    if (!settings_gamepad_mapping_is_active_on_layer(mapping, active_layer)) {
+      continue;
+    }
 
     if (mapping->button > GAMEPAD_BUTTON_NONE &&
         mapping->button <= GAMEPAD_BUTTON_HOME &&

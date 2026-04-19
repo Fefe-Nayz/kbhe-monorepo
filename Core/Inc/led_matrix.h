@@ -274,6 +274,41 @@ void led_matrix_set_enabled(bool enabled);
 bool led_matrix_is_enabled(void);
 
 /**
+ * @brief Set LED idle timeout in seconds (0 disables idle auto-off).
+ */
+void led_matrix_set_idle_timeout_seconds(uint8_t timeout_seconds);
+
+/**
+ * @brief Get LED idle timeout in seconds.
+ */
+uint8_t led_matrix_get_idle_timeout_seconds(void);
+
+/**
+ * @brief Allow system indicators (Caps/volume overlay) while RGB output is off.
+ */
+void led_matrix_set_allow_system_indicators_when_disabled(bool enabled);
+
+/**
+ * @brief Check if system indicators are allowed while RGB output is off.
+ */
+bool led_matrix_is_system_indicators_allowed_when_disabled(void);
+
+/**
+ * @brief Configure whether third-party stream writes count as idle activity.
+ */
+void led_matrix_set_idle_third_party_stream_counts_as_activity(bool enabled);
+
+/**
+ * @brief Check whether third-party stream writes count as idle activity.
+ */
+bool led_matrix_is_idle_third_party_stream_counts_as_activity(void);
+
+/**
+ * @brief Notify LED engine of explicit user activity (key/rotary action).
+ */
+void led_matrix_notify_user_activity(void);
+
+/**
  * @brief Update the LED strip (apply changes)
  * This is called automatically but can be forced
  */

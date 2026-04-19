@@ -11,7 +11,7 @@
 #include "stm32f7xx_hal_gpio.h"
 
 #define ROTARY_BUTTON_DEBOUNCE_MS 20u
-#define ROTARY_QUAD_TIMEOUT_MS 80u
+#define ROTARY_QUAD_TIMEOUT_MS 2000u
 #define ROTARY_BRIGHTNESS_STEP_UNIT 4u
 #define ROTARY_EFFECT_SPEED_STEP_UNIT 4u
 #define ROTARY_HUE_STEP_UNIT 4u
@@ -436,6 +436,8 @@ static void rotary_handle_button_action(void) {
   uint8_t active_layer = layout_get_active_layer_top();
   settings_get_rotary_encoder(&rotary);
 
+  led_matrix_notify_user_activity();
+
   if (rotary.click_binding.mode == (uint8_t)ROTARY_BINDING_MODE_KEYCODE) {
     if (rotary_binding_tap(&rotary.click_binding, active_modifiers,
                            active_layer)) {
@@ -484,6 +486,8 @@ static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
   if (rotary.invert_direction) {
     direction = (int8_t)-direction;
   }
+
+  led_matrix_notify_user_activity();
 
   last_rotation_direction = direction;
   rotation_step_counter++;

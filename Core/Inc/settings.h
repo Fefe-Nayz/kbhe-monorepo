@@ -43,6 +43,13 @@ extern "C" {
 #define SETTINGS_ADVANCED_TICK_RATE_MIN 1u
 #define SETTINGS_ADVANCED_TICK_RATE_MAX 100u
 #define SETTINGS_DEFAULT_ADVANCED_TICK_RATE 1u
+#define SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS 20u
+#define SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED 0u
+#define SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS 0u
+#define SETTINGS_LED_IDLE_TIMEOUT_MAX_SECONDS 255u
+#define SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS 0u
+#define SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED 0u
+#define SETTINGS_DEFAULT_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY 0u
 #define SETTINGS_DKS_BOTTOM_OUT_POINT_MIN_TENTHS 1u
 #define SETTINGS_DKS_BOTTOM_OUT_POINT_MAX_TENTHS 40u
 #define SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS 40u
@@ -50,6 +57,13 @@ extern "C" {
 #define SETTINGS_SOCD_FULLY_PRESSED_POINT_MAX_TENTHS 40u
 #define SETTINGS_SOCD_FULLY_PRESSED_POINT_DEFAULT_TENTHS 40u
 #define SETTINGS_KEYBOARD_NAME_LENGTH 32u
+#define SETTINGS_GAMEPAD_MAP_LAYER_MASK_ALL                                     \
+  ((uint8_t)((1u << SETTINGS_LAYER_COUNT) - 1u))
+#define SETTINGS_OPTIONS_RESERVED_LED_SYSTEM_WHEN_DISABLED_MASK 0x01u
+#define SETTINGS_OPTIONS_RESERVED_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_MASK 0x02u
+#define SETTINGS_OPTIONS_RESERVED_ALLOWED_MASK                                   \
+  (SETTINGS_OPTIONS_RESERVED_LED_SYSTEM_WHEN_DISABLED_MASK |                  \
+   SETTINGS_OPTIONS_RESERVED_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_MASK)
 
 //--------------------------------------------------------------------+
 // Gamepad Mapping Constants
@@ -189,7 +203,7 @@ typedef struct __attribute__((packed)) {
   uint8_t led_enabled : 1;           // Enable LED matrix
   uint8_t nkro_enabled : 1;          // Auto mode: try NKRO, fallback to 6KRO
   uint8_t led_thermal_protection_enabled : 1; // Clamp brightness above temp threshold
-  uint8_t reserved : 2;              // Reserved for future use
+  uint8_t reserved : 2;              // See SETTINGS_OPTIONS_RESERVED_* masks
 } settings_options_t;
 
 /**
@@ -217,8 +231,49 @@ typedef struct __attribute__((packed)) {
   uint8_t axis;      // gamepad_axis_t - which axis to map to (0 = none)
   uint8_t direction; // gamepad_direction_t - positive or negative
   uint8_t button;    // gamepad_button_t - button to press (0 = none)
-  uint8_t reserved;  // Padding
+  uint8_t reserved;  // Layer mask bitfield (bit0..bit3), 0 => all layers
 } settings_gamepad_mapping_t;
+
+static inline uint8_t settings_gamepad_mapping_get_layer_mask(
+    const settings_gamepad_mapping_t *mapping) {
+  uint8_t layer_mask = SETTINGS_GAMEPAD_MAP_LAYER_MASK_ALL;
+
+  if (mapping == 0) {
+    return layer_mask;
+  }
+
+  layer_mask =
+      (uint8_t)(mapping->reserved & SETTINGS_GAMEPAD_MAP_LAYER_MASK_ALL);
+  if (layer_mask == 0u) {
+    return SETTINGS_GAMEPAD_MAP_LAYER_MASK_ALL;
+  }
+
+  return layer_mask;
+}
+
+static inline void settings_gamepad_mapping_set_layer_mask(
+    settings_gamepad_mapping_t *mapping, uint8_t layer_mask) {
+  if (mapping == 0) {
+    return;
+  }
+
+  layer_mask = (uint8_t)(layer_mask & SETTINGS_GAMEPAD_MAP_LAYER_MASK_ALL);
+  if (layer_mask == 0u) {
+    layer_mask = SETTINGS_GAMEPAD_MAP_LAYER_MASK_ALL;
+  }
+
+  mapping->reserved = layer_mask;
+}
+
+static inline bool settings_gamepad_mapping_is_active_on_layer(
+    const settings_gamepad_mapping_t *mapping, uint8_t layer_index) {
+  if (layer_index >= SETTINGS_LAYER_COUNT) {
+    return false;
+  }
+
+  return (settings_gamepad_mapping_get_layer_mask(mapping) &
+          (uint8_t)(1u << layer_index)) != 0u;
+}
 
 typedef struct __attribute__((packed)) {
   uint16_t x_01mm; // Distance in 0.01 mm (0..400 for 0..4.00 mm)
@@ -724,6 +779,21 @@ uint8_t settings_get_advanced_tick_rate(void);
 bool settings_set_advanced_tick_rate(uint8_t tick_rate);
 
 /**
+ * @brief Get trigger chatter guard settings for the active profile.
+ * @param enabled Output: true if guard is enabled
+ * @param duration_ms Output: guard duration in ms
+ */
+void settings_get_trigger_chatter_guard(bool *enabled, uint8_t *duration_ms);
+
+/**
+ * @brief Set trigger chatter guard settings for the active profile.
+ * @param enabled true to enable, false to disable
+ * @param duration_ms guard duration in ms (0..SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS)
+ * @return true if accepted
+ */
+bool settings_set_trigger_chatter_guard(bool enabled, uint8_t duration_ms);
+
+/**
  * @brief Get currently active persistent profile slot.
  * @return Profile index (0..SETTINGS_PROFILE_COUNT-1)
  */
@@ -860,6 +930,38 @@ bool settings_is_led_enabled(void);
  * @return true if successful
  */
 bool settings_set_led_enabled(bool enabled);
+
+/**
+ * @brief Get LED idle timeout (seconds).
+ *        0 disables idle auto-off.
+ */
+uint8_t settings_get_led_idle_timeout_seconds(void);
+
+/**
+ * @brief Set LED idle timeout (seconds).
+ *        0 disables idle auto-off.
+ */
+bool settings_set_led_idle_timeout_seconds(uint8_t timeout_seconds);
+
+/**
+ * @brief Check whether system LED indicators are allowed while RGB is off.
+ */
+bool settings_is_led_system_indicators_allowed_when_disabled(void);
+
+/**
+ * @brief Allow/disallow system LED indicators while RGB is off.
+ */
+bool settings_set_led_system_indicators_allowed_when_disabled(bool enabled);
+
+/**
+ * @brief Check whether third-party LED stream writes count as idle activity.
+ */
+bool settings_is_led_idle_third_party_stream_counts_as_activity(void);
+
+/**
+ * @brief Configure whether third-party LED stream writes count as idle activity.
+ */
+bool settings_set_led_idle_third_party_stream_counts_as_activity(bool enabled);
 
 /**
  * @brief Get LED brightness
@@ -1164,6 +1266,15 @@ uint8_t settings_gamepad_apply_curve(uint16_t distance_01mm);
  * @return true if the key contributes to a gamepad axis or button
  */
 bool settings_is_key_mapped_to_gamepad(uint8_t key_index);
+
+/**
+ * @brief Check whether a key maps to gamepad on a specific layer.
+ * @param key_index Key index
+ * @param layer_index Layer index
+ * @return true if this key has a valid mapping active on the provided layer
+ */
+bool settings_is_key_mapped_to_gamepad_on_layer(uint8_t key_index,
+                                                uint8_t layer_index);
 
 //--------------------------------------------------------------------+
 // Rotary Encoder Settings API

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..widgets import PageScaffold, SectionCard, StatusChip
+from ..common import LED_EFFECT_NAMES
 
 
 class AppSettingsPage(QWidget):
@@ -37,6 +38,7 @@ class AppSettingsPage(QWidget):
 
         scaffold.add_card(self._build_theme_card())
         scaffold.add_card(self._build_live_card())
+        scaffold.add_card(self._build_shutdown_effect_card())
 
         self.status_chip = StatusChip("App settings ready.", "neutral")
         scaffold.content_layout.addWidget(self.status_chip)
@@ -59,6 +61,48 @@ class AppSettingsPage(QWidget):
         row.addWidget(self.theme_combo, 1)
 
         card.body_layout.addLayout(row)
+        return card
+
+    def _build_shutdown_effect_card(self) -> SectionCard:
+        card = SectionCard(
+            "Shutdown LED Behavior",
+            "Optionally force a specific LED effect when the app closes, then restore the previous one on next launch.",
+        )
+
+        self.close_effect_toggle = QCheckBox("Apply selected LED effect on app close")
+        self.close_effect_toggle.toggled.connect(self._on_close_effect_toggled)
+        card.body_layout.addWidget(self.close_effect_toggle)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        lbl = QLabel("Effect on close")
+        lbl.setObjectName("Muted")
+        row.addWidget(lbl)
+
+        self.close_effect_combo = QComboBox()
+        for effect_id, effect_name in sorted(
+            ((int(k), str(v)) for k, v in LED_EFFECT_NAMES.items()),
+            key=lambda item: item[0],
+        ):
+            self.close_effect_combo.addItem(f"{effect_id:02d} - {effect_name}", effect_id)
+        self.close_effect_combo.currentIndexChanged.connect(self._on_close_effect_mode_changed)
+        row.addWidget(self.close_effect_combo, 1)
+
+        card.body_layout.addLayout(row)
+
+        self.restore_previous_effect_toggle = QCheckBox(
+            "Restore previous LED effect automatically on next startup"
+        )
+        self.restore_previous_effect_toggle.toggled.connect(self._on_restore_previous_toggled)
+        card.body_layout.addWidget(self.restore_previous_effect_toggle)
+
+        note = QLabel(
+            "When restore is enabled, the app stores the currently active effect before applying the shutdown effect."
+        )
+        note.setObjectName("Muted")
+        note.setWordWrap(True)
+        card.body_layout.addWidget(note)
+
         return card
 
     def _build_live_card(self) -> SectionCard:
@@ -135,6 +179,59 @@ class AppSettingsPage(QWidget):
         self.session.set_live_interval_ms(int(value))
         self._set_status(f"Global refresh interval set to {int(value)} ms.", "success")
 
+    def _on_close_effect_toggled(self, checked: bool) -> None:
+        if self._loading:
+            return
+        if self.controller is None or not hasattr(self.controller, "set_close_effect_enabled"):
+            return
+        try:
+            self.controller.set_close_effect_enabled(bool(checked))
+            self._sync_close_effect_controls()
+            self._set_status(
+                "Shutdown LED override enabled." if checked else "Shutdown LED override disabled.",
+                "success",
+            )
+        except Exception as exc:
+            self._set_status(f"Failed to update shutdown LED override: {exc}", "error")
+
+    def _on_close_effect_mode_changed(self, _index: int) -> None:
+        if self._loading:
+            return
+        if self.controller is None or not hasattr(self.controller, "set_close_effect_mode"):
+            return
+        mode = self.close_effect_combo.currentData()
+        if mode is None:
+            return
+        try:
+            self.controller.set_close_effect_mode(int(mode))
+            self._set_status(
+                f"Shutdown LED effect set to {self.close_effect_combo.currentText()}.",
+                "success",
+            )
+        except Exception as exc:
+            self._set_status(f"Failed to update shutdown effect: {exc}", "error")
+
+    def _on_restore_previous_toggled(self, checked: bool) -> None:
+        if self._loading:
+            return
+        if self.controller is None or not hasattr(self.controller, "set_restore_previous_effect_on_startup"):
+            return
+        try:
+            self.controller.set_restore_previous_effect_on_startup(bool(checked))
+            self._set_status(
+                "Startup restore of previous effect enabled."
+                if checked
+                else "Startup restore of previous effect disabled.",
+                "success",
+            )
+        except Exception as exc:
+            self._set_status(f"Failed to update startup restore option: {exc}", "error")
+
+    def _sync_close_effect_controls(self) -> None:
+        enabled = bool(self.close_effect_toggle.isChecked())
+        self.close_effect_combo.setEnabled(enabled)
+        self.restore_previous_effect_toggle.setEnabled(enabled)
+
     def _on_session_live_settings_changed(self, enabled: bool, interval_ms: int) -> None:
         self._loading = True
         try:
@@ -158,6 +255,31 @@ class AppSettingsPage(QWidget):
                 self.live_toggle.setChecked(bool(getattr(self.session, "live_enabled", True)))
             with QSignalBlocker(self.interval_spin):
                 self.interval_spin.setValue(int(getattr(self.session, "live_interval_ms", 100)))
+
+            close_enabled = False
+            close_mode = self.close_effect_combo.currentData()
+            restore_previous = True
+            if self.controller is not None:
+                if hasattr(self.controller, "get_close_effect_enabled"):
+                    close_enabled = bool(self.controller.get_close_effect_enabled())
+                if hasattr(self.controller, "get_close_effect_mode"):
+                    close_mode = int(self.controller.get_close_effect_mode())
+                if hasattr(self.controller, "get_restore_previous_effect_on_startup"):
+                    restore_previous = bool(self.controller.get_restore_previous_effect_on_startup())
+
+            with QSignalBlocker(self.close_effect_toggle):
+                self.close_effect_toggle.setChecked(close_enabled)
+
+            combo_index = self.close_effect_combo.findData(int(close_mode))
+            if combo_index < 0:
+                combo_index = 0
+            with QSignalBlocker(self.close_effect_combo):
+                self.close_effect_combo.setCurrentIndex(combo_index)
+
+            with QSignalBlocker(self.restore_previous_effect_toggle):
+                self.restore_previous_effect_toggle.setChecked(restore_previous)
+
+            self._sync_close_effect_controls()
         finally:
             self._loading = False
 
