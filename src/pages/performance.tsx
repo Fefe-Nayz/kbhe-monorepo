@@ -19,7 +19,7 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
-import { KEY_COUNT } from "@/lib/kbhe/protocol";
+import { KEY_COUNT, TRIGGER_CHATTER_GUARD_MAX_MS } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import {
   IconAlertTriangle,
@@ -136,6 +136,12 @@ export default function Performance() {
   const tickRateQ = useQuery({
     queryKey: queryKeys.device.advancedTickRate(),
     queryFn: () => kbheDevice.getAdvancedTickRate(),
+    enabled: connected,
+  });
+
+  const triggerChatterGuardQ = useQuery({
+    queryKey: queryKeys.device.triggerChatterGuard(),
+    queryFn: () => kbheDevice.getTriggerChatterGuard(),
     enabled: connected,
   });
 
@@ -333,6 +339,33 @@ export default function Performance() {
     mutationFn: (v) => kbheDevice.setAdvancedTickRate(v),
     optimisticUpdate: (_cur, v) => v,
   });
+
+  const triggerChatterGuardMutation = useOptimisticMutation<
+    { enabled: boolean; duration_ms: number } | null,
+    { enabled: boolean; duration_ms: number },
+    boolean
+  >({
+    queryKey: queryKeys.device.triggerChatterGuard(),
+    mutationFn: async (next) => {
+      markSaving();
+      return kbheDevice.setTriggerChatterGuard(next.enabled, next.duration_ms);
+    },
+    optimisticUpdate: (_cur, next) => next,
+    onSuccess: () => markSaved(),
+    onError: () => markError(),
+  });
+
+  const chatterGuardValue = triggerChatterGuardQ.data ?? { enabled: false, duration_ms: 0 };
+
+  const commitChatterGuard = useCallback(
+    (patch: Partial<{ enabled: boolean; duration_ms: number }>) => {
+      triggerChatterGuardMutation.mutate({
+        enabled: patch.enabled ?? chatterGuardValue.enabled,
+        duration_ms: patch.duration_ms ?? chatterGuardValue.duration_ms,
+      });
+    },
+    [chatterGuardValue.duration_ms, chatterGuardValue.enabled, triggerChatterGuardMutation],
+  );
 
   // Merge a partial patch with the current full settings and commit.
   function commitKey(
@@ -652,6 +685,28 @@ export default function Performance() {
                     onLiveChange={v => liveTickRate(v)}
                     onCommit={v => tickMutation.mutate(v)}
                     disabled={!connected}
+                  />
+                </div>
+                <FormRow
+                  label="Chatter Guard"
+                  description="Anti-chatter gate to block rapid bounce after trigger"
+                >
+                  <Switch
+                    checked={chatterGuardValue.enabled}
+                    disabled={!connected || triggerChatterGuardQ.data == null}
+                    onCheckedChange={(enabled) => commitChatterGuard({ enabled })}
+                  />
+                </FormRow>
+                <div className="grid gap-2">
+                  <span className="text-sm font-medium">Chatter Guard Duration (ms)</span>
+                  <CommitSlider
+                    min={0}
+                    max={TRIGGER_CHATTER_GUARD_MAX_MS}
+                    step={1}
+                    value={chatterGuardValue.duration_ms}
+                    onLiveChange={() => {}}
+                    onCommit={(duration) => commitChatterGuard({ duration_ms: duration })}
+                    disabled={!connected || triggerChatterGuardQ.data == null}
                   />
                 </div>
               </div>

@@ -11,14 +11,17 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
+import { LayerSelect } from "@/components/layer-select";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type GamepadSettings, type GamepadCurvePoint } from "@/lib/kbhe/device";
 import {
   GAMEPAD_AXES,
   GAMEPAD_BUTTONS,
   GAMEPAD_DIRECTIONS,
+  GAMEPAD_LAYER_MASK_ALL,
   GAMEPAD_API_MODES,
   GAMEPAD_KEYBOARD_ROUTING,
+  LAYER_COUNT,
 } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -62,6 +65,8 @@ const BUTTON_GRID: { label: string; value: number }[] = Object.entries(GAMEPAD_B
 
 export default function Gamepad() {
   const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
+  const currentLayer = useKeyboardStore((s) => s.currentLayer);
+  const setCurrentLayer = useKeyboardStore((s) => s.setCurrentLayer);
   const { status } = useDeviceSession();
   const connected = status === "connected";
   const visible = usePageVisible();
@@ -89,7 +94,7 @@ export default function Gamepad() {
   });
 
   const keyMapQ = useQuery({
-    queryKey: queryKeys.gamepad.keyMap(keyIndex ?? -1),
+    queryKey: queryKeys.gamepad.keyMap(keyIndex ?? -1, currentLayer),
     queryFn: () => (keyIndex != null ? kbheDevice.getKeyGamepadMap(keyIndex) : null),
     enabled: connected && keyIndex != null,
   });
@@ -120,35 +125,97 @@ export default function Gamepad() {
       axis,
       direction,
       button,
+      layerMask,
     }: {
       axis: number;
       direction: number;
       button: number;
+      layerMask: number;
     }) => {
       if (keyIndex == null) return;
       markSaving();
-      await kbheDevice.setKeyGamepadMap(keyIndex, axis, direction, button);
+      await kbheDevice.setKeyGamepadMap(keyIndex, axis, direction, button, layerMask);
     },
     onSuccess: () => {
       markSaved();
-      if (keyIndex != null)
-        void qc.invalidateQueries({ queryKey: queryKeys.gamepad.keyMap(keyIndex) });
+      if (keyIndex != null) {
+        void qc.invalidateQueries({ queryKey: ["gamepad", "keyMap", keyIndex] });
+      }
     },
     onError: markError,
   });
 
+  const gamepadEnabledMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await kbheDevice.setGamepadEnabled(enabled);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.device.options() });
+    },
+  });
+
   const gs = gamepadQ.data;
   const km = keyMapQ.data;
+  const currentLayerBit = 1 << currentLayer;
+  const layerMaskAll = (1 << LAYER_COUNT) - 1;
+  const activeLayerMask = km?.layer_mask ?? GAMEPAD_LAYER_MASK_ALL;
+  const mappingActiveOnLayer = km != null && (activeLayerMask & currentLayerBit) !== 0;
+  const effectiveAxis = mappingActiveOnLayer ? (km?.axis ?? 0) : 0;
+  const effectiveDirection = mappingActiveOnLayer ? (km?.direction ?? 0) : 0;
+  const effectiveButton = mappingActiveOnLayer ? (km?.button ?? 0) : 0;
   const keyboardEnabled = optionsQ.data?.keyboard_enabled ?? false;
+  const gamepadEnabled = optionsQ.data?.gamepad_enabled ?? false;
+
+  const updateLayerScopedMapping = useCallback(
+    (next: Partial<{ axis: number; direction: number; button: number }>) => {
+      if (keyIndex == null || !km) {
+        return;
+      }
+
+      let nextAxis = next.axis ?? effectiveAxis;
+      let nextDirection = next.direction ?? effectiveDirection;
+      let nextButton = next.button ?? effectiveButton;
+      let nextLayerMask = km.layer_mask & layerMaskAll;
+      const hasLayerMapping = nextAxis !== 0 || nextButton !== 0;
+
+      if (hasLayerMapping) {
+        nextLayerMask |= currentLayerBit;
+      } else {
+        nextLayerMask &= ~currentLayerBit;
+        if (nextLayerMask === 0) {
+          nextAxis = 0;
+          nextDirection = 0;
+          nextButton = 0;
+        }
+      }
+
+      keyMapMutation.mutate({
+        axis: nextAxis,
+        direction: nextDirection,
+        button: nextButton,
+        layerMask: nextLayerMask === 0 ? layerMaskAll : nextLayerMask,
+      });
+    },
+    [
+      keyIndex,
+      km,
+      effectiveAxis,
+      effectiveDirection,
+      effectiveButton,
+      currentLayerBit,
+      keyMapMutation,
+      layerMaskAll,
+    ],
+  );
 
   // ── Assign button helper ──
 
   const assignButton = useCallback(
     (buttonValue: number) => {
       if (keyIndex == null || !km) return;
-      keyMapMutation.mutate({ axis: km.axis, direction: km.direction, button: buttonValue });
+      updateLayerScopedMapping({ button: buttonValue });
     },
-    [keyIndex, km, keyMapMutation],
+    [keyIndex, km, updateLayerScopedMapping],
   );
 
   // ── Stick preview ──
@@ -201,6 +268,7 @@ export default function Gamepad() {
   const menubar = (
     <>
       <div className="flex items-center gap-3">
+        <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">HID</span>
           <Switch
@@ -262,13 +330,13 @@ export default function Gamepad() {
             <SectionCard
               title={
                 keyIndex != null
-                  ? `Key ${keyIndex} — Assign Gamepad Button`
+                  ? `Key ${keyIndex} — Assign Gamepad Button (Layer ${currentLayer})`
                   : "Gamepad Button Map"
               }
               description={
                 keyIndex == null
                   ? "Select a key above, then click a button to assign"
-                  : "Click a button to assign it to this key"
+                  : "Click a button to assign it for the selected layer"
               }
             >
               {!connected ? (
@@ -288,7 +356,7 @@ export default function Gamepad() {
               ) : (
                 <div className="grid grid-cols-4 gap-2">
                   {BUTTON_GRID.map((btn) => {
-                    const active = km?.button === btn.value;
+                    const active = effectiveButton === btn.value;
                     return (
                       <button
                         key={btn.value}
@@ -313,7 +381,7 @@ export default function Gamepad() {
                     className={cn(
                       "h-12 rounded-lg border text-xs font-medium transition-colors",
                       "hover:bg-accent hover:text-accent-foreground",
-                      km?.button === 0 && "bg-muted text-muted-foreground",
+                      effectiveButton === 0 && "bg-muted text-muted-foreground",
                     )}
                     onClick={() => assignButton(0)}
                     disabled={!connected}
@@ -328,16 +396,10 @@ export default function Gamepad() {
                 <div className="mt-4 flex flex-col divide-y border-t pt-2">
                   <FormRow label="Axis" description="Analog axis for this key">
                     <Select
-                      value={String(km.axis)}
+                      value={String(effectiveAxis)}
                       disabled={!connected}
                       items={selectItems(GAMEPAD_AXES)}
-                      onValueChange={(v) =>
-                        keyMapMutation.mutate({
-                          axis: Number(v),
-                          direction: km.direction,
-                          button: km.button,
-                        })
-                      }
+                      onValueChange={(v) => updateLayerScopedMapping({ axis: Number(v) })}
                     >
                       <SelectTrigger className="w-40 h-8">
                         <SelectValue />
@@ -353,16 +415,10 @@ export default function Gamepad() {
                   </FormRow>
                   <FormRow label="Direction" description="Axis direction">
                     <Select
-                      value={String(km.direction)}
+                      value={String(effectiveDirection)}
                       disabled={!connected}
                       items={selectItems(GAMEPAD_DIRECTIONS)}
-                      onValueChange={(v) =>
-                        keyMapMutation.mutate({
-                          axis: km.axis,
-                          direction: Number(v),
-                          button: km.button,
-                        })
-                      }
+                      onValueChange={(v) => updateLayerScopedMapping({ direction: Number(v) })}
                     >
                       <SelectTrigger className="w-28 h-8">
                         <SelectValue />
@@ -384,6 +440,16 @@ export default function Gamepad() {
             <div className="flex flex-col gap-4">
               <SectionCard title="Input Routing">
                 <div className="flex flex-col divide-y">
+                  <FormRow
+                    label="Gamepad Enabled"
+                    description="Enable or disable gamepad output on the device"
+                  >
+                    <Switch
+                      checked={gamepadEnabled}
+                      disabled={!connected || gamepadEnabledMutation.isPending}
+                      onCheckedChange={(value) => gamepadEnabledMutation.mutate(value)}
+                    />
+                  </FormRow>
                   <FormRow
                     label="Keyboard Routing"
                     description={keyboardEnabled

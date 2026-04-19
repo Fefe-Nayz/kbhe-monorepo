@@ -12,6 +12,7 @@ import {
   GAMEPAD_CURVE_MAX_DISTANCE_MM,
   GAMEPAD_CURVE_POINT_COUNT,
   GAMEPAD_DIRECTIONS,
+  GAMEPAD_LAYER_MASK_ALL,
   GAMEPAD_KEYBOARD_ROUTING,
   i16le,
   KEY_BEHAVIORS,
@@ -25,10 +26,15 @@ import {
   LED_EFFECT_PARAM_COLOR_G,
   LED_EFFECT_PARAM_COLOR_B,
   LED_EFFECT_PARAM_SPEED,
+  LED_IDLE_TIMEOUT_DEFAULT_SECONDS,
+  LED_IDLE_TIMEOUT_MAX_SECONDS,
+  LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_DEFAULT,
   LED_AUDIO_SPECTRUM_BAND_COUNT,
   SETTINGS_PROFILE_NAME_LENGTH,
   LAYER_COUNT,
   Status,
+  TRIGGER_CHATTER_GUARD_DEFAULT_MS,
+  TRIGGER_CHATTER_GUARD_MAX_MS,
   u16le,
   u32le,
   pushU16,
@@ -167,6 +173,18 @@ export interface KeyGamepadMap {
   axis: number;
   direction: number;
   button: number;
+  layer_mask: number;
+}
+
+export interface LedIdleOptions {
+  idle_timeout_seconds: number;
+  allow_system_when_disabled: boolean;
+  third_party_stream_counts_as_activity: boolean;
+}
+
+export interface TriggerChatterGuard {
+  enabled: boolean;
+  duration_ms: number;
 }
 
 export interface FilterParams {
@@ -374,6 +392,18 @@ export class KBHEDevice {
     );
   }
 
+  private sanitizeTriggerChatterGuardDuration(value: unknown): number {
+    const normalized = Number(value);
+    if (!Number.isFinite(normalized)) {
+      return TRIGGER_CHATTER_GUARD_DEFAULT_MS;
+    }
+
+    return Math.max(
+      0,
+      Math.min(TRIGGER_CHATTER_GUARD_MAX_MS, Math.trunc(normalized)),
+    );
+  }
+
   private defaultDynamicZones(primaryKeycode = 0x14): DynamicZone[] {
     return [
       { end_mm_tenths: 40, end_mm: 4.0, hid_keycode: primaryKeycode },
@@ -439,6 +469,28 @@ export class KBHEDevice {
     return Object.values(GAMEPAD_API_MODES).includes(normalized as never)
       ? normalized
       : GAMEPAD_API_MODES["HID (DirectInput)"];
+  }
+
+  private sanitizeGamepadLayerMask(value: unknown): number {
+    const normalized = Number(value);
+    if (!Number.isFinite(normalized)) {
+      return GAMEPAD_LAYER_MASK_ALL;
+    }
+
+    const mask = Math.trunc(normalized) & GAMEPAD_LAYER_MASK_ALL;
+    return mask === 0 ? GAMEPAD_LAYER_MASK_ALL : mask;
+  }
+
+  private sanitizeLedIdleTimeoutSeconds(value: unknown): number {
+    const normalized = Number(value);
+    if (!Number.isFinite(normalized)) {
+      return LED_IDLE_TIMEOUT_DEFAULT_SECONDS;
+    }
+
+    return Math.max(
+      0,
+      Math.min(LED_IDLE_TIMEOUT_MAX_SECONDS, Math.trunc(normalized)),
+    );
   }
 
   private sanitizeGamepadCurvePoints(points: unknown): GamepadCurvePoint[] {
@@ -611,6 +663,27 @@ export class KBHEDevice {
   async setAdvancedTickRate(tickRate: number): Promise<boolean> {
     const value = this.sanitizeAdvancedTickRate(tickRate);
     const response = await this.sendCommand(Command.SET_ADVANCED_TICK_RATE, [0, value], 300);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  async getTriggerChatterGuard(): Promise<TriggerChatterGuard | null> {
+    const response = await this.sendCommand(Command.GET_TRIGGER_CHATTER_GUARD);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        enabled: Boolean(response[2]),
+        duration_ms: this.sanitizeTriggerChatterGuardDuration(response[3]),
+      };
+    }
+    return null;
+  }
+
+  async setTriggerChatterGuard(enabled: boolean, durationMs: number): Promise<boolean> {
+    const duration = this.sanitizeTriggerChatterGuardDuration(durationMs);
+    const response = await this.sendCommand(
+      Command.SET_TRIGGER_CHATTER_GUARD,
+      [0, enabled ? 1 : 0, duration],
+      300,
+    );
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }
 
@@ -1363,11 +1436,13 @@ export class KBHEDevice {
   async getKeyGamepadMap(keyIndex: number): Promise<KeyGamepadMap | null> {
     const response = await this.sendCommand(Command.GET_KEY_GAMEPAD_MAP, [0, keyIndex]);
     if (response && response.length >= 6 && response[1] === Status.OK) {
+      const rawLayerMask = response.length >= 7 ? response[6] : GAMEPAD_LAYER_MASK_ALL;
       return {
         key_index: response[2],
         axis: response[3],
         direction: response[4],
         button: response[5],
+        layer_mask: this.sanitizeGamepadLayerMask(rawLayerMask),
       };
     }
     return null;
@@ -1378,6 +1453,7 @@ export class KBHEDevice {
     axis: string | number,
     direction: string | number,
     button: string | number,
+    layerMask: number = GAMEPAD_LAYER_MASK_ALL,
   ): Promise<boolean> {
     const axisValue =
       typeof axis === "string" ? GAMEPAD_AXES[axis as keyof typeof GAMEPAD_AXES] ?? 0 : axis;
@@ -1389,12 +1465,45 @@ export class KBHEDevice {
       typeof button === "string"
         ? GAMEPAD_BUTTONS[button as keyof typeof GAMEPAD_BUTTONS] ?? 0
         : button;
+    const sanitizedLayerMask = this.sanitizeGamepadLayerMask(layerMask);
     const response = await this.sendCommand(Command.SET_KEY_GAMEPAD_MAP, [
       0,
       keyIndex,
       Number(axisValue) & 0xff,
       Number(directionValue) & 0xff,
       Number(buttonValue) & 0xff,
+      sanitizedLayerMask & 0xff,
+    ]);
+    return !!response && response.length >= 2 && response[1] === Status.OK;
+  }
+
+  async getLedIdleOptions(): Promise<LedIdleOptions | null> {
+    const response = await this.sendCommand(Command.GET_LED_IDLE_OPTIONS);
+    if (response && response.length >= 4 && response[1] === Status.OK) {
+      return {
+        idle_timeout_seconds: this.sanitizeLedIdleTimeoutSeconds(response[2]),
+        allow_system_when_disabled: Boolean(response[3]),
+        third_party_stream_counts_as_activity:
+          response.length >= 5
+            ? Boolean(response[4])
+            : LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_DEFAULT,
+      };
+    }
+    return null;
+  }
+
+  async setLedIdleOptions(
+    idleTimeoutSeconds: number,
+    allowSystemWhenDisabled: boolean,
+    thirdPartyStreamCountsAsActivity: boolean =
+      LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_DEFAULT,
+  ): Promise<boolean> {
+    const timeout = this.sanitizeLedIdleTimeoutSeconds(idleTimeoutSeconds);
+    const response = await this.sendCommand(Command.SET_LED_IDLE_OPTIONS, [
+      0,
+      timeout & 0xff,
+      allowSystemWhenDisabled ? 1 : 0,
+      thirdPartyStreamCountsAsActivity ? 1 : 0,
     ]);
     return !!response && response.length >= 2 && response[1] === Status.OK;
   }

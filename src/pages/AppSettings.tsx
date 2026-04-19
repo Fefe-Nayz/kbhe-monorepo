@@ -24,17 +24,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  getCloseLightingPreferences,
   getLaunchOnStartupEnabled,
   getWindowsMicaEnabled,
+  setCloseLightingPreferences,
   getStartupPreferences,
   isWindowsMicaSupported,
   setLaunchOnStartupEnabled,
   setStartupPreferences,
   setWindowsMicaEnabled,
   STARTUP_WINDOW_MODE_OPTIONS,
+  type CloseLightingPreferences,
   type StartupWindowMode,
 } from "@/lib/app-startup";
 import { useDeviceSession } from "@/lib/kbhe/session";
+import { LEDEffect, LED_EFFECT_NAMES } from "@/lib/kbhe/protocol";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { toast } from "sonner";
 
@@ -74,6 +78,11 @@ const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: "light", label: "Light" },
 ];
 
+const CLOSE_EFFECT_OPTIONS: Array<{ value: number; label: string }> = Object.entries(LED_EFFECT_NAMES)
+  .map(([value, label]) => ({ value: Number(value), label }))
+  .filter(({ value }) => Number.isFinite(value) && value !== LEDEffect.NONE)
+  .sort((a, b) => a.value - b.value);
+
 export default function AppSettings() {
   const qc = useQueryClient();
   const developerMode = useDeviceSession((state) => state.developerMode);
@@ -81,7 +90,18 @@ export default function AppSettings() {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const micaSupported = isWindowsMicaSupported();
   const [micaEnabled, setMicaEnabled] = useState<boolean>(() => getWindowsMicaEnabled());
+  const [closeLightingPreferences, setCloseLightingPreferencesState] = useState<CloseLightingPreferences>(
+    () => getCloseLightingPreferences(),
+  );
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
+  const updateCloseLightingPreferences = (next: Partial<CloseLightingPreferences>) => {
+    setCloseLightingPreferencesState((previous) => {
+      const updated = { ...previous, ...next };
+      setCloseLightingPreferences(updated);
+      return updated;
+    });
+  };
 
   const startupPrefsQ = useQuery({
     queryKey: APP_QUERY_KEYS.startupPreferences,
@@ -236,6 +256,70 @@ export default function AppSettings() {
                   </SelectGroup>
                 </SelectContent>
               </Select>
+            </FormRow>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Lighting Lifecycle"
+          description="Optionally apply a dedicated LED effect when closing the app window."
+        >
+          <div className="flex flex-col divide-y">
+            <FormRow
+              label="Apply Effect on Window Close"
+              description="When enabled, the selected effect is applied before the app hides to tray"
+            >
+              <Switch
+                checked={closeLightingPreferences.enabled}
+                onCheckedChange={(value) => {
+                  updateCloseLightingPreferences({ enabled: value });
+                  toast.success(value ? "Close effect enabled." : "Close effect disabled.");
+                }}
+              />
+            </FormRow>
+
+            <FormRow
+              label="Close Effect"
+              description="LED effect to apply when the main window is closed"
+            >
+              <Select
+                value={String(closeLightingPreferences.closeEffect)}
+                disabled={!closeLightingPreferences.enabled}
+                onValueChange={(value) => {
+                  updateCloseLightingPreferences({ closeEffect: Number(value) });
+                  toast.success("Close effect updated.");
+                }}
+              >
+                <SelectTrigger className="h-8 w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {CLOSE_EFFECT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormRow>
+
+            <FormRow
+              label="Restore Previous Effect on Startup"
+              description="After relaunch, restore the effect that was active before close"
+            >
+              <Switch
+                checked={closeLightingPreferences.restorePreviousOnStartup}
+                onCheckedChange={(value) => {
+                  updateCloseLightingPreferences({ restorePreviousOnStartup: value });
+                  toast.success(
+                    value
+                      ? "Previous effect restore enabled."
+                      : "Previous effect restore disabled.",
+                  );
+                }}
+              />
             </FormRow>
           </div>
         </SectionCard>

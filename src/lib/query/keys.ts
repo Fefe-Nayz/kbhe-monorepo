@@ -11,6 +11,7 @@ export const queryKeys = {
     gamepadEnabled: () => ["device", "gamepadEnabled"] as const,
     nkroEnabled: () => ["device", "nkroEnabled"] as const,
     advancedTickRate: () => ["device", "advancedTickRate"] as const,
+    triggerChatterGuard: () => ["device", "triggerChatterGuard"] as const,
     filterEnabled: () => ["device", "filterEnabled"] as const,
     filterParams: () => ["device", "filterParams"] as const,
     mcuMetrics: () => ["device", "mcuMetrics"] as const,
@@ -42,7 +43,7 @@ export const queryKeys = {
 
   gamepad: {
     settings: () => ["gamepad", "settings"] as const,
-    keyMap: (index: number) => ["gamepad", "keyMap", index] as const,
+    keyMap: (index: number, layer: number) => ["gamepad", "keyMap", index, layer] as const,
     withKeyboard: () => ["gamepad", "withKeyboard"] as const,
   },
 
@@ -61,6 +62,7 @@ export const queryKeys = {
     effectColor: () => ["led", "effectColor"] as const,
     effectParams: (mode: number) => ["led", "effectParams", mode] as const,
     fpsLimit: () => ["led", "fpsLimit"] as const,
+    idleOptions: () => ["led", "idleOptions"] as const,
     diagnostic: () => ["led", "diagnostic"] as const,
     allPixels: () => ["led", "allPixels"] as const,
   },

@@ -39,7 +39,6 @@ import {
   IconFileImport,
   IconFileExport,
   IconRestore,
-  IconSearch,
 } from "@tabler/icons-react";
 
 // ---------------------------------------------------------------------------
@@ -413,6 +412,13 @@ export default function Lighting() {
     placeholderData: (previous) => previous,
   });
 
+  const idleOptionsQ = useQuery({
+    queryKey: queryKeys.led.idleOptions(),
+    queryFn: () => kbheDevice.getLedIdleOptions(),
+    enabled: connected,
+    placeholderData: (previous) => previous,
+  });
+
   const currentEffect = effectQ.data ?? LEDEffect.NONE;
   const currentEffectForSelection = canonicalEffectId(currentEffect);
 
@@ -618,8 +624,75 @@ export default function Lighting() {
     onError: markError,
   });
 
+  const idleTimeoutMut = useMutation({
+    mutationFn: async (timeoutSeconds: number) => {
+      markSaving();
+      const current = idleOptionsQ.data ?? {
+        idle_timeout_seconds: 0,
+        allow_system_when_disabled: false,
+        third_party_stream_counts_as_activity: false,
+      };
+      await kbheDevice.setLedIdleOptions(
+        timeoutSeconds,
+        current.allow_system_when_disabled,
+        current.third_party_stream_counts_as_activity,
+      );
+    },
+    onSuccess: () => {
+      markSaved();
+      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
+    },
+    onError: markError,
+  });
+
+  const allowSystemIndicatorsMut = useMutation({
+    mutationFn: async (allowSystemWhenDisabled: boolean) => {
+      markSaving();
+      const current = idleOptionsQ.data ?? {
+        idle_timeout_seconds: 0,
+        allow_system_when_disabled: false,
+        third_party_stream_counts_as_activity: false,
+      };
+      await kbheDevice.setLedIdleOptions(
+        current.idle_timeout_seconds,
+        allowSystemWhenDisabled,
+        current.third_party_stream_counts_as_activity,
+      );
+    },
+    onSuccess: () => {
+      markSaved();
+      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
+    },
+    onError: markError,
+  });
+
+  const thirdPartyIdleActivityMut = useMutation({
+    mutationFn: async (thirdPartyStreamCountsAsActivity: boolean) => {
+      markSaving();
+      const current = idleOptionsQ.data ?? {
+        idle_timeout_seconds: 0,
+        allow_system_when_disabled: false,
+        third_party_stream_counts_as_activity: false,
+      };
+      await kbheDevice.setLedIdleOptions(
+        current.idle_timeout_seconds,
+        current.allow_system_when_disabled,
+        thirdPartyStreamCountsAsActivity,
+      );
+    },
+    onSuccess: () => {
+      markSaved();
+      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
+    },
+    onError: markError,
+  });
+
   const canResetEffectParams =
     connected && !!schemaQ.data && !!paramsQ.data && !paramsMut.isPending;
+  const ledIdleTimeoutSeconds = idleOptionsQ.data?.idle_timeout_seconds ?? 0;
+  const allowSystemWhenDisabled = idleOptionsQ.data?.allow_system_when_disabled ?? false;
+  const thirdPartyStreamCountsAsActivity =
+    idleOptionsQ.data?.third_party_stream_counts_as_activity ?? false;
 
   const handleResetEffectParams = useCallback(() => {
     if (!schemaQ.data || !paramsQ.data) {
@@ -1080,6 +1153,43 @@ export default function Lighting() {
                   checked={enabledQ.data ?? false}
                   disabled={!connected}
                   onCheckedChange={(v) => enabledMut.mutate(v)}
+                />
+              </FormRow>
+              <FormRow
+                label="Idle Auto-Off"
+                description="Automatically disable RGB output after inactivity (seconds, 0 = off)"
+              >
+                <div className="flex items-center gap-3 w-52">
+                  <CommitSlider
+                    min={0}
+                    max={255}
+                    step={1}
+                    value={ledIdleTimeoutSeconds}
+                    onLiveChange={() => {}}
+                    onCommit={(v) => idleTimeoutMut.mutate(v)}
+                    disabled={!connected || idleOptionsQ.data == null}
+                    className="flex-1"
+                  />
+                </div>
+              </FormRow>
+              <FormRow
+                label="Allow System Indicators"
+                description="Keep Caps Lock and volume bar LEDs available when RGB is disabled"
+              >
+                <Switch
+                  checked={allowSystemWhenDisabled}
+                  disabled={!connected || idleOptionsQ.data == null}
+                  onCheckedChange={(v) => allowSystemIndicatorsMut.mutate(v)}
+                />
+              </FormRow>
+              <FormRow
+                label="Third-Party Stream Keeps Awake"
+                description="Count external RGB stream writes as activity for idle auto-off"
+              >
+                <Switch
+                  checked={thirdPartyStreamCountsAsActivity}
+                  disabled={!connected || idleOptionsQ.data == null}
+                  onCheckedChange={(v) => thirdPartyIdleActivityMut.mutate(v)}
                 />
               </FormRow>
               <FormRow label="Global Brightness">
