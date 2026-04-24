@@ -143,7 +143,11 @@ export default function AdvancedKeys() {
   const profileContext = activeProfileIndex ?? 0;
   const connected = status === "connected";
   const resolveKeycapLegend = useOSKeycapLegend();
-  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
+  const {
+    keyLegendSlotsMap,
+    keyLegendOverlayMap,
+    isLoading: keyboardPreviewLoading,
+  } = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
   const queryClient = useQueryClient();
 
@@ -500,6 +504,16 @@ export default function AdvancedKeys() {
 
     return next;
   }, [advancedMenuByIndex, keyLegendSlotsMap]);
+
+  const keyboardLegendOverlayMap = useMemo(() => {
+    const next: Record<string, ReactNode | undefined> = { ...keyLegendOverlayMap };
+
+    for (const [index] of advancedMenuByIndex.entries()) {
+      next[`key-${index}`] = undefined;
+    }
+
+    return next;
+  }, [advancedMenuByIndex, keyLegendOverlayMap]);
 
   const keyboardKeyColorMap = useMemo(() => {
     const next: Record<string, string> = {};
@@ -1113,6 +1127,7 @@ export default function AdvancedKeys() {
           showLayerSelector={false}
           showRotary={false}
           keyLegendSlotsMap={keyboardLegendSlotsMap}
+          keyLegendOverlayMap={keyboardLegendOverlayMap}
           loading={keyboardPreviewLoading}
           keyLegendClassName="text-[9px] leading-[1.05]"
           keyColorMap={keyboardKeyColorMap}

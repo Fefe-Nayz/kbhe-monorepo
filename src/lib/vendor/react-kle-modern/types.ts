@@ -102,6 +102,7 @@ export interface KeyboardLayoutProps {
   keyColorMap?: Record<string, string>;
   keyLegendMap?: Record<string, ReactNode>;
   keyLegendSlotsMap?: Record<string, Array<ReactNode | undefined>>;
+  keyLegendOverlayMap?: Record<string, ReactNode | undefined>;
   keyLegendClassNameMap?: Record<string, string | undefined>;
   keyLegendColorMap?: Record<string, string | undefined>;
   keyLegendFontSizeMap?: Record<string, number | undefined>;

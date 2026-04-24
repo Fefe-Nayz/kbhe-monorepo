@@ -44,6 +44,7 @@ export const queryKeys = {
   gamepad: {
     settings: () => ["gamepad", "settings"] as const,
     keyMap: (index: number, layer: number) => ["gamepad", "keyMap", index, layer] as const,
+    allKeyMaps: (layer: number) => ["gamepad", "keyMap", "all", layer] as const,
     withKeyboard: () => ["gamepad", "withKeyboard"] as const,
   },
 

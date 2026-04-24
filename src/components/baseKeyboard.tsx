@@ -24,6 +24,7 @@ interface BaseKeyboardProps {
   showTooltips?: boolean;
   keyLegendMap?: Record<string, React.ReactNode>;
   keyLegendSlotsMap?: Record<string, Array<React.ReactNode | undefined>>;
+  keyLegendOverlayMap?: Record<string, React.ReactNode | undefined>;
   keyLegendClassName?: string;
   loading?: boolean;
   renderKeyOverlay?: (keyId: string) => React.ReactNode;
@@ -168,6 +169,7 @@ export default function BaseKeyboard({
   showTooltips = true,
   keyLegendMap,
   keyLegendSlotsMap,
+  keyLegendOverlayMap,
   keyLegendClassName,
   loading = false,
   renderKeyOverlay,
@@ -414,6 +416,7 @@ export default function BaseKeyboard({
                   keyColorMap={keyColorMap}
                   keyLegendMap={resolvedKeyLegendMap}
                   keyLegendSlotsMap={keyLegendSlotsMap}
+                  keyLegendOverlayMap={keyLegendOverlayMap}
                   keyLegendClassNameMap={resolvedKeyLegendClassNameMap}
                   keyLegendColorMap={resolvedKeyLegendColorMap}
                   keyLegendFontSizeMap={resolvedKeyLegendFontSizeMap}

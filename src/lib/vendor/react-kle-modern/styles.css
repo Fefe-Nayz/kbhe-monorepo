@@ -205,8 +205,9 @@
 }
 
 .kle-legends {
+  --kle-legends-extra-padding: 4px;
   position: absolute;
-  inset: calc(var(--kle-top-inset) + 4px);
+  inset: calc(var(--kle-top-inset) + var(--kle-legends-extra-padding));
   pointer-events: none;
   transform: translateY(var(--kle-top-layer-offset));
   transition: transform 120ms ease;
@@ -222,7 +223,226 @@
 }
 
 .kle-root[data-kle-theme="modern"] .kle-legends {
-  inset: calc(var(--kle-top-inset) + 6px);
+  --kle-legends-extra-padding: 6px;
+}
+
+.kle-legend-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: inherit;
+}
+
+.kbhe-gp-split-overlay {
+  position: absolute;
+  inset: calc(-1 * var(--kle-legends-extra-padding, 6px));
+  overflow: hidden;
+  color: inherit;
+  pointer-events: none;
+}
+
+.kbhe-gp-split-divider {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  overflow: visible;
+  opacity: 0.58;
+}
+
+.kbhe-gp-split-divider line {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: square;
+  vector-effect: non-scaling-stroke;
+}
+
+.kbhe-gp-split-triangle {
+  stroke: none;
+  fill: currentColor;
+}
+
+.kbhe-gp-split-triangle--gamepad {
+  fill-opacity: 0.04;
+}
+
+.kbhe-gp-split-triangle--keyboard {
+  fill-opacity: 0.1;
+}
+
+.kbhe-gp-split-gamepad {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 58%;
+  height: 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: pre-line;
+  font-weight: 600;
+  color: inherit;
+  pointer-events: none;
+  line-height: 0.95;
+}
+
+.kbhe-gp-split-gamepad--simple {
+  font-size: 0.72rem;
+}
+
+.kbhe-gp-split-gamepad--special {
+  font-size: 0.6rem;
+}
+
+.kbhe-gp-split-keyboard-simple {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 58%;
+  height: 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: pre-line;
+  font-weight: 600;
+  color: inherit;
+  pointer-events: none;
+  line-height: 0.95;
+}
+
+.kbhe-gp-split-keyboard-simple--simple {
+  font-size: 0.72rem;
+}
+
+.kbhe-gp-split-keyboard-layout--special {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.kbhe-gp-split-keyboard-slot--special {
+  position: absolute;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.46rem !important;
+  line-height: 0.85;
+  font-weight: 600;
+  color: inherit;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--top-left {
+  top: 54%;
+  left: 54%;
+  right: auto;
+  bottom: auto;
+  justify-content: flex-start;
+  text-align: left;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--top-center {
+  top: 54%;
+  left: 76%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--top-right {
+  top: 54%;
+  right: 6%;
+  left: auto;
+  bottom: auto;
+  justify-content: flex-end;
+  text-align: right;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--middle-left {
+  top: 74%;
+  left: 54%;
+  right: auto;
+  bottom: auto;
+  transform: translateY(-50%);
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--center {
+  top: 74%;
+  left: 76%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  max-width: 42%;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--middle-right {
+  top: 74%;
+  right: 6%;
+  left: auto;
+  bottom: auto;
+  transform: translateY(-50%);
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--bottom-left {
+  bottom: 8%;
+  left: 54%;
+  right: auto;
+  top: auto;
+  justify-content: flex-start;
+  text-align: left;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--bottom-center {
+  bottom: 8%;
+  left: 76%;
+  right: auto;
+  top: auto;
+  transform: translateX(-50%);
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--bottom-right {
+  bottom: 8%;
+  right: 6%;
+  top: auto;
+  left: auto;
+  justify-content: flex-end;
+  text-align: right;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--front-left {
+  bottom: 2%;
+  left: 54%;
+  right: auto;
+  top: auto;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--front-center {
+  bottom: 2%;
+  left: 76%;
+  right: auto;
+  top: auto;
+  transform: translateX(-50%);
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--front-right {
+  bottom: 2%;
+  right: 6%;
+  left: auto;
+  top: auto;
+  transform: none;
 }
 
 .kle-legend {

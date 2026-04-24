@@ -70,7 +70,11 @@ export default function Gamepad() {
   const { status } = useDeviceSession();
   const connected = status === "connected";
   const visible = usePageVisible();
-  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
+  const {
+    keyLegendSlotsMap,
+    keyLegendOverlayMap,
+    isLoading: keyboardPreviewLoading,
+  } = useKeyboardPreviewLegends();
   const qc = useQueryClient();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
@@ -138,9 +142,8 @@ export default function Gamepad() {
     },
     onSuccess: () => {
       markSaved();
-      if (keyIndex != null) {
-        void qc.invalidateQueries({ queryKey: ["gamepad", "keyMap", keyIndex] });
-      }
+      void qc.invalidateQueries({ queryKey: ["gamepad", "keyMap"] });
+      void qc.invalidateQueries({ queryKey: queryKeys.gamepad.allKeyMaps(currentLayer) });
     },
     onError: markError,
   });
@@ -306,6 +309,7 @@ export default function Gamepad() {
           showRotary={false}
           loading={keyboardPreviewLoading}
           keyLegendSlotsMap={keyLegendSlotsMap}
+          keyLegendOverlayMap={keyLegendOverlayMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />
       }

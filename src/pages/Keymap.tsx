@@ -1,7 +1,8 @@
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useOSKeycapLegend } from "@/hooks/use-os-layout";
+import { useKeyboardPreviewLegends } from "@/hooks/use-keyboard-preview-legends";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { KeycodeAccordion } from "@/components/keycode-accordion";
@@ -11,13 +12,17 @@ import { Button } from "@/components/ui/button";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
-import { HID_KEYCODE_NAMES, HID_KEYCODES, KEY_COUNT } from "@/lib/kbhe/protocol";
-import { buildKeycodeLegendSlots } from "@/lib/kbhe/keycode-icons";
-import { previewKeys } from "@/constants/defaultLayout";
+import {
+  GAMEPAD_AXIS_NAMES,
+  GAMEPAD_BUTTON_NAMES,
+  GAMEPAD_DIRECTIONS,
+  GAMEPAD_LAYER_MASK_ALL,
+  HID_KEYCODES,
+  KEY_COUNT,
+  LAYER_COUNT,
+} from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import { IconRestore } from "@tabler/icons-react";
-
-const EMPTY_KEY_SLOTS: Array<string | undefined> = Array.from({ length: 12 }, () => "");
 
 async function fetchAllLayerKeycodes(layer: number): Promise<Record<number, number>> {
   const codes: Record<number, number> = {};
@@ -36,6 +41,51 @@ async function fetchAllLayerKeycodes(layer: number): Promise<Record<number, numb
   return codes;
 }
 
+const GAMEPAD_BUTTON_TO_KEYCODE: Record<number, number | undefined> = {
+  1: HID_KEYCODES["GP A"],
+  2: HID_KEYCODES["GP B"],
+  3: HID_KEYCODES["GP X"],
+  4: HID_KEYCODES["GP Y"],
+  5: HID_KEYCODES["GP LB"],
+  6: HID_KEYCODES["GP RB"],
+  7: HID_KEYCODES["GP LT Trigger"],
+  8: HID_KEYCODES["GP RT Trigger"],
+  9: HID_KEYCODES["GP Back"],
+  10: HID_KEYCODES["GP Start"],
+  11: HID_KEYCODES["GP L3"],
+  12: HID_KEYCODES["GP R3"],
+  13: HID_KEYCODES["GP DPad Up"],
+  14: HID_KEYCODES["GP DPad Down"],
+  15: HID_KEYCODES["GP DPad Left"],
+  16: HID_KEYCODES["GP DPad Right"],
+  17: HID_KEYCODES["GP Home"],
+};
+
+function mapAxisToGamepadKeycode(axis: number, direction: number): number | undefined {
+  const positive = direction !== GAMEPAD_DIRECTIONS["-"];
+
+  if (axis === 1) {
+    return positive ? HID_KEYCODES["GP LS Right"] : HID_KEYCODES["GP LS Left"];
+  }
+  if (axis === 2) {
+    return positive ? HID_KEYCODES["GP LS Down"] : HID_KEYCODES["GP LS Up"];
+  }
+  if (axis === 3) {
+    return positive ? HID_KEYCODES["GP RS Right"] : HID_KEYCODES["GP RS Left"];
+  }
+  if (axis === 4) {
+    return positive ? HID_KEYCODES["GP RS Down"] : HID_KEYCODES["GP RS Up"];
+  }
+  if (axis === 5) {
+    return HID_KEYCODES["GP LT Trigger"];
+  }
+  if (axis === 6) {
+    return HID_KEYCODES["GP RT Trigger"];
+  }
+
+  return undefined;
+}
+
 export default function Keymap() {
   const selectedKeys = useKeyboardStore((s) => s.selectedKeys);
   const currentLayer = useKeyboardStore((s) => s.currentLayer);
@@ -47,6 +97,23 @@ export default function Keymap() {
   const profileContext = activeProfileIndex ?? -1;
   const { saveState, markSaving, markSaved } = useAutosave();
   const resolveKeycapLegend = useOSKeycapLegend();
+  const {
+    keyLegendSlotsMap,
+    keyLegendOverlayMap,
+    isLoading: keyboardPreviewLoading,
+  } = useKeyboardPreviewLegends();
+
+  const focusedKeyId = selectedKeys[0] ?? null;
+  const focusedKeyIndex = focusedKeyId?.startsWith("key-")
+    ? Number.parseInt(focusedKeyId.replace("key-", ""), 10)
+    : null;
+
+  const focusedGamepadMap = useQuery({
+    queryKey: queryKeys.gamepad.keyMap(focusedKeyIndex ?? -1, currentLayer),
+    queryFn: () => (focusedKeyIndex != null ? kbheDevice.getKeyGamepadMap(focusedKeyIndex) : null),
+    enabled: connected && focusedKeyIndex != null,
+    staleTime: 15_000,
+  });
 
   const layerKeycodes = useQuery({
     queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer, profileContext),
@@ -93,29 +160,58 @@ export default function Keymap() {
     return layerKeycodes.data?.[idx];
   })();
 
-  const keyLegendSlotsMap = useMemo(() => {
-    const map: Record<string, Array<ReactNode | undefined>> = {};
-    for (const key of previewKeys) {
-      map[key.id] = [...EMPTY_KEY_SLOTS];
+  const focusedGamepadSummary = (() => {
+    if (focusedKeyIndex == null || !focusedGamepadMap.data) {
+      return null;
     }
 
-    if (!connected || !layerKeycodes.data) {
-      return map;
+    const mapping = focusedGamepadMap.data;
+    const currentLayerBit = 1 << currentLayer;
+    const layerMaskAll = (1 << LAYER_COUNT) - 1;
+    const activeLayerMask = mapping.layer_mask || GAMEPAD_LAYER_MASK_ALL;
+    const mappingActiveOnLayer = (activeLayerMask & currentLayerBit) !== 0;
+    if (!mappingActiveOnLayer || (mapping.axis === 0 && mapping.button === 0)) {
+      return null;
     }
 
-    for (const [index, code] of Object.entries(layerKeycodes.data)) {
-      const numericCode = Number(code);
-      if (numericCode === HID_KEYCODES.TRANSPARENT) {
-        map[`key-${index}`] = [...EMPTY_KEY_SLOTS];
-        continue;
-      }
-
-      const fallback = HID_KEYCODE_NAMES[numericCode] ?? `0x${numericCode.toString(16)}`;
-      const legend = resolveKeycapLegend(numericCode, fallback);
-      map[`key-${index}`] = buildKeycodeLegendSlots(numericCode, legend.slots, "size-3.5");
+    const parts: string[] = [];
+    if (mapping.button !== 0) {
+      parts.push(GAMEPAD_BUTTON_NAMES[mapping.button] ?? `Button ${mapping.button}`);
     }
-    return map;
-  }, [connected, layerKeycodes.data, resolveKeycapLegend]);
+    if (mapping.axis !== 0) {
+      const axis = GAMEPAD_AXIS_NAMES[mapping.axis] ?? `Axis ${mapping.axis}`;
+      const direction = mapping.direction === GAMEPAD_DIRECTIONS["-"] ? "-" : "+";
+      parts.push(`${axis} ${direction}`);
+    }
+
+    const summary = parts.join(" + ");
+    return summary.length > 0 ? summary : null;
+  })();
+
+  const focusedGamepadSelectedCodes = (() => {
+    if (focusedKeyIndex == null || !focusedGamepadMap.data) {
+      return [];
+    }
+
+    const mapping = focusedGamepadMap.data;
+    const layerMask = mapping.layer_mask || GAMEPAD_LAYER_MASK_ALL;
+    if ((layerMask & (1 << currentLayer)) === 0) {
+      return [];
+    }
+
+    const resolved = new Set<number>();
+    const buttonCode = GAMEPAD_BUTTON_TO_KEYCODE[mapping.button];
+    if (typeof buttonCode === "number") {
+      resolved.add(buttonCode);
+    }
+
+    const axisCode = mapAxisToGamepadKeycode(mapping.axis, mapping.direction);
+    if (typeof axisCode === "number") {
+      resolved.add(axisCode);
+    }
+
+    return Array.from(resolved);
+  })();
 
   const menubar = (
     <>
@@ -123,6 +219,11 @@ export default function Keymap() {
         <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
       </div>
       <div className="flex items-center gap-2">
+        {focusedGamepadSummary && (
+          <span className="rounded-md border px-2 py-1 text-xs text-muted-foreground">
+            GP: {focusedGamepadSummary}
+          </span>
+        )}
         <AutosaveStatus state={saveState} />
         <Button variant="destructive" size="sm" className="h-8 gap-1.5" disabled={!connected}>
           <IconRestore className="size-4" />
@@ -140,11 +241,9 @@ export default function Keymap() {
           onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}
-          loading={
-            connected &&
-            ((layerKeycodes.isLoading && !layerKeycodes.data) || !resolveKeycapLegend.isReady)
-          }
+          loading={keyboardPreviewLoading}
           keyLegendSlotsMap={keyLegendSlotsMap}
+          keyLegendOverlayMap={keyLegendOverlayMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />
       }
@@ -153,6 +252,7 @@ export default function Keymap() {
       <KeycodeAccordion
         onSelect={handleKeycodeSelect}
         selectedCode={selectedCode}
+        selectedCodes={focusedGamepadSelectedCodes}
         className="h-full"
         resolveLegend={resolveKeycapLegend}
       />

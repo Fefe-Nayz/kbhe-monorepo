@@ -28,6 +28,7 @@ interface KeyboardKeyProps {
   overrideColor?: string;
   primaryLegend?: ReactNode;
   legendSlots?: Array<ReactNode | undefined>;
+  legendOverlay?: ReactNode;
   primaryLegendClassName?: string;
   primaryLegendColor?: string;
   primaryLegendFontSize?: number;
@@ -101,6 +102,7 @@ function KeyboardKeyComponent({
   overrideColor,
   primaryLegend,
   legendSlots,
+  legendOverlay,
   primaryLegendClassName,
   primaryLegendColor,
   primaryLegendFontSize,
@@ -219,11 +221,18 @@ function KeyboardKeyComponent({
     return label;
   });
 
-  const label = effectiveLegendTexts[4] || effectiveLegendTexts[0] || keyData.id;
-  const tooltipText = effectiveLegendTexts
+  const overlayLegendText = getLegendText(legendOverlay);
+
+  const label = effectiveLegendTexts[4] || effectiveLegendTexts[0] || overlayLegendText || keyData.id;
+  const tooltipParts = effectiveLegendTexts
     .filter((value): value is string => Boolean(value && value.trim().length > 0))
     .map((l) => l.replace(/\n/g, " ").trim())
-    .join(" / ");
+    .concat(
+      overlayLegendText && overlayLegendText.trim().length > 0
+        ? [overlayLegendText.replace(/\n/g, " ").trim()]
+        : [],
+    );
+  const tooltipText = Array.from(new Set(tooltipParts)).join(" / ");
   const clipId = `kle-top-clip-${reactId}`;
   const content = (
     <>
@@ -277,7 +286,10 @@ function KeyboardKeyComponent({
         </g>
       </svg>
 
-      <span className="kle-legends">{legends}</span>
+      <span className="kle-legends">
+        {legends}
+        {legendOverlay ? <span className="kle-legend-overlay">{legendOverlay}</span> : null}
+      </span>
     </>
   );
 
@@ -344,6 +356,7 @@ export const KeyboardKey = memo(KeyboardKeyComponent, (prev, next) => (
   prev.overrideColor === next.overrideColor &&
   prev.primaryLegend === next.primaryLegend &&
   prev.legendSlots === next.legendSlots &&
+  prev.legendOverlay === next.legendOverlay &&
   prev.primaryLegendClassName === next.primaryLegendClassName &&
   prev.primaryLegendColor === next.primaryLegendColor &&
   prev.primaryLegendFontSize === next.primaryLegendFontSize &&

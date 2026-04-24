@@ -183,15 +183,26 @@ function categorize(resolveLegend: (hidKeycode: number, fallbackName: string) =>
 interface KeycodeAccordionProps {
   onSelect: (code: number, name: string) => void;
   selectedCode?: number;
+  selectedCodes?: number[];
   className?: string;
   resolveLegend?: (hidKeycode: number, fallbackName: string) => KeycapLegend;
 }
 
-export function KeycodeAccordion({ onSelect, selectedCode, className, resolveLegend }: KeycodeAccordionProps) {
+export function KeycodeAccordion({ onSelect, selectedCode, selectedCodes, className, resolveLegend }: KeycodeAccordionProps) {
   const [search, setSearch] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const hookResolveKeycapLegend = useOSKeycapLegend();
   const resolveKeycapLegend = resolveLegend ?? hookResolveKeycapLegend;
+  const selectedCodesSet = useMemo(() => {
+    const merged = new Set<number>();
+    if (typeof selectedCode === "number") {
+      merged.add(selectedCode);
+    }
+    for (const code of selectedCodes ?? []) {
+      merged.add(code);
+    }
+    return merged;
+  }, [selectedCode, selectedCodes]);
 
   const categories = useMemo(() => categorize(resolveKeycapLegend), [resolveKeycapLegend]);
 
@@ -248,22 +259,25 @@ export function KeycodeAccordion({ onSelect, selectedCode, className, resolveLeg
               </AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-wrap gap-1.5 pb-2">
-                  {cat.keys.map((k) => (
+                  {cat.keys.map((k) => {
+                    const isSelected = selectedCodesSet.has(k.code);
+                    return (
                     <KeycapButton
                       key={k.code}
                       keyId={`keycode-${k.code}`}
                       legendSlots={buildKeycodeLegendSlots(k.code, k.legend.slots, "size-3.5")}
                       labelText={k.legend.text}
                       unit={KEYCODE_TILE_UNIT}
-                      selected={selectedCode === k.code}
-                      className={cn("rounded-md", selectedCode === k.code && "ring-2 ring-primary/20")}
+                      selected={isSelected}
+                      className={cn("rounded-md", isSelected && "ring-2 ring-primary/20")}
                       onClick={() => onSelect(k.code, k.legend.text)}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         onSelect(0, "NO");
                       }}
                     />
-                  ))}
+                    );
+                  })}
                 </div>
               </AccordionContent>
             </AccordionItem>

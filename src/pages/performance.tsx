@@ -81,7 +81,11 @@ export default function Performance() {
   const activeProfileIndex = useDeviceSession((s) => s.activeProfileIndex);
   const profileContext = activeProfileIndex ?? 0;
   const connected = status === "connected";
-  const { keyLegendSlotsMap, isLoading: keyboardPreviewLoading } = useKeyboardPreviewLegends();
+  const {
+    keyLegendSlotsMap,
+    keyLegendOverlayMap,
+    isLoading: keyboardPreviewLoading,
+  } = useKeyboardPreviewLegends();
   const { saveState, markSaving, markSaved, markError } = useAutosave();
 
   const selectedKeyIndexes = useMemo(() => {
@@ -464,6 +468,7 @@ export default function Performance() {
           showRotary={false}
           loading={keyboardPreviewLoading}
           keyLegendSlotsMap={keyLegendSlotsMap}
+          keyLegendOverlayMap={keyLegendOverlayMap}
           keyLegendClassName="text-[9px] leading-[1.05]"
         />
       }
