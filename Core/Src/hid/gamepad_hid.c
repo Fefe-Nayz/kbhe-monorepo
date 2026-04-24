@@ -36,6 +36,12 @@ enum {
 static gamepad_report_t gamepad_report = {0};
 static settings_gamepad_t cached_gamepad = SETTINGS_DEFAULT_GAMEPAD;
 static settings_gamepad_mapping_t cached_mappings[NUM_KEYS];
+static uint8_t cached_mapped_layers_mask = 0u;
+static uint8_t cached_layer_button_keys[SETTINGS_LAYER_COUNT][NUM_KEYS] = {{0}};
+static uint8_t cached_layer_button_key_count[SETTINGS_LAYER_COUNT] = {0};
+static uint8_t cached_layer_axis_keys[SETTINGS_LAYER_COUNT][NUM_KEYS] = {{0}};
+static uint8_t cached_layer_axis_key_count[SETTINGS_LAYER_COUNT] = {0};
+static uint8_t cached_curve_lut[GAMEPAD_CURVE_MAX_DISTANCE_01MM + 1u] = {0};
 static volatile bool gamepad_report_changed = false;
 static bool gamepad_enabled = true;
 static uint8_t custom_button_counts[KBHE_GAMEPAD_BUTTON_HOME + 1u] = {0};
@@ -83,6 +89,38 @@ static uint32_t gamepad_get_custom_buttons_mask(void) {
   }
 
   return buttons;
+}
+
+static bool gamepad_has_custom_axis_activity(void) {
+  for (uint8_t axis = (uint8_t)GAMEPAD_AXIS_LEFT_X;
+       axis <= (uint8_t)GAMEPAD_AXIS_TRIGGER_R; axis++) {
+    if (custom_axis_counts[axis][0] > 0u || custom_axis_counts[axis][1] > 0u) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static void gamepad_clear_cached_mapping_indices(void) {
+  cached_mapped_layers_mask = 0u;
+  memset(cached_layer_button_key_count, 0, sizeof(cached_layer_button_key_count));
+  memset(cached_layer_axis_key_count, 0, sizeof(cached_layer_axis_key_count));
+}
+
+static void gamepad_rebuild_curve_lut(void) {
+  for (uint16_t distance_01mm = 0u;
+       distance_01mm <= GAMEPAD_CURVE_MAX_DISTANCE_01MM; distance_01mm++) {
+    cached_curve_lut[distance_01mm] = settings_gamepad_apply_curve(distance_01mm);
+  }
+}
+
+static inline uint8_t gamepad_apply_curve_cached(uint16_t distance_01mm) {
+  if (distance_01mm > GAMEPAD_CURVE_MAX_DISTANCE_01MM) {
+    return cached_curve_lut[GAMEPAD_CURVE_MAX_DISTANCE_01MM];
+  }
+
+  return cached_curve_lut[distance_01mm];
 }
 
 static inline int16_t gamepad_clamp_axis_i16(int32_t value) {
@@ -355,6 +393,8 @@ static void gamepad_build_hid_report(const gamepad_report_t *source,
 
 void gamepad_hid_init(void) {
   memset(cached_mappings, 0, sizeof(cached_mappings));
+  gamepad_clear_cached_mapping_indices();
+  gamepad_rebuild_curve_lut();
   cached_gamepad = (settings_gamepad_t)SETTINGS_DEFAULT_GAMEPAD;
   gamepad_report = gamepad_neutral_report();
   prev_gamepad_hid_report = gamepad_neutral_hid_report();
@@ -370,14 +410,55 @@ void gamepad_hid_reload_settings(void) {
 
   if (settings == NULL) {
     cached_gamepad = (settings_gamepad_t)SETTINGS_DEFAULT_GAMEPAD;
+    gamepad_clear_cached_mapping_indices();
     memset(cached_mappings, 0, sizeof(cached_mappings));
+    gamepad_rebuild_curve_lut();
     return;
   }
 
   memcpy(&cached_gamepad, &settings->gamepad, sizeof(cached_gamepad));
+  gamepad_clear_cached_mapping_indices();
+
   for (uint8_t key = 0; key < NUM_KEYS; key++) {
+    bool has_button_mapping = false;
+    bool has_axis_mapping = false;
+    uint8_t layer_mask = 0u;
+
     cached_mappings[key] = settings->keys[key].gamepad_map;
+    has_button_mapping = gamepad_is_valid_button_id(cached_mappings[key].button);
+    has_axis_mapping = gamepad_is_valid_axis_id(cached_mappings[key].axis);
+
+    if (!has_button_mapping && !has_axis_mapping) {
+      continue;
+    }
+
+    layer_mask = settings_gamepad_mapping_get_layer_mask(&cached_mappings[key]);
+    cached_mapped_layers_mask |= layer_mask;
+
+    for (uint8_t layer = 0u; layer < SETTINGS_LAYER_COUNT; layer++) {
+      if ((layer_mask & ((uint8_t)1u << layer)) == 0u) {
+        continue;
+      }
+
+      if (has_button_mapping) {
+        uint8_t index = cached_layer_button_key_count[layer];
+        if (index < NUM_KEYS) {
+          cached_layer_button_keys[layer][index] = key;
+          cached_layer_button_key_count[layer] = (uint8_t)(index + 1u);
+        }
+      }
+
+      if (has_axis_mapping) {
+        uint8_t index = cached_layer_axis_key_count[layer];
+        if (index < NUM_KEYS) {
+          cached_layer_axis_keys[layer][index] = key;
+          cached_layer_axis_key_count[layer] = (uint8_t)(index + 1u);
+        }
+      }
+    }
   }
+
+  gamepad_rebuild_curve_lut();
 }
 
 void gamepad_hid_refresh_state(void) {
@@ -385,6 +466,11 @@ void gamepad_hid_refresh_state(void) {
   uint8_t positive[GAMEPAD_AXIS_TRIGGER_R + 1u] = {0};
   uint8_t negative[GAMEPAD_AXIS_TRIGGER_R + 1u] = {0};
   uint8_t active_layer = layout_get_active_layer_top();
+  uint32_t custom_buttons = 0u;
+  bool custom_axis_active = false;
+  bool layer_has_mapping = false;
+  uint8_t layer_button_key_count = 0u;
+  uint8_t layer_axis_key_count = 0u;
   int16_t left_x = 0;
   int16_t left_y = 0;
   int16_t right_x = 0;
@@ -395,42 +481,49 @@ void gamepad_hid_refresh_state(void) {
     return;
   }
 
-  for (uint8_t key = 0; key < NUM_KEYS; key++) {
-    const settings_gamepad_mapping_t *mapping = &cached_mappings[key];
-    uint16_t distance_01mm = 0u;
-    uint8_t analog_value = 0u;
+  if (active_layer >= SETTINGS_LAYER_COUNT) {
+    active_layer = 0u;
+  }
 
-    if (!settings_gamepad_mapping_is_active_on_layer(mapping, active_layer)) {
-      continue;
-    }
+  custom_buttons = gamepad_get_custom_buttons_mask();
+  custom_axis_active = gamepad_has_custom_axis_activity();
+  layer_has_mapping = (cached_mapped_layers_mask & ((uint8_t)1u << active_layer)) != 0u;
 
-    if (mapping->button > GAMEPAD_BUTTON_NONE &&
-        mapping->button <= GAMEPAD_BUTTON_HOME &&
-        trigger_get_key_state(key) == PRESSED) {
-      uint8_t bit_index = (uint8_t)(mapping->button - 1u);
-      if (bit_index < GAMEPAD_BUTTON_BIT_COUNT) {
+  if (!layer_has_mapping && custom_buttons == 0u && !custom_axis_active) {
+    gamepad_store_report(&next_report);
+    return;
+  }
+
+  if (layer_has_mapping) {
+    layer_button_key_count = cached_layer_button_key_count[active_layer];
+    for (uint8_t index = 0u; index < layer_button_key_count; index++) {
+      uint8_t key = cached_layer_button_keys[active_layer][index];
+      const settings_gamepad_mapping_t *mapping = &cached_mappings[key];
+
+      if (trigger_get_key_state(key) == PRESSED) {
+        uint8_t bit_index = (uint8_t)(mapping->button - 1u);
         next_report.buttons |= (uint32_t)1u << bit_index;
       }
     }
 
-    if (mapping->axis <= GAMEPAD_AXIS_NONE ||
-        mapping->axis > GAMEPAD_AXIS_TRIGGER_R) {
-      continue;
-    }
+    layer_axis_key_count = cached_layer_axis_key_count[active_layer];
+    for (uint8_t index = 0u; index < layer_axis_key_count; index++) {
+      uint8_t key = cached_layer_axis_keys[active_layer][index];
+      const settings_gamepad_mapping_t *mapping = &cached_mappings[key];
+      uint16_t distance_01mm = trigger_get_distance_01mm(key);
+      uint8_t analog_value = gamepad_apply_curve_cached(distance_01mm);
 
-    distance_01mm = trigger_get_distance_01mm(key);
-    analog_value = settings_gamepad_apply_curve(distance_01mm);
-
-    if (mapping->direction == (uint8_t)GAMEPAD_DIR_NEGATIVE) {
-      negative[mapping->axis] =
-          gamepad_max_u8(negative[mapping->axis], analog_value);
-    } else {
-      positive[mapping->axis] =
-          gamepad_max_u8(positive[mapping->axis], analog_value);
+      if (mapping->direction == (uint8_t)GAMEPAD_DIR_NEGATIVE) {
+        negative[mapping->axis] =
+            gamepad_max_u8(negative[mapping->axis], analog_value);
+      } else {
+        positive[mapping->axis] =
+            gamepad_max_u8(positive[mapping->axis], analog_value);
+      }
     }
   }
 
-  next_report.buttons |= gamepad_get_custom_buttons_mask();
+  next_report.buttons |= custom_buttons;
 
   for (uint8_t axis = (uint8_t)GAMEPAD_AXIS_LEFT_X;
        axis <= (uint8_t)GAMEPAD_AXIS_TRIGGER_R; axis++) {
