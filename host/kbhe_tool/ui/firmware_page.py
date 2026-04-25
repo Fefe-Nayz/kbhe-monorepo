@@ -58,7 +58,7 @@ class FirmwarePageMixin:
 
     def create_firmware_widgets(self, parent):
         """Create firmware update widgets with file picker and live logs."""
-        default_bin = pathlib.Path(__file__).resolve().parents[2] / "build" / "Release" / "kbhe.bin"
+        default_bin = pathlib.Path(__file__).resolve().parents[3] / "build" / "Release" / "kbhe.bin"
 
         self.firmware_busy = getattr(self, "firmware_busy", False)
         self.firmware_log_queue = getattr(self, "firmware_log_queue", queue.Queue())
