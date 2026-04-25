@@ -20,14 +20,15 @@ Le clavier expose une interface RAW HID qui sert de canal de controle entre le f
 
 ## Architecture du depot
 
-- `Core/`: firmware principal (application)
-- `Bootloader/`: bootloader custom de mise a jour
-- `kbhe_tool/`: librairie Python de communication + GUI Qt
-- `raw_hid.py`: point d'entree CLI principal
-- `firmware_updater.py`: protocole de flash updater (PID dedie)
-- `adc_capture_cli.py`, `value_extractor.py`, `regression.py`, `lut_extractor.py`: outils d'analyse/calibration
+- `firmware/`: build embarque STM32, firmware principal, bootloader, HAL/CMSIS, TinyUSB et linker scripts
+- `host/`: librairie Python de communication + GUI Qt, CLI RAW HID et updater firmware
+- `analysis/`: scripts d'analyse/calibration ADC, regression et generation LUT
+- `layouts/`: layouts clavier JSON
+- `data/`: captures et jeux de donnees de mesure
+- `integrations/`: integrations externes comme SignalRGB et le package React KLE
 - `docs/RAW_HID_PROTOCOL.MD`: reference de protocole RAW HID
-- `CMakeLists.txt`, `CMakePresets.json`: build embedded (Debug/Release/AppOnly)
+- `CMakeLists.txt`, `CMakePresets.json`: wrapper de build firmware depuis la racine
+- `.github/workflows/firmware.yml`: CI firmware + publication des releases taguees
 
 ## Fonctionnalites principales (detaillees)
 
@@ -101,7 +102,7 @@ Le clavier expose une interface RAW HID qui sert de canal de controle entre le f
 Commande d'entree :
 
 ```powershell
-python raw_hid.py
+python host/raw_hid.py
 ```
 
 Options principales :
@@ -126,11 +127,11 @@ Le configurateur offre des pages dediees :
 
 ### Scripts d'analyse
 
-- `adc_capture_cli.py` : capture ADC brute/filtree et export CSV
-- `value_extractor.py` : extraction de points ADC <-> distance
-- `regression.py` : ajustements mathematiques et comparaison de modeles
-- `lut_extractor.py` : generation/validation LUT depuis modeles et CSV
-- `parse_adc_data.py` / `analysis_data.py` : conversion et analyse rapide
+- `host/adc_capture_cli.py` : capture ADC brute/filtree et export CSV
+- `analysis/value_extractor.py` : extraction de points ADC <-> distance
+- `analysis/regression.py` : ajustements mathematiques et comparaison de modeles
+- `analysis/lut_extractor.py` : generation/validation LUT depuis modeles et CSV
+- `analysis/parse_adc_data.py` / `analysis/analysis_data.py` : conversion et analyse rapide
 
 ## Build firmware
 
@@ -146,6 +147,12 @@ Exemple :
 
 ```powershell
 cmake --preset Release
+cmake --build --preset Release
+```
+
+Apres une premiere configuration, le build courant se lance directement avec :
+
+```powershell
 cmake --build --preset Release
 ```
 
@@ -202,7 +209,7 @@ pip install hidapi
 Puis lancer :
 
 ```powershell
-python raw_hid.py --flash build/Release/kbhe.bin
+python host/raw_hid.py --flash build/Release/kbhe.bin
 ```
 
 Cette etape finalise l'image applicative avec le cycle updater complet.
@@ -212,7 +219,7 @@ Cette etape finalise l'image applicative avec le cycle updater complet.
 Apres installation initiale, utiliser directement :
 
 ```powershell
-python raw_hid.py --flash build/Release/kbhe.bin
+python host/raw_hid.py --flash build/Release/kbhe.bin
 ```
 
 Pas besoin de repasser par la procedure complete CubeProgrammer.
@@ -235,6 +242,18 @@ Exemple rapide :
 
 ```powershell
 pip install hidapi PySide6 numpy matplotlib pandas
+```
+
+## CI/CD GitHub
+
+Le workflow `.github/workflows/firmware.yml` construit automatiquement `Release` et `Release-apponly` sur chaque push vers `main`, pull request et lancement manuel.
+
+- Les artifacts de build sont disponibles dans l'onglet Actions.
+- Pour publier une release GitHub, pousser un tag `v*`, par exemple :
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 ## Documentation complementaire

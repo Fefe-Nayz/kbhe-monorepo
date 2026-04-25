@@ -18,20 +18,20 @@ New identity commands:
 Flash the application image with the integrated updater command:
 
 ```bash
-python raw_hid.py --flash build/Release/kbhe.bin
+python host/raw_hid.py --flash build/Release/kbhe.bin
 ```
 
 Optional arguments:
 
 ```bash
-python raw_hid.py --flash build/Release/kbhe.bin --fw-version 0x0102 --timeout 5 --retries 5
+python host/raw_hid.py --flash build/Release/kbhe.bin --fw-version 0x0102 --timeout 5 --retries 5
 ```
 
 ### GUI
 Launch the keyboard configurator GUI:
 
 ```bash
-python raw_hid.py --gui
+python host/raw_hid.py --gui
 ```
 
 The GUI now includes a dedicated `Firmware` page with:

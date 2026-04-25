@@ -95,14 +95,14 @@ def align_up(value, align):
 
 
 def read_default_fw_version():
-    settings_path = pathlib.Path(__file__).resolve().parent / "Core" / "Src" / "settings.c"
+    settings_path = pathlib.Path(__file__).resolve().parent.parent / "firmware" / "Core" / "Src" / "settings.c"
     if not settings_path.exists():
-        raise RuntimeError("could not locate Core/Src/settings.c for firmware version autodetect")
+        raise RuntimeError("could not locate firmware/Core/Src/settings.c for firmware version autodetect")
 
     text = settings_path.read_text(encoding="utf-8", errors="replace")
     match = re.search(r"#define\s+FIRMWARE_VERSION\s+(0x[0-9A-Fa-f]+|\d+)", text)
     if not match:
-        raise RuntimeError("could not parse FIRMWARE_VERSION from Core/Src/settings.c")
+        raise RuntimeError("could not parse FIRMWARE_VERSION from firmware/Core/Src/settings.c")
 
     return int(match.group(1), 0)
 
@@ -378,7 +378,7 @@ def parse_args():
         "--fw-version",
         type=lambda value: int(value, 0),
         default=None,
-        help="Firmware version to store in the updater trailer (default: read FIRMWARE_VERSION from Core/Src/settings.c)",
+        help="Firmware version to store in the updater trailer (default: read FIRMWARE_VERSION from firmware/Core/Src/settings.c)",
     )
     parser.add_argument(
         "--timeout",

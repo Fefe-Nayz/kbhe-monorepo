@@ -9,7 +9,7 @@ _UPDATER_TRAILER_MAGIC = 0x55445452
 _UPDATER_TRAILER_MAGIC_BYTES = struct.pack("<I", _UPDATER_TRAILER_MAGIC)
 _UPDATER_TRAILER_STRUCT = struct.Struct("<IIIHHI")
 
-# Mirrors Core/Inc/updater_shared.h
+# Mirrors firmware/Core/Inc/updater_shared.h
 _UPDATER_APP_SLOT_SIZE = 0x00050000
 _UPDATER_TRAILER_RESERVED_SIZE = 0x00000100
 _UPDATER_APP_MAX_IMAGE_SIZE = _UPDATER_APP_SLOT_SIZE - _UPDATER_TRAILER_RESERVED_SIZE
@@ -30,7 +30,7 @@ _RELEASE_NEXT_FN_PREFIXES = (
 
 def _read_repo_firmware_version() -> int | None:
     repo_root = pathlib.Path(__file__).resolve().parent.parent
-    settings_path = repo_root / "Core" / "Src" / "settings.c"
+    settings_path = repo_root.parent / "firmware" / "Core" / "Src" / "settings.c"
     if not settings_path.exists():
         return None
 
@@ -285,7 +285,7 @@ def resolve_firmware_version(firmware_path: str | pathlib.Path, explicit_version
     repo_version = _read_repo_firmware_version()
     if repo_version is not None:
         suffix = "after ambiguous binary signature" if code_signature_error is not None else "repo source fallback"
-        return repo_version, f"Core/Src/settings.c ({suffix})"
+        return repo_version, f"firmware/Core/Src/settings.c ({suffix})"
 
     if code_signature_error is not None:
         raise code_signature_error

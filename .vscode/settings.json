@@ -1,11 +1,13 @@
 {
     "cmake.cmakePath": "cube-cmake",
+    "cmake.useCMakePresets": "always",
     "cmake.configureArgs": [
         "-DCMAKE_COMMAND=cube-cmake"
     ],
     "cmake.preferredGenerators": [
         "Ninja"
     ],
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/Release/compile_commands.json",
     "stm32cube-ide-clangd.path": "cube",
     "stm32cube-ide-clangd.arguments": [
         "starm-clangd",

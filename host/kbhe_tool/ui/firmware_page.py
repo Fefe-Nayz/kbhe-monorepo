@@ -118,7 +118,7 @@ class FirmwarePageMixin:
         options_intro.pack(fill=tk.X, pady=(0, 8))
         ttk.Label(
             options_intro,
-            text="Leave firmware version blank to auto-read Core/Src/settings.c.",
+            text="Leave firmware version blank to auto-read firmware/Core/Src/settings.c.",
             style="SurfaceSubtle.TLabel",
             wraplength=980,
             justify=tk.LEFT,
@@ -270,7 +270,7 @@ class FirmwarePageMixin:
             messagebox.showerror("Invalid firmware options", str(exc))
             return
 
-        version_label = version_text if version_text else "auto-detect from Core/Src/settings.c"
+        version_label = version_text if version_text else "auto-detect from firmware/Core/Src/settings.c"
         confirm = messagebox.askyesno(
             "Confirm firmware flash",
             f"Flash the selected firmware image?\n\n"
