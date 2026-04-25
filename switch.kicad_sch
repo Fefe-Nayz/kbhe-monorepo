@@ -5,7 +5,7 @@
 	(uuid "05df3e7e-0ed0-4886-8f3a-be429e5050a3")
 	(paper "A4")
 	(lib_symbols
-		(symbol "70HE:Switch_1.25U"
+		(symbol "75HE:Switch_1.25U"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -79,7 +79,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "70HE:Switch_1.5U"
+		(symbol "75HE:Switch_1.5U"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -153,7 +153,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "70HE:Switch_1.75U"
+		(symbol "75HE:Switch_1.75U"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -227,7 +227,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "70HE:Switch_1U"
+		(symbol "75HE:Switch_1U"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -301,7 +301,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "70HE:Switch_2U"
+		(symbol "75HE:Switch_2U"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -375,7 +375,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "70HE:Switch_6.25U"
+		(symbol "75HE:Switch_6.25U"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -451,7 +451,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1.25U")
+		(lib_id "75HE:Switch_1.25U")
 		(at 30.48 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -533,7 +533,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_6.25U")
+		(lib_id "75HE:Switch_6.25U")
 		(at 82.55 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -615,7 +615,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 207.01 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -697,7 +697,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 151.13 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -779,7 +779,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 44.45 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -861,7 +861,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 162.56 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -943,7 +943,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 72.39 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -1025,7 +1025,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 76.2 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -1107,7 +1107,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 156.21 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -1189,7 +1189,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 55.88 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -1271,7 +1271,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 189.23 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -1353,7 +1353,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 207.01 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -1435,7 +1435,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 167.64 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -1517,7 +1517,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 144.78 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -1599,7 +1599,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 139.7 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -1681,7 +1681,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 60.96 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -1763,7 +1763,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 116.84 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -1845,7 +1845,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 138.43 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -1927,7 +1927,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1.5U")
+		(lib_id "75HE:Switch_1.5U")
 		(at 30.48 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -2009,7 +2009,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 76.2 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -2091,7 +2091,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 144.78 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -2173,7 +2173,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 207.01 102.87 0)
 		(unit 1)
 		(body_style 1)
@@ -2255,7 +2255,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 87.63 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -2337,7 +2337,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 105.41 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -2419,7 +2419,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 110.49 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -2501,7 +2501,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 127 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -2583,7 +2583,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 93.98 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -2665,7 +2665,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1.75U")
+		(lib_id "75HE:Switch_1.75U")
 		(at 175.26 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -2747,7 +2747,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 128.27 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -2829,7 +2829,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 167.64 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -2911,7 +2911,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 129.54 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -2993,7 +2993,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 152.4 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -3075,7 +3075,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 41.91 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -3157,7 +3157,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 207.01 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -3239,7 +3239,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 133.35 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -3321,7 +3321,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 121.92 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -3403,7 +3403,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 30.48 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -3485,7 +3485,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 110.49 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -3567,7 +3567,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1.75U")
+		(lib_id "75HE:Switch_1.75U")
 		(at 30.48 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -3649,7 +3649,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1.25U")
+		(lib_id "75HE:Switch_1.25U")
 		(at 30.48 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -3731,7 +3731,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 104.14 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -3813,7 +3813,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 149.86 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -3895,7 +3895,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 181.61 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -3977,7 +3977,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 163.83 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -4059,7 +4059,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 53.34 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -4141,7 +4141,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 69.85 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -4223,7 +4223,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 99.06 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -4305,7 +4305,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 179.07 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -4387,7 +4387,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 67.31 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -4469,7 +4469,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 58.42 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -4551,7 +4551,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 49.53 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -4633,7 +4633,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 83.82 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -4715,7 +4715,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 110.49 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -4797,7 +4797,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 162.56 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -4879,7 +4879,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 140.97 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -4961,7 +4961,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 46.99 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -5043,7 +5043,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1.25U")
+		(lib_id "75HE:Switch_1.25U")
 		(at 58.42 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -5125,7 +5125,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 156.21 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -5207,7 +5207,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 87.63 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -5289,7 +5289,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 81.28 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -5371,7 +5371,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 53.34 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -5453,7 +5453,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 194.31 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -5535,7 +5535,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 30.48 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -5617,7 +5617,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 175.26 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -5699,7 +5699,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 64.77 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -5781,7 +5781,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 118.11 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -5863,7 +5863,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 115.57 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -5945,7 +5945,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 121.92 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -6027,7 +6027,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 133.35 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -6109,7 +6109,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 127 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -6191,7 +6191,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 194.31 114.3 0)
 		(unit 1)
 		(body_style 1)
@@ -6273,7 +6273,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 41.91 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -6355,7 +6355,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 80.01 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -6437,7 +6437,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 173.99 90.17 0)
 		(unit 1)
 		(body_style 1)
@@ -6519,7 +6519,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 64.77 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -6601,7 +6601,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 142.24 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -6683,7 +6683,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 92.71 110.49 0)
 		(unit 1)
 		(body_style 1)
@@ -6765,7 +6765,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 106.68 101.6 0)
 		(unit 1)
 		(body_style 1)
@@ -6847,7 +6847,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_2U")
+		(lib_id "75HE:Switch_2U")
 		(at 181.61 77.47 0)
 		(unit 1)
 		(body_style 1)
@@ -6929,7 +6929,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 99.06 64.77 0)
 		(unit 1)
 		(body_style 1)
@@ -7011,7 +7011,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1.25U")
+		(lib_id "75HE:Switch_1.25U")
 		(at 44.45 121.92 0)
 		(unit 1)
 		(body_style 1)
@@ -7093,7 +7093,7 @@
 		)
 	)
 	(symbol
-		(lib_id "70HE:Switch_1U")
+		(lib_id "75HE:Switch_1U")
 		(at 95.25 101.6 0)
 		(unit 1)
 		(body_style 1)

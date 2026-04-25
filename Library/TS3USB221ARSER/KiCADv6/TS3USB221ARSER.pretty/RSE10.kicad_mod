@@ -108,4 +108,9 @@
   (pad "8" smd rect (at 0.7274 -0.25 90) (size 0.249936 0.70485) (layers "F.Cu" "F.Paste" "F.Mask"))
   (pad "9" smd rect (at 0.7274 -0.750001 90) (size 0.3 0.7048) (layers "F.Cu" "F.Paste" "F.Mask"))
   (pad "10" smd rect (at 0 -0.952444) (size 0.350012 0.754888) (layers "F.Cu" "F.Paste" "F.Mask"))
+  (model "${KIPRJMOD}/Library/TS3USB221ARSER/3D/TS3USB221ARSER.stp"
+    (offset (xyz 0 0 0))
+    (scale (xyz 1 1 1))
+    (rotate (xyz 0 0 0))
+  )
 )

@@ -3,6 +3,7 @@
 # Fichiers temporaires et de verrouillage
 *.lck
 *.lock
+~*.kicad_*
 *_autosave*
 
 # Fichiers de sauvegarde (Backups)
@@ -10,6 +11,8 @@
 *.kicad_pcb-bak
 *.sch-bak
 *-bak
+/75he-backups/
+/production/backups/
 
 # Cache des empreintes (Footprint cache)
 fp-info-cache
@@ -24,9 +27,21 @@ fp-info-cache
 /plot/
 /bom/
 /fabrication/
+/fabrication_check/
+/analysis_exports/
+/plots/
+/plots_after/
+/plots_current/
+/tmp/
+/production/
+/production/*.zip
+/75he.step
+/75he.stl
+/fabrication-toolkit-options.json
 *.gbr
 *.drl
 *.pos
+*.ipc
 *.rpt
 *.csv
 *.xml

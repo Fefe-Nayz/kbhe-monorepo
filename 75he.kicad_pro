@@ -497,8 +497,12 @@
     }
   },
   "libraries": {
-    "pinned_footprint_libs": [],
-    "pinned_symbol_libs": []
+    "pinned_footprint_libs": [
+      "75HE"
+    ],
+    "pinned_symbol_libs": [
+      "75HE"
+    ]
   },
   "meta": {
     "filename": "75he.kicad_pro",

@@ -348,4 +348,15 @@
 		(uuid "de113e94-39fe-4704-985a-5ca60093b368")
 	)
 	(embedded_fonts no)
+	(model "${KIPRJMOD}/Library/TPS7A4701RGWR/3D/TPS7A4701RGWT.stp"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
 )

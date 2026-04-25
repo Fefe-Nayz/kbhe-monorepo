@@ -300,7 +300,7 @@
 		(uuid "737a7da0-a6f6-4477-a723-86637f53eaab")
 	)
 	(embedded_fonts no)
-	(model "SN74LV4051APWR.stp"
+	(model "${KIPRJMOD}/Library/SN74LV4051APWR/3D/SN74LV4051APWR.stp"
 		(offset
 			(xyz 0 0 0)
 		)

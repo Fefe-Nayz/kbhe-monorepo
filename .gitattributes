@@ -1,3 +1,25 @@
+# KiCad project text files
+.gitattributes text eol=lf
+*.kicad_pro text eol=lf
+*.kicad_sch text eol=lf
+*.kicad_pcb text eol=lf
+*.kicad_dru text eol=lf
+*.kicad_mod text eol=lf
+*.kicad_sym text eol=lf
+fp-lib-table text eol=lf
+sym-lib-table text eol=lf
+*.md text eol=lf
+
+# Binary/generated artifacts
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.zip binary
+*.step binary
+*.stp binary
+*.stl binary
+*.wrl binary
 *.3mf filter=lfs diff=lfs merge=lfs -text
 *.f3d filter=lfs diff=lfs merge=lfs -text
 *.f3z filter=lfs diff=lfs merge=lfs -text

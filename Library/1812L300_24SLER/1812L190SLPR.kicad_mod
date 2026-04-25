@@ -26,7 +26,7 @@
   (fp_arc (start -4 -0) (end -4.000 0.1) (angle -180) (layer F.SilkS) (width 0.2))
   (pad 1 smd rect (at -2.615 -0 0) (size 1.780 3.150) (layers F.Cu F.Paste F.Mask))
   (pad 2 smd rect (at 2.615 -0 0) (size 1.780 3.150) (layers F.Cu F.Paste F.Mask))
-  (model 1812L300_24SLER.stp
+  (model "${KIPRJMOD}/Library/1812L300_24SLER/3D/1812L300_24SLER.stp"
     (at (xyz 0 0 0))
     (scale (xyz 1 1 1))
     (rotate (xyz 0 0 0))

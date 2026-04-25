@@ -472,4 +472,15 @@
 		(uuid "f0cfa6e5-b6bb-47c1-b76d-f8b2f80f2c8d")
 	)
 	(embedded_fonts no)
+	(model "${KIPRJMOD}/Library/LDL1117S33R/3D/LDL1117S33R.stp"
+		(offset
+			(xyz -3.25 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz -90 0 0)
+		)
+	)
 )

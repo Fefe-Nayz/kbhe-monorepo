@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "PCM_JLCPCB-Diodes") (type "KiCad") (uri "${KIPRJMOD}/../../Library/PCM_JLCPCB/symbols/JLCPCB-Diodes.kicad_sym") (options "") (descr "Repository-local JLCPCB diode symbols"))
+)
