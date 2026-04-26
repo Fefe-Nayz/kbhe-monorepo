@@ -2,53 +2,59 @@
 
 KBHE is a Hall effect keyboard project packaged as one product monorepo: STM32 firmware, the Tauri desktop configurator, the 75HE KiCad PCB, and the mechanical 3D files live together with the documentation needed to build and maintain them.
 
-**CAD full assembly (v13)**
+**CAD: full assembly (v13)**
 
-![75HE assembly render](assets/photos/cad-assembly/75he-assembly-render-v13.png)
+![Mechanical assembly CAD v13](assets/cad/75he-mechanical/mech-cad-assembly-v13.png)
 
-**Photo: assembled 75% (RGB)**
+**Assembled 75% keyboard (pudding caps, RGB)**
 
-![75HE photo assembled with RGB backlit](assets/photos/keyboard-build/75he-assembled-rgb-2026-04-20.png)
+![Assembled 75HE with transparent RGB keycaps](assets/photos/product/75he-assembled-pudding-rgb.png)
 
-## 75HE v1.0 PCB (real photos)
+## TIPE presentation (synoptic, report, part drawing)
 
-| Top (soldered components) | Bottom (solder side, hand-held) |
+Sourced materials for the TIPE deliverables: synoptic, English summary, part naming drawing, a short workbench video clip.
+
+- [tipe-synoptique.pdf](assets/presentation/tipe-synoptique.pdf) — project synoptic
+- [tipe-english-paper.pdf](assets/presentation/tipe-english-paper.pdf) — short English paper
+- [tipe-drawing-part-labels.pdf](assets/presentation/tipe-drawing-part-labels.pdf) — drawing, part / reference labels
+- [tipe-bench-clip.mp4](assets/presentation/tipe-bench-clip.mp4) — short bench / lab clip
+
+## 75HE v1.0 main PCB (photographs)
+
+| Top: switches + per-key RGB | Bottom: solder side (hand) |
 | --- | --- |
-| ![75HE v1.0 top photo](assets/photos/keyboard-pcb/75he-v1-0-pcb-top-photo-2026-04-08.jpeg) | ![75HE v1.0 bottom photo](assets/photos/keyboard-pcb/75he-v1-0-pcb-bottom-in-hand-2026-04-08.jpeg) |
+| ![75HE PCB top](assets/photos/pcb-75he/75he-pcb-top-switches-and-leds.jpg) | ![75HE PCB bottom](assets/photos/pcb-75he/75he-pcb-bottom-solder-side-handheld.jpg) |
 
 ## Final 75HE PCB (full board, KiCad 3D)
 
-Renders of the main production board (component side and solder side), as exported from the KiCad project in `hardware/pcb/75he/Assets/`.
+Renders of the main production board, exported from the KiCad project in `hardware/pcb/75he/Assets/`.
 
 | Top (component side) | Bottom (solder side) |
 | --- | --- |
-| ![75HE PCB top](hardware/pcb/75he/Assets/75he-front.png) | ![75HE PCB bottom](hardware/pcb/75he/Assets/75he-back.png) |
+| ![75HE PCB top KiCad 3D](hardware/pcb/75he/Assets/75he-front.png) | ![75HE PCB bottom KiCad 3D](hardware/pcb/75he/Assets/75he-back.png) |
 
-## Build and lab photos
+## Prototyping: fabrication, plates, 3D prints
 
-Real hardware alongside CAD: plate, printed case, 3D print, MCU breakout, 6-key hall test board, and the TIPE HE v0.1 multiplexer board.
-
-| Plate + 3D-printed case | FDM print in progress on the build plate |
-| --- | --- |
-| ![75% metal plate and printed top](assets/photos/keyboard-build/plate-and-3d-top-case-2026-04-16.jpg) | ![Keyboard part printing on 3D printer](assets/photos/keyboard-build/fdm-print-on-build-plate-2026-04-16.jpg) |
-
-| MCU test PCB (STLink + DFU) | 6-key hall test board (wired) |
-| --- | --- |
-| ![MCU test PCB with STLink and DFU](assets/photos/mcu-dev-board/mcu-test-pcb-stlink-dfu-2026-04-25.jpg) | ![6-key hall test board with harness](assets/photos/legacy-proto/6key-hall-test-board-wired-2026-04-25.jpg) |
-
-| MCU test PCB, USB/DFU (top) | MCU test PCB, DFU + wire harness |
-| --- | --- |
-| ![MCU top USB / DFU](assets/photos/mcu-dev-board/mcu-test-pcb-top-usb-2026-04-25.jpg) | ![MCU DFU, USB-C, flying wires](assets/photos/mcu-dev-board/mcu-test-pcb-top-dfu-usb-c-wired-2026-04-26.jpg) |
-
-**« TIPE Keyboard HE v0.1 »** (CD74HC4067 + six hall inputs, wired for bench tests)
-
-![Tipe v0.1 board wired](assets/photos/legacy-proto/keyboard-he-v0-1-multiplexer-wired-2026-04-26.jpg)
-
-## TIPE workshop, 14 Apr 2026 (session photos)
-
-| Atelier (1) | Atelier (2) | Atelier (3) |
+| Metal plate and 3D-printed top bezel | FDM: case half on the build plate | Printed set: top bezel, switch plate, bottom (75HE embossed) |
 | --- | --- | --- |
-| ![Tipe workshop 1](assets/photos/workshop-2026-04-14/tipe-workshop-2026-04-14-01.jpg) | ![Tipe workshop 2](assets/photos/workshop-2026-04-14/tipe-workshop-2026-04-14-02.jpg) | ![Tipe workshop 3](assets/photos/workshop-2026-04-14/tipe-workshop-2026-04-14-03.jpg) |
+| ![Plate and top bezel](assets/photos/fdm-fabrication/metal-plate-3d-printed-top-bezel.jpg) | ![FDM print in progress](assets/photos/fdm-fabrication/fdm-ongoing-keyboard-case-half-on-build-plate.jpg) | ![Case parts with embossed 75HE](assets/photos/fdm-fabrication/3d-printed-case-top-plate-bottom-75he-embossed-logo.jpg) |
+
+## STM32 breakout, hall prototypes, and TIPE v0.1 bench setup
+
+| STM32 test PCB: STLink + DFU silk | STM32: USB-C, DFU area (top) | STM32: bench, USB-C, DFU + flying wires |
+| --- | --- | --- |
+| ![STLink and DFU labels](assets/photos/pcb-mcu-breakout/stm32-breakout-stlink-silk-dfu-pads.jpg) | ![USB-C and DFU](assets/photos/pcb-mcu-breakout/stm32-breakout-top-usb-c-connector-dfu.jpg) | ![Cabled on bench](assets/photos/pcb-mcu-breakout/stm32-breakout-bench-dfu-usb-c-wired-harness.jpg) |
+
+| 6-key Hall bench PCB | **TIPE Keyboard HE** v0.1 (CD74HC4067) — bench wiring | v0.1 Hall analog board **cabled to** STM32 breakout |
+| --- | --- | --- |
+| ![6 key hall](assets/photos/prototypes/6key-hall-bench-pcb-wired-harness.jpg) | ![TIPE v0.1 one board](assets/photos/prototypes/tipe-hall-v0-1-analog-frontend-pcb-bench-wired.jpg) | ![v0.1 to MCU](assets/photos/prototypes/tipe-hall-v0-1-bench-cabled-to-stm32-breakout.jpg) |
+
+## TIPE research bench and lab (wide stills)
+
+| At the bench (1) | At the bench (2) | At the bench (3) |
+| --- | --- | --- |
+| ![Bench 1](assets/photos/tipe-lab/bench-session-wide-1.jpg) | ![Bench 2](assets/photos/tipe-lab/bench-session-wide-2.jpg) | ![Bench 3](assets/photos/tipe-lab/bench-session-wide-3.jpg) |
+
 
 ## First-time board programming (STM32CubeProgrammer, DFU)
 
@@ -62,10 +68,10 @@ The **first** time you program a **blank** board you need a Release build, the p
 - `apps/configurator/` - Tauri desktop configurator for key settings, calibration, lighting, firmware flashing and app updates.
 - `hardware/pcb/75he/` - KiCad PCB project with project-local libraries, 3D models, documentation and legacy PCB revisions.
 - `hardware/3d/` - mechanical source files and exported models. Large mechanical formats are tracked with Git LFS.
-- `assets/` - documentation images: `assets/photos/` (sorted by kind: `keyboard-pcb/`, `mcu-dev-board/`, `workshop-2026-04-14/`, etc.), and `assets/cad/75he-exploded/` for CAD renders. PDFs and other project documents stay in `assets/`.
-- `tools/` - host-side Python tools, firmware utilities, analysis scripts and integrations.
-- `docs/` - shared documentation and release notes.
-- `layouts/` and `data/` - keyboard layout data and firmware support data.
+- `assets/presentation/` - TIPE PDFs (synoptic, English paper, part-label drawing) and a short workbench **.mp4** clip.
+- `assets/cad/75he-mechanical/` - mechanical **CAD** stills: full assembly, shaded exploded stack, isometric, part-exploded **top / bottom / three-quarter** views.
+- `assets/photos/` - real photos, grouped by topic: `product/`, `pcb-75he/`, `pcb-mcu-breakout/`, `prototypes/`, `fdm-fabrication/`, `tipe-lab/`, `app/`. No camera timestamps in file names: names describe **content**.
+- `tools/`, `docs/`, `layouts/`, `data/` - as before.
 
 ## Firmware
 
@@ -78,9 +84,9 @@ Artifacts are written to `build/Release/`. The CI also builds `Release-apponly` 
 
 ## Configurator
 
-The desktop app handles keymap, performance, Gamepad, calibration, the rotary encoder, lighting, and firmware over RAW HID. Example: **Keymap** tab for a 75% ISO-FR layout.
+The desktop app handles keymap, performance, Gamepad, calibration, the rotary encoder, lighting, and firmware over RAW HID. Example: **Keymap** for a 75% **ISO-FR** layout in dark UI.
 
-![KBHE configurator, Keymap tab](assets/photos/software/kbhe-configurator-keymap-2026-04-26.png)
+![Configurator Keymap, ISO-FR](assets/photos/app/configurator-keymap-iso-fr-dark-theme.png)
 
 ```powershell
 cd apps/configurator
@@ -116,19 +122,23 @@ git lfs install
 
 The current mechanical files are under `hardware/3d/current/`; older exports are kept under `hardware/3d/legacy/`.
 
-## PCB and CAD (exploded views)
+## Mechanical CAD: exploded part views and overviews
 
-The KiCad project is self-contained under `hardware/pcb/75he/`: footprints, symbols, 3D models and useful component documentation are stored inside the project tree. **Illustration renders** and **photos** of the run live under `assets/` (see `assets/photos` and `assets/cad/75he-exploded`). Legacy KiCad projects are under `hardware/pcb/75he/Legacy/`.
+Files live in `assets/cad/75he-mechanical/`. The **“parts”** set are consistent orientations of the decomposed case + plate; **“legacy”** older exports use different camera framing.
 
-| Exploded (face) | Exploded (back) | 3/4 view |
+| Exploded: parts from top | Exploded: parts, bottom / rear | Exploded: three-quarter (right) |
 | --- | --- | --- |
-| ![Exploded face](assets/cad/75he-exploded/face-v2.png) | ![Exploded back](assets/cad/75he-exploded/back-v2.png) | ![3/4 right](assets/cad/75he-exploded/three-quarter-right-v2.png) |
+| ![Top](assets/cad/75he-mechanical/mech-cad-exploded-parts-top.png) | ![Bottom rear](assets/cad/75he-mechanical/mech-cad-exploded-parts-bottom-rear.png) | ![Three quarter](assets/cad/75he-mechanical/mech-cad-exploded-parts-three-quarter-right.png) |
 
-### Legacy KiCad prototypes (3D render exports)
+| All layers **stacked** (shade) | Full keyboard **3/4** (no case explode) | **Side elevation** (older export) | **Rear-left** isometric (older export) |
+| --- | --- | --- | --- |
+| ![Stacked](assets/cad/75he-mechanical/mech-cad-exploded-assembly-layers-stacked.png) | ![Front 3/4](assets/cad/75he-mechanical/mech-cad-keyboard-front-three-quarter.png) | ![Side](assets/cad/75he-mechanical/mech-cad-exploded-elevation-side-legacy.png) | ![Rear left](assets/cad/75he-mechanical/mech-cad-exploded-isometric-rear-left.png) |
 
-| 6-key hall | MCU board v1 | MCU board v2 |
+### Legacy KiCad prototypes (3D exports from the repo)
+
+| 6-key Hall | MCU v1 | MCU v2 |
 | --- | --- | --- |
-| ![6-key proto](hardware/pcb/75he/Legacy/proto-6-key-hall-sensors/assets/exports/renders/proto-6-key-hall-sensors-proto_pcb-front-x25-zoom1-rt-transparent.png) | ![MCU v1](hardware/pcb/75he/Legacy/proto-mcu-v1/assets/exports/renders/proto-mcu-v1-mcu-front-x25-zoom1-rt-transparent.png) | ![MCU v2](hardware/pcb/75he/Legacy/proto-mcu-v2/assets/exports/renders/proto-mcu-v2-mcu-front-x25-zoom1-rt-transparent.png) |
+| ![6-key](hardware/pcb/75he/Legacy/proto-6-key-hall-sensors/assets/exports/renders/proto-6-key-hall-sensors-proto_pcb-front-x25-zoom1-rt-transparent.png) | ![MCU v1](hardware/pcb/75he/Legacy/proto-mcu-v1/assets/exports/renders/proto-mcu-v1-mcu-front-x25-zoom1-rt-transparent.png) | ![MCU v2](hardware/pcb/75he/Legacy/proto-mcu-v2/assets/exports/renders/proto-mcu-v2-mcu-front-x25-zoom1-rt-transparent.png) |
 
 ## Current limitations - TODOs
 - For transparen keycaps the space bar lacks leds on the sides
