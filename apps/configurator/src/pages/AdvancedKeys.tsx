@@ -25,6 +25,10 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
+import {
+  patchActiveAppProfileAdvancedTickRate,
+  patchActiveAppProfileKeySettings,
+} from "@/lib/kbhe/profile-snapshot-store";
 import { KEY_BEHAVIORS, HID_KEYCODE_NAMES, SOCD_RESOLUTIONS, KEY_COUNT } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import { cn, selectItems } from "@/lib/utils";
@@ -233,12 +237,17 @@ export default function AdvancedKeys() {
     if (!base) {
       throw new Error(`Unable to load key settings for key ${keyIndex}`);
     }
-    await kbheDevice.setKeySettingsExtended(keyIndex, {
+    const nextSettings = {
       ...base,
       ...patch,
       profile_index: profileContext,
       layer_index: currentLayer,
-    });
+    };
+    const ok = await kbheDevice.setKeySettingsExtended(keyIndex, nextSettings);
+    if (!ok) {
+      throw new Error(`Unable to update key settings for key ${keyIndex}`);
+    }
+    patchActiveAppProfileKeySettings(nextSettings);
   }, [currentLayer, getBaseSettingsForKey, profileContext]);
 
   const keyMutation = useOptimisticMutation<KeySettings | null, Partial<KeySettings>>({
@@ -756,7 +765,12 @@ export default function AdvancedKeys() {
                 max={100}
                 step={1}
                 value={tickRateQ.data ?? 1}
-                onCommit={(v) => kbheDevice.setAdvancedTickRate(v)}
+                onCommit={async (v) => {
+                  const ok = await kbheDevice.setAdvancedTickRate(v);
+                  if (ok) {
+                    patchActiveAppProfileAdvancedTickRate(v);
+                  }
+                }}
                 disabled={!connected}
               />
             </div>

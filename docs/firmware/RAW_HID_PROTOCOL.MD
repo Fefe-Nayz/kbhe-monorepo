@@ -68,6 +68,8 @@ Codes status updater:
 | FACTORY_RESET | 0x03 | aucun | status |
 | USB_REENUMERATE | 0x04 | aucun | status |
 
+`FACTORY_RESET` retourne une erreur en mode RAM-only: le reset usine est une operation persistante.
+
 ### 3.2 Options globales (0x20..0x2F)
 
 | Commande | ID | Parametres requete | Reponse |
@@ -88,6 +90,8 @@ Codes status updater:
 | SET_KEYBOARD_NAME | 0x2D | keyboard_name[32] | status + keyboard_name applique |
 | COPY_PROFILE_SLOT | 0x2E | source_profile_index, target_profile_index | status + source + target + profile_used_mask |
 | RESET_PROFILE_SLOT | 0x2F | profile_index | status + profile_index + profile_used_mask |
+
+`SAVE_SETTINGS` retourne une erreur en mode RAM-only: ce mode interdit toute planification d'ecriture flash.
 
 Note option `raw_hid_echo`:
 
@@ -524,10 +528,11 @@ DELETE_PROFILE (0x5F)
 Notes:
 
 - Limite MCU: 4 slots max.
-- Etat par defaut firmware/factory reset: les 4 slots sont initialises avec les reglages par defaut (`profile_used_mask = 0x0F`).
+- Etat par defaut firmware/factory reset: seul le slot 0 est initialise avec les reglages par defaut (`profile_used_mask = 0x01`).
 - La suppression du dernier slot restant est refusee.
 - `CREATE_PROFILE` clone l'integralite des reglages du profil actif (mapping, layers, gamepad, LED, filtres, rotary, etc.).
 - `SET_ACTIVE_PROFILE` recharge l'integralite des reglages du slot cible.
+- Les commandes qui modifient les slots device (`SET_ACTIVE_PROFILE`, `SET_DEFAULT_PROFILE`, `SET_PROFILE_NAME`, `CREATE_PROFILE`, `DELETE_PROFILE`, `COPY_PROFILE_SLOT`, `RESET_PROFILE_SLOT`) retournent une erreur en mode RAM-only. L'hote doit d'abord sortir du mode RAM-only pour faire une operation persistante.
 
 #### 3.3.9 Keycode de layer
 

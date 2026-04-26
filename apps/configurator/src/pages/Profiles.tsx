@@ -7,8 +7,10 @@ import { kbheDevice } from "@/lib/kbhe/device";
 import {
   activateDeviceRuntimeProfile,
   activateTemporaryAppProfile,
+  ensurePersistentDeviceRuntime,
   hydrateProfileStoreFromSession,
   setDefaultDeviceRuntimeProfile,
+  syncActiveDeviceProfileMirrorFromKeyboard,
 } from "@/lib/kbhe/profile-runtime";
 import {
   applyFirmwareProfileSnapshot,
@@ -179,6 +181,7 @@ export default function Profiles() {
   const syncRuntimeState = useCallback(async () => {
     await DeviceSessionManager.refreshRuntimeProfileState();
     hydrateProfileStoreFromSession();
+    await syncActiveDeviceProfileMirrorFromKeyboard();
     void queryClient.invalidateQueries({ queryKey: ["profile"] });
     void queryClient.invalidateQueries({ queryKey: ["keymap"] });
   }, [queryClient]);
@@ -202,6 +205,10 @@ export default function Profiles() {
 
     if (source?.kind === "device") {
       if (!connected) {
+        return false;
+      }
+
+      if (!await ensurePersistentDeviceRuntime()) {
         return false;
       }
 
@@ -335,9 +342,25 @@ export default function Profiles() {
           return;
         }
 
+        if (!await ensurePersistentDeviceRuntime()) {
+          toast.error("Failed to leave temporary mode before creating a device profile");
+          return;
+        }
+
         const created = await kbheDevice.createProfile(name);
         if (!created) {
           toast.error("Failed to create device profile");
+          return;
+        }
+        const snapshot = await captureFirmwareProfileSnapshot(created.profile_index);
+        useProfileStore.getState().upsertDeviceProfileMirror(
+          created.profile_index,
+          name,
+          true,
+          snapshot ?? undefined,
+        );
+        if (!await kbheDevice.saveSettings()) {
+          toast.error("Created, but failed to persist device profile");
           return;
         }
 
@@ -441,9 +464,19 @@ export default function Profiles() {
           return;
         }
 
+        if (!await ensurePersistentDeviceRuntime()) {
+          toast.error("Failed to leave temporary mode before renaming this profile");
+          return;
+        }
+
         const renamed = await kbheDevice.setProfileName(renameTarget.slot, nextName);
         if (!renamed) {
           toast.error("Failed to rename device profile");
+          return;
+        }
+        useProfileStore.getState().upsertDeviceProfileMirror(renameTarget.slot, nextName, true);
+        if (!await kbheDevice.saveSettings()) {
+          toast.error("Renamed, but failed to persist device profile");
           return;
         }
 
@@ -485,9 +518,19 @@ export default function Profiles() {
           return;
         }
 
+        if (!await ensurePersistentDeviceRuntime()) {
+          toast.error("Failed to leave temporary mode before deleting this profile");
+          return;
+        }
+
         const deleted = await kbheDevice.deleteProfile(deleteTarget.slot);
         if (!deleted) {
           toast.error("Failed to delete device profile");
+          return;
+        }
+        useProfileStore.getState().removeDeviceProfileMirror(deleteTarget.slot);
+        if (!await kbheDevice.saveSettings()) {
+          toast.error("Deleted, but failed to persist device profile changes");
           return;
         }
 
@@ -534,6 +577,11 @@ export default function Profiles() {
           return;
         }
 
+        if (!await ensurePersistentDeviceRuntime()) {
+          toast.error("Failed to leave temporary mode before creating a device profile");
+          return;
+        }
+
         if (duplicateTarget.kind === "device") {
           const copied = await kbheDevice.copyProfileSlot(duplicateTarget.slot, targetSlot);
           if (!copied) {
@@ -543,6 +591,18 @@ export default function Profiles() {
           const renamed = await kbheDevice.setProfileName(targetSlot, nextName);
           if (!renamed) {
             toast.error("Duplicated, but failed to set profile name");
+            return;
+          }
+          const snapshot = await captureFirmwareProfileSnapshot(targetSlot);
+          useProfileStore.getState().upsertDeviceProfileMirror(
+            targetSlot,
+            nextName,
+            true,
+            snapshot ?? undefined,
+          );
+          if (!await kbheDevice.saveSettings()) {
+            toast.error("Duplicated, but failed to persist device profile");
+            return;
           }
         } else {
           const sourceApp = getAppProfileByName(duplicateTarget.name);
@@ -569,9 +629,11 @@ export default function Profiles() {
           if (!applied) {
             // Best effort rollback to avoid leaving a partially-applied profile slot around.
             await kbheDevice.deleteProfile(created.profile_index);
+            await kbheDevice.saveSettings();
             toast.error("Failed to apply app profile data to the new device slot");
             return;
           }
+          useProfileStore.getState().upsertDeviceProfileMirror(created.profile_index, nextName, true, snapshot);
         }
 
         await syncRuntimeState();
@@ -675,9 +737,24 @@ export default function Profiles() {
                                 disabled={actionPending || !connected}
                                 onClick={() => {
                                   void runAction(async () => {
+                                    if (!await ensurePersistentDeviceRuntime()) {
+                                      toast.error("Failed to leave temporary mode before resetting this profile");
+                                      return;
+                                    }
                                     const ok = await kbheDevice.resetProfileSlot(profile.slot);
                                     if (!ok) {
                                       toast.error("Failed to reset device profile");
+                                      return;
+                                    }
+                                    const snapshot = await captureFirmwareProfileSnapshot(profile.slot);
+                                    useProfileStore.getState().upsertDeviceProfileMirror(
+                                      profile.slot,
+                                      profile.name,
+                                      true,
+                                      snapshot ?? undefined,
+                                    );
+                                    if (!await kbheDevice.saveSettings()) {
+                                      toast.error("Reset, but failed to persist device profile");
                                       return;
                                     }
                                     await syncRuntimeState();

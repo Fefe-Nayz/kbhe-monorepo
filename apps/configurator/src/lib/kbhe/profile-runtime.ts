@@ -3,7 +3,11 @@ import { queryKeys } from "@/lib/query/keys"
 import { kbheDevice } from "./device"
 import { DeviceSessionManager, useDeviceSession } from "./session"
 import { useProfileStore } from "@/stores/profileStore"
-import { applyFirmwareProfileSnapshot, isFirmwareProfileSnapshot } from "./profile-sync"
+import {
+  applyFirmwareProfileSnapshot,
+  captureFirmwareProfileSnapshot,
+  isFirmwareProfileSnapshot,
+} from "./profile-sync"
 
 function invalidateRuntimeProfileQueries() {
   void queryClient.invalidateQueries({ queryKey: queryKeys.profile.active() })
@@ -15,6 +19,30 @@ function invalidateRuntimeProfileQueries() {
 
 function isRuntimeConnected() {
   return useDeviceSession.getState().status === "connected"
+}
+
+export async function ensurePersistentDeviceRuntime(): Promise<boolean> {
+  if (!isRuntimeConnected()) {
+    return false
+  }
+
+  const ramOnlyMode =
+    useDeviceSession.getState().ramOnlyMode ?? await kbheDevice.getRamOnlyMode()
+  if (!ramOnlyMode) {
+    return true
+  }
+
+  const exited = await kbheDevice.exitRamOnlyMode()
+  if (!exited) {
+    return false
+  }
+
+  useProfileStore.getState().setRuntimeSource("device")
+  useProfileStore.getState().setRamOnlyActive(false)
+  await DeviceSessionManager.refreshRuntimeProfileState()
+  hydrateProfileStoreFromSession()
+  invalidateRuntimeProfileQueries()
+  return true
 }
 
 export async function activateDeviceRuntimeProfile(slot: number): Promise<boolean> {
@@ -32,6 +60,10 @@ export async function activateDeviceRuntimeProfile(slot: number): Promise<boolea
 
   const result = await kbheDevice.setActiveProfile(slot)
   if (!result) {
+    return false
+  }
+  const saved = await kbheDevice.saveSettings()
+  if (!saved) {
     return false
   }
 
@@ -90,9 +122,18 @@ export async function setDefaultDeviceRuntimeProfile(slot: number | null): Promi
     return false
   }
 
+  const persistent = await ensurePersistentDeviceRuntime()
+  if (!persistent) {
+    return false
+  }
+
   const target = slot == null ? 0xff : slot
   const result = await kbheDevice.setDefaultProfile(target)
   if (!result) {
+    return false
+  }
+  const saved = await kbheDevice.saveSettings()
+  if (!saved) {
     return false
   }
 
@@ -122,4 +163,30 @@ export function hydrateProfileStoreFromSession() {
 
   const hasActiveAppProfile = Boolean(profileStore.activeAppProfileName)
   profileStore.setRuntimeSource(session.ramOnlyMode && hasActiveAppProfile ? "app" : "device")
+}
+
+export async function syncActiveDeviceProfileMirrorFromKeyboard(): Promise<void> {
+  const session = useDeviceSession.getState()
+  if (
+    session.status !== "connected" ||
+    session.ramOnlyMode ||
+    session.activeProfileIndex == null ||
+    (session.profileUsedMask & (1 << session.activeProfileIndex)) === 0
+  ) {
+    return
+  }
+
+  const snapshot = await captureFirmwareProfileSnapshot(session.activeProfileIndex)
+  if (!snapshot) {
+    return
+  }
+
+  const name = session.profileNames[session.activeProfileIndex]
+    ?? `Slot ${session.activeProfileIndex + 1}`
+  useProfileStore.getState().upsertDeviceProfileMirror(
+    session.activeProfileIndex,
+    name,
+    true,
+    snapshot,
+  )
 }

@@ -715,7 +715,7 @@ bool settings_reset(void);
 
 /**
  * @brief Save current settings to flash
- * @return true if save was successful
+ * @return true if save was successful; false in RAM-only mode
  */
 bool settings_save(void);
 
@@ -724,6 +724,8 @@ bool settings_save(void);
  *
  * This keeps RAW HID command handlers non-blocking by avoiding direct flash
  * writes in command context.
+ * In RAM-only mode the request is rejected because no flash write may be
+ * scheduled.
  *
  * @return true if the request was accepted
  */
@@ -818,9 +820,9 @@ bool settings_set_default_profile_index(uint8_t profile_index);
 /**
  * @brief Whether the keyboard is currently in RAM-only mode.
  *
- * In RAM-only mode every settings write goes to RAM only; calls to
- * settings_save() are silently suppressed.  The mode is cleared on reboot
- * or by calling settings_exit_ram_only_mode().
+ * In RAM-only mode every settings write goes to RAM only; explicit save
+ * requests are rejected and autosave does not schedule flash writes. The mode
+ * is cleared on reboot or by calling settings_exit_ram_only_mode().
  */
 bool settings_is_ram_only_mode(void);
 

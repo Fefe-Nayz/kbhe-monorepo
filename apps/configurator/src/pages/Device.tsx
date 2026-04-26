@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
+import {
+  patchActiveAppProfileLedSnapshot,
+  patchActiveAppProfileNkroEnabled,
+  patchActiveAppProfileOptions,
+} from "@/lib/kbhe/profile-snapshot-store";
 import { queryKeys } from "@/lib/query/keys";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
 import { PageContent } from "@/components/shared/PageLayout";
@@ -76,17 +81,38 @@ export default function Device() {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
+      const patchOptions = (patch: Partial<NonNullable<typeof optionsQ.data>>) => {
+        if (optionsQ.data) {
+          patchActiveAppProfileOptions({ ...optionsQ.data, ...patch });
+        }
+      };
+
       switch (key) {
         case "keyboard": {
-          await kbheDevice.setKeyboardEnabled(value);
+          const ok = await kbheDevice.setKeyboardEnabled(value);
+          if (ok) patchOptions({ keyboard_enabled: value });
           break;
         }
-        case "gamepad": await kbheDevice.setGamepadEnabled(value); break;
-        case "nkro": await kbheDevice.setNkroEnabled(value); break;
-        case "led": await kbheDevice.ledSetEnabled(value); break;
-        case "led_thermal_protection":
-          await kbheDevice.setLedThermalProtectionEnabled(value);
+        case "gamepad": {
+          const ok = await kbheDevice.setGamepadEnabled(value);
+          if (ok) patchOptions({ gamepad_enabled: value });
           break;
+        }
+        case "nkro": {
+          const ok = await kbheDevice.setNkroEnabled(value);
+          if (ok) patchActiveAppProfileNkroEnabled(value);
+          break;
+        }
+        case "led": {
+          const ok = await kbheDevice.ledSetEnabled(value);
+          if (ok) patchActiveAppProfileLedSnapshot({ enabled: value });
+          break;
+        }
+        case "led_thermal_protection": {
+          const ok = await kbheDevice.setLedThermalProtectionEnabled(value);
+          if (ok) patchOptions({ led_thermal_protection_enabled: value });
+          break;
+        }
       }
     },
     onSuccess: () => void qc.invalidateQueries(),

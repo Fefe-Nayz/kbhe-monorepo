@@ -235,6 +235,8 @@ export enum LEDEffect {
   MATRIX = LEDEffect.NONE,
 }
 
+export const LED_EFFECT_COUNT = LEDEffect.BASS_RIPPLE + 1;
+
 export const LED_EFFECT_NAMES: Record<number, string> = {
   [LEDEffect.NONE]: "Matrix (Software)",
   [LEDEffect.PLASMA]: "Plasma",

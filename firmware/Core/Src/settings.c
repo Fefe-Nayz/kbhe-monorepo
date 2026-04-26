@@ -23,8 +23,7 @@
 //--------------------------------------------------------------------+
 #define FIRMWARE_VERSION_MAJOR 2u
 #define FIRMWARE_VERSION_MINOR 0u
-#define FIRMWARE_VERSION_PATCH 1u
-
+#define FIRMWARE_VERSION_PATCH 2u
 #define FIRMWARE_VERSION_PACKED                                                \
   (((uint32_t)FIRMWARE_VERSION_MAJOR << 16) |                                  \
    ((uint32_t)FIRMWARE_VERSION_MINOR << 8) |                                   \
@@ -58,7 +57,7 @@ static bool settings_save_requested = false;
 static bool settings_save_in_progress = false;
 static uint32_t settings_save_snapshot_change_counter = 0u;
 static settings_t settings_save_snapshot;
-// When true, settings_save() is a no-op (inactive/RAM-only profile active)
+// When true, explicit flash saves are rejected (inactive/RAM-only profile active)
 static bool settings_ram_only_mode = false;
 static uint32_t settings_change_counter = 0u;
 static uint32_t settings_last_seen_change_counter = 0u;
@@ -1833,6 +1832,10 @@ settings_options_t settings_get_options(void) {
 }
 
 bool settings_reset(void) {
+  if (settings_ram_only_mode) {
+    return false;
+  }
+
   settings_set_defaults();
   calibration_load_settings();
   settings_apply_runtime_from_current_profile();
@@ -1858,7 +1861,7 @@ bool settings_save(void) {
 
   // RAM-only mode: writes stay in RAM and are never persisted to flash.
   if (settings_ram_only_mode) {
-    return true;
+    return false;
   }
 
   settings_profile_sync_active_slot();
@@ -1880,6 +1883,11 @@ bool settings_save(void) {
 }
 
 bool settings_request_save(void) {
+  if (settings_ram_only_mode) {
+    settings_save_requested = false;
+    return false;
+  }
+
   if (!settings_dirty) {
     settings_save_requested = false;
     return true;

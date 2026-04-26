@@ -6,6 +6,13 @@ import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import {
+  patchActiveAppProfileLedEffectParams,
+  patchActiveAppProfileLedIdleOptions,
+  patchActiveAppProfileLedPixel,
+  patchActiveAppProfileLedPixels,
+  patchActiveAppProfileLedSnapshot,
+} from "@/lib/kbhe/profile-snapshot-store";
+import {
   LEDEffect, KEY_COUNT, LED_EFFECT_NAMES, LED_PARAM_TYPES,
   LED_EFFECT_PARAM_SPEED, LED_EFFECT_PARAM_COUNT,
   LED_USB_SUSPEND_RGB_OFF_DEFAULT,
@@ -590,28 +597,44 @@ export default function Lighting() {
   // ---- Mutations ----
 
   const enabledMut = useMutation({
-    mutationFn: async (v: boolean) => { markSaving(); await kbheDevice.ledSetEnabled(v); },
+    mutationFn: async (v: boolean) => {
+      markSaving();
+      const ok = await kbheDevice.ledSetEnabled(v);
+      if (ok) patchActiveAppProfileLedSnapshot({ enabled: v });
+    },
     onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.enabled() }); },
     onError: markError,
   });
 
   const brightnessMut = useOptimisticMutation<number, number, void>({
     queryKey: queryKeys.led.brightness(),
-    mutationFn: async (v) => { markSaving(); await kbheDevice.ledSetBrightness(v); },
+    mutationFn: async (v) => {
+      markSaving();
+      const ok = await kbheDevice.ledSetBrightness(v);
+      if (ok) patchActiveAppProfileLedSnapshot({ brightness: v });
+    },
     optimisticUpdate: (_cur, v) => v,
     onSuccess: markSaved,
     onError: markError,
   });
 
   const effectMut = useMutation({
-    mutationFn: async (v: number) => { markSaving(); await kbheDevice.setLedEffect(v); },
+    mutationFn: async (v: number) => {
+      markSaving();
+      const ok = await kbheDevice.setLedEffect(v);
+      if (ok) patchActiveAppProfileLedSnapshot({ effectMode: v });
+    },
     onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.effect() }); },
     onError: markError,
   });
 
   const fpsMut = useOptimisticMutation<number, number, void>({
     queryKey: queryKeys.led.fpsLimit(),
-    mutationFn: async (v) => { markSaving(); await kbheDevice.setLedFpsLimit(v); },
+    mutationFn: async (v) => {
+      markSaving();
+      const ok = await kbheDevice.setLedFpsLimit(v);
+      if (ok) patchActiveAppProfileLedSnapshot({ fpsLimit: v });
+    },
     optimisticUpdate: (_cur, v) => v,
     onSuccess: markSaved,
     onError: markError,
@@ -619,7 +642,11 @@ export default function Lighting() {
 
   const paramsMut = useOptimisticMutation<number[], number[], void>({
     queryKey: queryKeys.led.effectParams(currentEffect),
-    mutationFn: async (params) => { markSaving(); await kbheDevice.setLedEffectParams(currentEffect, params); },
+    mutationFn: async (params) => {
+      markSaving();
+      const ok = await kbheDevice.setLedEffectParams(currentEffect, params);
+      if (ok) patchActiveAppProfileLedEffectParams(currentEffect, params);
+    },
     optimisticUpdate: (_cur, params) => params,
     onSuccess: markSaved,
     onError: markError,
@@ -634,12 +661,14 @@ export default function Lighting() {
         third_party_stream_counts_as_activity: false,
         usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
       };
-      await kbheDevice.setLedIdleOptions(
-        timeoutSeconds,
-        current.allow_system_when_disabled,
-        current.third_party_stream_counts_as_activity,
-        current.usb_suspend_rgb_off,
+      const next = { ...current, idle_timeout_seconds: timeoutSeconds };
+      const ok = await kbheDevice.setLedIdleOptions(
+        next.idle_timeout_seconds,
+        next.allow_system_when_disabled,
+        next.third_party_stream_counts_as_activity,
+        next.usb_suspend_rgb_off,
       );
+      if (ok) patchActiveAppProfileLedIdleOptions(next);
     },
     onSuccess: () => {
       markSaved();
@@ -657,12 +686,14 @@ export default function Lighting() {
         third_party_stream_counts_as_activity: false,
         usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
       };
-      await kbheDevice.setLedIdleOptions(
-        current.idle_timeout_seconds,
-        allowSystemWhenDisabled,
-        current.third_party_stream_counts_as_activity,
-        current.usb_suspend_rgb_off,
+      const next = { ...current, allow_system_when_disabled: allowSystemWhenDisabled };
+      const ok = await kbheDevice.setLedIdleOptions(
+        next.idle_timeout_seconds,
+        next.allow_system_when_disabled,
+        next.third_party_stream_counts_as_activity,
+        next.usb_suspend_rgb_off,
       );
+      if (ok) patchActiveAppProfileLedIdleOptions(next);
     },
     onSuccess: () => {
       markSaved();
@@ -680,12 +711,17 @@ export default function Lighting() {
         third_party_stream_counts_as_activity: false,
         usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
       };
-      await kbheDevice.setLedIdleOptions(
-        current.idle_timeout_seconds,
-        current.allow_system_when_disabled,
-        thirdPartyStreamCountsAsActivity,
-        current.usb_suspend_rgb_off,
+      const next = {
+        ...current,
+        third_party_stream_counts_as_activity: thirdPartyStreamCountsAsActivity,
+      };
+      const ok = await kbheDevice.setLedIdleOptions(
+        next.idle_timeout_seconds,
+        next.allow_system_when_disabled,
+        next.third_party_stream_counts_as_activity,
+        next.usb_suspend_rgb_off,
       );
+      if (ok) patchActiveAppProfileLedIdleOptions(next);
     },
     onSuccess: () => {
       markSaved();
@@ -703,12 +739,14 @@ export default function Lighting() {
         third_party_stream_counts_as_activity: false,
         usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
       };
-      await kbheDevice.setLedIdleOptions(
-        current.idle_timeout_seconds,
-        current.allow_system_when_disabled,
-        current.third_party_stream_counts_as_activity,
-        usbSuspendRgbOff,
+      const next = { ...current, usb_suspend_rgb_off: usbSuspendRgbOff };
+      const ok = await kbheDevice.setLedIdleOptions(
+        next.idle_timeout_seconds,
+        next.allow_system_when_disabled,
+        next.third_party_stream_counts_as_activity,
+        next.usb_suspend_rgb_off,
       );
+      if (ok) patchActiveAppProfileLedIdleOptions(next);
     },
     onSuccess: () => {
       markSaved();
@@ -753,8 +791,11 @@ export default function Lighting() {
   }, [paramsQ.data, schemaQ.data, paramsMut]);
 
   const fillMut = useMutation({
-    mutationFn: async (c: RGBColor) => { markSaving(); await kbheDevice.ledFill(c.r, c.g, c.b); },
-    onSuccess: (_data, c) => {
+    mutationFn: async (c: RGBColor) => {
+      markSaving();
+      return kbheDevice.ledFill(c.r, c.g, c.b);
+    },
+    onSuccess: (ok, c) => {
       const filled = new Array(KEY_COUNT * 3).fill(0);
       for (let i = 0; i < KEY_COUNT; i++) {
         const offset = i * 3;
@@ -763,6 +804,7 @@ export default function Lighting() {
         filled[offset + 2] = c.b & 0xff;
       }
       updateMatrixPixelsLocal(filled);
+      if (ok) patchActiveAppProfileLedPixels(filled);
       markSaved();
       void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
     },
@@ -770,9 +812,14 @@ export default function Lighting() {
   });
 
   const clearMut = useMutation({
-    mutationFn: async () => { markSaving(); await kbheDevice.ledClear(); },
-    onSuccess: () => {
-      updateMatrixPixelsLocal(new Array(KEY_COUNT * 3).fill(0));
+    mutationFn: async () => {
+      markSaving();
+      return kbheDevice.ledClear();
+    },
+    onSuccess: (ok) => {
+      const cleared = new Array(KEY_COUNT * 3).fill(0);
+      updateMatrixPixelsLocal(cleared);
+      if (ok) patchActiveAppProfileLedPixels(cleared);
       markSaved();
       void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
     },
@@ -780,9 +827,13 @@ export default function Lighting() {
   });
 
   const uploadMut = useMutation({
-    mutationFn: async (pixels: number[]) => { markSaving(); await kbheDevice.ledUploadAll(pixels); },
-    onSuccess: (_data, pixels) => {
+    mutationFn: async (pixels: number[]) => {
+      markSaving();
+      return kbheDevice.ledUploadAll(pixels);
+    },
+    onSuccess: (ok, pixels) => {
       updateMatrixPixelsLocal(pixels);
+      if (ok) patchActiveAppProfileLedPixels(pixels);
       markSaved();
       void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
     },
@@ -804,15 +855,18 @@ export default function Lighting() {
   // ---- Live throttled calls (runtime-only, no flash — firmware auto-saves after 750ms) ----
 
   const liveBrightness = useThrottledCall(async (v: number) => {
-    await kbheDevice.ledSetBrightness(v);
+    const ok = await kbheDevice.ledSetBrightness(v);
+    if (ok) patchActiveAppProfileLedSnapshot({ brightness: v });
   });
 
   const liveFps = useThrottledCall(async (v: number) => {
-    await kbheDevice.setLedFpsLimit(v);
+    const ok = await kbheDevice.setLedFpsLimit(v);
+    if (ok) patchActiveAppProfileLedSnapshot({ fpsLimit: v });
   });
 
   const liveParams = useThrottledCall(async (params: number[]) => {
-    await kbheDevice.setLedEffectParams(currentEffect, params);
+    const ok = await kbheDevice.setLedEffectParams(currentEffect, params);
+    if (ok) patchActiveAppProfileLedEffectParams(currentEffect, params);
   });
 
   const matrixSetPixelPendingRef = useRef<Map<number, RGBColor>>(new Map());
@@ -830,7 +884,8 @@ export default function Lighting() {
         matrixSetPixelPendingRef.current.clear();
 
         for (const [index, color] of batch) {
-          await kbheDevice.ledSetPixel(index, color.r, color.g, color.b);
+          const ok = await kbheDevice.ledSetPixel(index, color.r, color.g, color.b);
+          if (ok) patchActiveAppProfileLedPixel(index, color);
         }
       }
     } catch {

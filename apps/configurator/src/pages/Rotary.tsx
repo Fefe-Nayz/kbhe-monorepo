@@ -6,6 +6,7 @@ import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { usePageVisible } from "@/hooks/use-page-visible";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice, type RotaryEncoderSettings, type RotaryBinding } from "@/lib/kbhe/device";
+import { patchActiveAppProfileRotarySettings } from "@/lib/kbhe/profile-snapshot-store";
 import { isVolumeServiceRunning } from "@/lib/kbhe/volume-service";
 import {
   ROTARY_ACTIONS, ROTARY_BUTTON_ACTIONS, ROTARY_RGB_BEHAVIORS, ROTARY_PROGRESS_STYLES,
@@ -330,7 +331,11 @@ export default function Rotary() {
     queryKey: queryKeys.rotary.settings(),
     mutationFn: async (full) => {
       markSaving();
-      return kbheDevice.setRotaryEncoderSettings(full);
+      const ok = await kbheDevice.setRotaryEncoderSettings(full);
+      if (ok) {
+        patchActiveAppProfileRotarySettings(full as RotaryEncoderSettings);
+      }
+      return ok;
     },
     optimisticUpdate: (_cur, full) => full as RotaryEncoderSettings,
     onSuccess: () => {
@@ -347,7 +352,11 @@ export default function Rotary() {
 
   const liveRotary = useThrottledCall(async (patch: Partial<RotaryPatch>) => {
     if (!rotaryQ.data) return;
-    await kbheDevice.setRotaryEncoderSettings({ ...rotaryQ.data, ...patch });
+    const next = { ...rotaryQ.data, ...patch };
+    const ok = await kbheDevice.setRotaryEncoderSettings(next);
+    if (ok) {
+      patchActiveAppProfileRotarySettings(next as RotaryEncoderSettings);
+    }
   });
 
   const livePreviewQ = useQuery({

@@ -63,6 +63,7 @@ const RESETTABLE_LOCAL_STORAGE_KEYS = new Set([
 const RESETTABLE_LOCAL_STORAGE_PREFIXES = [
   "kbhe-",
   "keyboard-profile:",
+  "keyboard-device-profile:",
 ];
 
 function shouldResetLocalStorageKey(key: string): boolean {

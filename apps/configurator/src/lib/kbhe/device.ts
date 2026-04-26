@@ -1770,11 +1770,11 @@ export class KBHEDevice {
   async createProfile(name?: string): Promise<ProfileInfo | null> {
     const payload: number[] = [0, ...(name ? this.encodeProfileName(name) : new Array(SETTINGS_PROFILE_NAME_LENGTH).fill(0))];
     const response = await this.sendCommand(Command.CREATE_PROFILE, payload, 500);
-    if (response && response.length >= 4 && response[1] === Status.OK) {
+    if (response && response.length >= 20 && response[1] === Status.OK) {
       return {
         profile_index: response[2] ?? 0,
         profile_used_mask: response[3] ?? 0,
-        name: name,
+        name: this.decodeCString(response, 4, SETTINGS_PROFILE_NAME_LENGTH),
       };
     }
     return null;

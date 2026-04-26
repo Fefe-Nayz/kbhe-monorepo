@@ -267,7 +267,8 @@ static void cmd_enter_bootloader(const uint8_t *in, uint8_t *out) {
   (void)in;
   resp->command_id = CMD_ENTER_BOOTLOADER;
 
-  if (settings_has_unsaved_changes() && !settings_save()) {
+  if (!settings_is_ram_only_mode() &&
+      settings_has_unsaved_changes() && !settings_save()) {
     resp->status_or_len = HID_RESP_ERROR;
     return;
   }
@@ -479,6 +480,11 @@ static void cmd_copy_profile_slot(const uint8_t *in, uint8_t *out) {
   resp->target_profile_index = req->target_profile_index;
   resp->profile_used_mask = settings_get_profile_used_mask();
 
+  if (settings_is_ram_only_mode()) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
   if (req->source_profile_index >= SETTINGS_PROFILE_COUNT ||
       req->target_profile_index >= SETTINGS_PROFILE_COUNT ||
       !settings_is_profile_slot_used(req->source_profile_index)) {
@@ -500,6 +506,11 @@ static void cmd_reset_profile_slot(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_RESET_PROFILE_SLOT;
   resp->profile_index = req->profile_index;
   resp->profile_used_mask = settings_get_profile_used_mask();
+
+  if (settings_is_ram_only_mode()) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
 
   if (req->profile_index >= SETTINGS_PROFILE_COUNT ||
       !settings_is_profile_slot_used(req->profile_index)) {
@@ -526,6 +537,13 @@ static void cmd_set_default_profile(const uint8_t *in, uint8_t *out) {
   const hid_packet_profile_index_t *req = (const hid_packet_profile_index_t *)in;
   hid_packet_profile_index_t       *resp = (hid_packet_profile_index_t *)out;
   resp->command_id = CMD_SET_DEFAULT_PROFILE;
+
+  if (settings_is_ram_only_mode()) {
+    resp->status = HID_RESP_ERROR;
+    resp->profile_index = settings_get_default_profile_index();
+    resp->profile_used_mask = settings_get_profile_used_mask();
+    return;
+  }
 
   uint8_t idx = req->profile_index;
   if (idx != SETTINGS_DEFAULT_PROFILE_NONE &&
@@ -1034,6 +1052,11 @@ static void cmd_set_active_profile(const uint8_t *in, uint8_t *out) {
   resp->profile_index = req->profile_index;
   resp->profile_used_mask = settings_get_profile_used_mask();
 
+  if (settings_is_ram_only_mode()) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
   if (req->profile_index >= SETTINGS_PROFILE_COUNT ||
       !settings_is_profile_slot_used(req->profile_index)) {
     resp->status = HID_RESP_INVALID_PARAM;
@@ -1081,28 +1104,35 @@ static void cmd_get_profile_name(const uint8_t *in, uint8_t *out) {
 }
 
 static void cmd_set_profile_name(const uint8_t *in, uint8_t *out) {
-  const hid_packet_profile_name_t *req = (const hid_packet_profile_name_t *)in;
+  const hid_packet_t *req = (const hid_packet_t *)in;
   hid_packet_profile_name_t *resp = (hid_packet_profile_name_t *)out;
   const char *name = NULL;
+  uint8_t profile_index = req->payload[0];
+  const char *requested_name = (const char *)&req->payload[1];
 
   resp->command_id = CMD_SET_PROFILE_NAME;
-  resp->profile_index = req->profile_index;
+  resp->profile_index = profile_index;
   resp->profile_used_mask = settings_get_profile_used_mask();
   memset(resp->profile_name, 0, sizeof(resp->profile_name));
 
-  if (req->profile_index >= SETTINGS_PROFILE_COUNT ||
-      !settings_is_profile_slot_used(req->profile_index)) {
+  if (settings_is_ram_only_mode()) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
+  if (profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(profile_index)) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
 
-  if (!settings_set_profile_name(req->profile_index, req->profile_name,
+  if (!settings_set_profile_name(profile_index, requested_name,
                                  SETTINGS_PROFILE_NAME_LENGTH)) {
     resp->status = HID_RESP_ERROR;
     return;
   }
 
-  name = settings_get_profile_name(req->profile_index);
+  name = settings_get_profile_name(profile_index);
   if (name == NULL) {
     resp->status = HID_RESP_ERROR;
     return;
@@ -1120,7 +1150,7 @@ static void cmd_set_profile_name(const uint8_t *in, uint8_t *out) {
 }
 
 static void cmd_create_profile(const uint8_t *in, uint8_t *out) {
-  const hid_packet_profile_name_t *req = (const hid_packet_profile_name_t *)in;
+  const hid_packet_t *req = (const hid_packet_t *)in;
   hid_packet_profile_name_t *resp = (hid_packet_profile_name_t *)out;
   const char *name = NULL;
   int8_t created_slot = -1;
@@ -1130,6 +1160,11 @@ static void cmd_create_profile(const uint8_t *in, uint8_t *out) {
   resp->profile_used_mask = settings_get_profile_used_mask();
   memset(resp->profile_name, 0, sizeof(resp->profile_name));
 
+  if (settings_is_ram_only_mode()) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+
   if (resp->profile_used_mask ==
       (uint8_t)((1u << SETTINGS_PROFILE_COUNT) - 1u)) {
     resp->status = HID_RESP_INVALID_PARAM;
@@ -1137,7 +1172,8 @@ static void cmd_create_profile(const uint8_t *in, uint8_t *out) {
   }
 
   created_slot =
-      settings_create_profile(req->profile_name, SETTINGS_PROFILE_NAME_LENGTH);
+      settings_create_profile((const char *)&req->payload[0],
+                              SETTINGS_PROFILE_NAME_LENGTH);
   if (created_slot < 0) {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
@@ -1166,6 +1202,11 @@ static void cmd_delete_profile(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_DELETE_PROFILE;
   resp->profile_index = req->profile_index;
   resp->profile_used_mask = settings_get_profile_used_mask();
+
+  if (settings_is_ram_only_mode()) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
 
   if (req->profile_index >= SETTINGS_PROFILE_COUNT) {
     resp->status = HID_RESP_INVALID_PARAM;

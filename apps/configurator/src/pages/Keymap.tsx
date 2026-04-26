@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
+import { patchActiveAppProfileSnapshot } from "@/lib/kbhe/profile-snapshot-store";
 import {
   GAMEPAD_AXIS_NAMES,
   GAMEPAD_BUTTON_NAMES,
@@ -125,7 +126,19 @@ export default function Keymap() {
     queryKey: queryKeys.keymap.allLayerKeycodes(currentLayer, profileContext),
     mutationFn: async ({ keyIndex, keycode }: { keyIndex: number; keycode: number }) => {
       markSaving();
-      await kbheDevice.setLayerKeycode(currentLayer, keyIndex, keycode);
+      const ok = await kbheDevice.setLayerKeycode(currentLayer, keyIndex, keycode);
+      if (!ok) {
+        throw new Error(`Unable to update keycode for key ${keyIndex}`);
+      }
+      patchActiveAppProfileSnapshot((snapshot) => {
+        const entry = snapshot.keySettings.find(
+          (item) => item.key_index === keyIndex && item.layer_index === currentLayer,
+        );
+        if (entry) {
+          entry.hid_keycode = keycode;
+          entry.profile_index = profileContext;
+        }
+      });
     },
     optimisticUpdate: (cur, { keyIndex, keycode }) => ({ ...(cur ?? {}), [keyIndex]: keycode }),
     onSuccess: () => markSaved(),

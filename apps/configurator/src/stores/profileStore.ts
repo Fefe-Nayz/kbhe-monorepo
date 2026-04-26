@@ -7,6 +7,7 @@ import {
 } from "@/lib/kbhe/profile-sync"
 
 const APP_STORAGE_PREFIX = "keyboard-profile:"
+const DEVICE_STORAGE_PREFIX = "keyboard-device-profile:"
 const ACTIVE_APP_PROFILE_KEY = "keyboard-active-app-profile"
 const LEGACY_ACTIVE_APP_PROFILE_KEY = "keyboard-active-profile"
 
@@ -37,6 +38,17 @@ export interface DeviceProfileRef {
   used: boolean
   isActive: boolean
   isDefault: boolean
+  mirroredAt?: number
+  firmwareSnapshot?: FirmwareProfileSnapshot
+}
+
+interface DeviceProfileMirror {
+  source: "device"
+  slot: number
+  name: string
+  used: boolean
+  mirroredAt: number
+  firmwareSnapshot?: FirmwareProfileSnapshot
 }
 
 interface RuntimeDeviceState {
@@ -73,6 +85,13 @@ interface ProfileStore {
   setActiveDeviceSlot: (slot: number | null) => void
   setDefaultDeviceSlot: (slot: number | null) => void
   setRamOnlyActive: (active: boolean) => void
+  upsertDeviceProfileMirror: (
+    slot: number,
+    name: string,
+    used: boolean,
+    firmwareSnapshot?: FirmwareProfileSnapshot | null,
+  ) => void
+  removeDeviceProfileMirror: (slot: number) => void
 
   // Legacy app-profile API
   getNumberOfProfiles: () => number
@@ -166,6 +185,56 @@ function loadAppProfilesFromStorage(): AppProfile[] {
   return profiles
 }
 
+function readDeviceProfileMirror(slot: number): DeviceProfileMirror | null {
+  const raw = localStorage.getItem(DEVICE_STORAGE_PREFIX + slot)
+  if (!raw) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<DeviceProfileMirror>
+    if (parsed.source !== "device" || parsed.slot !== slot || typeof parsed.name !== "string") {
+      return null
+    }
+
+    return {
+      source: "device",
+      slot,
+      name: parsed.name,
+      used: Boolean(parsed.used),
+      mirroredAt: typeof parsed.mirroredAt === "number" ? parsed.mirroredAt : 0,
+      ...(isFirmwareProfileSnapshot(parsed.firmwareSnapshot)
+        ? { firmwareSnapshot: parsed.firmwareSnapshot }
+        : {}),
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeDeviceProfileMirror(
+  slot: number,
+  name: string,
+  used: boolean,
+  firmwareSnapshot?: FirmwareProfileSnapshot | null,
+) {
+  const existing = readDeviceProfileMirror(slot)
+  const snapshot = firmwareSnapshot === undefined
+    ? existing?.firmwareSnapshot
+    : firmwareSnapshot ?? undefined
+
+  const record: DeviceProfileMirror = {
+    source: "device",
+    slot,
+    name,
+    used,
+    mirroredAt: Date.now(),
+    ...(snapshot ? { firmwareSnapshot: snapshot } : {}),
+  }
+
+  localStorage.setItem(DEVICE_STORAGE_PREFIX + slot, JSON.stringify(record))
+}
+
 function applyDeviceProfileFlags(
   profiles: DeviceProfileRef[],
   activeDeviceSlot: number | null,
@@ -211,12 +280,20 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   setRuntimeDeviceState: (next) => {
     set((state) => {
       const activeDeviceSlot = next.activeDeviceSlot ?? state.activeDeviceSlot
-      const defaultDeviceSlot = next.defaultDeviceSlot ?? state.defaultDeviceSlot
+      const defaultDeviceSlot = Object.prototype.hasOwnProperty.call(next, "defaultDeviceSlot")
+        ? next.defaultDeviceSlot ?? null
+        : state.defaultDeviceSlot
+      const activeSlot = Object.prototype.hasOwnProperty.call(next, "activeDeviceSlot")
+        ? next.activeDeviceSlot ?? null
+        : activeDeviceSlot
       const profileUsedMask = next.profileUsedMask ?? state.profileUsedMask
-      const ramOnlyActive = next.ramOnlyActive ?? state.ramOnlyActive
+      const ramOnlyActive = Object.prototype.hasOwnProperty.call(next, "ramOnlyActive")
+        ? Boolean(next.ramOnlyActive)
+        : state.ramOnlyActive
 
       const baseProfiles = next.deviceProfiles
         ? next.deviceProfiles.map((profile) => ({
+            ...(readDeviceProfileMirror(profile.slot) ?? {}),
             source: "device" as const,
             slot: profile.slot,
             name: profile.name,
@@ -227,11 +304,11 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         : state.deviceProfiles
 
       return {
-        activeDeviceSlot,
+        activeDeviceSlot: activeSlot,
         defaultDeviceSlot,
         profileUsedMask,
         ramOnlyActive,
-        deviceProfiles: applyDeviceProfileFlags(baseProfiles, activeDeviceSlot, defaultDeviceSlot),
+        deviceProfiles: applyDeviceProfileFlags(baseProfiles, activeSlot, defaultDeviceSlot),
       }
     })
   },
@@ -239,6 +316,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   setDeviceProfiles: (profiles) => {
     set((state) => {
       const nextProfiles = profiles.map((profile) => ({
+        ...(readDeviceProfileMirror(profile.slot) ?? {}),
         source: "device" as const,
         slot: profile.slot,
         name: profile.name,
@@ -281,6 +359,48 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
   setRamOnlyActive: (ramOnlyActive) => {
     set({ ramOnlyActive })
+  },
+
+  upsertDeviceProfileMirror: (slot, name, used, firmwareSnapshot) => {
+    writeDeviceProfileMirror(slot, name, used, firmwareSnapshot)
+    set((state) => ({
+      deviceProfiles: applyDeviceProfileFlags(
+        state.deviceProfiles.map((profile) => {
+          if (profile.slot !== slot) {
+            return profile
+          }
+          const mirror = readDeviceProfileMirror(slot)
+          return {
+            ...profile,
+            name,
+            used,
+            ...(mirror?.mirroredAt ? { mirroredAt: mirror.mirroredAt } : {}),
+            ...(mirror?.firmwareSnapshot ? { firmwareSnapshot: mirror.firmwareSnapshot } : {}),
+          }
+        }),
+        state.activeDeviceSlot,
+        state.defaultDeviceSlot,
+      ),
+    }))
+  },
+
+  removeDeviceProfileMirror: (slot) => {
+    localStorage.removeItem(DEVICE_STORAGE_PREFIX + slot)
+    set((state) => ({
+      deviceProfiles: state.deviceProfiles.map((profile) => {
+        if (profile.slot !== slot) {
+          return profile
+        }
+        return {
+          source: "device",
+          slot: profile.slot,
+          name: profile.name,
+          used: profile.used,
+          isActive: profile.isActive,
+          isDefault: profile.isDefault,
+        }
+      }),
+    }))
   },
 
   getNumberOfProfiles: () => get().appProfiles.length,

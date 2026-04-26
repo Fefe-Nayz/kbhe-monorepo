@@ -19,6 +19,13 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
+import {
+  patchActiveAppProfileAdvancedTickRate,
+  patchActiveAppProfileFilterEnabled,
+  patchActiveAppProfileFilterParams,
+  patchActiveAppProfileKeySettings,
+  patchActiveAppProfileTriggerChatterGuard,
+} from "@/lib/kbhe/profile-snapshot-store";
 import { KEY_COUNT, TRIGGER_CHATTER_GUARD_MAX_MS } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -235,20 +242,30 @@ export default function Performance() {
         }
       : patch;
 
-    await kbheDevice.setKeySettingsExtended(keyIndex, {
+    const nextSettings = {
       ...settings,
       ...effectivePatch,
       profile_index: profileContext,
       layer_index: currentLayer,
-    });
+    };
+    const ok = await kbheDevice.setKeySettingsExtended(keyIndex, nextSettings);
+    if (ok) {
+      patchActiveAppProfileKeySettings(nextSettings);
+    }
   });
 
   const liveFilterParams = useThrottledCall(async (params: FilterParams) => {
-    await kbheDevice.setFilterParams(params.noise_band, params.alpha_min_denom, params.alpha_max_denom);
+    const ok = await kbheDevice.setFilterParams(params.noise_band, params.alpha_min_denom, params.alpha_max_denom);
+    if (ok) {
+      patchActiveAppProfileFilterParams(params);
+    }
   });
 
   const liveTickRate = useThrottledCall(async (v: number) => {
-    await kbheDevice.setAdvancedTickRate(v);
+    const ok = await kbheDevice.setAdvancedTickRate(v);
+    if (ok) {
+      patchActiveAppProfileAdvancedTickRate(v);
+    }
   });
 
   // ── Commit mutations (fire on pointer-up, update query cache) ──
@@ -283,12 +300,18 @@ export default function Performance() {
               }
             : patch;
 
-          await kbheDevice.setKeySettingsExtended(targetKeyIndex, {
+          const nextSettings = {
             ...base,
             ...effectivePatch,
             profile_index: profileContext,
             layer_index: currentLayer,
-          });
+          };
+
+          const ok = await kbheDevice.setKeySettingsExtended(targetKeyIndex, nextSettings);
+          if (!ok) {
+            throw new Error(`Unable to update key settings for key ${targetKeyIndex}`);
+          }
+          patchActiveAppProfileKeySettings(nextSettings);
         }),
       );
     },
@@ -328,19 +351,37 @@ export default function Performance() {
 
   const filterMutation = useOptimisticMutation<boolean, boolean, boolean>({
     queryKey: queryKeys.device.filterEnabled(),
-    mutationFn: (v) => kbheDevice.setFilterEnabled(v),
+    mutationFn: async (v) => {
+      const ok = await kbheDevice.setFilterEnabled(v);
+      if (ok) {
+        patchActiveAppProfileFilterEnabled(v);
+      }
+      return ok;
+    },
     optimisticUpdate: (_cur, v) => v,
   });
 
   const filterParamsMutation = useOptimisticMutation<FilterParams, FilterParams, boolean>({
     queryKey: ["device", "filterParams"],
-    mutationFn: (p) => kbheDevice.setFilterParams(p.noise_band, p.alpha_min_denom, p.alpha_max_denom),
+    mutationFn: async (p) => {
+      const ok = await kbheDevice.setFilterParams(p.noise_band, p.alpha_min_denom, p.alpha_max_denom);
+      if (ok) {
+        patchActiveAppProfileFilterParams(p);
+      }
+      return ok;
+    },
     optimisticUpdate: (_cur, p) => p,
   });
 
   const tickMutation = useOptimisticMutation<number, number, boolean>({
     queryKey: queryKeys.device.advancedTickRate(),
-    mutationFn: (v) => kbheDevice.setAdvancedTickRate(v),
+    mutationFn: async (v) => {
+      const ok = await kbheDevice.setAdvancedTickRate(v);
+      if (ok) {
+        patchActiveAppProfileAdvancedTickRate(v);
+      }
+      return ok;
+    },
     optimisticUpdate: (_cur, v) => v,
   });
 
@@ -355,7 +396,12 @@ export default function Performance() {
       return kbheDevice.setTriggerChatterGuard(next.enabled, next.duration_ms);
     },
     optimisticUpdate: (_cur, next) => next,
-    onSuccess: () => markSaved(),
+    onSuccess: (ok, next) => {
+      if (ok) {
+        patchActiveAppProfileTriggerChatterGuard(next);
+      }
+      markSaved();
+    },
     onError: () => markError(),
   });
 
@@ -400,6 +446,10 @@ export default function Performance() {
           const ok = await kbheDevice.resetKeyTriggerSettings(targetKeyIndex);
           if (!ok) {
             throw new Error(`Unable to reset trigger settings for key ${targetKeyIndex}`);
+          }
+          const nextSettings = await kbheDevice.getKeySettings(targetKeyIndex, profileContext, currentLayer);
+          if (nextSettings) {
+            patchActiveAppProfileKeySettings(nextSettings);
           }
         }),
       );

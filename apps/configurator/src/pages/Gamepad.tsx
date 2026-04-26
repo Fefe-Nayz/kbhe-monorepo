@@ -15,6 +15,11 @@ import { LayerSelect } from "@/components/layer-select";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type GamepadSettings, type GamepadCurvePoint } from "@/lib/kbhe/device";
 import {
+  patchActiveAppProfileGamepadSettings,
+  patchActiveAppProfileKeyGamepadMap,
+  patchActiveAppProfileOptions,
+} from "@/lib/kbhe/profile-snapshot-store";
+import {
   GAMEPAD_AXES,
   GAMEPAD_BUTTONS,
   GAMEPAD_DIRECTIONS,
@@ -115,7 +120,15 @@ export default function Gamepad() {
   const gamepadMutation = useMutation({
     mutationFn: async (patch: Partial<GamepadSettings>) => {
       markSaving();
-      await kbheDevice.setGamepadSettings(patch);
+      const base = gamepadQ.data;
+      if (!base) {
+        return;
+      }
+      const next: GamepadSettings = { ...base, ...patch };
+      const ok = await kbheDevice.setGamepadSettings(next);
+      if (ok) {
+        patchActiveAppProfileGamepadSettings(next);
+      }
     },
     onSuccess: () => {
       markSaved();
@@ -138,7 +151,13 @@ export default function Gamepad() {
     }) => {
       if (keyIndex == null) return;
       markSaving();
-      await kbheDevice.setKeyGamepadMap(keyIndex, axis, direction, button, layerMask);
+      const ok = await kbheDevice.setKeyGamepadMap(keyIndex, axis, direction, button, layerMask);
+      if (ok) {
+        const next = await kbheDevice.getKeyGamepadMap(keyIndex);
+        if (next) {
+          patchActiveAppProfileKeyGamepadMap(next);
+        }
+      }
     },
     onSuccess: () => {
       markSaved();
@@ -150,7 +169,13 @@ export default function Gamepad() {
 
   const gamepadEnabledMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      await kbheDevice.setGamepadEnabled(enabled);
+      const ok = await kbheDevice.setGamepadEnabled(enabled);
+      if (ok && optionsQ.data) {
+        patchActiveAppProfileOptions({
+          ...optionsQ.data,
+          gamepad_enabled: enabled,
+        });
+      }
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.device.options() });
@@ -252,7 +277,11 @@ export default function Gamepad() {
   // Live preview during drag: throttled runtime-only SET, no query cache update.
   const liveCurveUpdate = useThrottledCall(async (pts: CurvePoint[]) => {
     if (!gs) return;
-    await kbheDevice.setGamepadSettings({ ...gs, curve_points: editorCurveToDevice(pts) });
+    const next: GamepadSettings = { ...gs, curve_points: editorCurveToDevice(pts) };
+    const ok = await kbheDevice.setGamepadSettings(next);
+    if (ok) {
+      patchActiveAppProfileGamepadSettings(next);
+    }
   });
 
   const handleCurveChange = useCallback(
