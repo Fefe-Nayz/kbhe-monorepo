@@ -1,0 +1,61 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "kbhe-configurator",
+  "version": "0.1.0",
+  "identifier": "com.kbhe.configurator",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "KBHE Configurator",
+        "visible": false,
+        "backgroundColor": "#00000000",
+        "transparent": true,
+        "windowEffects": {
+          "effects": [
+            "mica"
+          ]
+        },
+        "width": 1280,
+        "height": 720,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "resizable": true,
+        "fullscreen": false
+      },
+      {
+        "label": "splashscreen",
+        "url": "splashscreen.html",
+        "backgroundColor": "#0F172A",
+        "width": 420,
+        "height": 260,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

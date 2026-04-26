@@ -1,0 +1,561 @@
+.kle-root {
+  --kle-gap: 6px;
+  --kle-frame-padding: 18px;
+  --kle-top-inset: 6px;
+  --kle-top-layer-offset: 0px;
+  --kle-top-layer-offset-hover: 0px;
+  --kle-top-layer-offset-active: 0px;
+  --kle-radius: var(--radius, 0.5rem);
+  --kle-key-color: #cccccc;
+  --kle-outer-stroke: rgba(0, 0, 0, 0.28);
+  --kle-inner-stroke: rgba(255, 255, 255, 0.78);
+  --kle-legend-color: #111827;
+
+  box-sizing: border-box;
+  position: relative;
+  overflow: visible;
+  padding: var(--kle-frame-padding);
+}
+
+.kle-root[data-kle-theme="kle"] {
+  border: 1px solid #a8a8a8;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.kle-root[data-kle-theme="modern"] {
+  --kle-key-color: var(--card, oklch(1 0 0));
+  --kle-legend-color: var(--card-foreground, oklch(0.145 0 0));
+  --kle-outer-stroke: var(--border, oklch(0.922 0 0));
+  --kle-inner-stroke: color-mix(in oklch, var(--border, oklch(0.922 0 0)) 70%, white 30%);
+  --kle-top-layer-offset: -1px;
+  --kle-top-layer-offset-hover: -1px;
+  --kle-top-layer-offset-active: 1px;
+
+  border: 1px solid var(--border, oklch(0.922 0 0));
+  border-radius: calc(var(--kle-radius) + 0.35rem);
+  background: var(--background, oklch(1 0 0));
+  box-shadow: none;
+}
+
+.kle-stage {
+  position: relative;
+  overflow: visible;
+}
+
+.kle-key-wrapper {
+  position: absolute;
+  overflow: visible;
+}
+
+.kle-key {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: default;
+  outline: none;
+  filter: saturate(var(--kle-key-saturation, 1));
+  opacity: var(--kle-key-opacity, 1);
+}
+
+.kle-key--interactive {
+  cursor: pointer;
+}
+
+.kle-key-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: filter 120ms ease;
+}
+
+.kle-key--interactive:hover .kle-key-svg,
+.kle-key--interactive:focus-visible .kle-key-svg {
+  transform: none;
+}
+
+.kle-key--interactive:active .kle-key-svg {
+  transform: none;
+}
+
+.kle-key--interactive:focus-visible {
+  outline: none;
+}
+
+.kle-key--ghost {
+  opacity: 0.58;
+}
+
+.kle-key--selected .kle-key-svg {
+  filter: none;
+}
+
+.kle-key-ring {
+  fill: none;
+  stroke: oklch(0.62 0.19 255);
+  stroke-opacity: 0.95;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.kle-key-shape {
+  filter: none;
+}
+
+.kle-key-shape--top {
+  transform: translateY(var(--kle-top-layer-offset));
+  transition: transform 120ms ease;
+}
+
+.kle-root[data-kle-theme="kle"] .kle-key-shape-outer {
+  fill: color-mix(in srgb, var(--kle-key-color) 88%, #8e8e8e 12%);
+}
+
+.kle-root[data-kle-theme="kle"] .kle-key-shape-inner {
+  fill: color-mix(in srgb, var(--kle-key-color) 62%, white 38%);
+}
+
+.kle-root[data-kle-theme="kle"] .kle-key-stroke-outer {
+  fill: none;
+  stroke: var(--kle-outer-stroke);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.kle-root[data-kle-theme="kle"] .kle-key-stroke-inner {
+  fill: none;
+  stroke: var(--kle-inner-stroke);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key-shape {
+  filter: none;
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key-shape--base {
+  filter: none;
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key-shape-outer {
+  fill: color-mix(in srgb, var(--kle-key-color) 82%, var(--border, oklch(0.922 0 0)) 18%);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key-shape-inner {
+  fill: color-mix(in srgb, var(--kle-key-color) 94%, white 6%);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key-stroke-outer,
+.kle-root[data-kle-theme="modern"] .kle-key-stroke-inner {
+  fill: none;
+  stroke: var(--kle-outer-stroke);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key-stroke-inner {
+  stroke: var(--kle-inner-stroke);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:hover .kle-key-shape-outer,
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:focus-visible .kle-key-shape-outer {
+  fill: color-mix(in srgb, var(--kle-key-color) 74%, var(--accent, oklch(0.97 0 0)) 26%);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:hover .kle-key-shape-inner,
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:focus-visible .kle-key-shape-inner {
+  fill: color-mix(in srgb, var(--kle-key-color) 80%, var(--accent, oklch(0.97 0 0)) 20%);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:active .kle-key-shape-outer {
+  fill: color-mix(in srgb, var(--kle-key-color) 70%, var(--accent, oklch(0.97 0 0)) 30%);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:active .kle-key-shape-inner {
+  fill: color-mix(in srgb, var(--kle-key-color) 76%, var(--accent, oklch(0.97 0 0)) 24%);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:hover .kle-key-shape--top,
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:focus-visible .kle-key-shape--top {
+  transform: translateY(var(--kle-top-layer-offset-hover));
+}
+
+.kle-root[data-kle-theme="modern"] .kle-key--interactive:active .kle-key-shape--top {
+  transform: translateY(var(--kle-top-layer-offset-active));
+}
+
+.kle-key--decal .kle-key-stroke-outer,
+.kle-key--decal .kle-key-stroke-inner {
+  stroke-dasharray: 5 4;
+}
+
+.kle-key-stepped-indicator {
+  fill: rgba(0, 0, 0, 0.12);
+}
+
+.kle-key-nub-indicator {
+  fill: rgba(0, 0, 0, 0.18);
+}
+
+.kle-legends {
+  --kle-legends-extra-padding: 4px;
+  position: absolute;
+  inset: calc(var(--kle-top-inset) + var(--kle-legends-extra-padding));
+  pointer-events: none;
+  transform: translateY(var(--kle-top-layer-offset));
+  transition: transform 120ms ease;
+}
+
+.kle-key--interactive:hover .kle-legends,
+.kle-key--interactive:focus-visible .kle-legends {
+  transform: translateY(var(--kle-top-layer-offset-hover));
+}
+
+.kle-key--interactive:active .kle-legends {
+  transform: translateY(var(--kle-top-layer-offset-active));
+}
+
+.kle-root[data-kle-theme="modern"] .kle-legends {
+  --kle-legends-extra-padding: 6px;
+}
+
+.kle-legend-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: inherit;
+}
+
+.kbhe-gp-split-overlay {
+  position: absolute;
+  inset: calc(-1 * var(--kle-legends-extra-padding, 6px));
+  overflow: hidden;
+  color: inherit;
+  pointer-events: none;
+}
+
+.kbhe-gp-split-divider {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  overflow: visible;
+  opacity: 0.58;
+}
+
+.kbhe-gp-split-divider line {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: square;
+  vector-effect: non-scaling-stroke;
+}
+
+.kbhe-gp-split-triangle {
+  stroke: none;
+  fill: currentColor;
+}
+
+.kbhe-gp-split-triangle--gamepad {
+  fill-opacity: 0.04;
+}
+
+.kbhe-gp-split-triangle--keyboard {
+  fill-opacity: 0.1;
+}
+
+.kbhe-gp-split-gamepad {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 58%;
+  height: 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: pre-line;
+  font-weight: 600;
+  color: inherit;
+  pointer-events: none;
+  line-height: 0.95;
+}
+
+.kbhe-gp-split-gamepad--simple {
+  font-size: 0.72rem;
+}
+
+.kbhe-gp-split-gamepad--special {
+  font-size: 0.6rem;
+}
+
+.kbhe-gp-split-keyboard-simple {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 58%;
+  height: 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: pre-line;
+  font-weight: 600;
+  color: inherit;
+  pointer-events: none;
+  line-height: 0.95;
+}
+
+.kbhe-gp-split-keyboard-simple--simple {
+  font-size: 0.72rem;
+}
+
+.kbhe-gp-split-keyboard-layout--special {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.kbhe-gp-split-keyboard-slot--special {
+  position: absolute;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.46rem !important;
+  line-height: 0.85;
+  font-weight: 600;
+  color: inherit;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--top-left {
+  top: 54%;
+  left: 54%;
+  right: auto;
+  bottom: auto;
+  justify-content: flex-start;
+  text-align: left;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--top-center {
+  top: 54%;
+  left: 76%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--top-right {
+  top: 54%;
+  right: 6%;
+  left: auto;
+  bottom: auto;
+  justify-content: flex-end;
+  text-align: right;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--middle-left {
+  top: 74%;
+  left: 54%;
+  right: auto;
+  bottom: auto;
+  transform: translateY(-50%);
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--center {
+  top: 74%;
+  left: 76%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  max-width: 42%;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--middle-right {
+  top: 74%;
+  right: 6%;
+  left: auto;
+  bottom: auto;
+  transform: translateY(-50%);
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--bottom-left {
+  bottom: 8%;
+  left: 54%;
+  right: auto;
+  top: auto;
+  justify-content: flex-start;
+  text-align: left;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--bottom-center {
+  bottom: 8%;
+  left: 76%;
+  right: auto;
+  top: auto;
+  transform: translateX(-50%);
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--bottom-right {
+  bottom: 8%;
+  right: 6%;
+  top: auto;
+  left: auto;
+  justify-content: flex-end;
+  text-align: right;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--front-left {
+  bottom: 2%;
+  left: 54%;
+  right: auto;
+  top: auto;
+  transform: none;
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--front-center {
+  bottom: 2%;
+  left: 76%;
+  right: auto;
+  top: auto;
+  transform: translateX(-50%);
+}
+
+.kbhe-gp-split-keyboard-layout--special .kle-legend--front-right {
+  bottom: 2%;
+  right: 6%;
+  left: auto;
+  top: auto;
+  transform: none;
+}
+
+.kle-legend {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 88%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.05;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--kle-legend-color);
+}
+
+.kle-root[data-kle-theme="modern"] .kle-legend {
+  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.kle-legend--placeholder {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  opacity: 0.08;
+  background: currentColor;
+}
+
+.kle-legend--top-left {
+  top: 8%;
+  left: 8%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.kle-legend--top-center {
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.kle-legend--top-right {
+  top: 8%;
+  right: 8%;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.kle-legend--middle-left {
+  top: 50%;
+  left: 8%;
+  transform: translateY(-50%);
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.kle-legend--center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 92%;
+}
+
+.kle-legend--middle-right {
+  top: 50%;
+  right: 8%;
+  transform: translateY(-50%);
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.kle-legend--bottom-left {
+  left: 8%;
+  bottom: 12%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.kle-legend--bottom-center {
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+}
+
+.kle-legend--bottom-right {
+  right: 8%;
+  bottom: 12%;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.kle-legend--front-left,
+.kle-legend--front-center,
+.kle-legend--front-right {
+  bottom: 4%;
+  font-size: 10px !important;
+  opacity: 0.72;
+}
+
+.kle-legend--front-left {
+  left: 8%;
+}
+
+.kle-legend--front-center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.kle-legend--front-right {
+  right: 8%;
+}
