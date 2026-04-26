@@ -4,13 +4,19 @@ KBHE is a Hall effect keyboard project packaged as one product monorepo: STM32 f
 
 **CAD full assembly (v13)**
 
-![75HE assembly render](assets/75HE_Assemblage_v13.png)
+![75HE assembly render](assets/photos/cad-assembly/75he-assembly-render-v13.png)
 
 **Photo: assembled 75% (RGB)**
 
-![75HE photo assembled with RGB backlit](assets/PXL_20260420_165714876.RAW-01.COVER.png)
+![75HE photo assembled with RGB backlit](assets/photos/keyboard-build/75he-assembled-rgb-2026-04-20.png)
 
-## Final 75HE PCB (full board)
+## 75HE v1.0 PCB (real photos)
+
+| Top (soldered components) | Bottom (solder side, hand-held) |
+| --- | --- |
+| ![75HE v1.0 top photo](assets/photos/keyboard-pcb/75he-v1-0-pcb-top-photo-2026-04-08.jpeg) | ![75HE v1.0 bottom photo](assets/photos/keyboard-pcb/75he-v1-0-pcb-bottom-in-hand-2026-04-08.jpeg) |
+
+## Final 75HE PCB (full board, KiCad 3D)
 
 Renders of the main production board (component side and solder side), as exported from the KiCad project in `hardware/pcb/75he/Assets/`.
 
@@ -20,15 +26,29 @@ Renders of the main production board (component side and solder side), as export
 
 ## Build and lab photos
 
-Real hardware alongside CAD: plate and printed top case, 3D print on the build plate, and an early MCU test PCB (silk `STLink` / `DFU` next to the programming documentation above).
+Real hardware alongside CAD: plate, printed case, 3D print, MCU breakout, 6-key hall test board, and the TIPE HE v0.1 multiplexer board.
 
 | Plate + 3D-printed case | FDM print in progress on the build plate |
 | --- | --- |
-| ![75% metal plate and printed top](assets/IMG_20260416_135403366.jpg) | ![Keyboard part printing on 3D printer](assets/IMG_20260416_144722641.jpg) |
+| ![75% metal plate and printed top](assets/photos/keyboard-build/plate-and-3d-top-case-2026-04-16.jpg) | ![Keyboard part printing on 3D printer](assets/photos/keyboard-build/fdm-print-on-build-plate-2026-04-16.jpg) |
 
-| MCU / breakout board (photo) | 6-key hall test PCB (photo) |
+| MCU test PCB (STLink + DFU) | 6-key hall test board (wired) |
 | --- | --- |
-| ![MCU test PCB with STLink and DFU silkscreen](assets/PXL_20260425_220212564.RAW-01.COVER.jpg) | ![6-key hall prototype with wired harness](assets/PXL_20260425_220409142.RAW-01.COVER.jpg) |
+| ![MCU test PCB with STLink and DFU](assets/photos/mcu-dev-board/mcu-test-pcb-stlink-dfu-2026-04-25.jpg) | ![6-key hall test board with harness](assets/photos/legacy-proto/6key-hall-test-board-wired-2026-04-25.jpg) |
+
+| MCU test PCB, USB/DFU (top) | MCU test PCB, DFU + wire harness |
+| --- | --- |
+| ![MCU top USB / DFU](assets/photos/mcu-dev-board/mcu-test-pcb-top-usb-2026-04-25.jpg) | ![MCU DFU, USB-C, flying wires](assets/photos/mcu-dev-board/mcu-test-pcb-top-dfu-usb-c-wired-2026-04-26.jpg) |
+
+**« TIPE Keyboard HE v0.1 »** (CD74HC4067 + six hall inputs, wired for bench tests)
+
+![Tipe v0.1 board wired](assets/photos/legacy-proto/keyboard-he-v0-1-multiplexer-wired-2026-04-26.jpg)
+
+## TIPE workshop, 14 Apr 2026 (session photos)
+
+| Atelier (1) | Atelier (2) | Atelier (3) |
+| --- | --- | --- |
+| ![Tipe workshop 1](assets/photos/workshop-2026-04-14/tipe-workshop-2026-04-14-01.jpg) | ![Tipe workshop 2](assets/photos/workshop-2026-04-14/tipe-workshop-2026-04-14-02.jpg) | ![Tipe workshop 3](assets/photos/workshop-2026-04-14/tipe-workshop-2026-04-14-03.jpg) |
 
 ## First-time board programming (STM32CubeProgrammer, DFU)
 
@@ -42,7 +62,7 @@ The **first** time you program a **blank** board you need a Release build, the p
 - `apps/configurator/` - Tauri desktop configurator for key settings, calibration, lighting, firmware flashing and app updates.
 - `hardware/pcb/75he/` - KiCad PCB project with project-local libraries, 3D models, documentation and legacy PCB revisions.
 - `hardware/3d/` - mechanical source files and exported models. Large mechanical formats are tracked with Git LFS.
-- `assets/` - product photos, assembly and exploded views used in documentation and presentation.
+- `assets/` - documentation images: `assets/photos/` (sorted by kind: `keyboard-pcb/`, `mcu-dev-board/`, `workshop-2026-04-14/`, etc.), and `assets/cad/75he-exploded/` for CAD renders. PDFs and other project documents stay in `assets/`.
 - `tools/` - host-side Python tools, firmware utilities, analysis scripts and integrations.
 - `docs/` - shared documentation and release notes.
 - `layouts/` and `data/` - keyboard layout data and firmware support data.
@@ -57,6 +77,10 @@ cmake --build --preset Release
 Artifacts are written to `build/Release/`. The CI also builds `Release-apponly` for app-only firmware packages. For a **first** flash of blank hardware, follow [docs/firmware/overview.md](docs/firmware/overview.md) (DFU, STM32CubeProgrammer) before relying on the app’s HID updater.
 
 ## Configurator
+
+The desktop app handles keymap, performance, Gamepad, calibration, the rotary encoder, lighting, and firmware over RAW HID. Example: **Keymap** tab for a 75% ISO-FR layout.
+
+![KBHE configurator, Keymap tab](assets/photos/software/kbhe-configurator-keymap-2026-04-26.png)
 
 ```powershell
 cd apps/configurator
@@ -94,11 +118,11 @@ The current mechanical files are under `hardware/3d/current/`; older exports are
 
 ## PCB and CAD (exploded views)
 
-The KiCad project is self-contained under `hardware/pcb/75he/`: footprints, symbols, 3D models and useful component documentation are stored inside the project tree. **Illustration renders** and **photos** of the run live under the top-level `assets/` folder. Legacy KiCad projects are under `hardware/pcb/75he/Legacy/`.
+The KiCad project is self-contained under `hardware/pcb/75he/`: footprints, symbols, 3D models and useful component documentation are stored inside the project tree. **Illustration renders** and **photos** of the run live under `assets/` (see `assets/photos` and `assets/cad/75he-exploded`). Legacy KiCad projects are under `hardware/pcb/75he/Legacy/`.
 
 | Exploded (face) | Exploded (back) | 3/4 view |
 | --- | --- | --- |
-| ![Exploded face](assets/Vue_eclatee_face_v2.png) | ![Exploded back](assets/vue_eclatee_dos_v2.png) | ![3/4 right](assets/Vue_eclatee_3_quarts_droite_v2.png) |
+| ![Exploded face](assets/cad/75he-exploded/face-v2.png) | ![Exploded back](assets/cad/75he-exploded/back-v2.png) | ![3/4 right](assets/cad/75he-exploded/three-quarter-right-v2.png) |
 
 ### Legacy KiCad prototypes (3D render exports)
 
