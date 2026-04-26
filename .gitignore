@@ -1,0 +1,71 @@
+# Build outputs
+/build/
+/dist/
+/out/
+/cmake-build-*/
+**/target/
+**/node_modules/
+**/dist/
+**/build/
+
+# CMake/Ninja
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+build.ninja
+.ninja_*
+
+# Firmware artifacts
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.su
+*.d
+*.o
+*.obj
+*.a
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE/editor
+.idea/
+.metadata/
+.history/
+.cache/
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# OS and temp files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
+
+# KiCad local/generated outputs
+**/*-backups/
+**/.history/
+**/fp-info-cache
+**/gerbers/
+**/plots/
+**/fabrication/
