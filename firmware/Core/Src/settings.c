@@ -21,7 +21,7 @@
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0109 // v1.9.0
+#define FIRMWARE_VERSION 0x0200 // v2.0.0
 #define KBHE_FW_VERSION_RECORD_MAGIC 0x4B465756u
 
 typedef struct __attribute__((packed)) {

@@ -64,3 +64,15 @@ The current mechanical files are under `hardware/3d/current/`; older exports are
 The KiCad project is self-contained under `hardware/pcb/75he/`: footprints, symbols, 3D models and useful component documentation are stored inside the project tree. Legacy PCB prototypes live under `hardware/pcb/75he/Legacy/`.
 
 ![75HE PCB back](hardware/pcb/75he/Assets/75he-back.png)
+
+## Current limitations - TODOs
+- For transparen keycaps the space bar lacks leds on the sides
+- For the enter key the led is colliding with the stabilizer which needs to be cut
+- DFU switch should be hidden
+- Wireless version
+- Underglow
+- Reversed mounted LEDs (single side pcb)
+- Mountiing holes placements may need to be adjusted
+- Try lowering pcb layer count without sacrificing noise performance
+- Add support for libhmk
+- Final touches on 3D models: adjust tolerances, raise the top case
