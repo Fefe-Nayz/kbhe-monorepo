@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isTauri } from "@tauri-apps/api/core";
 import { useState } from "react";
 import { PageContent } from "@/components/shared/PageLayout";
 import { FormRow, SectionCard } from "@/components/shared/SectionCard";
 import { useTheme } from "@/components/theme-provider";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,9 +39,10 @@ import {
   type CloseLightingPreferences,
   type StartupWindowMode,
 } from "@/lib/app-startup";
+import { checkAppUpdate, downloadAndRunAppInstaller } from "@/lib/kbhe/releases";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { LEDEffect, LED_EFFECT_NAMES } from "@/lib/kbhe/protocol";
-import { IconAlertTriangle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconDownload, IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
 
 type ThemeMode = "light" | "dark" | "system";
@@ -47,6 +50,7 @@ type ThemeMode = "light" | "dark" | "system";
 const APP_QUERY_KEYS = {
   startupPreferences: ["app", "startup-preferences"] as const,
   launchOnStartup: ["app", "launch-on-startup"] as const,
+  release: ["app", "release"] as const,
 };
 
 const RESETTABLE_LOCAL_STORAGE_KEYS = new Set([
@@ -113,6 +117,14 @@ export default function AppSettings() {
     queryFn: getLaunchOnStartupEnabled,
   });
 
+  const appUpdateQ = useQuery({
+    queryKey: APP_QUERY_KEYS.release,
+    queryFn: checkAppUpdate,
+    enabled: isTauri(),
+    refetchInterval: 60 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const startupModeMutation = useMutation({
     mutationFn: async (mode: StartupWindowMode) => {
       await setStartupPreferences({ startupMode: mode });
@@ -137,6 +149,19 @@ export default function AppSettings() {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "Failed to update launch on startup.";
+      toast.error(message);
+    },
+  });
+
+  const appUpdateMutation = useMutation({
+    mutationFn: async (tag: string) => {
+      await downloadAndRunAppInstaller(tag);
+    },
+    onSuccess: () => {
+      toast.success("Installer launched.");
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Failed to install update.";
       toast.error(message);
     },
   });
@@ -176,6 +201,54 @@ export default function AppSettings() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <PageContent containerClassName="max-w-2xl">
+        {isTauri() && (
+          <SectionCard
+            title="Application Update"
+            description={
+              appUpdateQ.data?.updateAvailable
+                ? `Release ${appUpdateQ.data.tag ?? appUpdateQ.data.version} is available.`
+                : appUpdateQ.isLoading
+                  ? "Checking GitHub releases..."
+                  : "Application is up to date."
+            }
+          >
+            <FormRow
+              label="Latest Installer"
+              description={appUpdateQ.data?.assetName ?? "No installer update available"}
+            >
+              <div className="flex items-center gap-2">
+                {appUpdateQ.data?.version && (
+                  <Badge variant="secondary" className="font-mono">
+                    {appUpdateQ.data.version}
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={appUpdateQ.isFetching || appUpdateMutation.isPending}
+                  onClick={() => {
+                    void appUpdateQ.refetch();
+                  }}
+                  title="Check again"
+                >
+                  <IconRefresh className="size-4" />
+                </Button>
+                <Button
+                  className="gap-2"
+                  disabled={!appUpdateQ.data?.tag || !appUpdateQ.data.updateAvailable || appUpdateMutation.isPending}
+                  onClick={() => {
+                    const tag = appUpdateQ.data?.tag;
+                    if (tag) appUpdateMutation.mutate(tag);
+                  }}
+                >
+                  <IconDownload className="size-4" />
+                  {appUpdateMutation.isPending ? "Downloading..." : "Install Update"}
+                </Button>
+              </div>
+            </FormRow>
+          </SectionCard>
+        )}
+
         <SectionCard
           title="Appearance"
           description="Personalize how the configurator looks on this machine."

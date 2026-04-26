@@ -5,8 +5,20 @@ on:
     branches:
       - main
     tags:
-      - "v*"
+      - "firmware-v*"
+    paths:
+      - "firmware/**"
+      - "tools/host/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/firmware.yml"
   pull_request:
+    paths:
+      - "firmware/**"
+      - "tools/host/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/firmware.yml"
   workflow_dispatch:
 
 permissions:
@@ -66,6 +78,13 @@ jobs:
           cp build/Release-apponly/kbhe.hex dist/kbhe-app-only.hex
           cp build/Release-apponly/kbhe.elf dist/kbhe-app-only.elf
           cp build/Release-apponly/kbhe.map dist/kbhe-app-only.map
+          cat > dist/firmware-manifest.json <<EOF
+          {
+            "tag": "${GITHUB_REF_NAME}",
+            "commit": "${GITHUB_SHA}",
+            "primaryBinary": "kbhe-app.bin"
+          }
+          EOF
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v7
@@ -75,7 +94,7 @@ jobs:
           if-no-files-found: error
 
       - name: Create GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/firmware-v')
         uses: softprops/action-gh-release@v3
         with:
           files: dist/*

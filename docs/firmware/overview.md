@@ -253,11 +253,11 @@ pip install hidapi PySide6 numpy matplotlib pandas
 Le workflow `.github/workflows/firmware.yml` construit automatiquement `Release` et `Release-apponly` sur chaque push vers `main`, pull request et lancement manuel.
 
 - Les artifacts de build sont disponibles dans l'onglet Actions.
-- Pour publier une release GitHub, pousser un tag `v*`, par exemple :
+- Pour publier une release GitHub consommable par le configurateur, pousser un tag `firmware-v*`, par exemple :
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag firmware-v0.1.0
+git push origin firmware-v0.1.0
 ```
 
 ## Documentation complementaire

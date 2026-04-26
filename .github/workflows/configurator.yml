@@ -1,0 +1,71 @@
+name: Configurator CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "app-v*"
+    paths:
+      - "apps/configurator/**"
+      - ".github/workflows/configurator.yml"
+  pull_request:
+    paths:
+      - "apps/configurator/**"
+      - ".github/workflows/configurator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build configurator
+    runs-on: windows-latest
+
+    env:
+      KBHE_RELEASE_OWNER: ${{ github.repository_owner }}
+      KBHE_RELEASE_REPO: ${{ github.event.repository.name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        working-directory: apps/configurator
+        run: bun install --frozen-lockfile
+
+      - name: Lint frontend
+        working-directory: apps/configurator
+        run: bun run lint
+
+      - name: Build frontend
+        working-directory: apps/configurator
+        run: bun run build
+
+      - name: Check Tauri backend
+        working-directory: apps/configurator/src-tauri
+        run: cargo check --locked
+
+      - name: Build and publish installer
+        if: startsWith(github.ref, 'refs/tags/app-v')
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KBHE_RELEASE_OWNER: ${{ github.repository_owner }}
+          KBHE_RELEASE_REPO: ${{ github.event.repository.name }}
+        with:
+          projectPath: apps/configurator
+          tagName: ${{ github.ref_name }}
+          releaseName: KBHE Configurator ${{ github.ref_name }}
+          releaseBody: Installer build for KBHE Configurator.
+          releaseDraft: false
+          prerelease: false

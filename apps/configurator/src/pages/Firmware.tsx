@@ -7,6 +7,10 @@ import { open as tauriOpen } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheFirmware, resolveFirmwareVersion, type FirmwareResolveResult } from "@/lib/kbhe/firmware";
+import {
+  checkFirmwareUpdate,
+  downloadFirmwareRelease,
+} from "@/lib/kbhe/releases";
 import { kbheTransport } from "@/lib/kbhe/transport";
 import { formatFirmwareVersion } from "@/lib/kbhe/protocol";
 import { Button } from "@/components/ui/button";
@@ -29,6 +33,8 @@ import {
   IconAlertTriangle,
   IconFileUpload,
   IconCheck,
+  IconDownload,
+  IconRefresh,
   IconX,
   IconPlugConnected,
   IconPlugConnectedX,
@@ -54,6 +60,14 @@ export default function Firmware() {
     staleTime: 1000,
   });
 
+  const firmwareUpdateQ = useQuery({
+    queryKey: ["release", "firmware", firmwareVersion],
+    queryFn: () => checkFirmwareUpdate(firmwareVersion),
+    enabled: isTauri(),
+    refetchInterval: 30 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const bootloaderDetected = !connected && Boolean(bootloaderPresenceQ.data);
   const connectedForStatus = connected || bootloaderDetected;
   const updateModeDetected = status === "updater" || bootloaderDetected;
@@ -66,6 +80,8 @@ export default function Firmware() {
   const [flashState, setFlashState] = useState<FlashState>("idle");
   const [flashProgress, setFlashProgress] = useState(0);
   const [flashLog, setFlashLog] = useState<string[]>([]);
+  const [firmwareUpdateError, setFirmwareUpdateError] = useState<string | null>(null);
+  const [firmwareUpdateState, setFirmwareUpdateState] = useState<"idle" | "downloading" | "flashing" | "error">("idle");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [timeoutSec, setTimeoutSec] = useState(5);
   const [retries, setRetries] = useState(5);
@@ -361,12 +377,18 @@ export default function Firmware() {
     logEndRef.current?.scrollIntoView({ block: "end" });
   }, [flashLog]);
 
-  const handleFlash = useCallback(async () => {
-    if (!firmwareBytes) return;
+  const runFlash = useCallback(async (
+    bytes: Uint8Array,
+    path: string | null,
+    versionInfo: FirmwareResolveResult | null,
+    resetLog = true,
+  ) => {
     setConfirmOpen(false);
     setFlashState("flashing");
     setFlashProgress(0);
-    setFlashLog([]);
+    if (resetLog) {
+      setFlashLog([]);
+    }
 
     const reconnectSession = async () => {
       appendLog("Reconnecting device session...");
@@ -388,9 +410,9 @@ export default function Firmware() {
 
       let finalVersion: number;
 
-      if (filePath && isTauri()) {
+      if (path && isTauri()) {
         // Native fast path: entire flash loop runs in Rust (no IPC per packet)
-        const { version: resolvedVersion } = resolveFirmwareVersion(firmwareBytes, fileVersion?.version);
+        const { version: resolvedVersion } = resolveFirmwareVersion(bytes, versionInfo?.version);
 
         const phaseLabels: Record<string, string> = {
           connecting: "Entering bootloader mode…",
@@ -425,7 +447,7 @@ export default function Firmware() {
 
         try {
           await invoke("kbhe_flash_firmware", {
-            firmwarePath: filePath,
+            firmwarePath: path,
             firmwareVersion: resolvedVersion,
           });
         } finally {
@@ -435,7 +457,7 @@ export default function Firmware() {
         finalVersion = resolvedVersion;
       } else {
         // Fallback: TypeScript-based flash (browser or no file path)
-        finalVersion = await kbheFirmware.flashFirmware(firmwareBytes, {
+        finalVersion = await kbheFirmware.flashFirmware(bytes, {
           timeoutMs: timeoutSec * 1000,
           retries,
           onLog: appendLog,
@@ -452,10 +474,47 @@ export default function Firmware() {
     } finally {
       void reconnectSession();
     }
-  }, [firmwareBytes, filePath, fileVersion, timeoutSec, retries, appendLog]);
+  }, [timeoutSec, retries, appendLog]);
+
+  const handleFlash = useCallback(async () => {
+    if (!firmwareBytes) return;
+    await runFlash(firmwareBytes, filePath, fileVersion);
+  }, [firmwareBytes, filePath, fileVersion, runFlash]);
+
+  const handleFlashLatestFirmware = useCallback(async () => {
+    const tag = firmwareUpdateQ.data?.tag;
+    if (!tag) return;
+
+    setFirmwareUpdateState("downloading");
+    setFirmwareUpdateError(null);
+    setFlashLog([]);
+    setFlashProgress(0);
+
+    try {
+      appendLog(`Downloading firmware release ${tag}...`);
+      const downloaded = await downloadFirmwareRelease(tag);
+      const bytes = new Uint8Array(await readFile(downloaded.path));
+      const versionInfo = resolveFirmwareVersion(bytes);
+
+      processSelectedFirmware(bytes, downloaded.fileName, downloaded.path);
+      appendLog(`Downloaded ${downloaded.fileName}.`);
+      setFirmwareUpdateState("flashing");
+      await runFlash(bytes, downloaded.path, versionInfo, false);
+      setFirmwareUpdateState("idle");
+      await firmwareUpdateQ.refetch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setFirmwareUpdateError(msg);
+      setFirmwareUpdateState("error");
+      setFlashState("error");
+      appendLog(`Error: ${msg}`);
+    }
+  }, [appendLog, firmwareUpdateQ, processSelectedFirmware, runFlash]);
 
   const fileSizeKb = firmwareBytes ? (firmwareBytes.length / 1024).toFixed(1) : null;
-  const canFlash = connected && !!firmwareBytes && flashState !== "flashing";
+  const canFlash = connected && !!firmwareBytes && flashState !== "flashing" && firmwareUpdateState !== "flashing";
+  const latestFirmware = firmwareUpdateQ.data;
+  const firmwareReleaseBusy = firmwareUpdateState === "downloading" || firmwareUpdateState === "flashing";
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -489,6 +548,65 @@ export default function Firmware() {
             <Badge variant="secondary" className="font-mono shrink-0">{firmwareVersion}</Badge>
           )}
         </div>
+
+        {/* -- Online firmware update -------------------------------- */}
+        {isTauri() && (
+          <div className="rounded-lg border bg-card">
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+              <div>
+                <h2 className="text-sm font-medium">Online Firmware Update</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {latestFirmware?.updateAvailable
+                    ? `Release ${latestFirmware.tag ?? latestFirmware.version} is available.`
+                    : firmwareUpdateQ.isLoading
+                      ? "Checking GitHub releases..."
+                      : "Firmware is up to date."}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={firmwareUpdateQ.isFetching || firmwareReleaseBusy}
+                onClick={() => {
+                  void firmwareUpdateQ.refetch();
+                }}
+                title="Check again"
+              >
+                <IconRefresh className="size-4" />
+              </Button>
+            </div>
+
+            {latestFirmware?.updateAvailable && (
+              <div className="flex flex-col gap-3 p-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {latestFirmware.version && (
+                    <Badge variant="secondary" className="font-mono">{latestFirmware.version}</Badge>
+                  )}
+                  {latestFirmware.assetName && <span>{latestFirmware.assetName}</span>}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    className="gap-2"
+                    disabled={!connected || firmwareReleaseBusy || flashState === "flashing"}
+                    onClick={() => void handleFlashLatestFirmware()}
+                  >
+                    <IconDownload className="size-4" />
+                    {firmwareReleaseBusy ? "Updating..." : "Download and Flash"}
+                  </Button>
+                  {!connected && (
+                    <span className="text-xs text-muted-foreground">Connect the keyboard before flashing.</span>
+                  )}
+                </div>
+                {firmwareUpdateError && (
+                  <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    <IconAlertTriangle className="size-4 shrink-0" />
+                    {firmwareUpdateError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── File picker area ────────────────────────────────── */}
         <div className="rounded-lg border bg-card">

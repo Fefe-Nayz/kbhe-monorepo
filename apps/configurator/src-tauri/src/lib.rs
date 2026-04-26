@@ -1,5 +1,6 @@
 mod audio;
 mod commands;
+mod releases;
 mod startup;
 mod volume;
 
@@ -137,6 +138,10 @@ pub fn run() {
             commands::kbhe_detect_bootloader_presence,
             commands::kbhe_get_os_key_variants,
             commands::kbhe_flash_firmware,
+            releases::kbhe_check_app_update,
+            releases::kbhe_check_firmware_update,
+            releases::kbhe_download_firmware_release,
+            releases::kbhe_download_and_run_app_installer,
             kbhe_frontend_ready,
             startup::kbhe_get_startup_preferences,
             startup::kbhe_set_startup_preferences,
