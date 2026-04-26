@@ -1,6 +1,6 @@
 [package]
 name = "kbhe-configurator"
-version = "0.1.1"
+version = "0.1.2"
 description = "Desktop configurator for the KBHE Hall effect keyboard"
 authors = ["KBHE"]
 license = ""
