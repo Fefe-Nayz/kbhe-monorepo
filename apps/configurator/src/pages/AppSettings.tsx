@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getVersion } from "@tauri-apps/api/app";
 import { isTauri } from "@tauri-apps/api/core";
 import { useState } from "react";
 import { PageContent } from "@/components/shared/PageLayout";
@@ -51,6 +52,7 @@ const APP_QUERY_KEYS = {
   startupPreferences: ["app", "startup-preferences"] as const,
   launchOnStartup: ["app", "launch-on-startup"] as const,
   release: ["app", "release"] as const,
+  version: ["app", "version"] as const,
 };
 
 const RESETTABLE_LOCAL_STORAGE_KEYS = new Set([
@@ -123,6 +125,13 @@ export default function AppSettings() {
     enabled: isTauri(),
     refetchInterval: 60 * 60 * 1000,
     staleTime: 10 * 60 * 1000,
+  });
+
+  const appVersionQ = useQuery({
+    queryKey: APP_QUERY_KEYS.version,
+    queryFn: getVersion,
+    enabled: isTauri(),
+    staleTime: Infinity,
   });
 
   const startupModeMutation = useMutation({
@@ -403,6 +412,22 @@ export default function AppSettings() {
         >
           <FormRow label="Developer Mode" description="Shows diagnostics and firmware developer options">
             <Switch checked={developerMode} onCheckedChange={(value) => setDeveloperMode(value)} />
+          </FormRow>
+        </SectionCard>
+
+        <SectionCard
+          title="About"
+          description="Build information for this configurator install."
+        >
+          <FormRow
+            label="App Version"
+            description="The version of kbhe-configurator currently running."
+          >
+            <Badge variant="secondary" className="font-mono">
+              {isTauri()
+                ? appVersionQ.data ?? (appVersionQ.isLoading ? "Loading..." : "Unknown")
+                : "Web preview"}
+            </Badge>
           </FormRow>
         </SectionCard>
 

@@ -608,7 +608,8 @@ export default function Firmware() {
           </div>
         )}
 
-        {/* ── File picker area ────────────────────────────────── */}
+        {/* ── File picker area (developer mode) ───────────────── */}
+        {developerMode && (
         <div className="rounded-lg border bg-card">
           <div className="border-b px-4 py-3">
             <h2 className="text-sm font-medium">Firmware File</h2>
@@ -724,6 +725,7 @@ export default function Firmware() {
             )}
           </div>
         </div>
+        )}
 
         {/* ── Flash options (developer mode) ─────────────────── */}
         {developerMode && (
@@ -761,20 +763,23 @@ export default function Firmware() {
         )}
 
         {/* ── Flash action + progress ─────────────────────────── */}
+        {(developerMode || flashState !== "idle" || flashLog.length > 0) && (
         <div className="rounded-lg border bg-card">
           <div className="border-b px-4 py-3">
             <h2 className="text-sm font-medium">Flash</h2>
           </div>
           <div className="p-4 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <Button
-                disabled={!canFlash}
-                className="gap-2"
-                onClick={() => setConfirmOpen(true)}
-              >
-                <IconUpload className="size-4" />
-                Flash Firmware
-              </Button>
+              {developerMode && (
+                <Button
+                  disabled={!canFlash}
+                  className="gap-2"
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  <IconUpload className="size-4" />
+                  Flash Firmware
+                </Button>
+              )}
 
               {flashState === "flashing" && (
                 <span className="text-xs text-muted-foreground animate-pulse">Flashing… {flashProgress}%</span>
@@ -807,6 +812,7 @@ export default function Firmware() {
             )}
           </div>
         </div>
+        )}
 
       </PageContent>
 
