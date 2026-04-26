@@ -587,13 +587,11 @@ function StickPreview({
 
   if (distances && distances.length > 0) {
     let sumX = 0;
-    let sumY = 0;
     let count = 0;
     for (let i = 0; i < distances.length; i++) {
       const d = distances[i];
       if (d > 0.01) {
         sumX += d;
-        sumY += d;
         count++;
       }
     }

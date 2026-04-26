@@ -52,18 +52,15 @@ function rgbToHueDeg(r: number, g: number, b: number): number {
   const delta = max - min;
   if (delta === 0) return 0;
 
-  let hue = 0;
-  if (max === nr) {
-    hue = ((ng - nb) / delta) % 6;
-  } else if (max === ng) {
-    hue = (nb - nr) / delta + 2;
-  } else {
-    hue = (nr - ng) / delta + 4;
-  }
+  const hue =
+    max === nr
+      ? ((ng - nb) / delta) % 6
+      : max === ng
+        ? (nb - nr) / delta + 2
+        : (nr - ng) / delta + 4;
 
-  hue *= 60;
-  if (hue < 0) hue += 360;
-  return hue;
+  const degrees = hue * 60;
+  return degrees < 0 ? degrees + 360 : degrees;
 }
 
 async function getSystemVolumeLevel(): Promise<number | null> {

@@ -423,7 +423,17 @@ export default function Performance() {
     } catch (error) {
       markError(error);
     }
-  }, [connected, markError, markSaved, markSaving, queryClient, selectedKeyIndexes]);
+  }, [
+    connected,
+    currentLayer,
+    markError,
+    markSaved,
+    markSaving,
+    profileContext,
+    queryClient,
+    runtimeSource,
+    selectedKeyIndexes,
+  ]);
 
   // ── UI ──
 

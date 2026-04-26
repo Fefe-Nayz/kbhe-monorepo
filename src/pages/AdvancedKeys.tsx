@@ -364,7 +364,17 @@ export default function AdvancedKeys() {
     } catch (error) {
       markError(error);
     }
-  }, [getBaseSettingsForKey, markError, markSaved, markSaving, queryClient, writeKeyPatch]);
+  }, [
+    currentLayer,
+    getBaseSettingsForKey,
+    markError,
+    markSaved,
+    markSaving,
+    profileContext,
+    queryClient,
+    runtimeSource,
+    writeKeyPatch,
+  ]);
 
   const clearSocdPair = useCallback(async (touch1: number, touch2?: number | null) => {
     try {
@@ -407,7 +417,17 @@ export default function AdvancedKeys() {
     } catch (error) {
       markError(error);
     }
-  }, [getBaseSettingsForKey, markError, markSaved, markSaving, queryClient, writeKeyPatch]);
+  }, [
+    currentLayer,
+    getBaseSettingsForKey,
+    markError,
+    markSaved,
+    markSaving,
+    profileContext,
+    queryClient,
+    runtimeSource,
+    writeKeyPatch,
+  ]);
 
   const closeConfigurePanel = useCallback(() => {
     setPanelMode("overview");

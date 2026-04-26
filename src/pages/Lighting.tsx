@@ -8,6 +8,7 @@ import { kbheDevice } from "@/lib/kbhe/device";
 import {
   LEDEffect, KEY_COUNT, LED_EFFECT_NAMES, LED_PARAM_TYPES,
   LED_EFFECT_PARAM_SPEED, LED_EFFECT_PARAM_COUNT,
+  LED_USB_SUSPEND_RGB_OFF_DEFAULT,
 } from "@/lib/kbhe/protocol";
 import { EFFECT_PARAM_ENUM_OPTIONS, EFFECT_PARAM_NAMES } from "@/lib/kbhe/effectParamNames";
 import BaseKeyboard from "@/components/baseKeyboard";
@@ -631,11 +632,13 @@ export default function Lighting() {
         idle_timeout_seconds: 0,
         allow_system_when_disabled: false,
         third_party_stream_counts_as_activity: false,
+        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
       };
       await kbheDevice.setLedIdleOptions(
         timeoutSeconds,
         current.allow_system_when_disabled,
         current.third_party_stream_counts_as_activity,
+        current.usb_suspend_rgb_off,
       );
     },
     onSuccess: () => {
@@ -652,11 +655,13 @@ export default function Lighting() {
         idle_timeout_seconds: 0,
         allow_system_when_disabled: false,
         third_party_stream_counts_as_activity: false,
+        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
       };
       await kbheDevice.setLedIdleOptions(
         current.idle_timeout_seconds,
         allowSystemWhenDisabled,
         current.third_party_stream_counts_as_activity,
+        current.usb_suspend_rgb_off,
       );
     },
     onSuccess: () => {
@@ -673,11 +678,36 @@ export default function Lighting() {
         idle_timeout_seconds: 0,
         allow_system_when_disabled: false,
         third_party_stream_counts_as_activity: false,
+        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
       };
       await kbheDevice.setLedIdleOptions(
         current.idle_timeout_seconds,
         current.allow_system_when_disabled,
         thirdPartyStreamCountsAsActivity,
+        current.usb_suspend_rgb_off,
+      );
+    },
+    onSuccess: () => {
+      markSaved();
+      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
+    },
+    onError: markError,
+  });
+
+  const usbSuspendRgbOffMut = useMutation({
+    mutationFn: async (usbSuspendRgbOff: boolean) => {
+      markSaving();
+      const current = idleOptionsQ.data ?? {
+        idle_timeout_seconds: 0,
+        allow_system_when_disabled: false,
+        third_party_stream_counts_as_activity: false,
+        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
+      };
+      await kbheDevice.setLedIdleOptions(
+        current.idle_timeout_seconds,
+        current.allow_system_when_disabled,
+        current.third_party_stream_counts_as_activity,
+        usbSuspendRgbOff,
       );
     },
     onSuccess: () => {
@@ -693,6 +723,8 @@ export default function Lighting() {
   const allowSystemWhenDisabled = idleOptionsQ.data?.allow_system_when_disabled ?? false;
   const thirdPartyStreamCountsAsActivity =
     idleOptionsQ.data?.third_party_stream_counts_as_activity ?? false;
+  const usbSuspendRgbOff =
+    idleOptionsQ.data?.usb_suspend_rgb_off ?? LED_USB_SUSPEND_RGB_OFF_DEFAULT;
 
   const handleResetEffectParams = useCallback(() => {
     if (!schemaQ.data || !paramsQ.data) {
@@ -1190,6 +1222,16 @@ export default function Lighting() {
                   checked={thirdPartyStreamCountsAsActivity}
                   disabled={!connected || idleOptionsQ.data == null}
                   onCheckedChange={(v) => thirdPartyIdleActivityMut.mutate(v)}
+                />
+              </FormRow>
+              <FormRow
+                label="USB Suspend RGB Off"
+                description="Force RGB off when the host USB bus enters suspend (sleep/soft-off with powered USB)"
+              >
+                <Switch
+                  checked={usbSuspendRgbOff}
+                  disabled={!connected || idleOptionsQ.data == null}
+                  onCheckedChange={(v) => usbSuspendRgbOffMut.mutate(v)}
                 />
               </FormRow>
               <FormRow label="Global Brightness">

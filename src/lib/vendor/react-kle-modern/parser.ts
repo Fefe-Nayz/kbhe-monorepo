@@ -176,7 +176,7 @@ export function deserializeKLE(rows: KLESerializedLayout): ParsedKeyboardLayout 
     keys: [],
   };
 
-  let current = createWorkingKey();
+  const current = createWorkingKey();
   let align = 4;
   let keyIndex = 0;
 

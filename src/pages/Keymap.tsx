@@ -19,7 +19,6 @@ import {
   GAMEPAD_LAYER_MASK_ALL,
   HID_KEYCODES,
   KEY_COUNT,
-  LAYER_COUNT,
 } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import { IconRestore } from "@tabler/icons-react";
@@ -167,7 +166,6 @@ export default function Keymap() {
 
     const mapping = focusedGamepadMap.data;
     const currentLayerBit = 1 << currentLayer;
-    const layerMaskAll = (1 << LAYER_COUNT) - 1;
     const activeLayerMask = mapping.layer_mask || GAMEPAD_LAYER_MASK_ALL;
     const mappingActiveOnLayer = (activeLayerMask & currentLayerBit) !== 0;
     if (!mappingActiveOnLayer || (mapping.axis === 0 && mapping.button === 0)) {

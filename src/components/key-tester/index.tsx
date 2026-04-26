@@ -102,7 +102,7 @@ export function KeyTester({
       }
 
       prevPressed.current = nowPressed;
-      }, [formatKeyLabel]);
+      }, []);
 
   useEffect(() => {
     if (!connected) {

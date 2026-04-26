@@ -16,10 +16,9 @@ export function useScreenScale(): number {
 
     useEffect(() => {
         const handleResize = () => {
-            const width = window.innerWidth
-            const a = (width - minW) / (maxW - minW);
-            setScale(minScale + a * (maxScale - minScale));
-            console.log("Resized window, new scale:", scale);
+        const width = window.innerWidth
+        const a = (width - minW) / (maxW - minW);
+        setScale(minScale + a * (maxScale - minScale));
         };
 
         window.addEventListener("resize", handleResize);

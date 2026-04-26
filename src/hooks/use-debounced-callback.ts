@@ -10,12 +10,12 @@ export function useDebouncedCallback<T extends (...args: never[]) => void>(
   ms: number,
 ): T {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  return useCallback(
-    ((...args: Parameters<T>) => {
+  const debounced = useCallback(
+    (...args: Parameters<T>) => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => fn(...args), ms);
-    }) as T,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
     [fn, ms],
   );
+  return debounced as T;
 }

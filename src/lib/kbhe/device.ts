@@ -29,6 +29,7 @@ import {
   LED_IDLE_TIMEOUT_DEFAULT_SECONDS,
   LED_IDLE_TIMEOUT_MAX_SECONDS,
   LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_DEFAULT,
+  LED_USB_SUSPEND_RGB_OFF_DEFAULT,
   LED_AUDIO_SPECTRUM_BAND_COUNT,
   SETTINGS_PROFILE_NAME_LENGTH,
   LAYER_COUNT,
@@ -180,6 +181,7 @@ export interface LedIdleOptions {
   idle_timeout_seconds: number;
   allow_system_when_disabled: boolean;
   third_party_stream_counts_as_activity: boolean;
+  usb_suspend_rgb_off: boolean;
 }
 
 export interface TriggerChatterGuard {
@@ -1480,6 +1482,16 @@ export class KBHEDevice {
   async getLedIdleOptions(): Promise<LedIdleOptions | null> {
     const response = await this.sendCommand(Command.GET_LED_IDLE_OPTIONS);
     if (response && response.length >= 4 && response[1] === Status.OK) {
+      let usbSuspendRgbOff = LED_USB_SUSPEND_RGB_OFF_DEFAULT;
+      const suspendResponse = await this.sendCommand(
+        Command.GET_LED_USB_SUSPEND_RGB_OFF,
+      );
+      if (suspendResponse && suspendResponse.length >= 3) {
+        if (suspendResponse[1] === Status.OK) {
+          usbSuspendRgbOff = Boolean(suspendResponse[2]);
+        }
+      }
+
       return {
         idle_timeout_seconds: this.sanitizeLedIdleTimeoutSeconds(response[2]),
         allow_system_when_disabled: Boolean(response[3]),
@@ -1487,6 +1499,7 @@ export class KBHEDevice {
           response.length >= 5
             ? Boolean(response[4])
             : LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_DEFAULT,
+        usb_suspend_rgb_off: usbSuspendRgbOff,
       };
     }
     return null;
@@ -1497,6 +1510,7 @@ export class KBHEDevice {
     allowSystemWhenDisabled: boolean,
     thirdPartyStreamCountsAsActivity: boolean =
       LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_DEFAULT,
+    usbSuspendRgbOff: boolean = LED_USB_SUSPEND_RGB_OFF_DEFAULT,
   ): Promise<boolean> {
     const timeout = this.sanitizeLedIdleTimeoutSeconds(idleTimeoutSeconds);
     const response = await this.sendCommand(Command.SET_LED_IDLE_OPTIONS, [
@@ -1505,7 +1519,20 @@ export class KBHEDevice {
       allowSystemWhenDisabled ? 1 : 0,
       thirdPartyStreamCountsAsActivity ? 1 : 0,
     ]);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
+    if (!response || response.length < 2 || response[1] !== Status.OK) {
+      return false;
+    }
+
+    const suspendResponse = await this.sendCommand(
+      Command.SET_LED_USB_SUSPEND_RGB_OFF,
+      [0, usbSuspendRgbOff ? 1 : 0],
+    );
+    return (
+      !!suspendResponse &&
+      suspendResponse.length >= 2 &&
+      (suspendResponse[1] === Status.OK ||
+        suspendResponse[1] === Status.INVALID_CMD)
+    );
   }
 
   async getLedEffect(): Promise<number | null> {

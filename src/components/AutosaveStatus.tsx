@@ -10,6 +10,7 @@ interface Props {
 }
 
 export function AutosaveStatus(_props: Props) {
+  void _props;
   // Status is now surfaced through Sonner toasts instead of inline text badges.
   return null;
 }

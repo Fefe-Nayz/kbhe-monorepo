@@ -234,22 +234,23 @@ function buildSplitOverlayLegend(
 ): ReactNode {
     const tooltipText = `${gamepadLabel.replace(/\n+/g, " ").trim()} / ${keyboardLabel.replace(/\n+/g, " ").trim()}`.trim();
 
-    const keyboardSlotNodes = keyboardSlots
-        .map((slot, index) => {
-            if (!hasVisibleSlotContent(slot)) {
-                return null;
-            }
+    const keyboardSlotNodes: ReactNode[] = [];
+    keyboardSlots.forEach((slot, index) => {
+        if (!hasVisibleSlotContent(slot)) {
+            return;
+        }
 
-            return createElement(
+        keyboardSlotNodes.push(
+            createElement(
                 "span",
                 {
                     key: `kb-${index}`,
                     className: `kle-legend ${LEGEND_POSITION_CLASSES[index]} kbhe-gp-split-keyboard-slot kbhe-gp-split-keyboard-slot--special`,
                 },
                 slot,
-            );
-        })
-        .filter((slot): slot is ReactNode => slot !== null);
+            ),
+        );
+    });
 
     const hasSpecialKeyboardLayout = keyboardSlotNodes.length > 1;
 

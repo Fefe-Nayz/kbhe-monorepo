@@ -327,9 +327,7 @@ function RawAdcTab({ connected, active }: { connected: boolean; active: boolean 
     refetchInterval: connected && active ? 80 : false,
   });
 
-  if (!connected) return <DisconnectedBanner />;
-
-  const values = rawQ.data ?? [];
+  const values = useMemo(() => rawQ.data ?? [], [rawQ.data]);
   const stats = useMemo(() => {
     if (values.length === 0) return null;
     const min = Math.min(...values);
@@ -337,6 +335,8 @@ function RawAdcTab({ connected, active }: { connected: boolean; active: boolean 
     const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
     return { min, max, avg };
   }, [values]);
+
+  if (!connected) return <DisconnectedBanner />;
 
   return (
     <SectionCard
