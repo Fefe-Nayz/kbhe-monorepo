@@ -138,7 +138,7 @@ Files live in `assets/cad/75he-mechanical/`. The **“parts”** set are consist
 
 | 6-key Hall | MCU v1 | MCU v2 |
 | --- | --- | --- |
-| ![6-key](hardware/pcb/75he/Legacy/proto-6-key-hall-sensors/assets/exports/renders/proto-6-key-hall-sensors-proto_pcb-front-x25-zoom1-rt-transparent.png) | ![MCU v1](hardware/pcb/75he/Legacy/proto-mcu-v1/assets/exports/renders/proto-mcu-v1-mcu-front-x25-zoom1-rt-transparent.png) | ![MCU v2](hardware/pcb/75he/Legacy/proto-mcu-v2/assets/exports/renders/proto-mcu-v2-mcu-front-x25-zoom1-rt-transparent.png) |
+| ![6-key](hardware/pcb/75he/Legacy/proto-6-key-hall-sensors/assets/proto-6-key-hall-sensors-proto_pcb-front-x25-zoom1-rt-transparent.png) | ![MCU v1](hardware/pcb/75he/Legacy/proto-mcu-v1/assets/proto-mcu-v1-mcu-front-x25-zoom1-rt-transparent.png) | ![MCU v2](hardware/pcb/75he/Legacy/proto-mcu-v2/assets/proto-mcu-v2-mcu-front-x25-zoom1-rt-transparent.png) |
 
 ## Current limitations - TODOs
 - For transparen keycaps the space bar lacks leds on the sides
