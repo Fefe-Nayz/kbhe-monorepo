@@ -176,22 +176,26 @@ typedef struct __attribute__((packed)) {
 } hid_packet_t;
 
 /**
- * @brief Firmware version response
+ * @brief Firmware version response (semver: major.minor.patch)
  */
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint16_t version;
-  uint8_t reserved[60];
+  uint8_t version_major;
+  uint8_t version_minor;
+  uint8_t version_patch;
+  uint8_t reserved[59];
 } hid_resp_firmware_version_t;
 
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
   uint8_t status;
-  uint16_t version;
+  uint8_t version_major;
+  uint8_t version_minor;
+  uint8_t version_patch;
   char serial[HID_DEVICE_SERIAL_MAX_LEN];
   char keyboard_name[SETTINGS_KEYBOARD_NAME_LENGTH];
-  uint8_t reserved[2];
+  uint8_t reserved[1];
 } hid_packet_device_info_t;
 
 typedef struct __attribute__((packed)) {

@@ -12,7 +12,7 @@ extern "C" {
 #define KBHE_APP_USB_PID 0x0002U
 #define KBHE_UPDATER_USB_PID 0x0003U
 
-#define UPDATER_PROTOCOL_VERSION 0x0001U
+#define UPDATER_PROTOCOL_VERSION 0x0002U
 #define UPDATER_PACKET_SIZE 64U
 #define UPDATER_PAYLOAD_SIZE 56U
 #define UPDATER_FLASH_WRITE_ALIGN 4U
@@ -82,16 +82,20 @@ typedef struct __attribute__((packed)) {
   uint32_t magic;
   uint32_t image_size;
   uint32_t image_crc32;
-  uint16_t fw_version;
-  uint16_t reserved;
+  uint8_t fw_version_major;
+  uint8_t fw_version_minor;
+  uint8_t fw_version_patch;
+  uint8_t reserved;
   uint32_t trailer_crc32;
 } updater_trailer_t;
 
 typedef struct __attribute__((packed)) {
   uint32_t image_size;
   uint32_t image_crc32;
-  uint16_t fw_version;
-  uint16_t reserved;
+  uint8_t fw_version_major;
+  uint8_t fw_version_minor;
+  uint8_t fw_version_patch;
+  uint8_t reserved;
 } updater_begin_request_t;
 
 typedef struct __attribute__((packed)) {
@@ -100,8 +104,10 @@ typedef struct __attribute__((packed)) {
   uint32_t app_base;
   uint32_t app_max_size;
   uint32_t write_align;
-  uint16_t installed_fw_version;
-  uint16_t reserved;
+  uint8_t installed_fw_version_major;
+  uint8_t installed_fw_version_minor;
+  uint8_t installed_fw_version_patch;
+  uint8_t reserved;
 } updater_hello_payload_t;
 
 typedef struct __attribute__((packed)) {
@@ -117,16 +123,23 @@ void boot_request_clear(void);
 void boot_request_set(boot_request_action_t action);
 bool boot_request_take(boot_request_action_t action);
 
+typedef struct {
+  uint8_t major;
+  uint8_t minor;
+  uint8_t patch;
+} updater_fw_version_t;
+
 uint32_t updater_crc32_compute(const void *data, uint32_t len);
 void updater_trailer_prepare(updater_trailer_t *trailer, uint32_t image_size,
-                             uint32_t image_crc32, uint16_t fw_version);
+                             uint32_t image_crc32,
+                             updater_fw_version_t fw_version);
 bool updater_trailer_is_valid(const updater_trailer_t *trailer);
 bool updater_read_trailer(updater_trailer_t *out_trailer);
 bool updater_is_app_vector_valid(uint32_t app_base);
 bool updater_is_app_image_valid_with_trailer(
     const updater_trailer_t *trailer);
 bool updater_is_app_image_valid(void);
-uint16_t updater_get_app_version(void);
+updater_fw_version_t updater_get_app_version(void);
 uint32_t updater_align_up(uint32_t value, uint32_t align);
 
 #ifdef __cplusplus

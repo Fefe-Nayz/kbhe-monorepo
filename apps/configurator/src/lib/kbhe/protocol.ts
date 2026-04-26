@@ -666,10 +666,14 @@ export function buildCommandReport(command: number, data: ArrayLike<number> = []
   return report;
 }
 
-export function formatFirmwareVersion(version: number): string {
-  const major = (version >> 8) & 0xff;
-  const minor = version & 0xff;
-  return `${major}.${minor}`;
+export interface FirmwareVersion {
+  major: number;
+  minor: number;
+  patch: number;
+}
+
+export function formatFirmwareVersion(version: FirmwareVersion): string {
+  return `${version.major}.${version.minor}.${version.patch}`;
 }
 
 export const ROTARY_BINDING_MODES = {

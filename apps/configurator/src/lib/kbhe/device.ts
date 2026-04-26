@@ -264,7 +264,6 @@ export interface LockStates {
 }
 
 export interface DeviceIdentity {
-  version: number;
   firmware_version: string;
   serial_number: string;
   keyboard_name: string;
@@ -532,31 +531,33 @@ export class KBHEDevice {
 
   async getFirmwareVersion(): Promise<string | null> {
     const response = await this.sendCommand(Command.GET_FIRMWARE_VERSION);
-    if (response && response.length >= 4) {
-      const version = response[2] | (response[3] << 8);
-      const major = (version >> 8) & 0xff;
-      const minor = version & 0xff;
-      return `${major}.${minor}`;
+    if (response && response.length >= 5) {
+      return formatFirmwareVersion({
+        major: response[2] ?? 0,
+        minor: response[3] ?? 0,
+        patch: response[4] ?? 0,
+      });
     }
     return null;
   }
 
   async ping(timeoutMs = 200): Promise<boolean> {
     const response = await this.sendCommand(Command.GET_FIRMWARE_VERSION, [], timeoutMs);
-    return !!response && response.length >= 4;
+    return !!response && response.length >= 5;
   }
 
   async getDeviceInfo(): Promise<DeviceIdentity | null> {
     const response = await this.sendCommand(Command.GET_DEVICE_INFO);
     if (response && response.length >= 62 && response[1] === Status.OK) {
-      const version = this.unpackU16(response, 2);
+      const major = response[2] ?? 0;
+      const minor = response[3] ?? 0;
+      const patch = response[4] ?? 0;
       return {
-        version,
-        firmware_version: formatFirmwareVersion(version),
-        serial_number: this.decodeCString(response, 4, DEVICE_SERIAL_MAX_LENGTH),
+        firmware_version: formatFirmwareVersion({ major, minor, patch }),
+        serial_number: this.decodeCString(response, 5, DEVICE_SERIAL_MAX_LENGTH),
         keyboard_name: this.decodeCString(
           response,
-          4 + DEVICE_SERIAL_MAX_LENGTH,
+          5 + DEVICE_SERIAL_MAX_LENGTH,
           KEYBOARD_NAME_LENGTH,
         ),
       };

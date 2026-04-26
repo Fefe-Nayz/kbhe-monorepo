@@ -119,13 +119,24 @@ Output lands in [`apps/configurator/src-tauri/target/release/bundle/`](../apps/c
 
 The firmware build is triggered by a `firmware-v*` tag. The firmware version
 embedded in the binary comes from the firmware sources (`firmware/`), **not
-from the tag** — the tag only labels the GitHub Release. If you want the
-keyboard's reported version to change, bump the firmware constants in source
-before tagging.
+from the tag** — the tag only labels the GitHub Release. The configurator
+compares the tag's semver against the version reported by the running firmware
+to decide if an update is available, so **the tag and the source constants
+must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
 
 ### Pre-push checklist
 
-1. **Bump firmware version in source** (if applicable) and commit to `main`.
+1. **Bump firmware version constants** in
+   [`firmware/Core/Src/settings.c`](../firmware/Core/Src/settings.c) so they
+   match the tag you're about to push:
+
+   ```c
+   #define FIRMWARE_VERSION_MAJOR 2u
+   #define FIRMWARE_VERSION_MINOR 0u
+   #define FIRMWARE_VERSION_PATCH 1u
+   ```
+
+   Commit the change to `main` before tagging.
 
 2. **Reproduce the CI build locally**:
 
@@ -143,8 +154,8 @@ before tagging.
 3. **Wait for the `Firmware CI` workflow on `main` to go green** before
    tagging.
 
-4. **Tag and push** (use semver `X.Y.Z` — the configurator's update parser
-   rejects two-component versions like `firmware-v1.2`):
+4. **Tag and push** (use semver `X.Y.Z` matching the source constants from
+   step 1):
 
    ```powershell
    git tag firmware-vX.Y.Z
@@ -181,4 +192,5 @@ installer built without them will check the default repository.
 | `cargo check --locked` fails on CI with "lock file needs to be updated" | `Cargo.toml` was modified without regenerating `Cargo.lock` | Run `cargo check` in `apps/configurator/src-tauri/`, commit the updated `Cargo.lock` |
 | Tag pushed but the release job didn't run | The `paths` filter on `push` may skip tag pushes whose target commit doesn't touch matching files | Make sure the tagged commit modifies a file under `apps/configurator/**` (a version bump does), or trigger manually via `workflow_dispatch` on the tag ref |
 | In-app "Application is up to date" despite a new release | `KBHE_RELEASE_OWNER`/`KBHE_RELEASE_REPO` defaults point at the wrong repo, or the asset extension is not `.exe`/`.msi` on Windows | Check the compiled-in defaults in `releases.rs`, and confirm `tauri-action` published the expected installer |
-| In-app firmware update always shown as available | `formatFirmwareVersion` returns `"major.minor"` (two components), which `semver::Version::parse` rejects, so `newer_than_current` falls through to `true` | Known limitation — currently any published firmware release reads as "newer". Fix would be to parse the device version with the same loose format used to render it |
+| In-app firmware update always shown as available | The keyboard reports a version that doesn't match the published tag (e.g. flashed firmware was built before the constants were bumped) | Re-flash the keyboard with a build whose `FIRMWARE_VERSION_*` constants match the tag you published, or bump source + tag together |
+| Updater protocol mismatch error after flashing | The bootloader on the keyboard is older than the configurator's `UPDATER_PROTOCOL_VERSION` | The bootloader sits in protected flash and is only updated via ST-Link / debugger. Reflash `kbhe_bootloader.bin` at `0x08000000` along with `kbhe.bin` at `0x08010000` |

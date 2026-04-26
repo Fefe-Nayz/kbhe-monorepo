@@ -220,9 +220,12 @@ static void hid_prepare_device_serial_cache(void) {
 
 static void cmd_get_firmware_version(const uint8_t *in, uint8_t *out) {
   hid_resp_firmware_version_t *resp = (hid_resp_firmware_version_t *)out;
+  (void)in;
   resp->command_id = CMD_GET_FIRMWARE_VERSION;
   resp->status = HID_RESP_OK;
-  resp->version = settings_get_firmware_version();
+  resp->version_major = settings_get_firmware_version_major();
+  resp->version_minor = settings_get_firmware_version_minor();
+  resp->version_patch = settings_get_firmware_version_patch();
 }
 
 static void cmd_factory_reset(const uint8_t *in, uint8_t *out) {
@@ -434,7 +437,9 @@ static void cmd_get_device_info(const uint8_t *in, uint8_t *out) {
 
   resp->command_id = CMD_GET_DEVICE_INFO;
   resp->status = HID_RESP_OK;
-  resp->version = settings_get_firmware_version();
+  resp->version_major = settings_get_firmware_version_major();
+  resp->version_minor = settings_get_firmware_version_minor();
+  resp->version_patch = settings_get_firmware_version_patch();
   memset(resp->serial, 0, sizeof(resp->serial));
   memset(resp->keyboard_name, 0, sizeof(resp->keyboard_name));
   memcpy(resp->serial, s_device_serial_cache, sizeof(resp->serial));

@@ -12,7 +12,7 @@ import {
   downloadFirmwareRelease,
 } from "@/lib/kbhe/releases";
 import { kbheTransport } from "@/lib/kbhe/transport";
-import { formatFirmwareVersion } from "@/lib/kbhe/protocol";
+import { formatFirmwareVersion, type FirmwareVersion } from "@/lib/kbhe/protocol";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -408,7 +408,7 @@ export default function Firmware() {
       await DeviceSessionManager.disconnect();
       await delay(250);
 
-      let finalVersion: number;
+      let finalVersion: FirmwareVersion;
 
       if (path && isTauri()) {
         // Native fast path: entire flash loop runs in Rust (no IPC per packet)

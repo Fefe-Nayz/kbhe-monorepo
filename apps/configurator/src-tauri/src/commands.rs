@@ -699,7 +699,7 @@ const UPDATER_CMD_BOOT: u8 = 0x06;
 const UPDATER_STATUS_OK: u8 = 0x00;
 const APP_CMD_ENTER_BOOTLOADER: u8 = 0x02;
 const DATA_CHUNK_SIZE: usize = 56;
-const UPDATER_PROTOCOL_VERSION: u16 = 0x0001;
+const UPDATER_PROTOCOL_VERSION: u16 = 0x0002;
 /// Device presence poll interval (matches Python DEVICE_POLL_DELAY_S = 0.02)
 const DEVICE_POLL_MS: u64 = 20;
 
@@ -857,10 +857,18 @@ fn wait_for_device_absent(
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmwareVersion {
+    pub major: u8,
+    pub minor: u8,
+    pub patch: u8,
+}
+
 #[tauri::command]
 pub async fn kbhe_flash_firmware(
     firmware_path: String,
-    firmware_version: Option<u16>,
+    firmware_version: Option<FirmwareVersion>,
     app: AppHandle,
     state: State<'_, KbheTransportState>,
 ) -> Result<(), String> {
@@ -878,7 +886,7 @@ pub async fn kbhe_flash_firmware(
 
 fn kbhe_flash_firmware_blocking(
     firmware_path: String,
-    firmware_version: Option<u16>,
+    firmware_version: Option<FirmwareVersion>,
     app: AppHandle,
 ) -> Result<(), String> {
     let firmware =
@@ -892,7 +900,7 @@ fn kbhe_flash_firmware_blocking(
     padded.resize(aligned_len, 0xFF);
 
     let image_crc32 = crc32_compute(&firmware);
-    let fw_version = firmware_version.unwrap_or(0);
+    let fw_version = firmware_version.unwrap_or_default();
     let total = firmware.len() as u32;
 
     emit_flash_progress(&app, "connecting", 0, total);
@@ -948,7 +956,7 @@ fn flash_with_device(
     firmware: &[u8],
     padded: &[u8],
     image_crc32: u32,
-    fw_version: u16,
+    fw_version: FirmwareVersion,
     app: &AppHandle,
     total: u32,
 ) -> Result<(), String> {
@@ -981,13 +989,15 @@ fn flash_with_device(
         }
     }
 
-    // BEGIN: <IIHH> = firmware_len, crc32, fw_version, 0
+    // BEGIN: image_size (u32 LE), image_crc32 (u32 LE), fw major/minor/patch (u8), reserved (u8)
     seq = seq.wrapping_add(1);
     emit_flash_progress(app, "begin", 0, total);
     let mut begin_payload = [0u8; 12];
     begin_payload[0..4].copy_from_slice(&(firmware.len() as u32).to_le_bytes());
     begin_payload[4..8].copy_from_slice(&image_crc32.to_le_bytes());
-    begin_payload[8..10].copy_from_slice(&fw_version.to_le_bytes());
+    begin_payload[8] = fw_version.major;
+    begin_payload[9] = fw_version.minor;
+    begin_payload[10] = fw_version.patch;
     let begin = updater_transact(device, UPDATER_CMD_BEGIN, seq, 0, &begin_payload, 5, 3_000)?;
     if begin.status != UPDATER_STATUS_OK {
         return Err(format!("BEGIN failed: status 0x{:02X}", begin.status));

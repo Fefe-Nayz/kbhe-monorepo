@@ -53,12 +53,15 @@ uint32_t updater_crc32_compute(const void *data, uint32_t len) {
 }
 
 void updater_trailer_prepare(updater_trailer_t *trailer, uint32_t image_size,
-                             uint32_t image_crc32, uint16_t fw_version) {
+                             uint32_t image_crc32,
+                             updater_fw_version_t fw_version) {
   memset(trailer, 0, sizeof(*trailer));
   trailer->magic = UPDATER_TRAILER_MAGIC;
   trailer->image_size = image_size;
   trailer->image_crc32 = image_crc32;
-  trailer->fw_version = fw_version;
+  trailer->fw_version_major = fw_version.major;
+  trailer->fw_version_minor = fw_version.minor;
+  trailer->fw_version_patch = fw_version.patch;
   trailer->trailer_crc32 =
       updater_crc32_compute(trailer, sizeof(*trailer) - sizeof(uint32_t));
 }
@@ -145,16 +148,20 @@ bool updater_is_app_image_valid(void) {
   return updater_is_app_image_valid_with_trailer(&trailer);
 }
 
-uint16_t updater_get_app_version(void) {
+updater_fw_version_t updater_get_app_version(void) {
+  updater_fw_version_t version = {0};
   updater_trailer_t trailer;
 
   if (!updater_read_trailer(&trailer)) {
-    return 0u;
+    return version;
   }
 
   if (!updater_is_app_image_valid_with_trailer(&trailer)) {
-    return 0u;
+    return version;
   }
 
-  return trailer.fw_version;
+  version.major = trailer.fw_version_major;
+  version.minor = trailer.fw_version_minor;
+  version.patch = trailer.fw_version_patch;
+  return version;
 }

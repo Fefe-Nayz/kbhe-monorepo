@@ -743,10 +743,11 @@ void settings_task(uint32_t now_ms);
 bool settings_has_unsaved_changes(void);
 
 /**
- * @brief Get firmware version
- * @return Firmware version number
+ * @brief Get firmware version components (semver major.minor.patch).
  */
-uint16_t settings_get_firmware_version(void);
+uint8_t settings_get_firmware_version_major(void);
+uint8_t settings_get_firmware_version_minor(void);
+uint8_t settings_get_firmware_version_patch(void);
 
 /**
  * @brief Get the persistent keyboard name (NUL-terminated RAM cache).

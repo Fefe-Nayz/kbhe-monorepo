@@ -1,4 +1,12 @@
-import { Command, PACKET_SIZE, REPORT_ID, formatFirmwareVersion, u16le, u32le } from "./protocol";
+import {
+  Command,
+  PACKET_SIZE,
+  REPORT_ID,
+  formatFirmwareVersion,
+  u16le,
+  u32le,
+  type FirmwareVersion,
+} from "./protocol";
 import { kbheCommander, KbheCommander } from "./commander";
 import { kbheTransport, type KbheTransport, type KbheTransportDeviceInfo } from "./transport";
 
@@ -7,7 +15,7 @@ const KBHE_FW_VERSION_RECORD_MAGIC = 0x4b465756;
 const UPDATER_APP_SLOT_SIZE = 0x00050000;
 const UPDATER_TRAILER_RESERVED_SIZE = 0x00000100;
 const UPDATER_APP_MAX_IMAGE_SIZE = UPDATER_APP_SLOT_SIZE - UPDATER_TRAILER_RESERVED_SIZE;
-const PROTOCOL_VERSION = 0x0001;
+const PROTOCOL_VERSION = 0x0002;
 const FLASH_WRITE_ALIGN = 4;
 const DATA_CHUNK_SIZE = 56;
 const APP_CMD_ENTER_BOOTLOADER = Command.ENTER_BOOTLOADER;
@@ -31,12 +39,12 @@ const STATUS_NAMES: Record<number, string> = {
 };
 
 export interface FirmwareResolveResult {
-  version: number;
+  version: FirmwareVersion;
   source: string;
 }
 
 export interface FirmwareFlashOptions {
-  firmwareVersion?: number;
+  firmwareVersion?: FirmwareVersion;
   timeoutMs?: number;
   retries?: number;
   onLog?: (message: string) => void;
@@ -147,14 +155,22 @@ function parseHelloPayload(payload: Uint8Array) {
   if (payload.length < 20) {
     throw new Error("HELLO payload too short");
   }
+  const installedFwVersion: FirmwareVersion = {
+    major: payload[16] ?? 0,
+    minor: payload[17] ?? 0,
+    patch: payload[18] ?? 0,
+  };
+  const installedPresent =
+    installedFwVersion.major !== 0 ||
+    installedFwVersion.minor !== 0 ||
+    installedFwVersion.patch !== 0;
   return {
     protocolVersion: u16le(payload, 0),
     flags: u16le(payload, 2),
     appBase: bytesToUint32(payload, 4),
     appMaxSize: bytesToUint32(payload, 8),
     writeAlign: bytesToUint32(payload, 12),
-    installedFwVersion: u16le(payload, 16),
-    reserved: u16le(payload, 18),
+    installedFwVersion: installedPresent ? installedFwVersion : null,
   };
 }
 
@@ -173,7 +189,7 @@ function crc32(bytes: Uint8Array): number {
 function tryReadVersionFromImageTrailer(bytes: Uint8Array): FirmwareResolveResult | null {
   const trailerSize = 20;
   let bestOffset = -1;
-  let bestVersion = 0;
+  let bestVersion: FirmwareVersion | null = null;
 
   for (let offset = 0; offset + trailerSize <= bytes.length; offset += 1) {
     if (bytesToUint32(bytes, offset) !== UPDATER_TRAILER_MAGIC) {
@@ -182,7 +198,11 @@ function tryReadVersionFromImageTrailer(bytes: Uint8Array): FirmwareResolveResul
 
     const imageSize = bytesToUint32(bytes, offset + 4);
     const imageCrc32 = bytesToUint32(bytes, offset + 8);
-    const fwVersion = u16le(bytes, offset + 12);
+    const fwVersion: FirmwareVersion = {
+      major: bytes[offset + 12] ?? 0,
+      minor: bytes[offset + 13] ?? 0,
+      patch: bytes[offset + 14] ?? 0,
+    };
     const trailerCrc32 = bytesToUint32(bytes, offset + 16);
 
     if (imageSize === 0 || imageSize > offset) {
@@ -207,28 +227,38 @@ function tryReadVersionFromImageTrailer(bytes: Uint8Array): FirmwareResolveResul
     }
   }
 
-  if (bestOffset >= 0) {
+  if (bestVersion) {
     return { version: bestVersion, source: `binary trailer @ 0x${bestOffset.toString(16).padStart(8, "0")}` };
   }
   return null;
 }
 
 function tryReadVersionFromMetadata(bytes: Uint8Array): FirmwareResolveResult | null {
-  let found: number | null = null;
+  let found: FirmwareVersion | null = null;
   let foundOffset = -1;
 
-  for (let offset = 0; offset + 8 <= bytes.length; offset += 1) {
+  for (let offset = 0; offset + 12 <= bytes.length; offset += 1) {
     if (bytesToUint32(bytes, offset) !== KBHE_FW_VERSION_RECORD_MAGIC) {
       continue;
     }
-    const version = u16le(bytes, offset + 4);
-    const versionXor = u16le(bytes, offset + 6);
-    if (((version ^ versionXor) & 0xffff) !== 0xffff) {
+    const versionPacked = bytesToUint32(bytes, offset + 4);
+    const versionXor = bytesToUint32(bytes, offset + 8);
+    if (((versionPacked ^ versionXor) >>> 0) !== 0xffffffff) {
       continue;
     }
-    if (found !== null && found !== version) {
+    const version: FirmwareVersion = {
+      major: (versionPacked >>> 16) & 0xff,
+      minor: (versionPacked >>> 8) & 0xff,
+      patch: versionPacked & 0xff,
+    };
+    if (
+      found !== null &&
+      (found.major !== version.major ||
+        found.minor !== version.minor ||
+        found.patch !== version.patch)
+    ) {
       throw new Error(
-        `ambiguous firmware version metadata in binary: 0x${found.toString(16).padStart(4, "0")}, 0x${version.toString(16).padStart(4, "0")}`,
+        `ambiguous firmware version metadata in binary: ${formatFirmwareVersion(found)}, ${formatFirmwareVersion(version)}`,
       );
     }
     found = version;
@@ -242,7 +272,7 @@ function tryReadVersionFromMetadata(bytes: Uint8Array): FirmwareResolveResult | 
 
 export function resolveFirmwareVersion(
   firmware: ArrayBuffer | Uint8Array,
-  explicitVersion?: number,
+  explicitVersion?: FirmwareVersion,
 ): FirmwareResolveResult {
   if (explicitVersion !== undefined) {
     return { version: explicitVersion, source: "manual" };
@@ -364,7 +394,7 @@ export class KBHEFirmware {
   async flashFirmware(
     firmware: ArrayBuffer | Uint8Array,
     options: FirmwareFlashOptions = {},
-  ): Promise<number> {
+  ): Promise<FirmwareVersion> {
     const bytes = firmware instanceof Uint8Array ? firmware : new Uint8Array(firmware);
     if (bytes.length === 0) {
       throw new Error("firmware file is empty");
@@ -376,7 +406,7 @@ export class KBHEFirmware {
     const log = options.onLog ?? (() => undefined);
     const transitionTimeoutMs = Math.max(timeoutMs, 12000);
 
-    log(`Flashing image with firmware version ${formatFirmwareVersion(firmwareVersion)} (0x${firmwareVersion.toString(16).padStart(4, "0")})`);
+    log(`Flashing image with firmware version ${formatFirmwareVersion(firmwareVersion)}`);
     if (source !== "manual") {
       log(`Version source: ${source}`);
     }
@@ -465,8 +495,9 @@ export class KBHEFirmware {
       beginPayload[5] = (imageCrc32 >> 8) & 0xff;
       beginPayload[6] = (imageCrc32 >> 16) & 0xff;
       beginPayload[7] = (imageCrc32 >> 24) & 0xff;
-      beginPayload[8] = firmwareVersion & 0xff;
-      beginPayload[9] = (firmwareVersion >> 8) & 0xff;
+      beginPayload[8] = firmwareVersion.major & 0xff;
+      beginPayload[9] = firmwareVersion.minor & 0xff;
+      beginPayload[10] = firmwareVersion.patch & 0xff;
       const begin = await this.transactWithRetry(
         buildUpdaterPacket(UPDATER_CMD_BEGIN, sequence, 0, beginPayload),
         timeoutMs,

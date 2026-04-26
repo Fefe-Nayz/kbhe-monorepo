@@ -19,22 +19,30 @@
 #include <string.h>
 
 //--------------------------------------------------------------------+
-// Firmware Version
+// Firmware Version (semver: major.minor.patch)
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0200 // v2.0.0
+#define FIRMWARE_VERSION_MAJOR 2u
+#define FIRMWARE_VERSION_MINOR 0u
+#define FIRMWARE_VERSION_PATCH 1u
+
+#define FIRMWARE_VERSION_PACKED                                                \
+  (((uint32_t)FIRMWARE_VERSION_MAJOR << 16) |                                  \
+   ((uint32_t)FIRMWARE_VERSION_MINOR << 8) |                                   \
+   ((uint32_t)FIRMWARE_VERSION_PATCH))
+
 #define KBHE_FW_VERSION_RECORD_MAGIC 0x4B465756u
 
 typedef struct __attribute__((packed)) {
   uint32_t magic;
-  uint16_t version;
-  uint16_t version_xor;
+  uint32_t version_packed; // (major << 16) | (minor << 8) | patch
+  uint32_t version_xor;    // version_packed ^ 0xFFFFFFFFu
 } kbhe_fw_version_record_t;
 
 __attribute__((used, section(".kbhe_fw_version")))
 static const kbhe_fw_version_record_t g_kbhe_fw_version_record = {
     .magic = KBHE_FW_VERSION_RECORD_MAGIC,
-    .version = FIRMWARE_VERSION,
-    .version_xor = (uint16_t)(FIRMWARE_VERSION ^ 0xFFFFu),
+    .version_packed = FIRMWARE_VERSION_PACKED,
+    .version_xor = (uint32_t)(FIRMWARE_VERSION_PACKED ^ 0xFFFFFFFFu),
 };
 
 //--------------------------------------------------------------------+
@@ -1967,7 +1975,17 @@ void settings_task(uint32_t now_ms) {
 
 bool settings_has_unsaved_changes(void) { return settings_dirty; }
 
-uint16_t settings_get_firmware_version(void) { return FIRMWARE_VERSION; }
+uint8_t settings_get_firmware_version_major(void) {
+  return FIRMWARE_VERSION_MAJOR;
+}
+
+uint8_t settings_get_firmware_version_minor(void) {
+  return FIRMWARE_VERSION_MINOR;
+}
+
+uint8_t settings_get_firmware_version_patch(void) {
+  return FIRMWARE_VERSION_PATCH;
+}
 
 const char *settings_get_keyboard_name(void) {
   return settings_keyboard_name_cache;

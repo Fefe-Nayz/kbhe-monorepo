@@ -10,7 +10,7 @@ typedef struct {
   uint32_t image_size;
   uint32_t aligned_size;
   uint32_t image_crc32;
-  uint16_t fw_version;
+  updater_fw_version_t fw_version;
   uint32_t next_offset;
 } updater_session_t;
 
@@ -120,8 +120,11 @@ static void handle_hello(const updater_packet_t *request,
   hello.write_align = UPDATER_FLASH_WRITE_ALIGN;
 
   if (updater_is_app_image_valid()) {
+    updater_fw_version_t installed = updater_get_app_version();
     hello.flags |= UPDATER_FLAG_APP_VALID;
-    hello.installed_fw_version = updater_get_app_version();
+    hello.installed_fw_version_major = installed.major;
+    hello.installed_fw_version_minor = installed.minor;
+    hello.installed_fw_version_patch = installed.patch;
   }
   if (s_session.active) {
     hello.flags |= UPDATER_FLAG_SESSION_ACTIVE;
@@ -158,7 +161,9 @@ static void handle_begin(const updater_packet_t *request,
   s_session.aligned_size =
       updater_align_up(begin.image_size, UPDATER_FLASH_WRITE_ALIGN);
   s_session.image_crc32 = begin.image_crc32;
-  s_session.fw_version = begin.fw_version;
+  s_session.fw_version.major = begin.fw_version_major;
+  s_session.fw_version.minor = begin.fw_version_minor;
+  s_session.fw_version.patch = begin.fw_version_patch;
   s_session.next_offset = 0u;
   s_pending_jump_after_response = false;
   s_jump_to_app = false;
