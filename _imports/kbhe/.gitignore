@@ -1,0 +1,80 @@
+# Build outputs
+/build/
+/cmake-build-*/
+/out/
+/dist/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+build.ninja
+.ninja_*
+
+# Embedded firmware artifacts
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.su
+*.d
+*.o
+*.obj
+*.a
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node / frontend
+node_modules/
+pnpm-lock.yaml
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# IDE and editor local state
+.idea/
+.metadata/
+.history/
+.cache/
+.vs/
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
+
+# Project scratch/generated inputs
+mx.scratch/
+repomix-output.xml
+/libhmk-main/
+/hmkconf-main/
+qmk_led_effects/

@@ -1,0 +1,82 @@
+name: Firmware CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build firmware
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            ninja-build \
+            gcc-arm-none-eabi \
+            binutils-arm-none-eabi \
+            libnewlib-arm-none-eabi
+
+      - name: Show tool versions
+        run: |
+          cmake --version
+          ninja --version
+          arm-none-eabi-gcc --version
+
+      - name: Configure Release
+        run: cmake --preset Release
+
+      - name: Build Release
+        run: cmake --build --preset Release
+
+      - name: Configure app-only Release
+        run: cmake --preset Release-apponly
+
+      - name: Build app-only Release
+        run: cmake --build --preset Release-apponly
+
+      - name: Package firmware artifacts
+        run: |
+          mkdir -p dist
+          cp build/Release/kbhe.bin dist/kbhe-app.bin
+          cp build/Release/kbhe.hex dist/kbhe-app.hex
+          cp build/Release/kbhe.elf dist/kbhe-app.elf
+          cp build/Release/kbhe.map dist/kbhe-app.map
+          cp build/Release/kbhe_bootloader.bin dist/kbhe-bootloader.bin
+          cp build/Release/kbhe_bootloader.hex dist/kbhe-bootloader.hex
+          cp build/Release/kbhe_bootloader.elf dist/kbhe-bootloader.elf
+          cp build/Release/kbhe_bootloader.map dist/kbhe-bootloader.map
+          cp build/Release-apponly/kbhe.bin dist/kbhe-app-only.bin
+          cp build/Release-apponly/kbhe.hex dist/kbhe-app-only.hex
+          cp build/Release-apponly/kbhe.elf dist/kbhe-app-only.elf
+          cp build/Release-apponly/kbhe.map dist/kbhe-app-only.map
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: kbhe-firmware-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true

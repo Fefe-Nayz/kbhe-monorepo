@@ -1,0 +1,61 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "${sourceDir}/firmware/cmake/gcc-arm-none-eabi.cmake",
+            "cacheVariables": {
+            }
+        },
+        {
+            "name": "default",
+            "displayName": "Release",
+            "description": "Default firmware release build",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "Release",
+            "inherits": "default"
+        },
+        {
+            "name": "Debug",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "Release-apponly",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "KBHE_ENABLE_CUSTOM_BOOTLOADER": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "displayName": "Release",
+            "configurePreset": "default"
+        },
+        {
+            "name": "Release",
+            "configurePreset": "Release"
+        },
+        {
+            "name": "Debug",
+            "configurePreset": "Debug"
+        },
+        {
+            "name": "Release-apponly",
+            "configurePreset": "Release-apponly"
+        }
+    ]
+}

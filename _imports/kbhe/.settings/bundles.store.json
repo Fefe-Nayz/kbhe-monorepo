@@ -1,0 +1,12 @@
+{
+  "bundles": [
+    {
+      "name": "st-arm-clangd",
+      "version": "21.1.0+st.2"
+    },
+    {
+      "name": "gnu-tools-for-stm32",
+      "version": "14.3.1+st.2"
+    }
+  ]
+}
