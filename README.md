@@ -141,7 +141,7 @@ Files live in `assets/cad/75he-mechanical/`. The **“parts”** set are consist
 | ![6-key](hardware/pcb/75he/Legacy/proto-6-key-hall-sensors/assets/proto-6-key-hall-sensors-proto_pcb-front-x25-zoom1-rt-transparent.png) | ![MCU v1](hardware/pcb/75he/Legacy/proto-mcu-v1/assets/proto-mcu-v1-mcu-front-x25-zoom1-rt-transparent.png) | ![MCU v2](hardware/pcb/75he/Legacy/proto-mcu-v2/assets/proto-mcu-v2-mcu-front-x25-zoom1-rt-transparent.png) |
 
 ## Current limitations - TODOs
-- For transparen keycaps the space bar lacks leds on the sides
+- For transparent keycaps the space bar lacks leds on the sides
 - For the enter key the led is colliding with the stabilizer which needs to be cut
 - DFU switch should be hidden
 - Wireless version
@@ -150,4 +150,4 @@ Files live in `assets/cad/75he-mechanical/`. The **“parts”** set are consist
 - Mountiing holes placements may need to be adjusted
 - Try lowering pcb layer count without sacrificing noise performance
 - Add support for libhmk
-- Final touches on 3D models: adjust tolerances, raise the top case
+- Final touches on 3D models: adjust tolerances, raise the top case, adjust USB and switch hole position
