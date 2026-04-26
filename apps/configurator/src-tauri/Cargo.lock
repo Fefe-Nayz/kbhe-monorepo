@@ -1719,7 +1719,7 @@ dependencies = [
 
 [[package]]
 name = "kbhe-configurator"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "hidapi",
  "log",
