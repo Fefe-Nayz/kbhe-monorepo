@@ -1,13 +1,19 @@
-## RAW HID
-``pip install hidapi``
+# RAW HID Usage
 
-Move hidapi.dll in the same folder of python executable
+Install the Python HID dependency:
+
+```powershell
+pip install hidapi
+```
+
+On Windows, if the bundled `hidapi.dll` is needed, keep it next to the Python
+entry point that runs the tools.
 
 ## Global protocol documentation
 
-See the complete protocol reference (application RAW HID + updater RAW HID):
+See the complete protocol reference for application RAW HID and updater RAW HID:
 
-- docs/RAW_HID_PROTOCOL.MD
+- `docs/RAW_HID_PROTOCOL.MD`
 
 New identity commands:
 
@@ -17,20 +23,20 @@ New identity commands:
 ### Firmware Update
 Flash the application image with the integrated updater command:
 
-```bash
+```powershell
 python host/raw_hid.py --flash build/Release/kbhe.bin
 ```
 
 Optional arguments:
 
-```bash
+```powershell
 python host/raw_hid.py --flash build/Release/kbhe.bin --fw-version 0x0102 --timeout 5 --retries 5
 ```
 
 ### GUI
 Launch the keyboard configurator GUI:
 
-```bash
+```powershell
 python host/raw_hid.py --gui
 ```
 

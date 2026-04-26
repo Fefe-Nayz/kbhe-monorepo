@@ -20,13 +20,14 @@ Le clavier expose une interface RAW HID qui sert de canal de controle entre le f
 
 ## Architecture du depot
 
-- `firmware/`: build embarque STM32, firmware principal, bootloader, HAL/CMSIS, TinyUSB et linker scripts
+- `firmware/`: build embarque STM32, firmware principal, bootloader, HAL/CMSIS, TinyUSB, linker scripts et projet CubeMX `.ioc`
 - `host/`: librairie Python de communication + GUI Qt, CLI RAW HID et updater firmware
 - `analysis/`: scripts d'analyse/calibration ADC, regression et generation LUT
 - `layouts/`: layouts clavier JSON
 - `data/`: captures et jeux de donnees de mesure
 - `integrations/`: integrations externes comme SignalRGB et le package React KLE
 - `docs/RAW_HID_PROTOCOL.MD`: reference de protocole RAW HID
+- `docs/raw_hid_usage.md`: notes d'utilisation des outils RAW HID
 - `CMakeLists.txt`, `CMakePresets.json`: wrapper de build firmware depuis la racine
 - `.github/workflows/firmware.yml`: CI firmware + publication des releases taguees
 
@@ -156,6 +157,9 @@ Apres une premiere configuration, le build courant se lance directement avec :
 cmake --build --preset Release
 ```
 
+`Release` est aussi le fallback CMake si un outil configure le projet sans
+selectionner explicitement de preset.
+
 Artifacts attendus en `Release` :
 
 - `build/Release/kbhe_bootloader.hex`
@@ -259,7 +263,7 @@ git push origin v0.1.0
 ## Documentation complementaire
 
 - Protocole RAW HID : `docs/RAW_HID_PROTOCOL.MD`
-- Notes d'usage RAW HID : `RAW_HID.md`
+- Notes d'usage RAW HID : `docs/raw_hid_usage.md`
 
 ## Note CubeMX / DMA
 
