@@ -285,7 +285,7 @@ export class KBHEDevice {
   constructor(
     private readonly commander: KbheCommander = kbheCommander,
     private readonly transport: KbheTransport = kbheTransport,
-  ) {}
+  ) { }
 
   async listDevices(): Promise<KbheTransportDeviceInfo[]> {
     return this.transport.listDevices();

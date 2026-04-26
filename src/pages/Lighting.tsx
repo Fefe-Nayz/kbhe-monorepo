@@ -1002,8 +1002,8 @@ export default function Lighting() {
         const explicitEnumOptions = EFFECT_PARAM_ENUM_OPTIONS[currentEffect]?.[desc.id];
         const fallbackEnumOptions =
           desc.type === LED_PARAM_TYPES.ENUM &&
-          desc.max >= desc.min &&
-          desc.max - desc.min <= 16
+            desc.max >= desc.min &&
+            desc.max - desc.min <= 16
             ? Array.from({ length: desc.max - desc.min + 1 }, (_, idx) => {
               const value = desc.min + idx;
               return { value, label: `Option ${value}` };
@@ -1197,7 +1197,7 @@ export default function Lighting() {
                     max={255}
                     step={1}
                     value={ledIdleTimeoutSeconds}
-                    onLiveChange={() => {}}
+                    onLiveChange={() => { }}
                     onCommit={(v) => idleTimeoutMut.mutate(v)}
                     disabled={!connected || idleOptionsQ.data == null}
                     className="flex-1"
