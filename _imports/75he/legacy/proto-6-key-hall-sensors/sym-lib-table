@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "PCM_JLCPCB-Extended") (type "KiCad") (uri "${KIPRJMOD}/Library/Symbols/JLCPCB-Extended.kicad_sym") (options "") (descr "Repository-local JLCPCB extended symbols"))
+)

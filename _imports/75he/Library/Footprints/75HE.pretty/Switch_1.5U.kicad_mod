@@ -1,0 +1,127 @@
+(footprint "Switch_1.5U"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -8.25 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "d60ba438-4287-45ae-a0b2-fca04c6035fb")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "Switch_1.5U"
+		(at 0 -5.75 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "d37c5359-73cd-4eed-9f56-21c27d639758")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "5b34c378-ca41-4e3d-a620-2c75d2e873f4")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "11c0f503-2852-492a-9361-fd003139afda")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_rect
+		(start -14.2875 -9.525)
+		(end 14.2875 9.525)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "93b43c73-880a-4faf-8ad8-87b74314dc32")
+	)
+	(fp_rect
+		(start -7.025 -7.025)
+		(end 7.025 7.025)
+		(stroke
+			(width 0.1)
+			(type dash)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "3a56c643-0a7b-44ef-be00-2f0fd2c94e73")
+	)
+	(fp_circle
+		(center -5.08 0)
+		(end -4.2175 0)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill yes)
+		(layer "Edge.Cuts")
+		(uuid "81a3f3ce-0840-489d-9d61-750b0f6e9702")
+	)
+	(fp_circle
+		(center 5.08 0)
+		(end 5.9425 0)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill yes)
+		(layer "Edge.Cuts")
+		(uuid "1d0b8aee-4268-498e-9c1b-31b931199d7b")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 -4.25 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "2158ed40-f1db-410c-8b43-9c703c213d2a")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/Library/3D/75HE/Gateron Magnetic Jade Switch.stp"
+		(hide yes)
+		(offset
+			(xyz -2.3 -178.35 -16)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz -0 -0 -90)
+		)
+	)
+)
