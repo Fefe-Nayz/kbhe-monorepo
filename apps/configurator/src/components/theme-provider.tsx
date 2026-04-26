@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 type Theme = "light" | "dark" | "system";
 
@@ -26,6 +28,18 @@ function applyTheme(resolved: "light" | "dark") {
   root.classList.add(resolved);
 }
 
+async function applyWindowTheme(theme: Theme) {
+  if (!isTauri()) {
+    return;
+  }
+
+  try {
+    await getCurrentWindow().setTheme(theme === "system" ? null : theme);
+  } catch {
+    // Keep DOM theme updates even if native window theme sync fails.
+  }
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -41,12 +55,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const resolved = resolveTheme(next);
     setResolvedTheme(resolved);
     applyTheme(resolved);
+    void applyWindowTheme(next);
   }, []);
 
   useEffect(() => {
     const resolved = resolveTheme(theme);
     setResolvedTheme(resolved);
     applyTheme(resolved);
+    void applyWindowTheme(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -56,6 +72,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const resolved = getSystemTheme();
       setResolvedTheme(resolved);
       applyTheme(resolved);
+      void applyWindowTheme("system");
     };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);

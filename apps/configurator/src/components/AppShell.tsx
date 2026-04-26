@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DeviceBanner } from "@/components/DeviceBanner";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { ThemeButton } from "@/components/nav-components/themeButton";
 import { ProfileSelect } from "@/components/profile-select";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
@@ -115,6 +116,7 @@ export function AppShell() {
         <SidebarInset className="flex min-w-0 flex-col min-h-0 overflow-hidden">
           <AppHeader title={pageTitle} />
           <DeviceBanner />
+          <UpdateBanner />
           <main className="flex min-w-0 flex-1 flex-col min-h-0 overflow-hidden">
             <Routes>
               <Route path="/"              element={<Dashboard />} />
