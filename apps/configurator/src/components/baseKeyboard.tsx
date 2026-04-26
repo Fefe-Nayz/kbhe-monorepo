@@ -83,18 +83,20 @@ function computeScale(
   availableHeight: number,
   naturalWidth: number,
   naturalHeight: number,
-): number {
-  if (
-    availableWidth <= 0 ||
-    availableHeight <= 0 ||
-    naturalWidth <= 0 ||
-    naturalHeight <= 0
-  ) {
-    return 1;
+): number | null {
+  if (naturalWidth <= 0 || naturalHeight <= 0) {
+    return null;
   }
 
-  const fitByWidth = availableWidth / naturalWidth;
-  const fitByHeight = availableHeight / naturalHeight;
+  const canFitWidth = availableWidth > 0;
+  const canFitHeight = availableHeight > 0;
+
+  if (!canFitWidth && !canFitHeight) {
+    return null;
+  }
+
+  const fitByWidth = canFitWidth ? availableWidth / naturalWidth : Number.POSITIVE_INFINITY;
+  const fitByHeight = canFitHeight ? availableHeight / naturalHeight : Number.POSITIVE_INFINITY;
   return Math.max(0, Math.min(1.25, fitByWidth, fitByHeight));
 }
 
@@ -106,7 +108,7 @@ function useAutoScale(
 ) {
   const [scale, setScale] = useState<number | null>(null);
 
-  const measureScale = useCallback((container: HTMLDivElement) => {
+  const measureScale = useCallback((container: HTMLDivElement): number | null => {
     const containerSize = getPaddingAdjustedSize(container);
     const layerSelectorHeight = includeLayerSelector ? getBlockHeight(layerSelectorRef.current) : 0;
 
@@ -133,6 +135,17 @@ function useAutoScale(
 
     const updateScale = () => {
       const nextScale = measureScale(el);
+      if (nextScale == null) {
+        return;
+      }
+
+      if (lastScale == null) {
+        lastScale = nextScale;
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => setScale(nextScale));
+        return;
+      }
+
       if (Math.abs(nextScale - lastScale) < 0.001) return;
 
       lastScale = nextScale;
