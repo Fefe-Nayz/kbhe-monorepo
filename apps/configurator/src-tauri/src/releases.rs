@@ -69,7 +69,7 @@ fn release_repo() -> &'static str {
 
 fn releases_url() -> String {
     format!(
-        "https://api.github.com/repos/{}/{}/releases",
+        "https://api.github.com/repos/{}/{}/releases?per_page=100",
         release_owner(),
         release_repo()
     )
