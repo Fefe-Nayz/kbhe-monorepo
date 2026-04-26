@@ -21,7 +21,7 @@ extern "C" {
 //--------------------------------------------------------------------+
 #define SETTINGS_MAGIC_START 0x4B424845 // "KBHE"
 #define SETTINGS_MAGIC_END 0x454E4421   // "END!"
-#define SETTINGS_VERSION 0x001D         // Phase-4B: LED thermal protection option
+#define SETTINGS_VERSION 0x001E         // Phase-4C: USB suspend RGB-off option
 
 //--------------------------------------------------------------------+
 // LED Matrix Constants
@@ -50,6 +50,7 @@ extern "C" {
 #define SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS 0u
 #define SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED 0u
 #define SETTINGS_DEFAULT_LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY 0u
+#define SETTINGS_DEFAULT_LED_USB_SUSPEND_RGB_OFF 1u
 #define SETTINGS_DKS_BOTTOM_OUT_POINT_MIN_TENTHS 1u
 #define SETTINGS_DKS_BOTTOM_OUT_POINT_MAX_TENTHS 40u
 #define SETTINGS_DKS_BOTTOM_OUT_POINT_DEFAULT_TENTHS 40u
@@ -500,7 +501,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
   uint8_t pixels[LED_MATRIX_DATA_BYTES];
   uint8_t brightness;                    // Global brightness (0-255)
-  uint8_t reserved[3];                   // Padding for alignment
+  uint8_t reserved[3];                   // Runtime metadata (chatter, idle, suspend policy)
 } settings_led_t;
 
 /**
@@ -962,6 +963,16 @@ bool settings_is_led_idle_third_party_stream_counts_as_activity(void);
  * @brief Configure whether third-party LED stream writes count as idle activity.
  */
 bool settings_set_led_idle_third_party_stream_counts_as_activity(bool enabled);
+
+/**
+ * @brief Check whether LEDs are forced off while USB is suspended.
+ */
+bool settings_is_led_usb_suspend_rgb_off_enabled(void);
+
+/**
+ * @brief Configure whether LEDs are forced off while USB is suspended.
+ */
+bool settings_set_led_usb_suspend_rgb_off_enabled(bool enabled);
 
 /**
  * @brief Get LED brightness

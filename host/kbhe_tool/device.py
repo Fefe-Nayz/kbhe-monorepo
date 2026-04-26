@@ -709,6 +709,19 @@ class KBHEDevice:
         """Clear the host-driven volume overlay."""
         resp = self.send_command(Command.CLEAR_LED_VOLUME_OVERLAY)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    def led_get_usb_suspend_rgb_off(self):
+        """Get whether RGB is forced off while USB is suspended."""
+        resp = self.send_command(Command.GET_LED_USB_SUSPEND_RGB_OFF)
+        if resp and len(resp) >= 3 and resp[1] == Status.OK:
+            return bool(resp[2])
+        return None
+
+    def led_set_usb_suspend_rgb_off(self, enabled):
+        """Set whether RGB is forced off while USB is suspended."""
+        data = [0, 1 if enabled else 0]
+        resp = self.send_command(Command.SET_LED_USB_SUSPEND_RGB_OFF, data)
+        return resp and len(resp) >= 2 and resp[1] == Status.OK
     
     def led_upload_all(self, pixels):
         """Upload the full persisted LED frame in HID chunks."""

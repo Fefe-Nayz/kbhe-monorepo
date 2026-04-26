@@ -21,7 +21,7 @@
 //--------------------------------------------------------------------+
 // Firmware Version
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION 0x0108 // v1.8.0
+#define FIRMWARE_VERSION 0x0109 // v1.9.0
 #define KBHE_FW_VERSION_RECORD_MAGIC 0x4B465756u
 
 typedef struct __attribute__((packed)) {
@@ -64,8 +64,13 @@ static char settings_profile_name_cache[SETTINGS_PROFILE_COUNT]
 #define SETTINGS_FLASH_WORDS_PER_STEP 16u
 #define SETTINGS_PROFILE_MASK_ALL ((1u << SETTINGS_PROFILE_COUNT) - 1u)
 #define SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_DURATION_INDEX 0u
-#define SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_ENABLED_INDEX 1u
+#define SETTINGS_LED_META_FLAGS_INDEX 1u
 #define SETTINGS_LED_META_LED_IDLE_TIMEOUT_SECONDS_INDEX 2u
+#define SETTINGS_LED_META_FLAG_TRIGGER_CHATTER_GUARD_ENABLED 0x01u
+#define SETTINGS_LED_META_FLAG_USB_SUSPEND_RGB_OFF 0x02u
+#define SETTINGS_LED_META_FLAGS_ALLOWED_MASK                                    \
+  (SETTINGS_LED_META_FLAG_TRIGGER_CHATTER_GUARD_ENABLED |                     \
+   SETTINGS_LED_META_FLAG_USB_SUSPEND_RGB_OFF)
 
 static uint8_t led_effect_restore_mode = LED_EFFECT_STATIC_MATRIX;
 static bool led_effect_restore_valid = false;
@@ -346,6 +351,42 @@ settings_sanitize_trigger_chatter_guard_enabled_raw(uint8_t enabled_raw) {
   return enabled_raw;
 }
 
+static uint8_t settings_default_led_meta_flags(void) {
+  uint8_t flags = 0u;
+
+  if (SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED != 0u) {
+    flags = (uint8_t)(flags | SETTINGS_LED_META_FLAG_TRIGGER_CHATTER_GUARD_ENABLED);
+  }
+
+  if (SETTINGS_DEFAULT_LED_USB_SUSPEND_RGB_OFF != 0u) {
+    flags = (uint8_t)(flags | SETTINGS_LED_META_FLAG_USB_SUSPEND_RGB_OFF);
+  }
+
+  return flags;
+}
+
+static uint8_t settings_sanitize_led_meta_flags_raw(uint8_t flags_raw) {
+  return (uint8_t)(flags_raw & SETTINGS_LED_META_FLAGS_ALLOWED_MASK);
+}
+
+static uint8_t settings_read_led_meta_flags(const settings_led_t *led) {
+  if (led == NULL) {
+    return settings_default_led_meta_flags();
+  }
+
+  return settings_sanitize_led_meta_flags_raw(
+      led->reserved[SETTINGS_LED_META_FLAGS_INDEX]);
+}
+
+static void settings_write_led_meta_flags(settings_led_t *led, uint8_t flags) {
+  if (led == NULL) {
+    return;
+  }
+
+  led->reserved[SETTINGS_LED_META_FLAGS_INDEX] =
+      settings_sanitize_led_meta_flags_raw(flags);
+}
+
 static uint8_t settings_sanitize_led_idle_timeout_seconds(
     uint8_t timeout_seconds) {
   if (timeout_seconds > SETTINGS_LED_IDLE_TIMEOUT_MAX_SECONDS) {
@@ -358,25 +399,37 @@ static uint8_t settings_sanitize_led_idle_timeout_seconds(
 static void settings_write_trigger_chatter_guard_to_led(settings_led_t *led,
                                                         bool enabled,
                                                         uint8_t duration_ms) {
+  uint8_t flags = 0u;
+
   if (led == NULL) {
     return;
   }
 
   led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_DURATION_INDEX] =
       settings_sanitize_trigger_chatter_guard_duration(duration_ms);
-  led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_ENABLED_INDEX] =
-      enabled ? 1u : 0u;
+
+  flags = settings_read_led_meta_flags(led);
+  if (enabled) {
+    flags = (uint8_t)(flags | SETTINGS_LED_META_FLAG_TRIGGER_CHATTER_GUARD_ENABLED);
+  } else {
+    flags =
+        (uint8_t)(flags & (uint8_t)~SETTINGS_LED_META_FLAG_TRIGGER_CHATTER_GUARD_ENABLED);
+  }
+  settings_write_led_meta_flags(led, flags);
 }
 
 static void settings_read_trigger_chatter_guard_from_led(
     const settings_led_t *led, bool *enabled, uint8_t *duration_ms) {
+  uint8_t flags = settings_default_led_meta_flags();
   uint8_t enabled_raw =
       (uint8_t)(SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED ? 1u : 0u);
   uint8_t duration_raw = SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS;
 
   if (led != NULL) {
-    enabled_raw =
-        led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_ENABLED_INDEX];
+    flags = settings_read_led_meta_flags(led);
+    enabled_raw = (flags & SETTINGS_LED_META_FLAG_TRIGGER_CHATTER_GUARD_ENABLED)
+                      ? 1u
+                      : 0u;
     duration_raw =
         led->reserved[SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_DURATION_INDEX];
   }
@@ -403,6 +456,41 @@ static void settings_sanitize_trigger_chatter_guard_storage(settings_led_t *led)
 
   settings_read_trigger_chatter_guard_from_led(led, &enabled, &duration_ms);
   settings_write_trigger_chatter_guard_to_led(led, enabled, duration_ms);
+}
+
+static bool settings_read_led_usb_suspend_rgb_off_from_led(
+    const settings_led_t *led) {
+  uint8_t flags = settings_read_led_meta_flags(led);
+  return (flags & SETTINGS_LED_META_FLAG_USB_SUSPEND_RGB_OFF) != 0u;
+}
+
+static void settings_write_led_usb_suspend_rgb_off_to_led(settings_led_t *led,
+                                                          bool enabled) {
+  uint8_t flags = 0u;
+
+  if (led == NULL) {
+    return;
+  }
+
+  flags = settings_read_led_meta_flags(led);
+  if (enabled) {
+    flags = (uint8_t)(flags | SETTINGS_LED_META_FLAG_USB_SUSPEND_RGB_OFF);
+  } else {
+    flags =
+        (uint8_t)(flags & (uint8_t)~SETTINGS_LED_META_FLAG_USB_SUSPEND_RGB_OFF);
+  }
+  settings_write_led_meta_flags(led, flags);
+}
+
+static void settings_sanitize_led_usb_suspend_rgb_off_storage(settings_led_t *led) {
+  bool enabled = false;
+
+  if (led == NULL) {
+    return;
+  }
+
+  enabled = settings_read_led_usb_suspend_rgb_off_from_led(led);
+  settings_write_led_usb_suspend_rgb_off_to_led(led, enabled);
 }
 
 static uint8_t
@@ -1458,8 +1546,11 @@ static void settings_set_defaults(void) {
       &current_settings.led,
       SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED != 0u,
       SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_MS);
-    settings_write_led_idle_timeout_seconds_to_led(
+  settings_write_led_idle_timeout_seconds_to_led(
       &current_settings.led, SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS);
+  settings_write_led_usb_suspend_rgb_off_to_led(
+      &current_settings.led,
+      SETTINGS_DEFAULT_LED_USB_SUSPEND_RGB_OFF != 0u);
 
   settings_default_rotary_encoder(&default_rotary);
   current_settings.rotary = default_rotary;
@@ -1538,6 +1629,14 @@ static bool settings_load_from_flash(void) {
     temp.default_profile_index = SETTINGS_DEFAULT_PROFILE_NONE;
     if (source_version < SETTINGS_VERSION) {
       temp.options.led_thermal_protection_enabled = 1u;
+      settings_write_led_usb_suspend_rgb_off_to_led(
+          &temp.led, SETTINGS_DEFAULT_LED_USB_SUSPEND_RGB_OFF != 0u);
+      for (uint8_t profile_index = 0u; profile_index < SETTINGS_PROFILE_COUNT;
+           profile_index++) {
+        settings_write_led_usb_suspend_rgb_off_to_led(
+            &temp.profiles[profile_index].led,
+            SETTINGS_DEFAULT_LED_USB_SUSPEND_RGB_OFF != 0u);
+      }
     }
     needs_resave = true;
   }
@@ -1579,6 +1678,7 @@ static bool settings_load_from_flash(void) {
     current_settings.advanced_tick_rate = settings_sanitize_advanced_tick_rate(
         current_settings.advanced_tick_rate);
     settings_sanitize_trigger_chatter_guard_storage(&current_settings.led);
+    settings_sanitize_led_usb_suspend_rgb_off_storage(&current_settings.led);
     settings_sanitize_led_idle_timeout_storage(&current_settings.led);
 
     settings_profile_capture_current_slot(profile_index);
@@ -2229,6 +2329,19 @@ bool settings_set_led_idle_third_party_stream_counts_as_activity(bool enabled) {
   settings_options_set_led_idle_third_party_stream_activity(
       &current_settings.options, enabled);
   led_matrix_set_idle_third_party_stream_counts_as_activity(enabled);
+  settings_mark_dirty();
+  return true;
+}
+
+bool settings_is_led_usb_suspend_rgb_off_enabled(void) {
+  return settings_read_led_usb_suspend_rgb_off_from_led(&current_settings.led);
+}
+
+bool settings_set_led_usb_suspend_rgb_off_enabled(bool enabled) {
+  settings_write_led_usb_suspend_rgb_off_to_led(&current_settings.led, enabled);
+  if (!enabled) {
+    led_matrix_set_usb_suspend_state(false);
+  }
   settings_mark_dirty();
   return true;
 }

@@ -304,6 +304,17 @@ void led_matrix_set_idle_third_party_stream_counts_as_activity(bool enabled);
 bool led_matrix_is_idle_third_party_stream_counts_as_activity(void);
 
 /**
+ * @brief Force LED output off while USB is in suspend state.
+ *        This does not modify the persisted LED enabled setting.
+ */
+void led_matrix_set_usb_suspend_state(bool suspended);
+
+/**
+ * @brief Check whether USB suspend output forcing is currently active.
+ */
+bool led_matrix_is_usb_suspend_active(void);
+
+/**
  * @brief Notify LED engine of explicit user activity (key/rotary action).
  */
 void led_matrix_notify_user_activity(void);

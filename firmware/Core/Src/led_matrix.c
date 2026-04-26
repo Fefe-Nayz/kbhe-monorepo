@@ -39,6 +39,7 @@ static uint8_t current_brightness = LED_BRIGHTNESS_DEFAULT;
 // Enabled state
 static bool display_enabled = true;
 static bool idle_sleep_active = false;
+static bool usb_suspend_active = false;
 static uint8_t idle_timeout_seconds = SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS;
 static bool allow_system_indicators_when_disabled =
   SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED != 0u;
@@ -870,10 +871,14 @@ static bool volume_overlay_color_for_index(uint8_t index, uint32_t now_ms,
 }
 
 static inline bool led_matrix_full_output_enabled(void) {
-  return display_enabled && !idle_sleep_active;
+  return display_enabled && !idle_sleep_active && !usb_suspend_active;
 }
 
 static bool led_matrix_system_overlay_enabled(uint32_t now_ms) {
+  if (usb_suspend_active) {
+    return false;
+  }
+
   if (!allow_system_indicators_when_disabled) {
     return false;
   }
@@ -1185,6 +1190,7 @@ bool led_matrix_init(void *htim, uint32_t channel) {
   current_brightness = LED_BRIGHTNESS_DEFAULT;
   display_enabled = true;
   idle_sleep_active = false;
+  usb_suspend_active = false;
   idle_timeout_seconds = SETTINGS_DEFAULT_LED_IDLE_TIMEOUT_SECONDS;
   allow_system_indicators_when_disabled =
       SETTINGS_DEFAULT_LED_ALLOW_SYSTEM_WHEN_DISABLED != 0u;
@@ -1417,6 +1423,19 @@ void led_matrix_set_idle_third_party_stream_counts_as_activity(bool enabled) {
 bool led_matrix_is_idle_third_party_stream_counts_as_activity(void) {
   return idle_third_party_stream_counts_as_activity;
 }
+
+void led_matrix_set_usb_suspend_state(bool suspended) {
+  if (usb_suspend_active == suspended) {
+    return;
+  }
+
+  usb_suspend_active = suspended;
+  if (initialized) {
+    update_ws2812();
+  }
+}
+
+bool led_matrix_is_usb_suspend_active(void) { return usb_suspend_active; }
 
 void led_matrix_notify_user_activity(void) {
   led_matrix_mark_activity(HAL_GetTick());

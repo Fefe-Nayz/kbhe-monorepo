@@ -10,6 +10,7 @@
 #include "hid/keyboard_nkro_hid.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
+#include "settings.h"
 #include "hid/raw_hid.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
@@ -177,6 +178,24 @@ void keyboard_hid_task(void) {
 //--------------------------------------------------------------------+
 // TinyUSB HID Callbacks (requis par TinyUSB)
 //--------------------------------------------------------------------+
+
+// Invoked when device is mounted/configured.
+void tud_mount_cb(void) { led_matrix_set_usb_suspend_state(false); }
+
+// Invoked when device is unmounted.
+void tud_umount_cb(void) { led_matrix_set_usb_suspend_state(false); }
+
+// Invoked when USB bus enters suspend.
+void tud_suspend_cb(bool remote_wakeup_en) {
+  (void)remote_wakeup_en;
+
+  if (settings_is_led_usb_suspend_rgb_off_enabled()) {
+    led_matrix_set_usb_suspend_state(true);
+  }
+}
+
+// Invoked when USB bus resumes.
+void tud_resume_cb(void) { led_matrix_set_usb_suspend_state(false); }
 
 /*
  * Invoked when received GET_REPORT control request

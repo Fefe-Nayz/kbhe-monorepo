@@ -2141,7 +2141,7 @@ static void cmd_get_led_idle_options(const uint8_t *in, uint8_t *out) {
   resp->idle_timeout_seconds = settings_get_led_idle_timeout_seconds();
   resp->allow_system_when_disabled =
       settings_is_led_system_indicators_allowed_when_disabled() ? 1u : 0u;
-    resp->third_party_stream_counts_as_activity =
+  resp->third_party_stream_counts_as_activity =
       settings_is_led_idle_third_party_stream_counts_as_activity() ? 1u : 0u;
 }
 
@@ -2157,19 +2157,38 @@ static void cmd_set_led_idle_options(const uint8_t *in, uint8_t *out) {
       settings_set_led_idle_timeout_seconds(req->idle_timeout_seconds);
   ok_policy = settings_set_led_system_indicators_allowed_when_disabled(
       req->allow_system_when_disabled != 0u);
-    ok_third_party_activity =
+  ok_third_party_activity =
       settings_set_led_idle_third_party_stream_counts_as_activity(
-        req->third_party_stream_counts_as_activity != 0u);
+          req->third_party_stream_counts_as_activity != 0u);
 
   resp->command_id = CMD_SET_LED_IDLE_OPTIONS;
-    resp->status = (ok_timeout && ok_policy && ok_third_party_activity)
-             ? HID_RESP_OK
-             : HID_RESP_INVALID_PARAM;
+  resp->status = (ok_timeout && ok_policy && ok_third_party_activity)
+                     ? HID_RESP_OK
+                     : HID_RESP_INVALID_PARAM;
   resp->idle_timeout_seconds = settings_get_led_idle_timeout_seconds();
   resp->allow_system_when_disabled =
       settings_is_led_system_indicators_allowed_when_disabled() ? 1u : 0u;
-    resp->third_party_stream_counts_as_activity =
+  resp->third_party_stream_counts_as_activity =
       settings_is_led_idle_third_party_stream_counts_as_activity() ? 1u : 0u;
+}
+
+static void cmd_get_led_usb_suspend_rgb_off(const uint8_t *in, uint8_t *out) {
+  hid_packet_bool_t *resp = (hid_packet_bool_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_GET_LED_USB_SUSPEND_RGB_OFF;
+  resp->status = HID_RESP_OK;
+  resp->value = settings_is_led_usb_suspend_rgb_off_enabled() ? 1u : 0u;
+}
+
+static void cmd_set_led_usb_suspend_rgb_off(const uint8_t *in, uint8_t *out) {
+  const hid_packet_bool_t *req = (const hid_packet_bool_t *)in;
+  hid_packet_bool_t *resp = (hid_packet_bool_t *)out;
+  bool success = settings_set_led_usb_suspend_rgb_off_enabled(req->value != 0u);
+
+  resp->command_id = CMD_SET_LED_USB_SUSPEND_RGB_OFF;
+  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->value = settings_is_led_usb_suspend_rgb_off_enabled() ? 1u : 0u;
 }
 
 //--------------------------------------------------------------------+
@@ -2873,6 +2892,14 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SET_LED_IDLE_OPTIONS:
     cmd_set_led_idle_options(in_packet, out_packet);
+    break;
+
+  case CMD_GET_LED_USB_SUSPEND_RGB_OFF:
+    cmd_get_led_usb_suspend_rgb_off(in_packet, out_packet);
+    break;
+
+  case CMD_SET_LED_USB_SUSPEND_RGB_OFF:
+    cmd_set_led_usb_suspend_rgb_off(in_packet, out_packet);
     break;
 
   // Filter commands

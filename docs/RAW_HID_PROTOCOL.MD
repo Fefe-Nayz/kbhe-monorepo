@@ -178,6 +178,7 @@ Valeurs par defaut usine (profil courant):
   - led_brightness=50
   - led_effect_color=(255,0,0)
   - led_fps_limit=60
+  - led_usb_suspend_rgb_off=1 (RGB coupe pendant USB suspend)
 - Filtre ADC:
   - filter_enabled=1
   - noise_band=8
@@ -595,6 +596,10 @@ RESET_KEY_TRIGGER_SETTINGS (0x58)
 | SET_LED_AUDIO_SPECTRUM | 0x78 | band_count + bands + impact_level | status + echo payload |
 | CLEAR_LED_AUDIO_SPECTRUM | 0x79 | aucun | status |
 | SET_LED_ALPHA_MASK | 0x7A | mask_len + mask_bytes (len=0 pour clear) | status + mask_len applique |
+| GET_LED_IDLE_OPTIONS | 0x7B | aucun | status + idle_timeout_seconds + allow_system_when_disabled + third_party_stream_counts_as_activity |
+| SET_LED_IDLE_OPTIONS | 0x7C | idle_timeout_seconds + allow_system_when_disabled + third_party_stream_counts_as_activity | status + echo des valeurs appliquees |
+| GET_LED_USB_SUSPEND_RGB_OFF | 0x7D | aucun | status + value (0/1) |
+| SET_LED_USB_SUSPEND_RGB_OFF | 0x7E | value (0/1) | status + value courant |
 
 Notes generales LED:
 - La vitesse et les couleurs des effets sont uniquement transportees via
@@ -604,6 +609,8 @@ Notes generales LED:
 - Tous les effets exposent PCOLOR (couleur de base). Par defaut rouge (255,0,0) = QMK default.
 - `GET_LED_EFFECT_SCHEMA` retourne des descriptors chunks de 6 octets:
   `id`, `type`, `min`, `max`, `default`, `step`.
+- Si `LED_USB_SUSPEND_RGB_OFF` est active, la matrice RGB est forcee a noir
+  pendant `USB suspend` puis restauree au `USB resume`.
 
 Params effets par categorie:
 

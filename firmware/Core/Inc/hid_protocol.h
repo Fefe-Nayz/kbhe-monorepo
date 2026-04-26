@@ -124,6 +124,8 @@ typedef enum {
   CMD_SET_LED_ALPHA_MASK = 0x7A, // Set/clear alpha mask (len + bitmask bytes)
   CMD_GET_LED_IDLE_OPTIONS = 0x7B, // Get LED idle timeout and idle policies
   CMD_SET_LED_IDLE_OPTIONS = 0x7C, // Set LED idle timeout and idle policies
+  CMD_GET_LED_USB_SUSPEND_RGB_OFF = 0x7D, // Get USB suspend RGB-off policy
+  CMD_SET_LED_USB_SUSPEND_RGB_OFF = 0x7E, // Set USB suspend RGB-off policy
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
