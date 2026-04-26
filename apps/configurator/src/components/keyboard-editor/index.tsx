@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { useDefaultLayout } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -12,6 +13,11 @@ const PREVIEW_MIN_SIZE = "16%";
 const PREVIEW_MAX_SIZE = "70%";
 const SETTINGS_DEFAULT_SIZE = "60%";
 const SETTINGS_MIN_SIZE = "30%";
+const KEYBOARD_EDITOR_LAYOUT_STORAGE_ID = "kbhe-configurator.keyboard-editor-layout.v1";
+const KEYBOARD_EDITOR_PANEL_IDS = [
+  "keyboard-editor-preview-panel",
+  "keyboard-editor-settings-panel",
+];
 
 interface KeyboardEditorProps {
   keyboard: ReactNode;
@@ -21,11 +27,18 @@ interface KeyboardEditorProps {
 }
 
 export function KeyboardEditor({ keyboard, menubar, children, className }: KeyboardEditorProps) {
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: KEYBOARD_EDITOR_LAYOUT_STORAGE_ID,
+    panelIds: KEYBOARD_EDITOR_PANEL_IDS,
+  });
+
   return (
     <div className={cn("flex h-full w-full min-w-0 flex-col overflow-hidden", className)}>
       <ResizablePanelGroup
         id="keyboard-editor-panel-group"
         orientation="vertical"
+        defaultLayout={defaultLayout}
+        onLayoutChanged={onLayoutChanged}
         resizeTargetMinimumSize={{ fine: 14, coarse: 28 }}
         className="min-h-0"
       >

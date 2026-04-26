@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { kbheDevice } from "@/lib/kbhe/device";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { queryKeys } from "@/lib/query/keys";
+import { useDashboardMcuTrendStore } from "@/stores/dashboard-mcu-trends-store";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { PageContent } from "@/components/shared/PageLayout";
 import { Badge } from "@/components/ui/badge";
@@ -23,15 +23,6 @@ import {
 } from "@tabler/icons-react";
 
 const POLL_INTERVAL = 5000;
-const TREND_POINTS = 24;
-
-function pushTrend(history: number[], value: number, maxPoints = TREND_POINTS): number[] {
-  const next = [...history, value];
-  if (next.length > maxPoints) {
-    next.splice(0, next.length - maxPoints);
-  }
-  return next;
-}
 
 function useDeviceOverview() {
   const { status } = useDeviceSession();
@@ -62,10 +53,10 @@ function useDeviceOverview() {
   });
 
   const mcuQ = useQuery({
-    queryKey: ["device", "mcu"],
+    queryKey: queryKeys.device.mcuMetrics(),
     queryFn: () => kbheDevice.getMcuMetrics(),
     enabled: connected,
-    refetchInterval: POLL_INTERVAL,
+    staleTime: POLL_INTERVAL,
   });
 
   return { gamepad: gamepadQ.data, nkro: nkroQ.data, ledEffect: ledEffectQ.data, mcu: mcuQ.data, connected };
@@ -90,28 +81,7 @@ function QuickLink({ icon: Icon, title, path, description }: {
 export default function Dashboard() {
   const { status, firmwareVersion } = useDeviceSession();
   const { gamepad, nkro, ledEffect, mcu, connected } = useDeviceOverview();
-  const [mcuTrends, setMcuTrends] = useState({
-    temperature: [] as number[],
-    vref: [] as number[],
-    scanRate: [] as number[],
-    load: [] as number[],
-  });
-
-  useEffect(() => {
-    if (!mcu) {
-      return;
-    }
-
-    setMcuTrends((prev) => ({
-      temperature:
-        mcu.temperature_valid && mcu.temperature_c != null
-          ? pushTrend(prev.temperature, mcu.temperature_c)
-          : prev.temperature,
-      vref: pushTrend(prev.vref, mcu.vref_mv),
-      scanRate: pushTrend(prev.scanRate, mcu.scan_rate_hz),
-      load: pushTrend(prev.load, mcu.load_percent),
-    }));
-  }, [mcu]);
+  const mcuTrends = useDashboardMcuTrendStore((state) => state.trends);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -164,28 +134,28 @@ export default function Dashboard() {
         {mcu && (
           <SectionCard title="MCU Metrics">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center& gap-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">Temperature</span>
                   <span className="text-sm font-mono">{mcu.temperature_c?.toFixed(1) ?? "—"} deg C</span>
                 </div>
                 <Sparkline values={mcuTrends.temperature} className="w-20" />
               </div>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">Vref</span>
                   <span className="text-sm font-mono">{(mcu.vref_mv / 1000).toFixed(3)} V</span>
                 </div>
                 <Sparkline values={mcuTrends.vref} className="w-20" />
               </div>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">Scan Rate</span>
                   <span className="text-sm font-mono">{mcu.scan_rate_hz} Hz</span>
                 </div>
                 <Sparkline values={mcuTrends.scanRate} className="w-20" />
               </div>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-muted-foreground">CPU Load</span>
                   <span className="text-sm font-mono">{mcu.load_percent.toFixed(1)}%</span>
