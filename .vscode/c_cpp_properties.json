@@ -2,9 +2,7 @@
     "configurations": [
         {
             "name": "STM32",
-            "compileCommands": [
-                "${workspaceFolder}/build/Release/compile_commands.json"
-            ],
+            "compileCommands": "${workspaceFolder}/build/default/compile_commands.json",
             "intelliSenseMode": "windows-msvc-x64",
             "cStandard": "c17",
             "cppStandard": "c++17"
