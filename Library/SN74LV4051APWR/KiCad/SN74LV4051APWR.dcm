@@ -1,9 +1,0 @@
-EESchema-DOCLIB  Version 2.0
-#
-$CMP SN74LV4051APWR
-D 8-Channel Analog Multiplexer/Demultiplexer
-K
-F http://www.ti.com/lit/gpn/sn74lv4051a
-$ENDCMP
-#
-#End Doc Library

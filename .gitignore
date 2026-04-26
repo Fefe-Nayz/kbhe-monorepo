@@ -12,6 +12,7 @@
 *.sch-bak
 *-bak
 /75he-backups/
+**/*-backups/
 /production/backups/
 
 # Cache des empreintes (Footprint cache)
@@ -49,6 +50,12 @@ fp-info-cache
 *.dxf
 *.pdf
 
+# Datasheets are source documentation for the KiCad projects.
+!/Docs/
+!/Docs/**
+!/Legacy/**/Docs/
+!/Legacy/**/Docs/**
+
 # Fichiers Netlist (généralement pas nécessaires si vous avez le schématique)
 *.net
 
@@ -56,5 +63,5 @@ fp-info-cache
 .DS_Store
 Thumbs.db
 
-/.history/
+**/.history/
 /.history_trim/

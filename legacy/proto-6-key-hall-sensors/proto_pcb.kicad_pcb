@@ -355,7 +355,7 @@
 			(uuid "93fd3749-f620-4290-a685-460a0bcecf27")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -619,7 +619,7 @@
 			(uuid "f9bbbd4b-e8b9-416c-83c6-658f2a6e805f")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -883,7 +883,7 @@
 			(uuid "1d94fcf1-9ca1-4d24-8944-4342023fdedf")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1147,7 +1147,7 @@
 			(uuid "9e4601af-22b7-4172-96ab-4872a369f404")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1411,7 +1411,7 @@
 			(uuid "56d8bc40-832f-4736-9eb4-7c6e7e948b3a")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1675,7 +1675,7 @@
 			(uuid "523bf32f-8d8d-47bd-820e-02144fa6c118")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2090,7 +2090,7 @@
 			(uuid "63418963-f02c-435c-983e-0d73e498925c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2505,7 +2505,7 @@
 			(uuid "68e45f91-5cd6-461b-9454-e651075d3849")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2819,7 +2819,7 @@
 			(uuid "e6080db2-d807-47b1-b1e9-69be7d5625d3")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3343,7 +3343,7 @@
 			(uuid "69db9452-d4bf-491f-bb3c-5cce86797217")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_SO.3dshapes/SSOP-24_5.3x8.2mm_P0.65mm.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_SO.3dshapes/SSOP-24_5.3x8.2mm_P0.65mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4162,7 +4162,7 @@
 			(uuid "b4a87d70-0f6f-4f78-a61f-06a92ce0a511")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4476,7 +4476,7 @@
 			(uuid "c03ee901-a471-43de-b6ed-8390794abc74")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4790,7 +4790,7 @@
 			(uuid "37f80fca-a027-477f-bc1a-21648a22def6")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)

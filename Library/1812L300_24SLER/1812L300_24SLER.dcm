@@ -1,9 +1,0 @@
-EESchema-DOCLIB  Version 2.0
-#
-$CMP 1812L300_24SLER
-D Low Rho Surface Mount Resettable PTC Fuse
-K
-F https://www.littelfuse.com/~/media/electronics/datasheets/resettable_ptcs/littelfuse_ptc_low_rho_datasheet.pdf.pdf
-$ENDCMP
-#
-#End Doc Library

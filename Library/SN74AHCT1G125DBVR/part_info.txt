@@ -1,9 +1,0 @@
-Manufacturer=Texas Instruments
-PartNumber=SN74AHCT1G125DBVR
-PartCategory=Integrated Circuit
-PackageCategory=SOT23 (5-Pin)
-PinCount=5
-Version=1.3
-Released=2016-01-27 08:33:26
-Downloaded=2026-03-22 01:29:39
-3D=Y

@@ -718,7 +718,7 @@
 			(uuid "12468b10-bbc7-44d6-a54b-bcbb917e0c5d")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1084,7 +1084,7 @@
 			(uuid "fd36ba88-5564-4941-805e-cec453fc3f74")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/R_0402.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/R_0402.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1297,7 +1297,7 @@
 			(uuid "df55f70b-e1ef-40ce-831f-a7f0756a55f9")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/1812L300_24SLER/3D/1812L300_24SLER.stp"
+		(model "${KIPRJMOD}/Library/3D/1812L300_24SLER/1812L300_24SLER.stp"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1873,7 +1873,7 @@
 			(uuid "14884337-2b0e-43d0-b36e-1731776a4af9")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/D_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/D_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2238,7 +2238,7 @@
 			(uuid "8c86e11b-de77-4b8f-a1b0-03e5454b8015")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3637,7 +3637,7 @@
 			(uuid "d7721ac2-940f-4526-aaa3-4d889f0a1656")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_QFP.3dshapes/LQFP-100_14x14mm_P0.5mm.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_QFP.3dshapes/LQFP-100_14x14mm_P0.5mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4042,7 +4042,7 @@
 			(uuid "6dddb83d-bd57-46ae-b6c6-01c0695d216a")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4407,7 +4407,7 @@
 			(uuid "87f1e391-491d-4a51-a1de-e8353f58f518")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4773,7 +4773,7 @@
 			(uuid "bcb69e5a-0423-4e9a-ad39-53460cb0470b")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/R_0402.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/R_0402.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -5276,7 +5276,7 @@
 			(uuid "3973d91e-f0de-4194-ba67-5e29f18d65f0")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/LDL1117S33R/3D/LDL1117S33R.stp"
+		(model "${KIPRJMOD}/Library/3D/LDL1117S33R/LDL1117S33R.stp"
 			(offset
 				(xyz 0 -3.25 0)
 			)
@@ -5681,7 +5681,7 @@
 			(uuid "8ace743f-e8bd-4462-94e5-34e3a9f3b62c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -6318,7 +6318,7 @@
 			(uuid "f01247f8-7cf7-46c2-b2df-fe130abdc189")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/D_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/D_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -6723,7 +6723,7 @@
 			(uuid "95103fa2-0058-4770-9416-8891feb1e7dd")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -7979,7 +7979,7 @@
 		)
 		(embedded_fonts no)
 	)
-	(footprint "SamacSys_Parts:SOT95P280X145-5N"
+	(footprint "SN74AHCT1G125DBVR:SOT95P280X145-5N"
 		(layer "F.Cu")
 		(uuid "339d1794-40db-455c-90a9-f69fac34464f")
 		(at 166.41 112.68)
@@ -8338,7 +8338,7 @@
 			(uuid "b056db1f-6605-48c3-9e8d-8a24f308c33f")
 		)
 		(embedded_fonts no)
-		(model "C:\\Users\\ferre\\Codespace\\Projects\\hall-effect-keyboard\\mcu\\SamacSys_Parts.3dshapes\\SN74AHCT1G125DBVR.stp"
+		(model "${KIPRJMOD}/Library/3D/SN74AHCT1G125DBVR/SN74AHCT1G125DBVR.stp"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -8913,7 +8913,7 @@
 			(uuid "009ee295-d2ba-4970-a9a5-5424c64f322e")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/TYPE-C-SMD_HX-TYPE-C-16PIN.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/TYPE-C-SMD_HX-TYPE-C-16PIN.step"
 			(offset
 				(xyz 0 -1.063 0)
 			)
@@ -9548,7 +9548,7 @@
 			(uuid "0075f539-680c-4781-8b6f-37d191d4c3ed")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -9907,7 +9907,7 @@
 			(uuid "957c704c-dc5d-403b-85dd-82956b405f24")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23-6.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23-6.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -10312,7 +10312,7 @@
 			(uuid "5bd198d6-abd2-45a1-9290-356d2f24f831")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -10677,7 +10677,7 @@
 			(uuid "76cf17fa-1298-4b1f-9079-261733251684")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -11484,7 +11484,7 @@
 			(uuid "71002753-e2fb-427d-ba59-b6d53ad58a6c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x04_P2.54mm_Vertical.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x04_P2.54mm_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -12121,7 +12121,7 @@
 			(uuid "2f91cb33-03be-4c61-b2ed-76f5552167d5")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/R_0402.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/R_0402.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -12591,7 +12591,7 @@
 			(uuid "12d05887-926c-4202-9372-9d5d483edd36")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -12956,7 +12956,7 @@
 			(uuid "bc8ec125-a8a1-4b1f-8d43-f0b233ee0c46")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -13361,7 +13361,7 @@
 			(uuid "8874a1b5-e279-4c6a-a591-477e545527d1")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -13996,7 +13996,7 @@
 			(uuid "83afe639-f73a-4b1b-9d15-53d415313d07")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -14465,7 +14465,7 @@
 			(uuid "d3abd72a-ca04-4b07-af5b-9e2875d83df4")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -15274,7 +15274,7 @@
 			(uuid "27a2e0fb-83ef-48e5-9703-4444e84b683c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -15744,7 +15744,7 @@
 			(uuid "83d4ab5d-5972-4037-ad61-f12184337083")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/R_0402.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/R_0402.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -16355,7 +16355,7 @@
 			(uuid "c70453b1-62e6-4037-ad72-311c8a54eae1")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -16924,7 +16924,7 @@
 			(uuid "83474ec8-31f1-4633-9f12-7a3620dd0b2f")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -17321,7 +17321,7 @@
 			(uuid "ba7f6f4f-6dcb-4b67-8398-280482397b55")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Inductor_SMD.3dshapes/L_0603_1608Metric.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Inductor_SMD.3dshapes/L_0603_1608Metric.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -17601,7 +17601,7 @@
 			(uuid "092a89dc-2c2e-4ed8-a600-d884ba04ab7c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Crystal.3dshapes/Crystal_SMD_2520-4Pin_2.5x2.0mm.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Crystal.3dshapes/Crystal_SMD_2520-4Pin_2.5x2.0mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -17966,7 +17966,7 @@
 			(uuid "6279694b-8703-42cf-b582-e646deb7d454")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -17978,7 +17978,7 @@
 			)
 		)
 	)
-	(footprint "easyeda2kicad:SW-TH_SK-12D02VG3"
+	(footprint "SW-TH_SK-12D02VG3:SW-TH_SK-12D02VG3"
 		(layer "F.Cu")
 		(uuid "be4a53bf-17f2-47f7-b509-4695a27e9f21")
 		(at 177.715 104.58 90)
@@ -18214,7 +18214,7 @@
 			(uuid "270cd019-4279-4ee8-8a17-46e07abca5a4")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/SW-TH_SK-12D02VG3/SW-TH_SK-12D02VG3.step"
+		(model "${KIPRJMOD}/Library/3D/SW-TH_SK-12D02VG3/SW-TH_SK-12D02VG3.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -18721,7 +18721,7 @@
 			(uuid "0b5742f7-c741-483b-9b63-f3303fefbb5b")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -19125,7 +19125,7 @@
 			(uuid "ea06a4d2-1fdc-4ddc-bffa-5daa2fb4f54d")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Resistor_SMD.3dshapes/R_0805_2012Metric.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Resistor_SMD.3dshapes/R_0805_2012Metric.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -19137,7 +19137,7 @@
 			)
 		)
 	)
-	(footprint "footprints:RSE10"
+	(footprint "TS3USB221ARSER:RSE10"
 		(layer "F.Cu")
 		(uuid "c8e0f39e-f9a5-475b-9027-1256202db878")
 		(at 166.08 116.81)
@@ -20047,7 +20047,7 @@
 			(uuid "754851ad-f43e-4106-9b91-1404b930bc3d")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/TS3USB221ARSER/3D/TS3USB221ARSER.stp"
+		(model "${KIPRJMOD}/Library/3D/TS3USB221ARSER/TS3USB221ARSER.stp"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -20870,7 +20870,7 @@
 			(uuid "1354d470-4642-48dd-aa0a-4d21d79b71fe")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0805.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0805.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -21235,7 +21235,7 @@
 			(uuid "a93c8b7c-1ee3-41de-8429-beb877956ec2")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -21693,7 +21693,7 @@
 			(uuid "405fcca0-9bc4-49c5-b7a5-32b2043dd60b")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/D_0603.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/D_0603.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -22241,7 +22241,7 @@
 			(uuid "de17a09b-ada8-4c6e-838b-cbca5e5ffa5e")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/TS-1088-AR02016.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/TS-1088-AR02016.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -22607,7 +22607,7 @@
 			(uuid "05d1b647-e51a-4ea9-94da-f1540648a35d")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/R_0402.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/R_0402.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -23077,7 +23077,7 @@
 			(uuid "450e8d45-a030-4b08-87c9-4515887e1997")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/C_0402.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/C_0402.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -23442,7 +23442,7 @@
 			(uuid "6100ab7f-e65d-4e8d-83c8-ebe6c470ef17")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/JLCPCB.3dshapes/R_0402.step"
+		(model "${KIPRJMOD}/Library/3D/JLCPCB.3dshapes/R_0402.step"
 			(offset
 				(xyz 0 0 0)
 			)

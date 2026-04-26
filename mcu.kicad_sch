@@ -8463,7 +8463,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "SamacSys_Parts:SN74AHCT1G125DBVR"
+		(symbol "SN74AHCT1G125DBVR:SN74AHCT1G125DBVR"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -14811,7 +14811,7 @@
 		)
 	)
 	(symbol
-		(lib_id "SamacSys_Parts:SN74AHCT1G125DBVR")
+		(lib_id "SN74AHCT1G125DBVR:SN74AHCT1G125DBVR")
 		(at 266.7 55.88 0)
 		(unit 1)
 		(body_style 1)
@@ -14842,7 +14842,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:SOT95P280X145-5N"
+		(property "Footprint" "SN74AHCT1G125DBVR:SOT95P280X145-5N"
 			(at 288.29 150.8 0)
 			(hide yes)
 			(show_name no)

@@ -334,7 +334,7 @@
 					(justify left top)
 				)
 			)
-			(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+			(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 				(at 24.13 -94.92 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -5603,7 +5603,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 62.23 253.67 0)
 			(hide yes)
 			(show_name no)
@@ -6820,7 +6820,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 62.23 211.76 0)
 			(hide yes)
 			(show_name no)
@@ -7249,7 +7249,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 142.24 333.68 0)
 			(hide yes)
 			(show_name no)
@@ -7444,7 +7444,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 142.24 291.77 0)
 			(hide yes)
 			(show_name no)
@@ -8109,7 +8109,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 135.89 122.86 0)
 			(hide yes)
 			(show_name no)
@@ -8382,7 +8382,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 62.23 296.85 0)
 			(hide yes)
 			(show_name no)
@@ -8577,7 +8577,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 62.23 168.58 0)
 			(hide yes)
 			(show_name no)
@@ -9320,7 +9320,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 134.62 164.77 0)
 			(hide yes)
 			(show_name no)
@@ -9749,7 +9749,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 62.23 124.13 0)
 			(hide yes)
 			(show_name no)
@@ -10022,7 +10022,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 142.24 248.59 0)
 			(hide yes)
 			(show_name no)
@@ -11081,7 +11081,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SOP65P640X120-16N:SOP65P640X120-16N"
+		(property "Footprint" "SN74LV4051APWR:SOP65P640X120-16N"
 			(at 138.43 207.95 0)
 			(hide yes)
 			(show_name no)

@@ -380,7 +380,7 @@
 			(uuid "63418963-f02c-435c-983e-0d73e498925c")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -680,7 +680,7 @@
 			(uuid "68e45f91-5cd6-461b-9454-e651075d3849")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -980,7 +980,7 @@
 			(uuid "e6080db2-d807-47b1-b1e9-69be7d5625d3")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1490,7 +1490,7 @@
 			(uuid "69db9452-d4bf-491f-bb3c-5cce86797217")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_SO.3dshapes/SSOP-24_5.3x8.2mm_P0.65mm.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_SO.3dshapes/SSOP-24_5.3x8.2mm_P0.65mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1790,7 +1790,7 @@
 			(uuid "b4a87d70-0f6f-4f78-a61f-06a92ce0a511")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2090,7 +2090,7 @@
 			(uuid "c03ee901-a471-43de-b6ed-8390794abc74")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2390,7 +2390,7 @@
 			(uuid "37f80fca-a027-477f-bc1a-21648a22def6")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/../../Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+		(model "${KIPRJMOD}/Library/3D/KiCad/Package_TO_SOT_SMD.3dshapes/SOT-23.step"
 			(offset
 				(xyz 0 0 0)
 			)

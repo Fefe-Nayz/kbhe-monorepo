@@ -8945,7 +8945,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "SamacSys_Parts:SN74AHCT1G125DBVR"
+		(symbol "SN74AHCT1G125DBVR:SN74AHCT1G125DBVR"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -9171,7 +9171,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "easyeda2kicad:SSSF111800"
+		(symbol "SSSF111800:SSSF111800"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -9191,7 +9191,7 @@
 					)
 				)
 			)
-			(property "Footprint" "easyeda2kicad:SW-TH_SSSF111800"
+			(property "Footprint" "SSSF111800:SW-TH_SSSF111800"
 				(at 0 -12.7 0)
 				(effects
 					(font
@@ -15310,7 +15310,7 @@
 		)
 	)
 	(symbol
-		(lib_id "SamacSys_Parts:SN74AHCT1G125DBVR")
+		(lib_id "SN74AHCT1G125DBVR:SN74AHCT1G125DBVR")
 		(at 129.54 196.85 180)
 		(unit 1)
 		(exclude_from_sim no)
@@ -15335,7 +15335,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:SOT95P280X145-5N"
+		(property "Footprint" "SN74AHCT1G125DBVR:SOT95P280X145-5N"
 			(at 107.95 101.93 0)
 			(effects
 				(font
@@ -24635,7 +24635,7 @@
 		)
 	)
 	(symbol
-		(lib_id "easyeda2kicad:SSSF111800")
+		(lib_id "SSSF111800:SSSF111800")
 		(at 99.06 73.66 90)
 		(unit 1)
 		(exclude_from_sim no)
@@ -24660,7 +24660,7 @@
 				)
 			)
 		)
-		(property "Footprint" "easyeda2kicad:SW-TH_SSSF111800"
+		(property "Footprint" "SSSF111800:SW-TH_SSSF111800"
 			(at 111.76 73.66 0)
 			(effects
 				(font

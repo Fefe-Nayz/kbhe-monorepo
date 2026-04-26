@@ -11,7 +11,7 @@
 		(comment 4 "Fait par Nino et Ferréol")
 	)
 	(lib_symbols
-		(symbol "2025-12-06_14-23-22:TS3USB221ARSER"
+		(symbol "TS3USB221ARSER:TS3USB221ARSER"
 			(pin_names
 				(offset 0.254)
 			)
@@ -9352,7 +9352,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "SamacSys_Parts:SN74AHCT1G125DBVR"
+		(symbol "SN74AHCT1G125DBVR:SN74AHCT1G125DBVR"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -9578,7 +9578,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "easyeda2kicad:SK-12D02"
+		(symbol "SW-TH_SK-12D02VG3:SK-12D02"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -9598,7 +9598,7 @@
 					)
 				)
 			)
-			(property "Footprint" "easyeda2kicad:SW-TH_SK-12D02VG3"
+			(property "Footprint" "SW-TH_SK-12D02VG3:SW-TH_SK-12D02VG3"
 				(at 0 -10.16 0)
 				(effects
 					(font
@@ -14187,7 +14187,7 @@
 		)
 	)
 	(symbol
-		(lib_id "2025-12-06_14-23-22:TS3USB221ARSER")
+		(lib_id "TS3USB221ARSER:TS3USB221ARSER")
 		(at 234.95 152.4 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -14212,7 +14212,7 @@
 				)
 			)
 		)
-		(property "Footprint" "footprints:RSE10"
+		(property "Footprint" "TS3USB221ARSER:RSE10"
 			(at 234.95 152.4 0)
 			(effects
 				(font
@@ -15238,7 +15238,7 @@
 		)
 	)
 	(symbol
-		(lib_id "easyeda2kicad:SK-12D02")
+		(lib_id "SW-TH_SK-12D02VG3:SK-12D02")
 		(at 68.58 85.09 270)
 		(unit 1)
 		(exclude_from_sim no)
@@ -15265,7 +15265,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "easyeda2kicad:SW-TH_SK-12D02VG3"
+		(property "Footprint" "SW-TH_SK-12D02VG3:SW-TH_SK-12D02VG3"
 			(at 58.42 85.09 0)
 			(effects
 				(font
@@ -15392,7 +15392,7 @@
 		)
 	)
 	(symbol
-		(lib_id "SamacSys_Parts:SN74AHCT1G125DBVR")
+		(lib_id "SN74AHCT1G125DBVR:SN74AHCT1G125DBVR")
 		(at 241.3 180.34 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -15417,7 +15417,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:SOT95P280X145-5N"
+		(property "Footprint" "SN74AHCT1G125DBVR:SOT95P280X145-5N"
 			(at 262.89 275.26 0)
 			(effects
 				(font
