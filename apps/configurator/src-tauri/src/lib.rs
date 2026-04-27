@@ -5,16 +5,136 @@ mod startup;
 mod volume;
 
 use tauri::{
-    menu::{Menu, MenuItem},
+    image::Image,
+    menu::{Menu, MenuBuilder, SubmenuBuilder},
     tray::TrayIconBuilder,
     AppHandle, Manager, WebviewWindow, WindowEvent,
 };
 use tauri_plugin_autostart::MacosLauncher;
 
+const APP_DISPLAY_NAME: &str = "KBHE configurator";
 const AUTOSTART_LAUNCH_FLAG: &str = "--kbhe-autostart";
+const TRAY_ICON_SIZE: u32 = 16;
+const TRAY_ID: &str = "main-tray";
+const TRAY_ICON_OPEN_SVG: &str = include_str!("../../public/open.svg");
+const TRAY_ICON_MINIMIZE_SVG: &str = include_str!("../../public/minimize.svg");
+const TRAY_ICON_GOTO_SVG: &str = include_str!("../../public/goto.svg");
+const TRAY_ICON_EXIT_SVG: &str = include_str!("../../public/exit.svg");
+
+#[derive(Clone, Default)]
+struct TrayMenuIcons {
+    open: Option<Image<'static>>,
+    minimize: Option<Image<'static>>,
+    go_to: Option<Image<'static>>,
+    exit: Option<Image<'static>>,
+}
 
 fn launched_from_autostart() -> bool {
     std::env::args_os().any(|arg| arg == AUTOSTART_LAUNCH_FLAG)
+}
+
+fn tray_icon_color(app: &AppHandle) -> &'static str {
+    let dark_theme = app
+        .get_webview_window("main")
+        .and_then(|window| window.theme().ok())
+        .is_some_and(|theme| matches!(theme, tauri::Theme::Dark));
+
+    if dark_theme {
+        "#F5F5F5"
+    } else {
+        "#242424"
+    }
+}
+
+fn rasterize_svg_icon(svg_source: &str, color_hex: &str, size: u32) -> Option<Image<'static>> {
+    let themed_svg = svg_source.replace("#242424", color_hex);
+    let tree = resvg::usvg::Tree::from_str(&themed_svg, &resvg::usvg::Options::default()).ok()?;
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size)?;
+
+    let tree_size = tree.size();
+    let scale_x = size as f32 / tree_size.width() as f32;
+    let scale_y = size as f32 / tree_size.height() as f32;
+    let scale = scale_x.min(scale_y);
+    let offset_x = (size as f32 - tree_size.width() as f32 * scale) * 0.5;
+    let offset_y = (size as f32 - tree_size.height() as f32 * scale) * 0.5;
+    let transform = resvg::tiny_skia::Transform::from_scale(scale, scale)
+        .post_translate(offset_x, offset_y);
+
+    let _ = resvg::render(&tree, transform, &mut pixmap.as_mut());
+    Some(Image::new_owned(pixmap.data().to_vec(), size, size))
+}
+
+fn build_tray_menu_icons(app: &AppHandle) -> TrayMenuIcons {
+    let color = tray_icon_color(app);
+
+    TrayMenuIcons {
+        open: rasterize_svg_icon(TRAY_ICON_OPEN_SVG, color, TRAY_ICON_SIZE),
+        minimize: rasterize_svg_icon(TRAY_ICON_MINIMIZE_SVG, color, TRAY_ICON_SIZE),
+        go_to: rasterize_svg_icon(TRAY_ICON_GOTO_SVG, color, TRAY_ICON_SIZE),
+        exit: rasterize_svg_icon(TRAY_ICON_EXIT_SVG, color, TRAY_ICON_SIZE),
+    }
+}
+
+fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let icons = build_tray_menu_icons(app);
+
+    let mut go_to_builder = SubmenuBuilder::with_id(app, "go_to", "Go to")
+        .text("open_dashboard", "Dashboard")
+        .text("open_lighting", "Lighting")
+        .text("open_settings", "Settings");
+    if let Some(icon) = icons.go_to.clone() {
+        go_to_builder = go_to_builder.submenu_icon(icon);
+    }
+    let go_to_menu = go_to_builder.build()?;
+
+    let mut menu_builder = MenuBuilder::new(app);
+    if let Some(icon) = icons.open {
+        menu_builder = menu_builder.icon("show", "Open", icon);
+    } else {
+        menu_builder = menu_builder.text("show", "Open");
+    }
+
+    if let Some(icon) = icons.minimize {
+        menu_builder = menu_builder.icon("hide", "Hide", icon);
+    } else {
+        menu_builder = menu_builder.text("hide", "Hide");
+    }
+
+    menu_builder = menu_builder.separator().item(&go_to_menu).separator();
+
+    if let Some(icon) = icons.exit {
+        menu_builder = menu_builder.icon("quit", "Quit", icon);
+    } else {
+        menu_builder = menu_builder.text("quit", "Quit");
+    }
+
+    menu_builder.build()
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+fn hide_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
+fn navigate_main_window(app: &AppHandle, route: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+
+        let script = format!(
+            "window.history.pushState(null, '', '{}'); window.dispatchEvent(new PopStateEvent('popstate'));",
+            route
+        );
+        let _ = window.eval(&script);
+    }
 }
 
 fn apply_startup_window_mode(window: &WebviewWindow, launched_from_autostart: bool) {
@@ -78,23 +198,30 @@ pub fn run() {
                 )?;
             }
 
-            let show = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = build_tray_menu(&app.handle())?;
 
-            let mut builder = TrayIconBuilder::new();
+            let mut builder = TrayIconBuilder::with_id(TRAY_ID);
             if let Some(icon) = app.default_window_icon().cloned() {
                 builder = builder.icon(icon);
             }
             builder
-                .tooltip("KBHE Configurator")
+                .tooltip(APP_DISPLAY_NAME)
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                        show_main_window(app);
+                    }
+                    "hide" => {
+                        hide_main_window(app);
+                    }
+                    "open_dashboard" => {
+                        navigate_main_window(app, "/");
+                    }
+                    "open_lighting" => {
+                        navigate_main_window(app, "/lighting");
+                    }
+                    "open_settings" => {
+                        navigate_main_window(app, "/settings");
                     }
                     "quit" => {
                         app.exit(0);
@@ -103,10 +230,7 @@ pub fn run() {
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
-                        if let Some(w) = tray.app_handle().get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                        show_main_window(&tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -130,6 +254,14 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() != "main" {
                 return;
+            }
+
+            if let WindowEvent::ThemeChanged(_) = event {
+                if let Ok(menu) = build_tray_menu(&window.app_handle()) {
+                    if let Some(tray) = window.app_handle().tray_by_id(TRAY_ID) {
+                        let _ = tray.set_menu(Some(menu));
+                    }
+                }
             }
 
             if let WindowEvent::CloseRequested { api, .. } = event {
