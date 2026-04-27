@@ -84,6 +84,34 @@ function Confirm-Action {
     }
 }
 
+function Read-MultilineInput {
+    param(
+        [string]$Prompt,
+        [string]$Terminator = "."
+    )
+
+    Write-Host "$Prompt" -ForegroundColor Yellow
+    Write-Host "  - Enter on empty first line: skip description"
+    Write-Host "  - Type '$Terminator' on its own line to finish"
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+    while ($true) {
+        $line = Read-Host
+
+        if ($lines.Count -eq 0 -and [string]::IsNullOrWhiteSpace($line)) {
+            return ""
+        }
+
+        if ($line -eq $Terminator) {
+            break
+        }
+
+        $lines.Add($line)
+    }
+
+    return ($lines -join [Environment]::NewLine)
+}
+
 function Parse-SemVer {
     param([string]$Value)
 
@@ -374,7 +402,7 @@ Invoke-External -Name "Show git status" -WorkingDirectory $repoRoot -Executable 
 $defaultSummary = Get-ReleaseCommitSummary -TargetChoice $Target -AppVersion (${appVersionInfo}?.NextVersion) -FirmwareVersion (${firmwareVersionInfo}?.NextVersion)
 $summaryInput = Read-Host "Commit summary (default: $defaultSummary)"
 $commitSummary = if ([string]::IsNullOrWhiteSpace($summaryInput)) { $defaultSummary } else { $summaryInput.Trim() }
-$commitDescription = Read-Host "Commit description (optional)"
+$commitDescription = Read-MultilineInput -Prompt "Commit description (optional)"
 
 if (-not (Confirm-Action -Prompt "Commit and push branch '$branchName'?" -DefaultYes:$false)) {
     throw "Aborted by user before commit/push."

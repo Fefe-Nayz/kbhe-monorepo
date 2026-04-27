@@ -12,7 +12,7 @@ import { ProfileSelect } from "@/components/profile-select";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { useAudioSpectrumService } from "@/lib/kbhe/useAudioSpectrumService";
 import { useAlphaMaskService } from "@/lib/kbhe/useAlphaMaskService";
-import { useCloseLightingService } from "@/lib/kbhe/useCloseLightingService";
+import { useDashboardMcuTrendsService } from "@/lib/kbhe/useDashboardMcuTrendsService";
 import Dashboard from "@/pages/Dashboard";
 import Profiles from "@/pages/Profiles";
 import Keymap from "@/pages/Keymap";
@@ -86,7 +86,7 @@ export function AppShell() {
   const pageTitle = getPageTitle(location.pathname);
   useAudioSpectrumService();
   useAlphaMaskService();
-  useCloseLightingService();
+  useDashboardMcuTrendsService();
 
   useEffect(() => {
     const handler = () => {

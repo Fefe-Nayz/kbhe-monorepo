@@ -11,7 +11,20 @@ use tauri::{
 };
 use tauri_plugin_autostart::MacosLauncher;
 
-fn apply_startup_window_mode(window: &WebviewWindow) {
+const AUTOSTART_LAUNCH_FLAG: &str = "--kbhe-autostart";
+
+fn launched_from_autostart() -> bool {
+    std::env::args_os().any(|arg| arg == AUTOSTART_LAUNCH_FLAG)
+}
+
+fn apply_startup_window_mode(window: &WebviewWindow, launched_from_autostart: bool) {
+    if !launched_from_autostart {
+        let _ = window.set_fullscreen(false);
+        let _ = window.show();
+        let _ = window.set_focus();
+        return;
+    }
+
     let prefs = startup::load_startup_preferences_from_app_handle(&window.app_handle());
 
     match prefs.startup_mode {
@@ -39,7 +52,7 @@ fn kbhe_frontend_ready(app: AppHandle) -> Result<(), String> {
     }
 
     if let Some(main) = app.get_webview_window("main") {
-        apply_startup_window_mode(&main);
+        apply_startup_window_mode(&main, launched_from_autostart());
     }
 
     Ok(())
@@ -51,7 +64,7 @@ pub fn run() {
         .manage(commands::KbheTransportState::default())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
-            None::<Vec<&'static str>>,
+            Some(vec![AUTOSTART_LAUNCH_FLAG]),
         ))
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
@@ -99,6 +112,7 @@ pub fn run() {
                 .build(app)?;
 
             let app_handle = app.handle().clone();
+            let startup_launch = launched_from_autostart();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(15));
 
@@ -107,7 +121,7 @@ pub fn run() {
                 }
 
                 if let Some(main) = app_handle.get_webview_window("main") {
-                    apply_startup_window_mode(&main);
+                    apply_startup_window_mode(&main, startup_launch);
                 }
             });
 

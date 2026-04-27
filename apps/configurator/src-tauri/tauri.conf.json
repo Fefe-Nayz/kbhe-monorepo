@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "kbhe-configurator",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "identifier": "com.kbhe.configurator",
   "build": {
     "frontendDist": "../dist",
@@ -23,7 +23,7 @@
           ]
         },
         "width": 1280,
-        "height": 720,
+        "height": 800,
         "minWidth": 1024,
         "minHeight": 768,
         "resizable": true,
@@ -33,8 +33,8 @@
         "label": "splashscreen",
         "url": "splashscreen.html",
         "backgroundColor": "#09090B",
-        "width": 420,
-        "height": 260,
+        "width": 500,
+        "height": 300,
         "resizable": false,
         "fullscreen": false,
         "decorations": false,
