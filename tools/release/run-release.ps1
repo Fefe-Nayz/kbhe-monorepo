@@ -399,7 +399,10 @@ if ($needsFirmware) {
 Write-Step "Git status before commit"
 Invoke-External -Name "Show git status" -WorkingDirectory $repoRoot -Executable "git" -Arguments @("status", "--short")
 
-$defaultSummary = Get-ReleaseCommitSummary -TargetChoice $Target -AppVersion (${appVersionInfo}?.NextVersion) -FirmwareVersion (${firmwareVersionInfo}?.NextVersion)
+$appV = if ($appVersionInfo) { $appVersionInfo.NextVersion } else { $null }
+$fwV  = if ($firmwareVersionInfo) { $firmwareVersionInfo.NextVersion } else { $null }
+
+$defaultSummary = Get-ReleaseCommitSummary -TargetChoice $Target -AppVersion $appV -FirmwareVersion $fwV
 $summaryInput = Read-Host "Commit summary (default: $defaultSummary)"
 $commitSummary = if ([string]::IsNullOrWhiteSpace($summaryInput)) { $defaultSummary } else { $summaryInput.Trim() }
 $commitDescription = Read-MultilineInput -Prompt "Commit description (optional)"

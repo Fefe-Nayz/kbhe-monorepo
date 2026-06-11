@@ -3,8 +3,9 @@
 #include <stdbool.h>
 #include "board_config.h"
 
-// #define LUT_ZERO_VALUE 2117
-#define LUT_ZERO_VALUE 2180
+// #define LUT_ZERO_VALUE 2180
+#define LUT_ZERO_VALUE 2195
+
 
 typedef enum {
     CALIBRATION_GUIDED_IDLE = 0,
