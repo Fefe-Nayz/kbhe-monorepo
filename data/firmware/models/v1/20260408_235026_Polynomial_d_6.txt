@@ -1,0 +1,13 @@
+Regression result
+=================
+Timestamp: 20260408_235026
+Source CSV: 20260408_231954_mesurepcbninokey1piedacoulissealamano.csv
+X column: tension_adc_pts
+Y column: distance_mm
+
+Model: Polynomial d=6
+Equation: y = 1.388e-16x^6 - 2.166e-12x^5 + 1.408e-08x^4 - 4.884e-05x^3 + 0.095274x^2 - 99.169195x + 4.306e+04
+r: 0.999516
+R^2: 0.999032
+Points used: 49
+Coefficients: [1.388093742810166852e-16, -2.166246232440368669e-12, 1.408411464527181733e-08, -4.883731424047798572e-05, 9.527383212435323878e-02, -9.916919499943756477e+01, 4.305635639511854242e+04]

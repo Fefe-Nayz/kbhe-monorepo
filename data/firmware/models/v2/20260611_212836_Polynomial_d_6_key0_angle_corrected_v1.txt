@@ -1,0 +1,13 @@
+Regression result
+=================
+Timestamp: 20260611_212836
+Source CSV: key0_angle_corrected_v1_offset_0.csv
+X column: raw_adc
+Y column: distance_mm
+
+Model: Polynomial d=6
+Equation: y = -4.061e-16x^6 + 6.198e-12x^5 - 3.938e-08x^4 + 1.333e-04x^3 - 0.253715x^2 + 257.380144x - 1.087e+05
+r: 0.999964
+R^2: 0.999928
+Points used: 139
+Coefficients: [-4.061285768486188292e-16, 6.197789746784813427e-12, -3.937562999929672031e-08, 1.333140260073038591e-04, -2.537153532472292139e-01, 2.573801441410816437e+02, -1.087483731013178331e+05]

@@ -1,0 +1,33 @@
+Validation report (Direct Offset)
+=================================
+Timestamp: 20260611_214628
+Model file: C:/Users/ninob/Documents/Code/kbhe-monorepo/tools/analysis/20260611_212836_Polynomial_d_6_key0_angle_corrected_v1.txt
+Experimental CSV: C:\Users\ninob\Documents\Code\kbhe-monorepo\tools\analysis\key0_angle_corrected_v1_offset_0.csv
+Model name: Polynomial d=6
+Equation: y = -4.061e-16x^6 + 6.198e-12x^5 - 3.938e-08x^4 + 1.333e-04x^3 - 0.253715x^2 + 257.380144x - 1.087e+05
+
+LUT extraction settings
+Range min: 2180
+Range max: 2850
+Step: 1
+Integer mode: True
+Integer precision um: 1
+
+Error summary (absolute, distance)
+Points compared: 139
+Min: 0.000000 mm  |  0.0 um
+Max: 0.029000 mm  |  29.0 um
+Mean: 0.006942 mm  |  6.9 um
+Std: 0.005020 mm  |  5.0 um
+RMSE: 0.008568 mm  |  8.6 um
+Median: 0.006000 mm  |  6.0 um
+P99: 0.021860 mm  |  21.9 um
+
+Percentiles (absolute error)
+P50: 0.006000 mm  |  6.0 um
+P75: 0.009000 mm  |  9.0 um
+P90: 0.014000 mm  |  14.0 um
+P95: 0.016100 mm  |  16.1 um
+P99: 0.021860 mm  |  21.9 um
+P99.5: 0.024860 mm  |  24.9 um
+P99.9: 0.028172 mm  |  28.2 um

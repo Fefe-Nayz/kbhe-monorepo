@@ -1,0 +1,34 @@
+Validation report
+=================
+Timestamp: 20260409_001242
+Model file: C:/Users/ninob/Documents/Code/kbhe/data/value_extractor/mesure_pcb_nino_pied_coulisse/20260408_235026_Polynomial_d_6.txt
+Experimental CSV: C:\Users\ninob\Documents\Code\kbhe\data\value_extractor\mesure_pcb_nino_pied_coulisse\20260408_231954_mesurepcbninokey1piedacoulissealamano.csv
+Model name: Polynomial d=6
+Equation: y = 1.388e-16x^6 - 2.166e-12x^5 + 1.408e-08x^4 - 4.884e-05x^3 + 0.095274x^2 - 99.169195x + 4.306e+04
+Zero reference (real): 16.795752 mm
+
+LUT extraction settings
+Range min: 2180
+Range max: 2850
+Step: 1
+Integer mode: True
+Integer precision um: 1
+
+Error summary (absolute, press distance)
+Points compared: 49
+Min: 0.000248 mm  |  0.2 um
+Max: 0.149248 mm  |  149.2 um
+Mean: 0.021373 mm  |  21.4 um
+Std: 0.024535 mm  |  24.5 um
+RMSE: 0.032539 mm  |  32.5 um
+Median: 0.016748 mm  |  16.7 um
+P99: 0.112768 mm  |  112.8 um
+
+Percentiles (absolute error, press distance)
+P50: 0.016748 mm  |  16.7 um
+P75: 0.024248 mm  |  24.2 um
+P90: 0.044451 mm  |  44.5 um
+P95: 0.059250 mm  |  59.2 um
+P99: 0.112768 mm  |  112.8 um
+P99.5: 0.131008 mm  |  131.0 um
+P99.9: 0.145600 mm  |  145.6 um

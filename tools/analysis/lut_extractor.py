@@ -3,20 +3,16 @@
 """LUT extractor and validator GUI.
 
 Inputs:
-- Polynomial model TXT exported by regression.py
-- Experimental CSV (tension_adc_pts, distance_mm)
+- Polynomial model TXT exported by regression.py (already offset-corrected)
+- Experimental CSV (distance_mm, raw_adc) -> Automatically detected by position
 
 Features:
 - Generate LUT from polynomial using range and step.
 - Optional integer extraction with configurable precision in um.
-- Convert real distance to press distance using model zero reference.
-- Plot LUT curve press_distance=f(tension).
+- Plot LUT curve distance=f(tension).
 - Save LUT to CSV.
 - Save LUT as C array text file.
-- Validate LUT against experimental data:
-  - Scatter plot (predicted vs experimental) with x=y reference
-  - Histogram of absolute errors
-  - Summary page with min/max/median/p99 absolute error
+- Validate LUT against experimental data (Direct Mode).
 """
 
 from __future__ import annotations
@@ -124,7 +120,7 @@ def load_model_file(file_path: Path) -> ModelInfo:
 
     model_name = ""
     equation = ""
-    x_column = "tension_adc_pts"
+    x_column = "raw_adc"
     y_column = "distance_mm"
     coefficients: np.ndarray | None = None
 
@@ -167,27 +163,31 @@ def load_model_file(file_path: Path) -> ModelInfo:
 def parse_float(value: str) -> float | None:
     if value is None:
         return None
-
     text = str(value).strip()
     if not text:
         return None
-
     if "," in text and "." not in text:
         text = text.replace(",", ".")
     elif "," in text and "." in text:
         text = text.replace(",", "")
-
     try:
         val = float(text)
     except ValueError:
         return None
-
     if not math.isfinite(val):
         return None
     return val
 
 
 def read_experimental_xy(file_path: Path) -> Tuple[np.ndarray, np.ndarray]:
+    """Lit le CSV expérimental propre en se basant strictement sur la position des colonnes.
+    
+    Colonne 1 = Distance (mm)
+    Colonne 2 = Tension ADC (pts)
+    """
+    x_adc_values: List[float] = []
+    y_dist_values: List[float] = []
+
     with file_path.open("r", newline="", encoding="utf-8-sig") as fh:
         sample = fh.read(4096)
         fh.seek(0)
@@ -196,60 +196,43 @@ def read_experimental_xy(file_path: Path) -> Tuple[np.ndarray, np.ndarray]:
         except csv.Error:
             dialect = csv.excel
 
-        reader = csv.DictReader(fh, dialect=dialect)
-        if not reader.fieldnames:
-            raise ValueError("No CSV header found")
+        reader = csv.reader(fh, dialect=dialect)
+        
+        # Ignorer la ligne d'en-tête s'il y en a une (ex: contient du texte comme "distance_mm")
+        try:
+            first_row = next(reader)
+            # Si la conversion échoue, c'est une en-tête de texte, on passe à la suite
+            float(first_row[0].replace(",", "."))
+            # Si ça marche, c'est de la donnée brute, on l'ajoute
+            d_val = parse_float(first_row[0])
+            a_val = parse_float(first_row[1])
+            if d_val is not None and a_val is not None:
+                y_dist_values.append(d_val)
+                x_adc_values.append(a_val)
+        except (ValueError, IndexError):
+            pass # C'était bien une en-tête textuelle, ignorée avec succès.
 
-        headers = [h.strip() for h in reader.fieldnames]
-        lookup = {h.lower(): h for h in headers}
+        # Lecture du reste des lignes
+        for row in reader:
+            if len(row) < 2:
+                continue
+            d_val = parse_float(row[0])
+            a_val = parse_float(row[1])
+            if d_val is not None and a_val is not None:
+                y_dist_values.append(d_val)
+                x_adc_values.append(a_val)
 
-        x_header = lookup.get("tension_adc_pts")
-        y_header = lookup.get("distance_mm")
+    if len(x_adc_values) < 2:
+        raise ValueError("Impossible de lire les données numériques du CSV. Vérifie le format.")
 
-        if x_header is None or y_header is None:
-            numeric_counts: Dict[str, int] = {h: 0 for h in headers}
-            rows_cache: List[Dict[str, str]] = []
-            for row in reader:
-                rows_cache.append(row)
-                for h in headers:
-                    if parse_float(row.get(h, "")) is not None:
-                        numeric_counts[h] += 1
-
-            best = sorted(headers, key=lambda h: numeric_counts[h], reverse=True)
-            if len(best) < 2:
-                raise ValueError("Could not infer two numeric columns in experimental CSV")
-
-            x_header, y_header = best[0], best[1]
-            x_values: List[float] = []
-            y_values: List[float] = []
-            for row in rows_cache:
-                xv = parse_float(row.get(x_header, ""))
-                yv = parse_float(row.get(y_header, ""))
-                if xv is None or yv is None:
-                    continue
-                x_values.append(xv)
-                y_values.append(yv)
-        else:
-            x_values = []
-            y_values = []
-            for row in reader:
-                xv = parse_float(row.get(x_header, ""))
-                yv = parse_float(row.get(y_header, ""))
-                if xv is None or yv is None:
-                    continue
-                x_values.append(xv)
-                y_values.append(yv)
-
-    if len(x_values) < 2:
-        raise ValueError("Not enough numeric points in experimental CSV")
-
-    return np.asarray(x_values, dtype=float), np.asarray(y_values, dtype=float)
+    # Retourne (ADC, Distance) pour correspondre au format d'entrée (X=ADC, Y=Distance) du modèle
+    return np.asarray(x_adc_values, dtype=float), np.asarray(y_dist_values, dtype=float)
 
 
 class LUTExtractorApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title("LUT Extractor")
+        self.root.title("LUT Extractor (Direct Mode)")
         self.root.geometry("1360x900")
         self.root.minsize(1180, 780)
 
@@ -264,7 +247,6 @@ class LUTExtractorApp:
         self.model_info_var = tk.StringVar(value="Modele: --")
 
         self.summary_vars = {
-            "zero_ref": tk.StringVar(value="--"),
             "min_abs": tk.StringVar(value="--"),
             "max_abs": tk.StringVar(value="--"),
             "mean_abs": tk.StringVar(value="--"),
@@ -277,12 +259,9 @@ class LUTExtractorApp:
 
         self.model_info: ModelInfo | None = None
         self.lut_x: np.ndarray | None = None
-        self.lut_y_real_mm: np.ndarray | None = None
-        self.lut_y_press_mm: np.ndarray | None = None
+        self.lut_y_mm: np.ndarray | None = None
         self.lut_y_export: np.ndarray | None = None
-        self.lut_export_header: str = "press_distance_mm"
-        self.zero_ref_real_mm: float | None = None
-        self.zero_ref_adc_pts: float | None = None
+        self.lut_export_header: str = "distance_mm"
 
         self.lut_canvas: FigureCanvasTkAgg | None = None
         self.validation_canvas: FigureCanvasTkAgg | None = None
@@ -299,7 +278,7 @@ class LUTExtractorApp:
         wrapper.columnconfigure(0, weight=1)
         wrapper.rowconfigure(2, weight=1)
 
-        title = ttk.Label(wrapper, text="LUT Extractor and Validator", font=("Georgia", 18, "bold"))
+        title = ttk.Label(wrapper, text="LUT Extractor and Validator (Direct Offset)", font=("Georgia", 18, "bold"))
         title.grid(row=0, column=0, sticky="w")
 
         controls = ttk.LabelFrame(wrapper, text="Inputs and extraction settings", padding=12)
@@ -362,40 +341,36 @@ class LUTExtractorApp:
     def _build_summary_tab(self) -> None:
         frame = ttk.Frame(self.tab_summary, padding=16)
         frame.pack(fill="both", expand=True)
-
         frame.columnconfigure(1, weight=1)
 
         ttk.Label(frame, text="Validation summary", font=("Georgia", 15, "bold")).grid(row=0, column=0, columnspan=3, sticky="w")
 
-        ttk.Label(frame, text="Zero reference (real distance):").grid(row=1, column=0, sticky="w", pady=(14, 6))
-        ttk.Label(frame, textvariable=self.summary_vars["zero_ref"]).grid(row=1, column=1, sticky="w", pady=(14, 6))
+        ttk.Label(frame, text="Points compared:").grid(row=1, column=0, sticky="w", pady=(14, 6))
+        ttk.Label(frame, textvariable=self.summary_vars["n_points"]).grid(row=1, column=1, sticky="w", pady=(14, 6))
 
-        ttk.Label(frame, text="Points compared:").grid(row=2, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["n_points"]).grid(row=2, column=1, sticky="w", pady=6)
+        ttk.Label(frame, text="Absolute error min:").grid(row=2, column=0, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.summary_vars["min_abs"]).grid(row=2, column=1, sticky="w", pady=6)
 
-        ttk.Label(frame, text="Absolute error min (press):").grid(row=3, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["min_abs"]).grid(row=3, column=1, sticky="w", pady=6)
+        ttk.Label(frame, text="Absolute error max:").grid(row=3, column=0, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.summary_vars["max_abs"]).grid(row=3, column=1, sticky="w", pady=6)
 
-        ttk.Label(frame, text="Absolute error max (press):").grid(row=4, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["max_abs"]).grid(row=4, column=1, sticky="w", pady=6)
+        ttk.Label(frame, text="Absolute error mean:").grid(row=4, column=0, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.summary_vars["mean_abs"]).grid(row=4, column=1, sticky="w", pady=6)
 
-        ttk.Label(frame, text="Absolute error mean (press):").grid(row=5, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["mean_abs"]).grid(row=5, column=1, sticky="w", pady=6)
+        ttk.Label(frame, text="Absolute error std:").grid(row=5, column=0, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.summary_vars["std_abs"]).grid(row=5, column=1, sticky="w", pady=6)
 
-        ttk.Label(frame, text="Absolute error std (press):").grid(row=6, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["std_abs"]).grid(row=6, column=1, sticky="w", pady=6)
+        ttk.Label(frame, text="RMSE:").grid(row=6, column=0, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.summary_vars["rmse"]).grid(row=6, column=1, sticky="w", pady=6)
 
-        ttk.Label(frame, text="RMSE (press):").grid(row=7, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["rmse"]).grid(row=7, column=1, sticky="w", pady=6)
+        ttk.Label(frame, text="Absolute error median:").grid(row=7, column=0, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.summary_vars["median_abs"]).grid(row=7, column=1, sticky="w", pady=6)
 
-        ttk.Label(frame, text="Absolute error median (press):").grid(row=8, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["median_abs"]).grid(row=8, column=1, sticky="w", pady=6)
-
-        ttk.Label(frame, text="Absolute error P99 (press):").grid(row=9, column=0, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.summary_vars["p99_abs"]).grid(row=9, column=1, sticky="w", pady=6)
+        ttk.Label(frame, text="Absolute error P99:").grid(row=8, column=0, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.summary_vars["p99_abs"]).grid(row=8, column=1, sticky="w", pady=6)
 
         percentiles_box = ttk.LabelFrame(frame, text="Percentiles (absolute error)", padding=10)
-        percentiles_box.grid(row=1, column=2, rowspan=9, sticky="nsew", padx=(24, 0))
+        percentiles_box.grid(row=1, column=2, rowspan=8, sticky="nsew", padx=(24, 0))
         percentiles_box.columnconfigure(0, weight=1)
         percentiles_box.rowconfigure(0, weight=1)
 
@@ -488,38 +463,27 @@ class LUTExtractorApp:
             return
 
         x = np.arange(start, stop + (step * 0.5), step, dtype=float)
-        y_real_mm = np.polyval(self.model_info.coefficients, x)
-
-        zero_index = int(np.argmax(y_real_mm))
-        zero_ref_real_mm = float(y_real_mm[zero_index])
-        zero_ref_adc = float(x[zero_index])
-
-        y_press_mm_raw = np.maximum(0.0, zero_ref_real_mm - y_real_mm)
+        y_mm_raw = np.polyval(self.model_info.coefficients, x)
+        y_mm_raw = np.maximum(0.0, y_mm_raw) 
 
         if integer_mode:
-            y_um_quant = np.rint((y_press_mm_raw * 1000.0) / precision_um) * precision_um
-            y_press_mm = y_um_quant / 1000.0
+            y_um_quant = np.rint((y_mm_raw * 1000.0) / precision_um) * precision_um
+            y_mm = y_um_quant / 1000.0
             y_export = y_um_quant.astype(np.int64)
-            header = f"press_distance_um_int_p{precision_um}"
+            header = f"distance_um_int_p{precision_um}"
         else:
-            y_press_mm = y_press_mm_raw
-            y_export = y_press_mm_raw
-            header = "press_distance_mm"
+            y_mm = y_mm_raw
+            y_export = y_mm_raw
+            header = "distance_mm"
 
         self.lut_x = x
-        self.lut_y_real_mm = y_real_mm
-        self.lut_y_press_mm = y_press_mm
+        self.lut_y_mm = y_mm
         self.lut_y_export = y_export
         self.lut_export_header = header
-        self.zero_ref_real_mm = zero_ref_real_mm
-        self.zero_ref_adc_pts = zero_ref_adc
         self.validation_data = None
 
-        self._render_lut_plot(x, y_press_mm)
-
-        self.status_var.set(
-            f"LUT generated with {len(x)} points. Zero reference={zero_ref_real_mm:.6f} mm at ADC {zero_ref_adc:.2f}."
-        )
+        self._render_lut_plot(x, y_mm)
+        self.status_var.set(f"LUT generated directly with {len(x)} points.")
         self.notebook.select(self.tab_lut)
 
     def _render_lut_plot(self, x: np.ndarray, y_mm: np.ndarray) -> None:
@@ -529,9 +493,9 @@ class LUTExtractorApp:
         fig = Figure(figsize=(9.2, 6.8), dpi=100)
         ax = fig.add_subplot(111)
         ax.plot(x, y_mm, color="#1d3557", linewidth=2.2)
-        ax.set_title("Press Distance vs Tension (LUT)")
+        ax.set_title("Distance vs Tension (LUT)")
         ax.set_xlabel("Tension (ADC pts)")
-        ax.set_ylabel("Press distance (mm)")
+        ax.set_ylabel("Distance (mm)")
         ax.grid(True, alpha=0.28)
 
         canvas = FigureCanvasTkAgg(fig, master=self.tab_lut)
@@ -540,57 +504,27 @@ class LUTExtractorApp:
         self.lut_canvas = canvas
 
     def _save_lut_csv(self) -> None:
-        if (
-            self.lut_x is None
-            or self.lut_y_real_mm is None
-            or self.lut_y_press_mm is None
-            or self.lut_y_export is None
-            or self.zero_ref_real_mm is None
-            or self.zero_ref_adc_pts is None
-        ):
+        if self.lut_x is None or self.lut_y_mm is None or self.lut_y_export is None:
             messagebox.showwarning("No LUT", "Generate LUT first.")
             return
 
         stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"{stamp}_lut.csv"
         output_path = filedialog.asksaveasfilename(
             title="Save LUT CSV",
             defaultextension=".csv",
-            initialfile=default_name,
+            initialfile=f"{stamp}_lut.csv",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
         )
         if not output_path:
             return
 
         path = Path(output_path)
-
         try:
             with path.open("w", newline="", encoding="utf-8") as fh:
                 writer = csv.writer(fh)
-                writer.writerow([
-                    "tension_adc_pts",
-                    self.lut_export_header,
-                    "press_distance_mm",
-                    "distance_real_mm",
-                    "zero_ref_real_mm",
-                    "zero_ref_adc_pts",
-                ])
-                for xv, yv_export, y_press_mm, y_real_mm in zip(
-                    self.lut_x,
-                    self.lut_y_export,
-                    self.lut_y_press_mm,
-                    self.lut_y_real_mm,
-                ):
-                    writer.writerow(
-                        [
-                            f"{xv:.6f}",
-                            yv_export,
-                            f"{y_press_mm:.6f}",
-                            f"{y_real_mm:.6f}",
-                            f"{self.zero_ref_real_mm:.6f}",
-                            f"{self.zero_ref_adc_pts:.6f}",
-                        ]
-                    )
+                writer.writerow(["tension_adc_pts", self.lut_export_header, "distance_mm"])
+                for xv, yv_export, y_mm in zip(self.lut_x, self.lut_y_export, self.lut_y_mm):
+                    writer.writerow([f"{xv:.6f}", yv_export, f"{y_mm:.6f}"])
         except Exception as exc:
             messagebox.showerror("Save error", f"Could not save LUT CSV:\n{exc}")
             return
@@ -599,13 +533,7 @@ class LUTExtractorApp:
         messagebox.showinfo("Saved", f"LUT CSV saved:\n{path}")
 
     def _save_lut_txt(self) -> None:
-        if (
-            self.lut_x is None
-            or self.lut_y_press_mm is None
-            or self.lut_y_export is None
-            or self.zero_ref_real_mm is None
-            or self.zero_ref_adc_pts is None
-        ):
+        if self.lut_x is None or self.lut_y_mm is None or self.lut_y_export is None:
             messagebox.showwarning("No LUT", "Generate LUT first.")
             return
 
@@ -621,12 +549,8 @@ class LUTExtractorApp:
 
         is_integer_lut = np.issubdtype(np.asarray(self.lut_y_export).dtype, np.integer)
         array_name = "lut_values"
-        if is_integer_lut:
-            c_type = "uint32_t"
-            value_formatter = lambda v: str(int(v))
-        else:
-            c_type = "float"
-            value_formatter = lambda v: f"{float(v):.6f}f"
+        c_type = "uint32_t" if is_integer_lut else "float"
+        value_formatter = (lambda v: str(int(v))) if is_integer_lut else (lambda v: f"{float(v):.6f}f")
 
         values_per_line = 12
         formatted_values = [value_formatter(v) for v in np.asarray(self.lut_y_export)]
@@ -636,22 +560,17 @@ class LUTExtractorApp:
             value_lines.append(f"    {chunk}")
 
         txt_lines = [
-            "// Auto-generated LUT (press distance vs ADC)",
+            "// Auto-generated LUT (Corrected distance vs ADC)",
             "#include <stdint.h>",
             "",
             f"static const uint32_t LUT_COUNT = {len(self.lut_x)}u;",
             f"static const float LUT_START_ADC = {float(self.lut_x[0]):.6f}f;",
             f"static const float LUT_END_ADC = {float(self.lut_x[-1]):.6f}f;",
             f"static const float LUT_STEP_ADC = {float(self.lut_x[1] - self.lut_x[0]) if len(self.lut_x) > 1 else 0.0:.6f}f;",
-            f"static const float LUT_ZERO_REAL_MM = {self.zero_ref_real_mm:.6f}f;",
-            f"static const float LUT_ZERO_ADC = {self.zero_ref_adc_pts:.6f}f;",
             "",
             f"static const {c_type} {array_name}[LUT_COUNT] = {{",
             *value_lines,
             "};",
-            "",
-            "// Press distance conversion:",
-            "// press_distance_mm = LUT_ZERO_REAL_MM - real_distance_mm",
         ]
 
         try:
@@ -664,7 +583,7 @@ class LUTExtractorApp:
         messagebox.showinfo("Saved", f"LUT TXT saved:\n{output_path}")
 
     def _run_validation(self) -> None:
-        if self.lut_x is None or self.lut_y_press_mm is None or self.zero_ref_real_mm is None:
+        if self.lut_x is None or self.lut_y_mm is None:
             messagebox.showwarning("No LUT", "Generate LUT before validation.")
             return
 
@@ -674,43 +593,39 @@ class LUTExtractorApp:
             return
 
         try:
-            x_exp, y_exp_real = read_experimental_xy(exp_path)
+            # Correction de la lecture : Récupère bien X=ADC, Y=Distance depuis ton fichier propre positionnel
+            x_exp, y_exp_mm = read_experimental_xy(exp_path)
         except Exception as exc:
             messagebox.showerror("Experimental CSV", f"Could not load experimental data:\n{exc}")
             return
 
-        y_exp_press = np.maximum(0.0, self.zero_ref_real_mm - y_exp_real)
-
+        # Comparaison directe des données propres
         y_pred = np.interp(
             x_exp,
             self.lut_x,
-            self.lut_y_press_mm,
-            left=float(self.lut_y_press_mm[0]),
-            right=float(self.lut_y_press_mm[-1]),
+            self.lut_y_mm,
+            left=float(self.lut_y_mm[0]),
+            right=float(self.lut_y_mm[-1]),
         )
 
-        errors = y_pred - y_exp_press
+        errors = y_pred - y_exp_mm
         abs_errors = np.abs(errors)
         abs_um = abs_errors * 1000.0
 
-        self._render_validation_plot(y_exp_press, y_pred, abs_um)
-        summary = self._update_summary(abs_errors, errors, len(y_exp_press))
+        self._render_validation_plot(y_exp_mm, y_pred, abs_um)
+        summary = self._update_summary(abs_errors, errors, len(y_exp_mm))
 
         self.validation_data = {
             "x_exp": x_exp,
-            "y_exp_real_mm": y_exp_real,
-            "y_exp_press_mm": y_exp_press,
+            "y_exp_mm": y_exp_mm,
             "y_pred": y_pred,
             "errors_mm": errors,
             "abs_errors_mm": abs_errors,
             "summary": summary,
             "exp_path": str(exp_path),
-            "zero_ref_real_mm": float(self.zero_ref_real_mm),
         }
 
-        self.status_var.set(
-            f"Validation completed on {len(y_exp_press)} points from {exp_path.name}."
-        )
+        self.status_var.set(f"Validation completed on {len(y_exp_mm)} points from {exp_path.name}.")
         self.notebook.select(self.tab_validation)
 
     def _render_validation_plot(self, y_true: np.ndarray, y_pred: np.ndarray, abs_err_um: np.ndarray) -> None:
@@ -725,9 +640,9 @@ class LUTExtractorApp:
         low = min(float(np.min(y_true)), float(np.min(y_pred)))
         high = max(float(np.max(y_true)), float(np.max(y_pred)))
         ax1.plot([low, high], [low, high], color="#e63946", linewidth=2.0, label="x = y")
-        ax1.set_title("Predicted vs Experimental (Press Distance)")
-        ax1.set_xlabel("Experimental press distance (mm)")
-        ax1.set_ylabel("LUT press distance (mm)")
+        ax1.set_title("Predicted vs Experimental (Distance)")
+        ax1.set_xlabel("Experimental distance (mm)")
+        ax1.set_ylabel("LUT distance (mm)")
         ax1.grid(True, alpha=0.25)
         ax1.legend()
 
@@ -763,13 +678,6 @@ class LUTExtractorApp:
         median_abs = float(np.median(abs_errors_mm))
         p99_abs = float(np.percentile(abs_errors_mm, 99))
         percentile_values = {float(p): float(np.percentile(abs_errors_mm, p)) for p in PERCENTILE_LEVELS}
-
-        if self.zero_ref_real_mm is not None and self.zero_ref_adc_pts is not None:
-            self.summary_vars["zero_ref"].set(
-                f"{self.zero_ref_real_mm:.6f} mm at ADC {self.zero_ref_adc_pts:.3f}"
-            )
-        else:
-            self.summary_vars["zero_ref"].set("--")
 
         self.summary_vars["n_points"].set(str(n_points))
         self.summary_vars["min_abs"].set(self._format_mm_um(min_abs))
@@ -813,11 +721,10 @@ class LUTExtractorApp:
             return
 
         stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"{stamp}_validation_report.txt"
         out_path = filedialog.asksaveasfilename(
             title="Save validation report",
             defaultextension=".txt",
-            initialfile=default_name,
+            initialfile=f"{stamp}_validation_report.txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
         )
         if not out_path:
@@ -829,14 +736,13 @@ class LUTExtractorApp:
         assert isinstance(percentiles_mm, dict)
 
         report_lines = [
-            "Validation report",
-            "=================",
+            "Validation report (Direct Offset)",
+            "=================================",
             f"Timestamp: {stamp}",
             f"Model file: {self.model_path_var.get().strip()}",
             f"Experimental CSV: {self.validation_data.get('exp_path', '')}",
             f"Model name: {self.model_info.model_name if self.model_info else '--'}",
             f"Equation: {self.model_info.equation if self.model_info else '--'}",
-            f"Zero reference (real): {float(self.validation_data.get('zero_ref_real_mm', float('nan'))):.6f} mm",
             "",
             "LUT extraction settings",
             f"Range min: {self.range_min_var.get().strip()}",
@@ -845,7 +751,7 @@ class LUTExtractorApp:
             f"Integer mode: {bool(self.integer_mode_var.get())}",
             f"Integer precision um: {self.precision_um_var.get().strip()}",
             "",
-            "Error summary (absolute, press distance)",
+            "Error summary (absolute, distance)",
             f"Points compared: {summary.get('n_points', '--')}",
             f"Min: {self._format_mm_um(float(summary.get('min_abs_mm', float('nan'))))}",
             f"Max: {self._format_mm_um(float(summary.get('max_abs_mm', float('nan'))))}",
@@ -855,7 +761,7 @@ class LUTExtractorApp:
             f"Median: {self._format_mm_um(float(summary.get('median_abs_mm', float('nan'))))}",
             f"P99: {self._format_mm_um(float(summary.get('p99_abs_mm', float('nan'))))}",
             "",
-            "Percentiles (absolute error, press distance)",
+            "Percentiles (absolute error)",
         ]
 
         for level in PERCENTILE_LEVELS:
@@ -869,9 +775,8 @@ class LUTExtractorApp:
             report_path.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
 
             x_exp = np.asarray(self.validation_data["x_exp"], dtype=float)
-            y_exp_real = np.asarray(self.validation_data["y_exp_real_mm"], dtype=float)
-            y_exp_press = np.asarray(self.validation_data["y_exp_press_mm"], dtype=float)
-            y_pred_press = np.asarray(self.validation_data["y_pred"], dtype=float)
+            y_exp_mm = np.asarray(self.validation_data["y_exp_mm"], dtype=float)
+            y_pred_mm = np.asarray(self.validation_data["y_pred"], dtype=float)
             errors = np.asarray(self.validation_data["errors_mm"], dtype=float)
             abs_errors = np.asarray(self.validation_data["abs_errors_mm"], dtype=float)
 
@@ -880,22 +785,20 @@ class LUTExtractorApp:
                 writer.writerow([
                     "index",
                     "tension_adc_pts",
-                    "distance_real_exp_mm",
-                    "distance_press_exp_mm",
-                    "distance_press_pred_mm",
-                    "error_press_mm",
+                    "distance_exp_mm",
+                    "distance_pred_mm",
+                    "error_mm",
                     "abs_error_mm",
                     "abs_error_um",
                 ])
-                for idx, (xv, y_real, y_true_press, y_hat_press, err, abs_err) in enumerate(
-                    zip(x_exp, y_exp_real, y_exp_press, y_pred_press, errors, abs_errors)
+                for idx, (xv, y_true, y_hat, err, abs_err) in enumerate(
+                    zip(x_exp, y_exp_mm, y_pred_mm, errors, abs_errors)
                 ):
                     writer.writerow([
                         idx,
                         f"{xv:.6f}",
-                        f"{y_real:.6f}",
-                        f"{y_true_press:.6f}",
-                        f"{y_hat_press:.6f}",
+                        f"{y_true:.6f}",
+                        f"{y_hat:.6f}",
                         f"{err:.6f}",
                         f"{abs_err:.6f}",
                         f"{abs_err * 1000.0:.3f}",
