@@ -38,6 +38,7 @@ import {
   IconWaveSquare,
   IconLock,
   IconArrowsExchange,
+  IconFileExport,
 } from "@tabler/icons-react";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -473,6 +474,90 @@ function TimeChart({
             stroke={colors[+keyIdx] ?? "#888"}
             strokeWidth={1.5}
             strokeLinejoin="round"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function XYChart({
+  measurements,
+  yMin,
+  yMax,
+  xMin,
+  xMax,
+  lineColor = "#3b82f6",
+}: {
+  measurements: { distance: number; rawAdc: number }[];
+  yMin: number;
+  yMax: number;
+  xMin: number;
+  xMax: number;
+  lineColor?: string;
+}) {
+  const xRange = xMax - xMin || 1;
+  const yRange = yMax - yMin || 1;
+  const gridLines = 5;
+
+  const pts = measurements
+    .map((m) => {
+      const x = ((m.distance - xMin) / xRange) * CHART_W;
+      const y = CHART_H - ((m.rawAdc - yMin) / yRange) * CHART_H;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+      className="w-full border rounded bg-muted/20"
+      preserveAspectRatio="none"
+      style={{ height: CHART_H }}
+    >
+      {/* Grid line Y */}
+      {Array.from({ length: gridLines + 1 }, (_, i) => {
+        const y = (i / gridLines) * CHART_H;
+        const val = yMax - (i / gridLines) * yRange;
+        return (
+          <g key={`y-${i}`}>
+            <line x1={0} y1={y} x2={CHART_W} y2={y} stroke="currentColor" strokeOpacity={0.08} />
+            <text x={4} y={y - 2} fontSize={9} fill="currentColor" opacity={0.4} fontFamily="monospace">{val.toFixed(0)}</text>
+          </g>
+        );
+      })}
+      {/* Grid line X */}
+      {Array.from({ length: gridLines + 1 }, (_, i) => {
+        const x = (i / gridLines) * CHART_W;
+        const val = xMin + (i / gridLines) * xRange;
+        return (
+          <g key={`x-${i}`}>
+            <line x1={x} y1={0} x2={x} y2={CHART_H} stroke="currentColor" strokeOpacity={0.08} />
+            <text x={x + 2} y={CHART_H - 4} fontSize={9} fill="currentColor" opacity={0.4} fontFamily="monospace">{val.toFixed(1)}mm</text>
+          </g>
+        );
+      })}
+      
+      {measurements.length > 1 && (
+        <polyline
+          points={pts}
+          fill="none"
+          stroke={lineColor}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+      )}
+      
+      {measurements.map((m, i) => {
+        const x = ((m.distance - xMin) / xRange) * CHART_W;
+        const y = CHART_H - ((m.rawAdc - yMin) / yRange) * CHART_H;
+        return (
+          <circle
+            key={i}
+            cx={x}
+            cy={y}
+            r={3}
+            className="fill-blue-500 stroke-background stroke-1"
           />
         );
       })}
@@ -1274,6 +1359,213 @@ function DebugTab({ connected, active }: { connected: boolean; active: boolean }
   );
 }
 
+// ── Export Tab ───────────────────────────────────────────────────────────────
+
+function ExportTab({ connected, active }: { connected: boolean; active: boolean }) {
+  const [filename, setFilename] = useState("measurements.csv");
+  const [step, setStep] = useState("0.1");
+  const [keyToTrack, setKeyToTrack] = useState("0");
+  const [useMedian, setUseMedian] = useState(false);
+
+  const [tracking, setTracking] = useState(false);
+  const [currentDistanceStr, setCurrentDistanceStr] = useState("0");
+  const [measurements, setMeasurements] = useState<{distance: number, rawAdc: number}[]>([]);
+  const [recentSamples, setRecentSamples] = useState<number[]>([]);
+
+  const rawQ = useQuery({
+    queryKey: ["diagnostics", "rawAdc"],
+    queryFn: () => kbheDevice.getAllRawAdcValues(),
+    enabled: connected && tracking && active,
+    refetchInterval: connected && tracking && active ? 80 : false,
+  });
+
+  const kIdx = parseInt(keyToTrack, 10);
+  const currentRawAdc = !isNaN(kIdx) && rawQ.data ? rawQ.data[kIdx] ?? 0 : 0;
+
+  useEffect(() => {
+    if (tracking && rawQ.data && !isNaN(kIdx)) {
+      setRecentSamples((prev) => {
+        // @ts-expect-error - prevent null assertion by ensuring rawQ.data is defined
+        const next = [...prev, rawQ.data[kIdx] ?? 0];
+        if (next.length > 8) {
+          return next.slice(next.length - 8);
+        }
+        return next;
+      });
+    }
+  }, [rawQ.data, tracking, kIdx]);
+
+  const displayAdc = useMedian && recentSamples.length > 0 
+    ? [...recentSamples].sort((a,b) => a - b)[Math.floor(recentSamples.length / 2)] 
+    : currentRawAdc;
+
+  const handleStart = () => {
+    setTracking(true);
+    setCurrentDistanceStr("0");
+    setMeasurements([]);
+    setRecentSamples([]);
+  };
+
+  const handleStop = () => {
+    setTracking(false);
+  };
+
+  const handleSaveMeasurement = () => {
+    const dist = parseFloat(currentDistanceStr);
+    const inc = parseFloat(step);
+    setMeasurements((prev) => [...prev, { distance: dist, rawAdc: displayAdc }]);
+    setCurrentDistanceStr((dist + inc).toFixed(3));
+  };
+
+  const handleDownloadCsv = () => {
+    const csvHeader = "distance_mm,raw_adc\n";
+    const csvContent = measurements.map(m => `${m.distance},${m.rawAdc}`).join("\n");
+    const blob = new Blob([csvHeader + csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (!connected) return <DisconnectedBanner />;
+
+  return (
+    <SectionCard title="Export Sensor Data" description="Record raw ADC values at specific distances for curve fitting">
+      <div className="flex flex-col gap-4">
+        {!tracking ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Filename</Label>
+              <Input
+                className="h-8"
+                autoComplete="off"
+                value={filename}
+                onChange={(e) => setFilename(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Key to Track (0-82)</Label>
+              <Input
+                type="number"
+                min="0"
+                max={KEY_COUNT - 1}
+                className="h-8"
+                value={keyToTrack}
+                onChange={(e) => setKeyToTrack(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Distance Step (mm)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                className="h-8"
+                value={step}
+                onChange={(e) => setStep(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col justify-end space-y-1.5 pb-1">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="median-switch"
+                  checked={useMedian}
+                  onCheckedChange={setUseMedian}
+                />
+                <Label htmlFor="median-switch" className="text-xs">
+                  Median Filter (8 samples)
+                </Label>
+              </div>
+            </div>
+            <div className="flex items-end col-span-2">
+              <Button className="h-8 w-full" onClick={handleStart}>
+                Start Tracking
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4 border rounded-md p-4 bg-muted/20">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm font-semibold">Tracking Key {keyToTrack} ({KEY_LABELS[kIdx]})</p>
+                <p className="text-xs text-muted-foreground">{measurements.length} measurements saved</p>
+              </div>
+              <div className="flex gap-2 text-sm font-mono items-center">
+                <span className="text-muted-foreground mr-2">
+                  {useMedian ? "Median ADC (8 spl):" : "Current RAW ADC:"}
+                </span>
+                <span className="tabular-nums text-foreground bg-background px-2 py-1 rounded border min-w-[60px] text-right">
+                  {displayAdc}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-end gap-4 mt-2">
+              <div className="space-y-1.5 flex-1">
+                <Label className="text-xs">Current Distance (mm)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="h-8"
+                    value={currentDistanceStr}
+                    onChange={(e) => setCurrentDistanceStr(e.target.value)}
+                  />
+                  <Button className="h-8 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSaveMeasurement}>
+                    Save Measurement
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {measurements.length > 0 && (
+              <div className="mt-2">
+                <XYChart 
+                  measurements={measurements}
+                  xMin={Math.min(0, ...measurements.map(m => m.distance))}
+                  xMax={Math.max(4, ...measurements.map(m => m.distance))}
+                  yMin={Math.min(...measurements.map(m => m.rawAdc)) * 0.95}
+                  yMax={Math.max(...measurements.map(m => m.rawAdc)) * 1.05}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-4 mt-4 pt-4 border-t w-full">
+              <Button variant="outline" className="h-8 flex-1" onClick={handleStop}>Stop</Button>
+              <Button 
+                className="h-8 flex-1" 
+                onClick={handleDownloadCsv} 
+                disabled={measurements.length === 0}
+              >
+                <IconFileExport className="size-4 mr-2" /> Download CSV
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {measurements.length > 0 && !tracking && (
+          <div className="border rounded-md p-4 bg-muted/20 flex flex-col gap-4">
+             <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">{measurements.length} rows collected.</span>
+                <Button className="h-8 items-center gap-2" onClick={handleDownloadCsv}>
+                    <IconFileExport className="size-4" /> Save CSV
+                </Button>
+             </div>
+             <XYChart 
+                measurements={measurements}
+                xMin={Math.min(0, ...measurements.map(m => m.distance))}
+                xMax={Math.max(4, ...measurements.map(m => m.distance))}
+                yMin={Math.min(...measurements.map(m => m.rawAdc)) * 0.95}
+                yMax={Math.max(...measurements.map(m => m.rawAdc)) * 1.05}
+             />
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 // ── Shared presentational helpers ────────────────────────────────────────────
 
 function MetricTile({
@@ -1361,6 +1653,9 @@ export default function Diagnostics() {
                 <TabsTrigger value="debug" className="gap-1.5">
                   <IconBug className="size-3" /> Debug
                 </TabsTrigger>
+                <TabsTrigger value="export" className="gap-1.5">
+                  <IconFileExport className="size-3" /> Export
+                </TabsTrigger>
               </TabsList>
               <Badge variant="destructive" className="text-[10px] h-5">
                 DEV
@@ -1403,6 +1698,16 @@ export default function Diagnostics() {
               <div className="p-4">
                 <div className="flex flex-col gap-4 max-w-3xl mx-auto">
                   <DebugTab connected={connected} active={activeTab === "debug"} />
+                </div>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="export" className="flex-1 min-h-0 mt-0">
+            <ScrollArea className="h-full">
+              <div className="p-4">
+                <div className="flex flex-col gap-4 max-w-3xl mx-auto">
+                  <ExportTab connected={connected} active={activeTab === "export"} />
                 </div>
               </div>
             </ScrollArea>
