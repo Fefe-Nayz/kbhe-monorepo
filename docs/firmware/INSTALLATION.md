@@ -6,11 +6,11 @@ Compiled firmware binary are available in the [releases tab](https://github.com/
 
 ### 1) Download firmware bootloader
 
-Download the latest `kbhe_bootloader.hex` from the [releases](https://github.com/kbhe/kbhe-monorepo/releases)
+Download the latest `kbhe-bootloader.hex` from the [releases](https://github.com/kbhe/kbhe-monorepo/releases)
 
 ### 2) Download firmware application
 
-Download the latest `kbhe_application.hex` from the [releases](https://github.com/kbhe/kbhe-monorepo/releases)
+Download the latest `kbhe-app.hex` from the [releases](https://github.com/kbhe/kbhe-monorepo/releases)
 
 ### 3) Flash firmware
 
@@ -18,8 +18,8 @@ Using STM32CubeProgrammer:
 
 1. Connect the board in DFU mode (using boot switch) or use an external programmer (ST-Link)
 2. Make a full chip erase (mass erase)
-3. Flash the bootloader `kbhe_bootloader.hex` ensure address is set to `0x08000000`
-4. Flash the application `kbhe_application.hex` ensure address is set to `0x08010000`
+3. Flash the bootloader `kbhe-bootloader.hex` ensure address is set to `0x08000000`
+4. Flash the application `kbhe-app.hex` ensure address is set to `0x08010000`
 
 ### 4) First boot
 
