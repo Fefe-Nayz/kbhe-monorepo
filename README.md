@@ -55,12 +55,19 @@ Renders of the main production board, exported from the KiCad project in `hardwa
 | --- | --- | --- |
 | ![Bench 1](assets/photos/tipe-lab/bench-session-wide-1.jpg) | ![Bench 2](assets/photos/tipe-lab/bench-session-wide-2.jpg) | ![Bench 3](assets/photos/tipe-lab/bench-session-wide-3.jpg) |
 
+## First-time installation
 
-## First-time board programming (STM32CubeProgrammer, DFU)
+Follow the instructions in [docs/firmware/INSTALLATION.md](docs/firmware/INSTALLATION.md) to flash the firmware for the first time using STM32CubeProgrammer.
+
+<!-- ## First-time board programming (STM32CubeProgrammer, DFU)
 
 The **first** time you program a **blank** board you need a Release build, the physical **DFU / FS** switch, **ROM DFU** over USB, and **STM32CubeProgrammer** to erase the chip and program the custom bootloader and application image. Ongoing updates use the Tauri app or the RAW HID tools instead.
 
-**Step-by-step (French):** [docs/firmware/overview.md](docs/firmware/overview.md) — start at the section *Flash initial d'une carte neuve (bootloader custom)* (build → DFU connect → full erase → flash `kbhe_bootloader.hex` at `0x08000000` and `kbhe.hex` at `0x08010000` → normal boot → optional `raw_hid.py --flash` to finalize the updater). Related notes: [docs/firmware/raw_hid_usage.md](docs/firmware/raw_hid_usage.md), [docs/README.md](docs/README.md).
+**Step-by-step (French):** [docs/firmware/overview.md](docs/firmware/overview.md) — start at the section *Flash initial d'une carte neuve (bootloader custom)* (build → DFU connect → full erase → flash `kbhe_bootloader.hex` at `0x08000000` and `kbhe.hex` at `0x08010000` → normal boot → optional `raw_hid.py --flash` to finalize the updater). Related notes: [docs/firmware/raw_hid_usage.md](docs/firmware/raw_hid_usage.md), [docs/README.md](docs/README.md). -->
+
+## Updating firmware
+
+Follow the instructions in [docs/firmware/INSTALLATION.md](docs/firmware/INSTALLATION.md) to update the firmware using the Configurator app or STM32CubeProgrammer.
 
 ## Repository Layout
 

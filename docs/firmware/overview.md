@@ -136,38 +136,9 @@ Le configurateur offre des pages dediees :
 
 ## Build firmware
 
-Le projet utilise CMake + presets.
+Follow the instructions in `docs/firmware/BUILD.md` to build the firmware using CMake.
 
-Presets disponibles :
-
-- `Debug`
-- `Release`
-- `Release-apponly` (sans bootloader custom)
-
-Exemple :
-
-```powershell
-cmake --preset Release
-cmake --build --preset Release
-```
-
-Apres une premiere configuration, le build courant se lance directement avec :
-
-```powershell
-cmake --build --preset Release
-```
-
-`Release` est aussi le fallback CMake si un outil configure le projet sans
-selectionner explicitement de preset.
-
-Artifacts attendus en `Release` :
-
-- `build/Release/kbhe_bootloader.hex`
-- `build/Release/kbhe_bootloader.bin`
-- `build/Release/kbhe.hex`
-- `build/Release/kbhe.bin`
-
-## Flash initial d'une carte neuve (bootloader custom)
+<!-- ## Flash initial d'une carte neuve (bootloader custom)
 
 ### 1) Construire les binaires Release
 
@@ -246,7 +217,7 @@ Exemple rapide :
 
 ```powershell
 pip install hidapi PySide6 numpy matplotlib pandas
-```
+``` -->
 
 ## CI/CD GitHub
 
