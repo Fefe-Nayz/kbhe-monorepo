@@ -91,7 +91,7 @@ Artifacts are written to `build/Release/`. The CI also builds `Release-apponly` 
 
 ## Configurator
 
-The desktop app handles keymap, performance, Gamepad, calibration, the rotary encoder, lighting, and firmware over RAW HID. Example: **Keymap** for a 75% **ISO-FR** layout in dark UI.
+The desktop app communicates with the keyboard over RAW HID to handle keymap, performance, gamepad mode, calibration, the rotary encoder, lighting, and firmware updates. Example: **Keymap** for a 75% **ISO-FR** layout in dark UI.
 
 ![Configurator Keymap, ISO-FR](assets/photos/app/configurator-keymap-iso-fr-dark-theme.png)
 
