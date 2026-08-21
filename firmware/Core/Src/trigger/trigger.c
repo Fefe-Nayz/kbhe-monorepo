@@ -697,6 +697,26 @@ inline key_state_e trigger_get_key_state(uint8_t key) {
     return key_states[key];
 }
 
+void trigger_socd_set_key_output(uint8_t key, bool pressed) {
+    uint16_t keycode = KC_NO;
+
+    if (key >= NUM_KEYS ||
+        key_trigger_settings[key].behavior_mode != KEY_BEHAVIOR_NORMAL) {
+        return;
+    }
+
+    keycode = key_behavior_states[key].active_keycode;
+    if (keycode == KC_NO) {
+        return;
+    }
+
+    if (pressed) {
+        layout_press_action_for_key(key, keycode);
+    } else {
+        layout_release_action_for_key(key, keycode);
+    }
+}
+
 static uint16_t mm_tenths_to_um(uint8_t value) {
     return (uint16_t)value * 100u;
 }

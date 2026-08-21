@@ -31,19 +31,19 @@ static inline void handle_most_pressed_wins(uint8_t key1, uint8_t key2) {
 
     if (key1_distance >= key2_distance) {
         // Release key 2
-        layout_release(key2);
+        trigger_socd_set_key_output(key2, false);
         socd_override_states[key2] = true;
         
         // Press key 1
-        layout_press(key1);
+        trigger_socd_set_key_output(key1, true);
         socd_override_states[key1] = false;
     } else {
         // Release key 1
-        layout_release(key1);
+        trigger_socd_set_key_output(key1, false);
         socd_override_states[key1] = true;
         
         // Press key 2
-        layout_press(key2);
+        trigger_socd_set_key_output(key2, true);
         socd_override_states[key2] = false;
     }
 }
@@ -63,33 +63,42 @@ inline void socd_on_press(uint8_t key) {
 
     switch (settings->resolution_mode) {
     case SETTINGS_SOCD_RESOLUTION_LAST_INPUT_WINS:
-        layout_release(linked_key);
+        trigger_socd_set_key_output(linked_key, false);
         socd_override_states[linked_key] = true;
         break;
 
     case SETTINGS_SOCD_RESOLUTION_ABSOLUTE_PRIORITY_KEY1:
+        if (trigger_get_key_state(linked_key) != PRESSED) {
+            break;
+        }
         if (key < linked_key) {
-            layout_release(linked_key);
+            trigger_socd_set_key_output(linked_key, false);
             socd_override_states[linked_key] = true;
         } else {
-            layout_release(key);
+            trigger_socd_set_key_output(key, false);
             socd_override_states[key] = true;
         }
         break;
 
     case SETTINGS_SOCD_RESOLUTION_ABSOLUTE_PRIORITY_KEY2:
+        if (trigger_get_key_state(linked_key) != PRESSED) {
+            break;
+        }
         if (key < linked_key) {
-            layout_release(key);
+            trigger_socd_set_key_output(key, false);
             socd_override_states[key] = true;
         } else {
-            layout_release(linked_key);
+            trigger_socd_set_key_output(linked_key, false);
             socd_override_states[linked_key] = true;
         }
         break;
 
     case SETTINGS_SOCD_RESOLUTION_NEUTRAL:
-        layout_release(key);
-        layout_release(linked_key);
+        if (trigger_get_key_state(linked_key) != PRESSED) {
+            break;
+        }
+        trigger_socd_set_key_output(key, false);
+        trigger_socd_set_key_output(linked_key, false);
         socd_override_states[key] = true;
         socd_override_states[linked_key] = true;
         break;
@@ -120,7 +129,7 @@ inline void socd_on_release(uint8_t key) {
             socd_override_states[key] = false;
 
         if (linked_key_state == PRESSED && socd_override_states[linked_key]) {
-            layout_press(linked_key);
+            trigger_socd_set_key_output(linked_key, true);
             socd_override_states[linked_key] = false;
         }
     }
@@ -203,8 +212,8 @@ void socd_task() {
 
                 if (key1_distance >= (int16_t)settings->fully_pressed_point_um &&
                     key2_distance >= (int16_t)settings->fully_pressed_point_um) {
-                    layout_press(key1);
-                    layout_press(key2);
+                    trigger_socd_set_key_output(key1, true);
+                    trigger_socd_set_key_output(key2, true);
                     socd_override_states[key1] = false;
                     socd_override_states[key2] = false;
                     continue;

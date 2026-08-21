@@ -69,6 +69,10 @@ void trigger_task(void);
 
 key_state_e trigger_get_key_state(uint8_t key);
 
+/* Apply or suppress the active output of a normal key without changing its
+ * physical trigger state. Used exclusively by SOCD resolution. */
+void trigger_socd_set_key_output(uint8_t key, bool pressed);
+
 uint16_t trigger_get_distance_01mm(uint8_t key);
 
 void trigger_reload_settings(void);
