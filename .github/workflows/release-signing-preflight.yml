@@ -191,9 +191,16 @@ jobs:
             if ($actual -ne $expected) {
               throw "PFX certificate thumbprint does not match the protected environment variable"
             }
+            $committedCertificatePem = `
+              Get-Content -LiteralPath $committedCertificatePath -Raw
+            $committedCertificateBase64 = `
+              $committedCertificatePem `
+                -replace '-----BEGIN CERTIFICATE-----', '' `
+                -replace '-----END CERTIFICATE-----', '' `
+                -replace '\s', ''
             $committedCertificate = `
-              [Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPemFile(
-                $committedCertificatePath
+              [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                [Convert]::FromBase64String($committedCertificateBase64)
               )
             if ((($committedCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()) -ne $expected -or
                 [Convert]::ToBase64String($committedCertificate.RawData) -ne

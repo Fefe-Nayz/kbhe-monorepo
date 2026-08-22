@@ -210,9 +210,16 @@ jobs:
             if ($actual -ne $expected) {
               throw "PFX certificate thumbprint does not match the protected environment variable"
             }
+            $committedCertificatePem = `
+              Get-Content -LiteralPath $committedCertificatePath -Raw
+            $committedCertificateBase64 = `
+              $committedCertificatePem `
+                -replace '-----BEGIN CERTIFICATE-----', '' `
+                -replace '-----END CERTIFICATE-----', '' `
+                -replace '\s', ''
             $committedCertificate = `
-              [Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPemFile(
-                $committedCertificatePath
+              [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                [Convert]::FromBase64String($committedCertificateBase64)
               )
             $committedThumbprint = `
               ($committedCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
@@ -438,9 +445,16 @@ jobs:
           }
 
           $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($certificatePath)
+          $committedCertificatePem = `
+            Get-Content -LiteralPath $committedCertificatePath -Raw
+          $committedCertificateBase64 = `
+            $committedCertificatePem `
+              -replace '-----BEGIN CERTIFICATE-----', '' `
+              -replace '-----END CERTIFICATE-----', '' `
+              -replace '\s', ''
           $committedCertificate = `
-            [Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPemFile(
-              $committedCertificatePath
+            [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+              [Convert]::FromBase64String($committedCertificateBase64)
             )
           $certificateThumbprint = ($certificate.Thumbprint -replace '\s', '').ToUpperInvariant()
           if ($certificateThumbprint -ne $expected -or
