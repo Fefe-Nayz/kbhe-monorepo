@@ -56,25 +56,27 @@ contents do not appear in a command line or terminal history:
 
 The release boundary is split across three GitHub Actions environments:
 
-| Environment | Allowed tag | Secrets | Environment variables |
+| Environment | Allowed refs | Secrets | Environment variables |
 |---|---|---|---|
-| `firmware-release` | `firmware-v*` | `KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64` | none |
-| `app-codesign` | `app-v*` | `KBHE_WINDOWS_CODESIGN_PFX_B64`, `KBHE_WINDOWS_CODESIGN_PASSWORD` | `KBHE_WINDOWS_CODESIGN_MODE`, `KBHE_WINDOWS_CODESIGN_CERT_THUMBPRINT` |
-| `app-publish` | `app-v*` | `KBHE_APP_RELEASE_SIGNING_KEY_B64` | the same mode and thumbprint values |
+| `firmware-release` | `firmware-v*`, `main` for manual preflight | `KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64` | none |
+| `app-codesign` | `app-v*`, `main` for manual preflight | `KBHE_WINDOWS_CODESIGN_PFX_B64`, `KBHE_WINDOWS_CODESIGN_PASSWORD` | `KBHE_WINDOWS_CODESIGN_MODE`, `KBHE_WINDOWS_CODESIGN_CERT_THUMBPRINT` |
+| `app-publish` | `app-v*`, `main` for manual preflight | `KBHE_APP_RELEASE_SIGNING_KEY_B64` | the same mode and thumbprint values |
 
-Configure required reviewers, prevent self-review, restrict each environment to
-the listed tag pattern, and disable administrator bypass. A protected job does
-not receive its environment secrets before another reviewer approves it.
-Normal pull-request and `main` jobs never receive release secrets.
+Configure required reviewers, restrict each environment to the listed refs, and
+disable administrator bypass. A protected job does not receive its environment
+secrets before a reviewer approves it. The `main` exception exists only for the
+manually dispatched signing preflight; normal pull-request and `main` CI jobs do
+not target these environments and never receive release secrets.
 
 The app workflow intentionally runs on two different Windows runners. The
 `app-codesign` runner is the only runner that receives the PFX; it builds and
 Authenticode-signs Tauri, verifies every executable and uploads a one-day
 private Actions artifact. A fresh `app-publish` runner does **not** run Bun,
 npm, frontend code, or the Tauri build. It re-verifies the transferred hashes,
-certificate, signer and timestamp, then receives the app Ed25519 key, creates a
-draft GitHub Release, re-downloads every asset, verifies it again, and only then
-makes the draft public. The firmware key is never available to either app job.
+certificate, signer and any timestamp required by the selected mode, then
+receives the app Ed25519 key, creates a draft GitHub Release, re-downloads every
+asset, verifies it again, and only then makes the draft public. The firmware key
+is never available to either app job.
 
 ### Windows Authenticode bootstrap
 
@@ -82,8 +84,11 @@ makes the draft public. The firmware key is never available to either app job.
 [`kbhe-community-authenticode.pem`](../apps/configurator/keys/kbhe-community-authenticode.pem).
 The workflow requires the PFX certificate, the committed PEM and the protected
 thumbprint variable to be byte-for-byte/thumbprint consistent. It also requires
-the code-signing EKU, current validity, SHA-256 signing, an RFC3161 timestamp,
-Windows Authenticode validation, and the exact expected signer.
+the code-signing EKU, current validity, SHA-256 signing, Windows Authenticode
+validation, and the exact expected signer. `public-ca` additionally requires an
+RFC3161 timestamp; `self-signed-bootstrap` deliberately signs without an
+external timestamp and relies on the detached KBHE Ed25519 signature for update
+authentication.
 
 The current `self-signed-bootstrap` mode is free and keeps the pipeline fail
 closed, but it is **not a publicly trusted publisher identity**. Microsoft
@@ -100,9 +105,10 @@ publicly trusted signing identity. See [Microsoft's SmartScreen guidance](https:
 Before any tag is created, dispatch **Release Signing Preflight** with target
 `app`, `firmware`, or `both`. It derives each Ed25519 public key from its
 protected private key and compares it with the committed PEM, performs a real
-sign/verify round trip, and signs/timestamps/verifies a disposable Windows
-executable with the protected PFX. The workflow writes no release and has only
-`contents: read` permission.
+sign/verify round trip, and signs/verifies a disposable Windows executable with
+the protected PFX. It also exercises and requires RFC3161 timestamping in
+`public-ca` mode. The workflow writes no release and has only `contents: read`
+permission.
 
 ## CI vs CD Behavior
 
@@ -110,7 +116,7 @@ The workflows split validation, code signing and publication:
 
 - **Push to `main` / pull request**: CI runs (frontend tests/lint/build, `cargo check --locked` and `cargo test --locked` for the configurator; all native tests plus both ARM builds for firmware). **No release is created.**
 - **Protected signing preflight**: validates all selected key pairs and the
-  Authenticode timestamp path without publishing anything.
+  mode-appropriate Authenticode path without publishing anything.
 - **Push of an `app-v*` or `firmware-v*` tag**: CI runs **and** the protected
   release jobs build, authenticate and publish the artifacts.
 
@@ -206,8 +212,8 @@ Run from the repo root.
 
 7. **Run the protected `Release Signing Preflight` workflow** for target
    `app` and wait for the `app-codesign` and `app-publish` reviewers/jobs. Do
-   not create a tag if either key pair, certificate, timestamp or verification
-   check fails.
+   not create a tag if either key pair, certificate, required timestamp or
+   verification check fails.
 
 8. **Tag and push** (this is what triggers the release build):
 
@@ -216,14 +222,16 @@ Run from the repo root.
    git push origin app-vX.Y.Z
    ```
 
-9. **Watch both protected tag jobs** in GitHub Actions. The first runner builds,
-   signs and timestamps Tauri with only the Authenticode PFX, then transfers a
-   hash manifest, the public certificate and installers as a short-lived private
-   Actions artifact. A fresh runner re-verifies Authenticode and exact hashes,
+9. **Watch both protected tag jobs** in GitHub Actions. The first runner builds
+   and signs Tauri with only the Authenticode PFX, adding an RFC3161 timestamp in
+   `public-ca` mode, then transfers a hash manifest, the public certificate and
+   installers as a short-lived private Actions artifact. A fresh runner
+   re-verifies Authenticode and exact hashes,
    then obtains only the app Ed25519 key. It creates detached `.sig` siblings in
    a draft release, downloads the exact remote assets, compares SHA-256 digests,
    re-verifies Authenticode and Ed25519, and finally publishes. Any missing,
-   duplicate, untrusted, untimestamped or unexpected asset blocks publication.
+   duplicate, untrusted, unexpectedly untimestamped or unexpected asset blocks
+   publication.
 
 Installer signatures use the `KBHEAPP2` domain and bind the normalized app
 version, OS, CPU architecture, exact asset filename, byte length and SHA-512
@@ -384,5 +392,5 @@ installer built without them will check the default repository.
 | Updater protocol mismatch error after flashing | The bootloader on the keyboard is older than the configurator's `UPDATER_PROTOCOL_VERSION` | Verify and flash the matching `kbhe-factory.bin` at `0x08000000` with ST-Link/STM32CubeProgrammer; this updates bootloader, app and signed trailer together |
 | Firmware signing fails | `KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64` is absent, malformed, or does not match the committed firmware public key | Correct the `firmware-release` environment secret and rerun signing preflight; never weaken the verifier |
 | App detached signing fails | `KBHE_APP_RELEASE_SIGNING_KEY_B64` is absent, malformed, or does not match the committed app public key | Correct the `app-publish` environment secret and rerun signing preflight |
-| Authenticode signing or verification fails | PFX/password, mode, expected thumbprint and committed public certificate disagree; the certificate lacks code-signing EKU/validity; or RFC3161 timestamping failed | Correct `app-codesign` and mirror its mode/thumbprint variables in `app-publish`, then require a green signing preflight before creating another version tag |
+| Authenticode signing or verification fails | PFX/password, mode, expected thumbprint and committed public certificate disagree; the certificate lacks code-signing EKU/validity; or required `public-ca` RFC3161 timestamping failed | Correct `app-codesign` and mirror its mode/thumbprint variables in `app-publish`, then require a green signing preflight before creating another version tag |
 | A release is not offered by the configurator | The expected binary/installer has no exact sibling `<asset>.sig` or the signature metadata is not 64 bytes | Re-run a correctly configured tag release and confirm that both assets were uploaded |

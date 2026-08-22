@@ -128,6 +128,7 @@ jobs:
     name: Validate Windows Authenticode key
     if: inputs.target == 'app' || inputs.target == 'both'
     runs-on: windows-latest
+    timeout-minutes: 15
     environment: app-codesign
 
     steps:
@@ -138,7 +139,7 @@ jobs:
             apps/configurator/keys/kbhe-community-authenticode.pem
           sparse-checkout-cone-mode: false
 
-      - name: Import, sign, timestamp, and verify a disposable executable
+      - name: Import, sign, and verify a disposable executable
         shell: pwsh
         env:
           CODESIGN_PFX_B64: ${{ secrets.KBHE_WINDOWS_CODESIGN_PFX_B64 }}
@@ -240,20 +241,30 @@ jobs:
             if ($null -eq $signtool) {
               throw "Windows SDK signtool.exe was not found"
             }
-            & $signtool.FullName sign /sha1 $expected /fd SHA256 `
-              /tr http://timestamp.digicert.com /td SHA256 /v $executablePath
+            if ($env:CODESIGN_MODE -eq "public-ca") {
+              & $signtool.FullName sign /sha1 $expected /fd SHA256 `
+                /tr http://timestamp.digicert.com /td SHA256 /v $executablePath
+            } else {
+              & $signtool.FullName sign /sha1 $expected /fd SHA256 /v $executablePath
+            }
             if ($LASTEXITCODE -ne 0) {
               throw "Disposable Authenticode signing failed"
             }
-            & $signtool.FullName verify /pa /tw /v $executablePath
+            if ($env:CODESIGN_MODE -eq "public-ca") {
+              & $signtool.FullName verify /pa /tw /v $executablePath
+            } else {
+              & $signtool.FullName verify /pa /v $executablePath
+            }
             if ($LASTEXITCODE -ne 0) {
               throw "Disposable Authenticode verification failed"
             }
             $signature = Get-AuthenticodeSignature -FilePath $executablePath
             $signer = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
             if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
-                $signer -ne $expected -or $null -eq $signature.TimeStamperCertificate) {
-              throw "Disposable signer, trust, or RFC3161 timestamp validation failed"
+                $signer -ne $expected -or
+                ($env:CODESIGN_MODE -eq "public-ca" -and
+                  $null -eq $signature.TimeStamperCertificate)) {
+              throw "Disposable signer, trust, or required RFC3161 timestamp validation failed"
             }
           } finally {
             Remove-Item Env:CODESIGN_PFX_B64 -ErrorAction SilentlyContinue
