@@ -244,9 +244,13 @@ jobs:
         shell: pwsh
         run: |
           if ($env:KBHE_PREFLIGHT_MODE -eq "self-signed-bootstrap") {
-            $trusted = Import-Certificate `
-              -FilePath $env:KBHE_PREFLIGHT_CERTIFICATE_PATH `
-              -CertStoreLocation Cert:\CurrentUser\Root
+            & certutil.exe -user -f -addstore Root `
+              $env:KBHE_PREFLIGHT_CERTIFICATE_PATH | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to establish temporary bootstrap trust"
+            }
+            $trusted = Get-Item -LiteralPath `
+              "Cert:\CurrentUser\Root\$env:KBHE_PREFLIGHT_EXPECTED"
             $actual = ($trusted.Thumbprint -replace '\s', '').ToUpperInvariant()
             if ($actual -ne $env:KBHE_PREFLIGHT_EXPECTED) {
               throw "Unexpected bootstrap trust-root thumbprint"
@@ -319,8 +323,11 @@ jobs:
           if ($env:KBHE_PREFLIGHT_EXPECTED -match '^[0-9A-F]{40}$') {
             Remove-Item "Cert:\CurrentUser\My\$env:KBHE_PREFLIGHT_EXPECTED" `
               -Force -ErrorAction SilentlyContinue
-            Remove-Item "Cert:\CurrentUser\Root\$env:KBHE_PREFLIGHT_EXPECTED" `
-              -Force -ErrorAction SilentlyContinue
+            $rootPath = "Cert:\CurrentUser\Root\$env:KBHE_PREFLIGHT_EXPECTED"
+            if (Test-Path -LiteralPath $rootPath) {
+              & certutil.exe -user -delstore Root `
+                $env:KBHE_PREFLIGHT_EXPECTED | Out-Null
+            }
           }
           foreach ($path in @(
             $env:KBHE_PREFLIGHT_CERTIFICATE_PATH,

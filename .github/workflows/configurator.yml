@@ -250,8 +250,11 @@ jobs:
               if ($certificate.Subject -ne $certificate.Issuer) {
                 throw "self-signed-bootstrap mode requires a self-issued certificate"
               }
-              $trusted = Import-Certificate -FilePath $cerPath `
-                -CertStoreLocation Cert:\CurrentUser\Root
+              & certutil.exe -user -f -addstore Root $cerPath | Out-Null
+              if ($LASTEXITCODE -ne 0) {
+                throw "Failed to establish temporary bootstrap trust"
+              }
+              $trusted = Get-Item -LiteralPath "Cert:\CurrentUser\Root\$expected"
               if (($trusted.Thumbprint -replace '\s', '').ToUpperInvariant() -ne $expected) {
                 throw "Unexpected bootstrap trust-root thumbprint"
               }
@@ -382,8 +385,9 @@ jobs:
           if ($expected -match '^[0-9A-F]{40}$') {
             Remove-Item "Cert:\CurrentUser\My\$expected" `
               -Force -ErrorAction SilentlyContinue
-            Remove-Item "Cert:\CurrentUser\Root\$expected" `
-              -Force -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath "Cert:\CurrentUser\Root\$expected") {
+              & certutil.exe -user -delstore Root $expected | Out-Null
+            }
           }
           Remove-Item apps/configurator/src-tauri/tauri.windows.conf.json `
             -Force -ErrorAction SilentlyContinue
@@ -479,8 +483,11 @@ jobs:
             if ($certificate.Subject -ne $certificate.Issuer) {
               throw "self-signed-bootstrap mode requires a self-issued certificate"
             }
-            $trusted = Import-Certificate -FilePath $certificatePath `
-              -CertStoreLocation Cert:\CurrentUser\Root
+            & certutil.exe -user -f -addstore Root $certificatePath | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to establish temporary publication trust"
+            }
+            $trusted = Get-Item -LiteralPath "Cert:\CurrentUser\Root\$expected"
             if (($trusted.Thumbprint -replace '\s', '').ToUpperInvariant() -ne $expected) {
               throw "Unexpected bootstrap trust-root thumbprint on publication runner"
             }
@@ -720,7 +727,7 @@ jobs:
           EXPECTED_CODESIGN_THUMBPRINT: ${{ vars.KBHE_WINDOWS_CODESIGN_CERT_THUMBPRINT }}
         run: |
           $expected = ($env:EXPECTED_CODESIGN_THUMBPRINT -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
-          if ($expected -match '^[0-9A-F]{40}$') {
-            Remove-Item "Cert:\CurrentUser\Root\$expected" `
-              -Force -ErrorAction SilentlyContinue
+          if ($expected -match '^[0-9A-F]{40}$' -and
+              (Test-Path -LiteralPath "Cert:\CurrentUser\Root\$expected")) {
+            & certutil.exe -user -delstore Root $expected | Out-Null
           }
