@@ -7,6 +7,7 @@
 #include "layout/keycodes.h"
 #include "settings.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "board_config.h"
 #include "class/hid/hid.h"

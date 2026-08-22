@@ -1,6 +1,7 @@
 #include "rotary_encoder.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "hid/consumer_hid.h"
 #include "led_matrix.h"
