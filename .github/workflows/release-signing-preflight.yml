@@ -139,7 +139,7 @@ jobs:
             apps/configurator/keys/kbhe-community-authenticode.pem
           sparse-checkout-cone-mode: false
 
-      - name: Import, sign, and verify a disposable executable
+      - name: Import and validate Authenticode key
         shell: pwsh
         env:
           CODESIGN_PFX_B64: ${{ secrets.KBHE_WINDOWS_CODESIGN_PFX_B64 }}
@@ -151,9 +151,16 @@ jobs:
           $cerPath = Join-Path $env:RUNNER_TEMP "kbhe-codesign-preflight.cer"
           $executablePath = Join-Path $env:RUNNER_TEMP "kbhe-codesign-preflight.exe"
           $committedCertificatePath = "apps/configurator/keys/kbhe-community-authenticode.pem"
-          $actual = $null
           $expected = ($env:EXPECTED_CODESIGN_THUMBPRINT -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
           $securePassword = $null
+          "KBHE_PREFLIGHT_CERTIFICATE_PATH=$cerPath" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "KBHE_PREFLIGHT_EXECUTABLE_PATH=$executablePath" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "KBHE_PREFLIGHT_EXPECTED=$expected" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "KBHE_PREFLIGHT_MODE=$env:CODESIGN_MODE" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           try {
             if ([string]::IsNullOrWhiteSpace($env:CODESIGN_PFX_B64) -or
                 [string]::IsNullOrWhiteSpace($env:CODESIGN_PASSWORD)) {
@@ -223,57 +230,103 @@ jobs:
               if ($certificate.Subject -ne $certificate.Issuer) {
                 throw "self-signed-bootstrap mode requires a self-issued certificate"
               }
-              Import-Certificate -FilePath $cerPath `
-                -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
-              Write-Output "::warning::Self-signed bootstrap Authenticode does not establish a publicly trusted Windows publisher."
             } elseif ($certificate.Subject -eq $certificate.Issuer) {
               throw "public-ca mode refuses a self-issued Authenticode certificate"
-            }
-
-            $source = 'public static class Program { public static void Main() { } }'
-            Add-Type -TypeDefinition $source `
-              -OutputAssembly $executablePath -OutputType ConsoleApplication
-
-            $signtool = @(
-              Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -File |
-                Sort-Object FullName -Descending
-            ) | Select-Object -First 1
-            if ($null -eq $signtool) {
-              throw "Windows SDK signtool.exe was not found"
-            }
-            if ($env:CODESIGN_MODE -eq "public-ca") {
-              & $signtool.FullName sign /sha1 $expected /fd SHA256 `
-                /tr http://timestamp.digicert.com /td SHA256 /v $executablePath
-            } else {
-              & $signtool.FullName sign /sha1 $expected /fd SHA256 /v $executablePath
-            }
-            if ($LASTEXITCODE -ne 0) {
-              throw "Disposable Authenticode signing failed"
-            }
-            if ($env:CODESIGN_MODE -eq "public-ca") {
-              & $signtool.FullName verify /pa /tw /v $executablePath
-            } else {
-              & $signtool.FullName verify /pa /v $executablePath
-            }
-            if ($LASTEXITCODE -ne 0) {
-              throw "Disposable Authenticode verification failed"
-            }
-            $signature = Get-AuthenticodeSignature -FilePath $executablePath
-            $signer = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-            if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
-                $signer -ne $expected -or
-                ($env:CODESIGN_MODE -eq "public-ca" -and
-                  $null -eq $signature.TimeStamperCertificate)) {
-              throw "Disposable signer, trust, or required RFC3161 timestamp validation failed"
             }
           } finally {
             Remove-Item Env:CODESIGN_PFX_B64 -ErrorAction SilentlyContinue
             Remove-Item Env:CODESIGN_PASSWORD -ErrorAction SilentlyContinue
-            if ($actual -match '^[0-9A-F]{40}$') {
-              Remove-Item "Cert:\CurrentUser\My\$actual" -Force -ErrorAction SilentlyContinue
-              Remove-Item "Cert:\CurrentUser\Root\$actual" -Force -ErrorAction SilentlyContinue
-            }
-            Remove-Item -LiteralPath $pfxPath, $cerPath, $executablePath `
-              -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $pfxPath -Force -ErrorAction SilentlyContinue
             $securePassword = $null
+          }
+
+      - name: Establish bootstrap trust
+        shell: pwsh
+        run: |
+          if ($env:KBHE_PREFLIGHT_MODE -eq "self-signed-bootstrap") {
+            $trusted = Import-Certificate `
+              -FilePath $env:KBHE_PREFLIGHT_CERTIFICATE_PATH `
+              -CertStoreLocation Cert:\CurrentUser\Root
+            $actual = ($trusted.Thumbprint -replace '\s', '').ToUpperInvariant()
+            if ($actual -ne $env:KBHE_PREFLIGHT_EXPECTED) {
+              throw "Unexpected bootstrap trust-root thumbprint"
+            }
+            Write-Output "::warning::Self-signed bootstrap Authenticode does not establish a publicly trusted Windows publisher."
+          }
+
+      - name: Create disposable executable
+        shell: pwsh
+        run: |
+          $source = 'public static class Program { public static void Main() { } }'
+          Add-Type -TypeDefinition $source `
+            -OutputAssembly $env:KBHE_PREFLIGHT_EXECUTABLE_PATH `
+            -OutputType ConsoleApplication
+
+      - name: Sign disposable executable
+        shell: pwsh
+        run: |
+          $signtool = @(
+            Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -File |
+              Sort-Object FullName -Descending
+          ) | Select-Object -First 1
+          if ($null -eq $signtool) {
+            throw "Windows SDK signtool.exe was not found"
+          }
+          if ($env:KBHE_PREFLIGHT_MODE -eq "public-ca") {
+            & $signtool.FullName sign /sha1 $env:KBHE_PREFLIGHT_EXPECTED /fd SHA256 `
+              /tr http://timestamp.digicert.com /td SHA256 /v `
+              $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          } else {
+            & $signtool.FullName sign /sha1 $env:KBHE_PREFLIGHT_EXPECTED /fd SHA256 /v `
+              $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Disposable Authenticode signing failed"
+          }
+
+      - name: Verify disposable executable
+        shell: pwsh
+        run: |
+          $signtool = @(
+            Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -File |
+              Sort-Object FullName -Descending
+          ) | Select-Object -First 1
+          if ($null -eq $signtool) {
+            throw "Windows SDK signtool.exe was not found"
+          }
+          if ($env:KBHE_PREFLIGHT_MODE -eq "public-ca") {
+            & $signtool.FullName verify /pa /tw /v $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          } else {
+            & $signtool.FullName verify /pa /v $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Disposable Authenticode verification failed"
+          }
+          $signature = Get-AuthenticodeSignature `
+            -FilePath $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          $signer = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+          if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+              $signer -ne $env:KBHE_PREFLIGHT_EXPECTED -or
+              ($env:KBHE_PREFLIGHT_MODE -eq "public-ca" -and
+                $null -eq $signature.TimeStamperCertificate)) {
+            throw "Disposable signer, trust, or required RFC3161 timestamp validation failed"
+          }
+
+      - name: Remove imported Authenticode material
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:KBHE_PREFLIGHT_EXPECTED -match '^[0-9A-F]{40}$') {
+            Remove-Item "Cert:\CurrentUser\My\$env:KBHE_PREFLIGHT_EXPECTED" `
+              -Force -ErrorAction SilentlyContinue
+            Remove-Item "Cert:\CurrentUser\Root\$env:KBHE_PREFLIGHT_EXPECTED" `
+              -Force -ErrorAction SilentlyContinue
+          }
+          foreach ($path in @(
+            $env:KBHE_PREFLIGHT_CERTIFICATE_PATH,
+            $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          )) {
+            if (-not [string]::IsNullOrWhiteSpace($path)) {
+              Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            }
           }
