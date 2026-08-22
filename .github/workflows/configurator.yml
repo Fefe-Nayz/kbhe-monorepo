@@ -271,7 +271,7 @@ jobs:
                 windows = @{
                   certificateThumbprint = $expected
                   digestAlgorithm = "sha256"
-                  timestampUrl = "https://timestamp.digicert.com"
+                  timestampUrl = "http://timestamp.digicert.com"
                 }
               }
             } | ConvertTo-Json -Depth 4 |

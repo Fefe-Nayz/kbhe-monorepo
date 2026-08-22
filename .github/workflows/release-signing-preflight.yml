@@ -241,7 +241,7 @@ jobs:
               throw "Windows SDK signtool.exe was not found"
             }
             & $signtool.FullName sign /sha1 $expected /fd SHA256 `
-              /tr https://timestamp.digicert.com /td SHA256 /v $executablePath
+              /tr http://timestamp.digicert.com /td SHA256 /v $executablePath
             if ($LASTEXITCODE -ne 0) {
               throw "Disposable Authenticode signing failed"
             }
