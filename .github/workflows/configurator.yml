@@ -250,16 +250,15 @@ jobs:
               if ($certificate.Subject -ne $certificate.Issuer) {
                 throw "self-signed-bootstrap mode requires a self-issued certificate"
               }
-              & certutil.exe -user -f -addstore Root $cerPath | Out-Null
+              & certutil.exe -user -f -addstore TrustedPeople $cerPath | Out-Null
               if ($LASTEXITCODE -ne 0) {
-                throw "Failed to establish temporary bootstrap trust"
+                throw "Failed to establish temporary bootstrap peer trust"
               }
-              $trusted = Get-Item -LiteralPath "Cert:\CurrentUser\Root\$expected"
+              $trusted = Get-Item -LiteralPath `
+                "Cert:\CurrentUser\TrustedPeople\$expected"
               if (($trusted.Thumbprint -replace '\s', '').ToUpperInvariant() -ne $expected) {
-                throw "Unexpected bootstrap trust-root thumbprint"
+                throw "Unexpected bootstrap trusted-peer thumbprint"
               }
-              "KBHE_CODESIGN_BOOTSTRAP_ROOT_THUMBPRINT=$expected" |
-                Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
               Write-Output "::warning::Bootstrap Authenticode is self-signed. Windows users will still see an unknown-publisher/SmartScreen warning. Detached Ed25519 authentication remains mandatory."
             } elseif ($certificate.Subject -eq $certificate.Issuer) {
               throw "public-ca mode refuses a self-issued Authenticode certificate"
@@ -385,8 +384,8 @@ jobs:
           if ($expected -match '^[0-9A-F]{40}$') {
             Remove-Item "Cert:\CurrentUser\My\$expected" `
               -Force -ErrorAction SilentlyContinue
-            if (Test-Path -LiteralPath "Cert:\CurrentUser\Root\$expected") {
-              & certutil.exe -user -delstore Root $expected | Out-Null
+            if (Test-Path -LiteralPath "Cert:\CurrentUser\TrustedPeople\$expected") {
+              & certutil.exe -user -delstore TrustedPeople $expected | Out-Null
             }
           }
           Remove-Item apps/configurator/src-tauri/tauri.windows.conf.json `
@@ -483,16 +482,15 @@ jobs:
             if ($certificate.Subject -ne $certificate.Issuer) {
               throw "self-signed-bootstrap mode requires a self-issued certificate"
             }
-            & certutil.exe -user -f -addstore Root $certificatePath | Out-Null
+            & certutil.exe -user -f -addstore TrustedPeople $certificatePath | Out-Null
             if ($LASTEXITCODE -ne 0) {
-              throw "Failed to establish temporary publication trust"
+              throw "Failed to establish temporary publication peer trust"
             }
-            $trusted = Get-Item -LiteralPath "Cert:\CurrentUser\Root\$expected"
+            $trusted = Get-Item -LiteralPath `
+              "Cert:\CurrentUser\TrustedPeople\$expected"
             if (($trusted.Thumbprint -replace '\s', '').ToUpperInvariant() -ne $expected) {
-              throw "Unexpected bootstrap trust-root thumbprint on publication runner"
+              throw "Unexpected bootstrap trusted-peer thumbprint on publication runner"
             }
-            "KBHE_PUBLISH_BOOTSTRAP_ROOT_THUMBPRINT=$expected" |
-              Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             Write-Output "::warning::Publishing a self-signed bootstrap Authenticode build; Windows will not treat it as a publicly trusted publisher."
           } elseif ($certificate.Subject -eq $certificate.Issuer) {
             throw "public-ca mode refuses a self-issued Authenticode certificate"
@@ -728,6 +726,6 @@ jobs:
         run: |
           $expected = ($env:EXPECTED_CODESIGN_THUMBPRINT -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
           if ($expected -match '^[0-9A-F]{40}$' -and
-              (Test-Path -LiteralPath "Cert:\CurrentUser\Root\$expected")) {
-            & certutil.exe -user -delstore Root $expected | Out-Null
+              (Test-Path -LiteralPath "Cert:\CurrentUser\TrustedPeople\$expected")) {
+            & certutil.exe -user -delstore TrustedPeople $expected | Out-Null
           }
