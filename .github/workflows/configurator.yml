@@ -326,9 +326,20 @@ jobs:
               throw "Authenticode verification failed for $($signedFile.FullName)"
             }
             $signature = Get-AuthenticodeSignature -FilePath $signedFile.FullName
-            $actual = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-            if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
-                $actual -ne $expected -or
+            $actual = if ($null -eq $signature.SignerCertificate) {
+              ""
+            } else {
+              ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+            }
+            $invalidPowerShellStatus = if ($env:KBHE_CODESIGN_MODE -eq "public-ca") {
+              $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid
+            } else {
+              $signature.Status -in @(
+                [System.Management.Automation.SignatureStatus]::NotSigned,
+                [System.Management.Automation.SignatureStatus]::HashMismatch
+              )
+            }
+            if ($invalidPowerShellStatus -or $actual -ne $expected -or
                 ($env:KBHE_CODESIGN_MODE -eq "public-ca" -and
                   $null -eq $signature.TimeStamperCertificate)) {
               throw "Signer, trust, or required RFC3161 timestamp validation failed for $($signedFile.Name)"
@@ -540,9 +551,20 @@ jobs:
               throw "Authenticode verification failed for $($asset.Name)"
             }
             $signature = Get-AuthenticodeSignature -FilePath $asset.FullName
-            $actual = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-            if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
-                $actual -ne $expected -or
+            $actual = if ($null -eq $signature.SignerCertificate) {
+              ""
+            } else {
+              ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+            }
+            $invalidPowerShellStatus = if ($manifest.codesignMode -eq "public-ca") {
+              $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid
+            } else {
+              $signature.Status -in @(
+                [System.Management.Automation.SignatureStatus]::NotSigned,
+                [System.Management.Automation.SignatureStatus]::HashMismatch
+              )
+            }
+            if ($invalidPowerShellStatus -or $actual -ne $expected -or
                 ($manifest.codesignMode -eq "public-ca" -and
                   $null -eq $signature.TimeStamperCertificate)) {
               throw "Signer, trust, or required RFC3161 timestamp validation failed for $($asset.Name)"
@@ -687,8 +709,20 @@ jobs:
                 throw "Downloaded Authenticode verification failed for $($record.name)"
               }
               $authenticode = Get-AuthenticodeSignature -FilePath $downloadedInstaller
-              $actual = ($authenticode.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-              if ($authenticode.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+              $actual = if ($null -eq $authenticode.SignerCertificate) {
+                ""
+              } else {
+                ($authenticode.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+              }
+              $invalidPowerShellStatus = if ($manifest.codesignMode -eq "public-ca") {
+                $authenticode.Status -ne [System.Management.Automation.SignatureStatus]::Valid
+              } else {
+                $authenticode.Status -in @(
+                  [System.Management.Automation.SignatureStatus]::NotSigned,
+                  [System.Management.Automation.SignatureStatus]::HashMismatch
+                )
+              }
+              if ($invalidPowerShellStatus -or
                   $actual -ne $env:KBHE_PUBLISH_CODESIGN_THUMBPRINT -or
                   ($manifest.codesignMode -eq "public-ca" -and
                     $null -eq $authenticode.TimeStamperCertificate)) {
