@@ -250,12 +250,12 @@ jobs:
               if ($certificate.Subject -ne $certificate.Issuer) {
                 throw "self-signed-bootstrap mode requires a self-issued certificate"
               }
-              & certutil.exe -user -f -addstore TrustedPeople $cerPath | Out-Null
+              & certutil.exe -f -addstore TrustedPeople $cerPath | Out-Null
               if ($LASTEXITCODE -ne 0) {
                 throw "Failed to establish temporary bootstrap peer trust"
               }
               $trusted = Get-Item -LiteralPath `
-                "Cert:\CurrentUser\TrustedPeople\$expected"
+                "Cert:\LocalMachine\TrustedPeople\$expected"
               if (($trusted.Thumbprint -replace '\s', '').ToUpperInvariant() -ne $expected) {
                 throw "Unexpected bootstrap trusted-peer thumbprint"
               }
@@ -384,8 +384,8 @@ jobs:
           if ($expected -match '^[0-9A-F]{40}$') {
             Remove-Item "Cert:\CurrentUser\My\$expected" `
               -Force -ErrorAction SilentlyContinue
-            if (Test-Path -LiteralPath "Cert:\CurrentUser\TrustedPeople\$expected") {
-              & certutil.exe -user -delstore TrustedPeople $expected | Out-Null
+            if (Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$expected") {
+              & certutil.exe -delstore TrustedPeople $expected | Out-Null
             }
           }
           Remove-Item apps/configurator/src-tauri/tauri.windows.conf.json `
@@ -482,12 +482,12 @@ jobs:
             if ($certificate.Subject -ne $certificate.Issuer) {
               throw "self-signed-bootstrap mode requires a self-issued certificate"
             }
-            & certutil.exe -user -f -addstore TrustedPeople $certificatePath | Out-Null
+            & certutil.exe -f -addstore TrustedPeople $certificatePath | Out-Null
             if ($LASTEXITCODE -ne 0) {
               throw "Failed to establish temporary publication peer trust"
             }
             $trusted = Get-Item -LiteralPath `
-              "Cert:\CurrentUser\TrustedPeople\$expected"
+              "Cert:\LocalMachine\TrustedPeople\$expected"
             if (($trusted.Thumbprint -replace '\s', '').ToUpperInvariant() -ne $expected) {
               throw "Unexpected bootstrap trusted-peer thumbprint on publication runner"
             }
@@ -726,6 +726,6 @@ jobs:
         run: |
           $expected = ($env:EXPECTED_CODESIGN_THUMBPRINT -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
           if ($expected -match '^[0-9A-F]{40}$' -and
-              (Test-Path -LiteralPath "Cert:\CurrentUser\TrustedPeople\$expected")) {
-            & certutil.exe -user -delstore TrustedPeople $expected | Out-Null
+              (Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$expected")) {
+            & certutil.exe -delstore TrustedPeople $expected | Out-Null
           }

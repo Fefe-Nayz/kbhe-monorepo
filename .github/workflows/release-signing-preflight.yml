@@ -244,13 +244,13 @@ jobs:
         shell: pwsh
         run: |
           if ($env:KBHE_PREFLIGHT_MODE -eq "self-signed-bootstrap") {
-            & certutil.exe -user -f -addstore TrustedPeople `
+            & certutil.exe -f -addstore TrustedPeople `
               $env:KBHE_PREFLIGHT_CERTIFICATE_PATH | Out-Null
             if ($LASTEXITCODE -ne 0) {
               throw "Failed to establish temporary bootstrap peer trust"
             }
             $trusted = Get-Item -LiteralPath `
-              "Cert:\CurrentUser\TrustedPeople\$env:KBHE_PREFLIGHT_EXPECTED"
+              "Cert:\LocalMachine\TrustedPeople\$env:KBHE_PREFLIGHT_EXPECTED"
             $actual = ($trusted.Thumbprint -replace '\s', '').ToUpperInvariant()
             if ($actual -ne $env:KBHE_PREFLIGHT_EXPECTED) {
               throw "Unexpected bootstrap trusted-peer thumbprint"
@@ -326,9 +326,9 @@ jobs:
             Remove-Item "Cert:\CurrentUser\My\$env:KBHE_PREFLIGHT_EXPECTED" `
               -Force -ErrorAction SilentlyContinue
             $trustedPeerPath = `
-              "Cert:\CurrentUser\TrustedPeople\$env:KBHE_PREFLIGHT_EXPECTED"
+              "Cert:\LocalMachine\TrustedPeople\$env:KBHE_PREFLIGHT_EXPECTED"
             if (Test-Path -LiteralPath $trustedPeerPath) {
-              & certutil.exe -user -delstore TrustedPeople `
+              & certutil.exe -delstore TrustedPeople `
                 $env:KBHE_PREFLIGHT_EXPECTED | Out-Null
             }
           }
