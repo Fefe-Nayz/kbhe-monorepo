@@ -6,6 +6,7 @@
 #include "led_matrix.h"
 #include "analog/analog.h"
 #include "led_indicator.h"
+#include "led_overlay_math.h"
 #include "main.h"
 #include "settings.h"
 #include "trigger/trigger.h"
@@ -52,6 +53,7 @@ static bool initialized = false;
 
 // Effect state variables
 static led_effect_mode_t current_effect = LED_EFFECT_NONE;
+static uint32_t effect_generation = 1u;
 static uint8_t fps_limit = 60; // Default 60 FPS
 static uint8_t effect_params[LED_EFFECT_PARAM_COUNT] = {
   [LED_EFFECT_PARAM_SPEED] = 128u,
@@ -138,7 +140,12 @@ static bool    alpha_key_mask_configured = false;
 // Temporary volume overlay shown on the function row.
 static bool volume_overlay_active = false;
 static uint8_t volume_overlay_level = 0u;
+static uint32_t volume_overlay_start_ms = 0u;
 static uint32_t volume_overlay_expire_ms = 0u;
+static uint8_t volume_overlay_rendered_alpha = 0u;
+static bool volume_overlay_render_dirty = false;
+static settings_rotary_encoder_t volume_overlay_render_config = {0};
+static bool volume_overlay_render_config_valid = false;
 static bool host_volume_level_valid = false;
 static uint8_t host_volume_level = 0u;
 static uint32_t host_volume_level_refresh_ms = 0u;
@@ -150,6 +157,27 @@ static const uint8_t volume_overlay_keys[] = {
   (sizeof(volume_overlay_keys) / sizeof(volume_overlay_keys[0]))
 #define HOST_VOLUME_LEVEL_STALE_MS 1250u
 #define HOST_VOLUME_STEP_ESTIMATE 5u
+#define VOLUME_OVERLAY_VISIBLE_MS 1200u
+#define VOLUME_OVERLAY_FADE_IN_MS 80u
+#define VOLUME_OVERLAY_FADE_OUT_MS 100u
+
+typedef struct {
+  bool visible;
+  bool target_active;
+  bool expire_active;
+  bool render_dirty;
+  uint8_t from_alpha;
+  uint8_t rendered_alpha;
+  uint32_t transition_start_ms;
+  uint32_t expire_ms;
+} led_state_overlay_runtime_t;
+
+static led_state_overlay_config_t
+    state_overlay_configs[LED_STATE_OVERLAY_COUNT] = {0};
+static led_state_overlay_runtime_t
+    state_overlay_runtime[LED_STATE_OVERLAY_COUNT] = {0};
+static uint8_t state_overlay_order[LED_STATE_OVERLAY_COUNT] = {0, 1, 2, 3,
+                                                               4, 5, 6, 7};
 
 // Logical key order follows the physical keyboard layout (K1..K82).
 // WS2812 chain order on the PCB is serpentine, so translate before pushing to
@@ -701,6 +729,155 @@ static inline bool volume_overlay_is_expired(uint32_t now_ms) {
          ((int32_t)(now_ms - volume_overlay_expire_ms) >= 0);
 }
 
+static uint8_t volume_overlay_alpha(uint32_t now_ms) {
+  uint32_t age_ms = 0u;
+  uint32_t remaining_ms = 0u;
+  uint8_t alpha = 255u;
+
+  if (!volume_overlay_active) {
+    return 0u;
+  }
+  if (volume_overlay_is_expired(now_ms)) {
+    volume_overlay_active = false;
+    return 0u;
+  }
+
+  age_ms = (uint32_t)(now_ms - volume_overlay_start_ms);
+  if (age_ms < VOLUME_OVERLAY_FADE_IN_MS) {
+    alpha = (uint8_t)((age_ms * 255u) / VOLUME_OVERLAY_FADE_IN_MS);
+  }
+
+  remaining_ms = (uint32_t)(volume_overlay_expire_ms - now_ms);
+  if (remaining_ms < VOLUME_OVERLAY_FADE_OUT_MS) {
+    uint8_t fade_out_alpha =
+        (uint8_t)((remaining_ms * 255u) / VOLUME_OVERLAY_FADE_OUT_MS);
+    if (fade_out_alpha < alpha) {
+      alpha = fade_out_alpha;
+    }
+  }
+
+  return alpha;
+}
+
+static bool volume_overlay_needs_refresh(uint32_t now_ms) {
+  settings_rotary_encoder_t rotary = {0};
+  uint8_t current_alpha = volume_overlay_alpha(now_ms);
+
+  if (volume_overlay_render_dirty ||
+      current_alpha != volume_overlay_rendered_alpha) {
+    return true;
+  }
+  if (!volume_overlay_active || current_alpha == 0u) {
+    return false;
+  }
+
+  settings_get_rotary_encoder(&rotary);
+  return rotary.progress_style != (uint8_t)ROTARY_PROGRESS_STYLE_SOLID;
+}
+
+static void state_overlay_rebuild_order(void) {
+  for (uint8_t i = 0u; i < LED_STATE_OVERLAY_COUNT; i++) {
+    state_overlay_order[i] = i;
+  }
+
+  for (uint8_t i = 1u; i < LED_STATE_OVERLAY_COUNT; i++) {
+    uint8_t candidate = state_overlay_order[i];
+    uint8_t cursor = i;
+    while (cursor > 0u &&
+           state_overlay_configs[state_overlay_order[cursor - 1u]].priority >
+               state_overlay_configs[candidate].priority) {
+      state_overlay_order[cursor] = state_overlay_order[cursor - 1u];
+      cursor--;
+    }
+    state_overlay_order[cursor] = candidate;
+  }
+}
+
+static uint8_t state_overlay_transition_alpha(uint8_t overlay_id,
+                                              uint32_t now_ms) {
+  led_state_overlay_runtime_t *runtime = &state_overlay_runtime[overlay_id];
+  const led_state_overlay_config_t *config =
+      &state_overlay_configs[overlay_id];
+  uint8_t target = runtime->target_active ? 255u : 0u;
+  uint16_t duration = runtime->target_active ? config->fade_in_ms
+                                             : config->fade_out_ms;
+  uint32_t elapsed = (uint32_t)(now_ms - runtime->transition_start_ms);
+  int16_t delta = (int16_t)target - (int16_t)runtime->from_alpha;
+
+  if (!runtime->visible || !config->enabled) {
+    return 0u;
+  }
+  if (duration == 0u || elapsed >= duration) {
+    if (!runtime->target_active) {
+      runtime->visible = false;
+    }
+    return target;
+  }
+
+  return (uint8_t)((int16_t)runtime->from_alpha +
+                   (int16_t)((delta * (int32_t)elapsed) / duration));
+}
+
+static uint8_t state_overlay_alpha(uint8_t overlay_id, uint32_t now_ms) {
+  led_state_overlay_runtime_t *runtime = &state_overlay_runtime[overlay_id];
+  uint8_t current = state_overlay_transition_alpha(overlay_id, now_ms);
+
+  if (runtime->target_active && runtime->expire_active &&
+      (int32_t)(now_ms - runtime->expire_ms) >= 0) {
+    runtime->from_alpha = current;
+    runtime->target_active = false;
+    runtime->transition_start_ms = now_ms;
+    runtime->expire_active = false;
+    runtime->expire_ms = 0u;
+    current = state_overlay_transition_alpha(overlay_id, now_ms);
+  }
+
+  return current;
+}
+
+static bool state_overlay_applies_to_key(
+    const led_state_overlay_config_t *config, uint8_t key_index) {
+  if ((config->flags & LED_OVERLAY_FLAG_ALL_KEYS) != 0u) {
+    return true;
+  }
+  return (config->key_mask[key_index / 8u] &
+          (uint8_t)(1u << (key_index % 8u))) != 0u;
+}
+
+static void apply_state_overlays(uint8_t index, uint32_t now_ms, uint8_t *r,
+                                 uint8_t *g, uint8_t *b) {
+  for (uint8_t order = 0u; order < LED_STATE_OVERLAY_COUNT; order++) {
+    uint8_t overlay_id = state_overlay_order[order];
+    const led_state_overlay_config_t *config =
+        &state_overlay_configs[overlay_id];
+    uint8_t transition_alpha = 0u;
+    uint8_t alpha = 0u;
+
+    if (!config->enabled || !state_overlay_applies_to_key(config, index)) {
+      continue;
+    }
+
+    transition_alpha = state_overlay_alpha(overlay_id, now_ms);
+    alpha = scale_u8(config->opacity, transition_alpha);
+    if (alpha == 0u) {
+      continue;
+    }
+
+    if (config->blend_mode == (uint8_t)LED_OVERLAY_BLEND_ADD) {
+      uint16_t add_r = (uint16_t)*r + scale_u8(config->color_r, alpha);
+      uint16_t add_g = (uint16_t)*g + scale_u8(config->color_g, alpha);
+      uint16_t add_b = (uint16_t)*b + scale_u8(config->color_b, alpha);
+      *r = (add_r > 255u) ? 255u : (uint8_t)add_r;
+      *g = (add_g > 255u) ? 255u : (uint8_t)add_g;
+      *b = (add_b > 255u) ? 255u : (uint8_t)add_b;
+    } else {
+      *r = led_overlay_blend_channel(*r, config->color_r, alpha);
+      *g = led_overlay_blend_channel(*g, config->color_g, alpha);
+      *b = led_overlay_blend_channel(*b, config->color_b, alpha);
+    }
+  }
+}
+
 static inline uint8_t triangle_wave_u8(uint8_t phase) {
   if (phase < 128u) {
     return (uint8_t)(phase << 1);
@@ -725,7 +902,7 @@ static bool volume_overlay_slot_for_index(uint8_t index, uint8_t *slot_out) {
 static uint8_t volume_overlay_fill_scale(uint8_t slot) {
   uint32_t scaled =
       (uint32_t)volume_overlay_level * (uint32_t)VOLUME_OVERLAY_KEY_COUNT;
-  uint32_t filled = (scaled + 254u) / 255u;
+  uint32_t filled = scaled / 255u;
 
   if (slot < filled) {
     return 255u;
@@ -818,38 +995,37 @@ static void volume_overlay_effect_palette_color(led_effect_mode_t effect_mode,
   }
 }
 
-static void volume_overlay_base_color(uint8_t slot, uint8_t *r, uint8_t *g,
-                                      uint8_t *b) {
-  settings_rotary_encoder_t rotary = {0};
+static void volume_overlay_base_color(
+    const settings_rotary_encoder_t *rotary, uint8_t slot, uint8_t *r,
+    uint8_t *g, uint8_t *b) {
   uint8_t hue = (uint8_t)(((uint16_t)slot * 255u) /
                           ((VOLUME_OVERLAY_KEY_COUNT > 1u)
                                ? (uint16_t)(VOLUME_OVERLAY_KEY_COUNT - 1u)
                                : 1u));
 
-  settings_get_rotary_encoder(&rotary);
-
-  switch ((rotary_progress_style_t)rotary.progress_style) {
+  switch ((rotary_progress_style_t)rotary->progress_style) {
   case ROTARY_PROGRESS_STYLE_RAINBOW:
     led_matrix_hsv_to_rgb((uint8_t)(hue + (uint8_t)(effect_offset * 4u)), 255u,
                           255u, r, g, b);
     break;
   case ROTARY_PROGRESS_STYLE_EFFECT_PALETTE:
     volume_overlay_effect_palette_color(
-        (led_effect_mode_t)rotary.progress_effect_mode, slot, r, g, b);
+        (led_effect_mode_t)rotary->progress_effect_mode, slot, r, g, b);
     break;
   case ROTARY_PROGRESS_STYLE_SOLID:
   default:
-    *r = rotary.progress_color_r;
-    *g = rotary.progress_color_g;
-    *b = rotary.progress_color_b;
+    *r = rotary->progress_color_r;
+    *g = rotary->progress_color_g;
+    *b = rotary->progress_color_b;
     break;
   }
 }
 
 static bool volume_overlay_color_for_index(uint8_t index, uint32_t now_ms,
-                                           uint8_t *r, uint8_t *g, uint8_t *b) {
+                                           uint8_t *r, uint8_t *g, uint8_t *b,
+                                           uint8_t *alpha) {
   uint8_t slot = 0u;
-  uint8_t scale = 0u;
+  uint8_t fill_scale = 0u;
 
   if (!volume_overlay_active) {
     return false;
@@ -862,16 +1038,47 @@ static bool volume_overlay_color_for_index(uint8_t index, uint32_t now_ms,
     return false;
   }
 
-  volume_overlay_base_color(slot, r, g, b);
-  scale = volume_overlay_fill_scale(slot);
-  *r = scale_u8(*r, scale);
-  *g = scale_u8(*g, scale);
-  *b = scale_u8(*b, scale);
-  return true;
+  *alpha = volume_overlay_alpha(now_ms);
+  if (*alpha == 0u) {
+    return false;
+  }
+  if (!volume_overlay_render_config_valid) {
+    settings_get_rotary_encoder(&volume_overlay_render_config);
+    volume_overlay_render_config_valid = true;
+  }
+  volume_overlay_base_color(&volume_overlay_render_config, slot, r, g, b);
+  fill_scale = volume_overlay_fill_scale(slot);
+  return led_overlay_prepare_progress_pixel(
+      settings_rotary_is_progress_filled_only(&volume_overlay_render_config),
+      fill_scale, r, g, b, alpha);
 }
 
 static inline bool led_matrix_full_output_enabled(void) {
   return display_enabled && !idle_sleep_active && !usb_suspend_active;
+}
+
+static bool state_overlays_visible(uint32_t now_ms) {
+  for (uint8_t overlay_id = 0u; overlay_id < LED_STATE_OVERLAY_COUNT;
+       overlay_id++) {
+    if (state_overlay_alpha(overlay_id, now_ms) > 0u) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool state_overlays_need_refresh(uint32_t now_ms) {
+  for (uint8_t overlay_id = 0u; overlay_id < LED_STATE_OVERLAY_COUNT;
+       overlay_id++) {
+    led_state_overlay_runtime_t *runtime =
+        &state_overlay_runtime[overlay_id];
+    uint8_t current_alpha = state_overlay_alpha(overlay_id, now_ms);
+
+    if (runtime->render_dirty || current_alpha != runtime->rendered_alpha) {
+      return true;
+    }
+  }
+  return false;
 }
 
 static bool led_matrix_system_overlay_enabled(uint32_t now_ms) {
@@ -887,7 +1094,8 @@ static bool led_matrix_system_overlay_enabled(uint32_t now_ms) {
     volume_overlay_active = false;
   }
 
-  return volume_overlay_active || led_indicator_is_caps_lock();
+  return volume_overlay_active || state_overlays_visible(now_ms) ||
+         led_indicator_is_caps_lock();
 }
 
 static inline bool led_matrix_should_drive_output(uint32_t now_ms) {
@@ -907,6 +1115,10 @@ static inline void push_runtime_pixel_to_ws2812_at(uint8_t index,
   uint8_t source_r = source_frame[index * 3 + 0];
   uint8_t source_g = source_frame[index * 3 + 1];
   uint8_t source_b = source_frame[index * 3 + 2];
+  uint8_t overlay_r = 0u;
+  uint8_t overlay_g = 0u;
+  uint8_t overlay_b = 0u;
+  uint8_t overlay_alpha = 0u;
 
   if (!full_output) {
     source_r = 0u;
@@ -914,10 +1126,16 @@ static inline void push_runtime_pixel_to_ws2812_at(uint8_t index,
     source_b = 0u;
   }
 
-  if (volume_overlay_color_for_index(index, now_ms, &source_r, &source_g,
-                                     &source_b)) {
-    // Progress overlay fully overrides the top row while active.
-  } else if (index == CAPS_LOCK_LED_INDEX && led_indicator_is_caps_lock()) {
+  if (volume_overlay_color_for_index(index, now_ms, &overlay_r, &overlay_g,
+                                     &overlay_b, &overlay_alpha)) {
+    source_r = led_overlay_blend_channel(source_r, overlay_r, overlay_alpha);
+    source_g = led_overlay_blend_channel(source_g, overlay_g, overlay_alpha);
+    source_b = led_overlay_blend_channel(source_b, overlay_b, overlay_alpha);
+  }
+
+  apply_state_overlays(index, now_ms, &source_r, &source_g, &source_b);
+
+  if (index == CAPS_LOCK_LED_INDEX && led_indicator_is_caps_lock()) {
     source_r = 255u;
     source_g = 255u;
     source_b = 255u;
@@ -944,12 +1162,24 @@ static void update_ws2812(void) {
   }
 
   now_ms = HAL_GetTick();
+  volume_overlay_render_config_valid = false;
+  if (volume_overlay_active) {
+    settings_get_rotary_encoder(&volume_overlay_render_config);
+    volume_overlay_render_config_valid = true;
+  }
   if (!led_matrix_should_drive_output(now_ms)) {
     // WS2812 keeps the previous frame latched until a new one is sent.
     // When output becomes fully disabled (e.g. Caps Lock overlay turns off),
     // push an explicit black frame so stale indicator pixels are cleared.
     zeroLedValues(&led_ws2812_handle);
     ws2812_show(&led_ws2812_handle);
+    for (uint8_t overlay_id = 0u; overlay_id < LED_STATE_OVERLAY_COUNT;
+         overlay_id++) {
+      state_overlay_runtime[overlay_id].rendered_alpha = 0u;
+      state_overlay_runtime[overlay_id].render_dirty = false;
+    }
+    volume_overlay_rendered_alpha = 0u;
+    volume_overlay_render_dirty = false;
     return;
   }
 
@@ -957,6 +1187,15 @@ static void update_ws2812(void) {
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     push_runtime_pixel_to_ws2812_at(i, now_ms);
   }
+
+  for (uint8_t overlay_id = 0u; overlay_id < LED_STATE_OVERLAY_COUNT;
+       overlay_id++) {
+    state_overlay_runtime[overlay_id].rendered_alpha =
+        state_overlay_alpha(overlay_id, now_ms);
+    state_overlay_runtime[overlay_id].render_dirty = false;
+  }
+  volume_overlay_rendered_alpha = volume_overlay_alpha(now_ms);
+  volume_overlay_render_dirty = false;
 
   ws2812_show(&led_ws2812_handle);
 }
@@ -1230,9 +1469,10 @@ void led_matrix_end_pixel_batch(void) {
   }
 
   pixel_batch_depth--;
-  if (pixel_batch_depth == 0u && pixel_batch_show_pending && initialized &&
-      display_enabled) {
-    ws2812_show(&led_ws2812_handle);
+  if (pixel_batch_depth == 0u && pixel_batch_show_pending) {
+    if (initialized && display_enabled) {
+      ws2812_show(&led_ws2812_handle);
+    }
     pixel_batch_show_pending = false;
   }
 }
@@ -1341,8 +1581,18 @@ void led_matrix_clear(void) {
 }
 
 void led_matrix_fill(uint8_t r, uint8_t g, uint8_t b) {
+  bool batch_output = !effect_render_context &&
+                      (current_effect == LED_EFFECT_STATIC_MATRIX ||
+                       current_effect == LED_EFFECT_THIRD_PARTY);
+
+  if (batch_output) {
+    led_matrix_begin_pixel_batch();
+  }
   for (uint8_t i = 0; i < LED_MATRIX_NUM_LEDS; i++) {
     led_matrix_set_pixel_idx(i, r, g, b);
+  }
+  if (batch_output) {
+    led_matrix_end_pixel_batch();
   }
 }
 
@@ -1610,6 +1860,7 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
 
   led_effect_mode_t previous_effect = current_effect;
   current_effect = mode;
+  effect_generation++;
   effect_offset = 0;
   last_effect_tick = 0;
   last_render_tick = 0;
@@ -1635,6 +1886,8 @@ void led_matrix_set_effect(led_effect_mode_t mode) {
 }
 
 led_effect_mode_t led_matrix_get_effect(void) { return current_effect; }
+
+uint32_t led_matrix_get_effect_generation(void) { return effect_generation; }
 
 void led_matrix_set_effect_color(uint8_t r, uint8_t g, uint8_t b) {
   if (LED_EFFECT_PARAM_COUNT <= LED_EFFECT_PARAM_COLOR_B) {
@@ -1969,9 +2222,13 @@ void led_matrix_set_progress_overlay(uint8_t level) {
   uint32_t now_ms = HAL_GetTick();
 
   led_matrix_mark_activity(now_ms);
+  if (!volume_overlay_active || volume_overlay_is_expired(now_ms)) {
+    volume_overlay_start_ms = now_ms;
+  }
   volume_overlay_active = true;
   volume_overlay_level = level;
-  volume_overlay_expire_ms = now_ms + 1200u;
+  volume_overlay_expire_ms = now_ms + VOLUME_OVERLAY_VISIBLE_MS;
+  volume_overlay_render_dirty = true;
 
   if (initialized &&
       (led_matrix_full_output_enabled() || allow_system_indicators_when_disabled)) {
@@ -1980,7 +2237,14 @@ void led_matrix_set_progress_overlay(uint8_t level) {
 }
 
 void led_matrix_clear_progress_overlay(void) {
-  volume_overlay_active = false;
+  uint32_t now_ms = HAL_GetTick();
+  if (volume_overlay_active && !volume_overlay_is_expired(now_ms)) {
+    volume_overlay_expire_ms = now_ms + VOLUME_OVERLAY_FADE_OUT_MS;
+    volume_overlay_render_dirty = true;
+  } else {
+    volume_overlay_active = false;
+    volume_overlay_render_dirty = volume_overlay_rendered_alpha != 0u;
+  }
 
   if (initialized &&
       (led_matrix_full_output_enabled() || allow_system_indicators_when_disabled)) {
@@ -1994,6 +2258,96 @@ void led_matrix_set_volume_overlay(uint8_t level) {
 
 void led_matrix_clear_volume_overlay(void) {
   led_matrix_clear_progress_overlay();
+}
+
+bool led_matrix_configure_state_overlay(
+    uint8_t overlay_id, const led_state_overlay_config_t *config) {
+  led_state_overlay_config_t sanitized = {0};
+
+  if (overlay_id >= LED_STATE_OVERLAY_COUNT || config == NULL) {
+    return false;
+  }
+
+  memcpy(&sanitized, config, sizeof(sanitized));
+  sanitized.enabled = sanitized.enabled ? 1u : 0u;
+  if (sanitized.blend_mode >= (uint8_t)LED_OVERLAY_BLEND_MAX) {
+    sanitized.blend_mode = (uint8_t)LED_OVERLAY_BLEND_ALPHA;
+  }
+  if (sanitized.fade_in_ms > 2000u) {
+    sanitized.fade_in_ms = 2000u;
+  }
+  if (sanitized.fade_out_ms > 2000u) {
+    sanitized.fade_out_ms = 2000u;
+  }
+
+  memcpy(&state_overlay_configs[overlay_id], &sanitized, sizeof(sanitized));
+  if (!sanitized.enabled) {
+    memset(&state_overlay_runtime[overlay_id], 0,
+           sizeof(state_overlay_runtime[overlay_id]));
+  }
+  state_overlay_runtime[overlay_id].render_dirty = true;
+  state_overlay_rebuild_order();
+  return true;
+}
+
+bool led_matrix_get_state_overlay_config(
+    uint8_t overlay_id, led_state_overlay_config_t *config_out) {
+  if (overlay_id >= LED_STATE_OVERLAY_COUNT || config_out == NULL) {
+    return false;
+  }
+  memcpy(config_out, &state_overlay_configs[overlay_id], sizeof(*config_out));
+  return true;
+}
+
+bool led_matrix_set_state_overlay_active(uint8_t overlay_id, bool active) {
+  led_state_overlay_runtime_t *runtime = NULL;
+  uint32_t now_ms = HAL_GetTick();
+  uint8_t current_alpha = 0u;
+
+  if (overlay_id >= LED_STATE_OVERLAY_COUNT ||
+      !state_overlay_configs[overlay_id].enabled) {
+    return false;
+  }
+
+  runtime = &state_overlay_runtime[overlay_id];
+  current_alpha = state_overlay_alpha(overlay_id, now_ms);
+  if (runtime->target_active == active &&
+      (active || !runtime->visible)) {
+    if (active) {
+      runtime->expire_active = false;
+      runtime->expire_ms = 0u;
+    }
+    return true;
+  }
+
+  runtime->visible = active || current_alpha > 0u;
+  runtime->target_active = active;
+  runtime->from_alpha = current_alpha;
+  runtime->transition_start_ms = now_ms;
+  runtime->expire_active = false;
+  runtime->expire_ms = 0u;
+  runtime->render_dirty = true;
+  led_matrix_mark_activity(now_ms);
+  return true;
+}
+
+bool led_matrix_pulse_state_overlay(uint8_t overlay_id, uint16_t duration_ms) {
+  if (duration_ms == 0u ||
+      !led_matrix_set_state_overlay_active(overlay_id, true)) {
+    return false;
+  }
+  state_overlay_runtime[overlay_id].expire_ms = HAL_GetTick() + duration_ms;
+  state_overlay_runtime[overlay_id].expire_active = true;
+  return true;
+}
+
+void led_matrix_clear_state_overlays(void) {
+  for (uint8_t overlay_id = 0u; overlay_id < LED_STATE_OVERLAY_COUNT;
+       overlay_id++) {
+    if (state_overlay_runtime[overlay_id].visible) {
+      (void)led_matrix_set_state_overlay_active(overlay_id, false);
+    }
+  }
 }
 
 void led_matrix_set_host_volume_level(uint8_t level) {
@@ -2106,6 +2460,9 @@ void led_matrix_set_live_frame(const uint8_t *data) {
     return;
   }
 
+  if (current_effect == LED_EFFECT_THIRD_PARTY) {
+    led_matrix_mark_third_party_stream_activity();
+  }
   memcpy(pixels_runtime, data, LED_MATRIX_DATA_SIZE);
 
   if (initialized && display_enabled) {
@@ -2197,6 +2554,8 @@ void led_matrix_clear_output_override_frame(void) {
 #include "led_effects/effect_bass_ripple.inc"
 
 void led_matrix_effect_tick(uint32_t tick) {
+  bool overlay_refresh_needed = false;
+
   if (!initialized) {
     return;
   }
@@ -2205,15 +2564,28 @@ void led_matrix_effect_tick(uint32_t tick) {
 
   if (volume_overlay_is_expired(tick)) {
     volume_overlay_active = false;
-    if (led_matrix_should_drive_output(tick)) {
-      update_ws2812();
-    } else {
-      zeroLedValues(&led_ws2812_handle);
-      ws2812_show(&led_ws2812_handle);
-    }
+    update_ws2812();
   }
 
+  overlay_refresh_needed =
+      volume_overlay_needs_refresh(tick) ||
+      state_overlays_need_refresh(tick);
+
   if (!led_matrix_full_output_enabled()) {
+    uint32_t render_delta = tick - last_render_tick;
+
+    if (!overlay_refresh_needed || usb_suspend_active ||
+        !allow_system_indicators_when_disabled) {
+      return;
+    }
+    if (fps_limit > 0u) {
+      uint32_t min_render_interval = 1000u / fps_limit;
+      if (render_delta < min_render_interval) {
+        return;
+      }
+    }
+    last_render_tick = tick;
+    update_ws2812();
     return;
   }
 
@@ -2264,6 +2636,9 @@ void led_matrix_effect_tick(uint32_t tick) {
   // Matrix static mode and third-party mode do not run internal animations.
   if (current_effect == LED_EFFECT_STATIC_MATRIX ||
       current_effect == LED_EFFECT_THIRD_PARTY) {
+    if (overlay_refresh_needed) {
+      update_ws2812();
+    }
     return;
   }
 
@@ -2300,8 +2675,10 @@ void led_matrix_effect_tick(uint32_t tick) {
   PDESC_COLOR(LED_EFFECT_PARAM_COLOR_R,  (r1),(g1),(b1)), \
   PDESC_COLOR(LED_EFFECT_PARAM_COLOR2_R, (r2),(g2),(b2))
 
-uint8_t led_matrix_get_effect_schema(uint8_t effect_mode,
-                                     led_param_desc_t *out) {
+/* Descriptor generation only runs for configurator queries. Keep the RGB
+ * renderer at -O3 while avoiding a multi-kilobyte cold switch expansion. */
+__attribute__((optimize("Os"))) uint8_t
+led_matrix_get_effect_schema(uint8_t effect_mode, led_param_desc_t *out) {
   if (out == NULL || effect_mode >= (uint8_t)LED_EFFECT_MAX) {
     return 0u;
   }

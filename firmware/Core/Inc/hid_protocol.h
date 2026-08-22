@@ -56,10 +56,11 @@ typedef enum {
   CMD_GET_DEFAULT_PROFILE = 0x30,       // Get default boot profile index
   CMD_SET_DEFAULT_PROFILE = 0x31,       // Set default boot profile index
   CMD_GET_RAM_ONLY_MODE = 0x32,         // Get RAM-only mode state
-  CMD_SET_RAM_ONLY_MODE = 0x33,         // Enter/exit RAM-only mode (suppress flash saves)
-  CMD_RELOAD_SETTINGS_FROM_FLASH = 0x34, // Exit RAM-only and reload last-saved settings
+  CMD_SET_RAM_ONLY_MODE = 0x33,         // Enter, discard/reboot, or O(1) leave extension
+  CMD_RELOAD_SETTINGS_FROM_FLASH = 0x34, // Discard volatile state via controlled reboot
   CMD_GET_TRIGGER_CHATTER_GUARD = 0x35, // Get anti-chatter guard runtime setting
   CMD_SET_TRIGGER_CHATTER_GUARD = 0x36, // Set anti-chatter guard runtime setting
+  CMD_GET_SETTINGS_SAVE_STATUS = 0x37,  // Query queued/writing/durable state
 
   // Key settings commands (0x40 - 0x5F)
   CMD_GET_KEY_SETTINGS = 0x40,
@@ -126,6 +127,9 @@ typedef enum {
   CMD_SET_LED_IDLE_OPTIONS = 0x7C, // Set LED idle timeout and idle policies
   CMD_GET_LED_USB_SUSPEND_RGB_OFF = 0x7D, // Get USB suspend RGB-off policy
   CMD_SET_LED_USB_SUSPEND_RGB_OFF = 0x7E, // Set USB suspend RGB-off policy
+  /* Stable, read-only capability descriptor shared with the optional libhmk
+   * RGB bridge. */
+  CMD_GET_RGB_CAPABILITIES = 0x7F,
 
   // ADC Filter commands (0x80 - 0x8F)
   CMD_GET_FILTER_ENABLED = 0x80, // Get filter enabled state
@@ -151,6 +155,33 @@ typedef enum {
   // Unknown command
   CMD_UNKNOWN = 0xFF,
 } hid_command_id_t;
+
+typedef enum {
+  HID_RAM_ONLY_REQUEST_INVALID = 0,
+  HID_RAM_ONLY_REQUEST_ENTER,
+  HID_RAM_ONLY_REQUEST_RELOAD_REBOOT,
+  HID_RAM_ONLY_REQUEST_LEAVE_V1,
+} hid_ram_only_request_t;
+
+/* SET_RAM_ONLY_MODE predates length-prefixed requests. Preserve its exact
+ * two-byte legacy forms and reserve length=2 for the explicit leave-v1 frame.
+ * No non-zero padding byte may accidentally select a state-changing path. */
+static inline hid_ram_only_request_t hid_ram_only_request_classify(
+    uint8_t declared_length, uint8_t mode, uint8_t extension_version) {
+  if (declared_length == 0u) {
+    if (mode == 1u) {
+      return HID_RAM_ONLY_REQUEST_ENTER;
+    }
+    if (mode == 0u) {
+      return HID_RAM_ONLY_REQUEST_RELOAD_REBOOT;
+    }
+    return HID_RAM_ONLY_REQUEST_INVALID;
+  }
+  if (declared_length == 2u && mode == 0u && extension_version == 1u) {
+    return HID_RAM_ONLY_REQUEST_LEAVE_V1;
+  }
+  return HID_RAM_ONLY_REQUEST_INVALID;
+}
 
 //--------------------------------------------------------------------+
 // Command Packet Structure
@@ -359,8 +390,14 @@ typedef struct __attribute__((packed)) {
   uint16_t click_fallback_no_mod_keycode;
   uint8_t click_layer_mode;
   uint8_t click_layer_index;
-  uint8_t reserved[26];
+  uint8_t acceleration;
+  uint8_t progress_filled_only;
+  uint8_t reserved[24];
 } hid_packet_rotary_encoder_settings_t;
+
+_Static_assert(sizeof(hid_packet_rotary_encoder_settings_t) ==
+                   HID_PROTOCOL_PACKET_SIZE,
+               "rotary settings report must remain one RAW HID packet");
 
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
@@ -489,7 +526,22 @@ typedef struct __attribute__((packed)) {
   uint16_t work_us;
   uint16_t load_permille;
   uint8_t temp_valid;
-  uint8_t reserved[45];
+  uint16_t max_scan_cycle_us;
+  uint32_t scan_deadline_miss_count;
+  uint32_t flash_programmed_words;
+  uint32_t flash_async_steps;
+  uint32_t flash_gc_count;
+  uint32_t flash_boot_erase_count;
+  uint32_t flash_runtime_erase_count;
+  uint32_t flash_deferred_no_space_count;
+  uint16_t flash_max_words_per_step;
+  uint8_t flash_async_busy;
+  uint8_t flash_spare_bank_ready;
+  uint16_t flash_word_program_datasheet_max_us;
+  uint8_t flash_hard_8khz_guarantee;
+  uint16_t p99_scan_cycle_us;
+  uint8_t flash_last_status;
+  uint8_t reserved[5];
 } hid_resp_mcu_metrics_t;
 
 /**
@@ -632,9 +684,40 @@ typedef struct __attribute__((packed)) {
   uint8_t reserved[59];
 } hid_packet_led_fill_t;
 
+/* RGB interoperability descriptor (CMD_GET_RGB_CAPABILITIES / 0x7F).
+ * protocol_major changes only for incompatible packet semantics. */
+#define HID_RGB_BRIDGE_PROTOCOL_MAJOR 1u
+#define HID_RGB_BRIDGE_PROTOCOL_MINOR 0u
+#define HID_RGB_CAP_ENABLED (1u << 0)
+#define HID_RGB_CAP_BRIGHTNESS (1u << 1)
+#define HID_RGB_CAP_PIXEL (1u << 2)
+#define HID_RGB_CAP_FRAME_CHUNKS (1u << 3)
+#define HID_RGB_CAP_FILL (1u << 4)
+#define HID_RGB_CAP_LIVE_MODE (1u << 5)
+#define HID_RGB_CAP_RESTORE_MODE (1u << 6)
+
+typedef struct __attribute__((packed)) {
+  uint8_t command_id;
+  uint8_t status;
+  uint8_t protocol_major;
+  uint8_t protocol_minor;
+  uint8_t led_count;
+  uint8_t bytes_per_pixel;
+  uint8_t chunk_bytes;
+  uint8_t live_effect_id;
+  uint16_t capabilities;
+  uint8_t color_order; /* 0 = logical RGB; physical order is device-owned. */
+  uint8_t reserved[53];
+} hid_packet_rgb_capabilities_t;
+
 /**
  * @brief LED chunk packet for bulk transfer.
  * Used both for GET_LED_ALL and SET_LED_ALL_CHUNK.
+ *
+ * In LED_EFFECT_THIRD_PARTY, SET chunk zero starts a new atomic frame and all
+ * chunks must use their canonical fixed-offset size. The frame is published
+ * only after the complete chunk bitmap has been received; late non-zero chunks
+ * after publication are rejected until the next chunk zero.
  */
 typedef struct __attribute__((packed)) {
   uint8_t command_id;
@@ -689,6 +772,9 @@ void hid_protocol_init(void);
  * @return true if response should be sent
  */
 bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet);
+
+bool hid_protocol_response_is_deferred(void);
+bool hid_protocol_poll_deferred_response(uint8_t *out_packet);
 
 #ifdef __cplusplus
 }

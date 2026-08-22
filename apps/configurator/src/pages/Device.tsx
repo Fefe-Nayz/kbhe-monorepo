@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
+import { requireDeviceSuccess } from "@/lib/kbhe/mutation-result";
 import {
   patchActiveAppProfileLedSnapshot,
   patchActiveAppProfileNkroEnabled,
@@ -83,43 +84,58 @@ export default function Device() {
     mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
       const patchOptions = (patch: Partial<NonNullable<typeof optionsQ.data>>) => {
         if (optionsQ.data) {
-          patchActiveAppProfileOptions({ ...optionsQ.data, ...patch });
+          patchActiveAppProfileOptions(patch);
         }
       };
 
       switch (key) {
         case "keyboard": {
           const ok = await kbheDevice.setKeyboardEnabled(value);
-          if (ok) patchOptions({ keyboard_enabled: value });
+          requireDeviceSuccess(ok, "keyboard output setting");
+          patchOptions({ keyboard_enabled: value });
           break;
         }
         case "gamepad": {
           const ok = await kbheDevice.setGamepadEnabled(value);
-          if (ok) patchOptions({ gamepad_enabled: value });
+          requireDeviceSuccess(ok, "gamepad output setting");
+          patchOptions({ gamepad_enabled: value });
           break;
         }
         case "nkro": {
           const ok = await kbheDevice.setNkroEnabled(value);
-          if (ok) patchActiveAppProfileNkroEnabled(value);
+          requireDeviceSuccess(ok, "NKRO setting");
+          patchActiveAppProfileNkroEnabled(value);
           break;
         }
         case "led": {
           const ok = await kbheDevice.ledSetEnabled(value);
-          if (ok) patchActiveAppProfileLedSnapshot({ enabled: value });
+          requireDeviceSuccess(ok, "LED setting");
+          patchActiveAppProfileLedSnapshot({ enabled: value });
           break;
         }
         case "led_thermal_protection": {
           const ok = await kbheDevice.setLedThermalProtectionEnabled(value);
-          if (ok) patchOptions({ led_thermal_protection_enabled: value });
+          requireDeviceSuccess(ok, "LED thermal protection setting");
+          patchOptions({ led_thermal_protection_enabled: value });
           break;
         }
       }
     },
     onSuccess: () => void qc.invalidateQueries(),
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to update the device setting.");
+    },
   });
 
   const saveMutation = useMutation({
-    mutationFn: () => kbheDevice.saveSettings(),
+    mutationFn: async () => {
+      const ok = await kbheDevice.saveSettings();
+      requireDeviceSuccess(ok, "saving settings to flash");
+    },
+    onSuccess: () => toast.success("Settings saved to device flash."),
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to save settings to flash.");
+    },
   });
 
   const rebootMutation = useMutation({

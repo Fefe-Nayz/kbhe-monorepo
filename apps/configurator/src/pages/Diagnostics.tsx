@@ -1103,6 +1103,28 @@ function DebugTab({ connected, active }: { connected: boolean; active: boolean }
               value={`${mcu.load_permille}`}
               trendValues={mcuTrends.loadPermille}
             />
+            {mcu.realtime_persistence_metrics_available && (
+              <>
+                <MetricTile label="p99 Scan" value={`${mcu.p99_scan_cycle_us}`} unit="us" />
+                <MetricTile label="Max Scan" value={`${mcu.max_scan_cycle_us}`} unit="us" />
+                <MetricTile label=">=125 us Scans" value={`${mcu.scan_deadline_miss_count}`} />
+                <MetricTile label="Flash Words" value={`${mcu.flash_programmed_words}`} />
+                <MetricTile label="Runtime Erases" value={`${mcu.flash_runtime_erase_count}`} />
+                <MetricTile label="No-space Deferrals" value={`${mcu.flash_deferred_no_space_count}`} />
+                <MetricTile
+                  label="Flash Budget"
+                  value={`${mcu.flash_max_words_per_step}`}
+                  unit="word/scan"
+                />
+                <MetricTile
+                  label="8 kHz Hard Guarantee"
+                  value={mcu.flash_hard_8khz_guarantee ? "Yes" : "Hardware-limited"}
+                  unit={mcu.flash_hard_8khz_guarantee
+                    ? ""
+                    : `(Flash max ${mcu.flash_word_program_datasheet_max_us} us)`}
+                />
+              </>
+            )}
           </div>
         )}
       </SectionCard>

@@ -6,14 +6,14 @@ flowchart TD
 
   UI --> ProfileStore["Profile Store Zustand"]
 
-  ProfileStore --> AppProfiles["App profiles<br/>localStorage: keyboard-profile:*<br/>illimites"]
-  ProfileStore --> DeviceMirror["Miroir device profiles<br/>localStorage: keyboard-device-profile:*<br/>copie locale seulement"]
+  ProfileStore --> AppProfiles["App profiles<br/>profiles-v2.json + WAL de reprise<br/>illimites"]
+  ProfileStore --> DeviceMirror["Miroir device profiles<br/>profiles-v2.json + WAL de reprise<br/>copie locale seulement"]
   ProfileStore --> RuntimeState["Etat runtime app<br/>runtimeSource<br/>activeAppProfileName<br/>activeDeviceSlot<br/>defaultDeviceSlot<br/>ramOnlyActive"]
 
   UI --> Protocol["RAW HID protocol"]
 
   Protocol --> FirmwareRAM["Firmware RAM<br/>current_settings<br/>etat actuellement applique"]
-  FirmwareRAM --> Flash["Flash MCU<br/>settings_t persistant<br/>device profiles slots 0..3"]
+  FirmwareRAM --> Flash["Flash MCU<br/>SETTINGS global compact<br/>ProfileDocument atomique par slot 0..3"]
 
   Flash --> Boot["Boot clavier"]
   Boot --> DefaultProfile{"Default device profile configure ?"}
@@ -36,7 +36,10 @@ Il y a 3 concepts distincts:
 Stocké dans la flash du clavier. Limité aux slots MCU, actuellement `0..3`. C’est persistant, bootable, et le clavier est la source de vérité.
 
 2. **App profile**
-Stocké uniquement dans l’app, dans `localStorage` via `keyboard-profile:*`. Illimité. Le clavier ne peut jamais booter directement dessus.
+Stocké uniquement dans l’app, dans `profiles-v2.json` via le store Tauri, avec
+un WAL de reprise dans `localStorage` jusqu'au flush durable. La version web
+utilise `localStorage` comme fallback. C'est illimité et le clavier ne peut
+jamais booter directement dessus.
 
 3. **Temporary RAM session**
 Quand on applique un app profile au clavier, l’app envoie son snapshot au firmware en RAM-only. Le clavier utilise ces réglages en RAM, mais ne les écrit jamais en flash.
@@ -97,7 +100,7 @@ sequenceDiagram
   UI->>HID: SET_RAM_ONLY_MODE = 1
   HID->>FW: entrer RAM-only
   UI->>HID: appliquer snapshot complet
-  HID->>FW: key settings, gamepad, rotary, filters, LED, NKRO, tick rate
+  HID->>FW: touches, gamepad, rotary, filtres, LED, macros, overlays, etats
   FW--xFlash: aucune ecriture flash
   UI->>Store: runtimeSource = app
   UI->>Store: ramOnlyActive = true
@@ -139,12 +142,16 @@ sequenceDiagram
   UI->>HID: GET_RAM_ONLY_MODE
   HID-->>UI: true
   UI->>HID: RELOAD_SETTINGS_FROM_FLASH
-  HID->>FW: sortir RAM-only
-  FW->>Flash: relire dernier etat persistant
+  HID-->>UI: commande acceptee
+  HID->>FW: reboot controle apres la reponse
+  FW->>Flash: relire settings + macros + overlays au boot
+  UI->>HID: attendre puis reconnecter le meme serial
   UI->>HID: CREATE_PROFILE "game"
   HID->>FW: creer slot device
+  UI->>HID: COMMIT_PROFILE_DOCUMENT (CAS)
+  FW->>Flash: publier le ProfileDocument complet et atomique
   UI->>HID: SAVE_SETTINGS
-  FW->>Flash: ecrire settings_t
+  FW->>Flash: publier les metadonnees globales compactes
   UI->>HID: capture snapshot du slot
 ```
 
@@ -169,7 +176,7 @@ Le bug était donc bien firmware. L’app envoyait le payload selon la logique a
 
 ```mermaid
 flowchart TD
-  PowerOn["Power on / reboot"] --> LoadFlash["Lire settings_t depuis flash"]
+  PowerOn["Power on / reboot"] --> LoadFlash["Lire SETTINGS global puis le ProfileDocument du slot"]
   LoadFlash --> HasDefault{"default_profile_index valide ?"}
   HasDefault -->|oui| BootDefault["Charger ce device profile"]
   HasDefault -->|non| BootLast["Charger dernier active_profile_index persistant"]
@@ -186,7 +193,8 @@ Un app profile ne peut pas être un boot default, car il n’existe pas dans la 
 - Les app profiles sont illimités et app-only.
 - Les device profiles occupent un slot MCU.
 - Une session app temporaire ne pollue jamais la flash.
-- Une opération device persistante sort toujours du RAM-only avant d’agir.
+- Une opération device persistante annule d'abord la session RAM-only par un
+  reboot contrôlé et attend la reconnexion du même clavier avant d’agir.
 - Le firmware refuse maintenant les opérations device persistantes si RAM-only est encore actif.
 - Le boot ne restaure que des device profiles.
 - Le miroir app des device profiles est une copie locale, pas la source de vérité.

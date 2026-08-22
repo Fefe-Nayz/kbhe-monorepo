@@ -8,7 +8,8 @@
 extern "C" {
 #endif
 
-#define ADC_CAPTURE_MAX_SAMPLES 30000u
+/* Diagnostic capture is deliberately bounded to 64 KiB for both channels. */
+#define ADC_CAPTURE_MAX_SAMPLES 16384u
 #define ADC_CAPTURE_MAX_READ_SAMPLES 12u
 
 void adc_capture_init(void);

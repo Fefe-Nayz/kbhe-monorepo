@@ -45,6 +45,19 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--signature",
+        default=None,
+        help="Detached Ed25519 signature (default: <firmware>.sig)",
+    )
+    parser.add_argument(
+        "--serial",
+        default=None,
+        help=(
+            "USB serial number of the keyboard to update "
+            "(required when multiple devices are present)"
+        ),
+    )
+    parser.add_argument(
         "--timeout",
         type=float,
         default=5.0,
@@ -75,29 +88,40 @@ def resolve_version(firmware_path: pathlib.Path, explicit_version: int | None) -
     version, source = resolve_firmware_version(firmware_path, explicit_version)
     _log(
         f"Using firmware version {format_firmware_version(version)} "
-        f"(0x{version:04X}) from {source}."
+        f"(0x{version:06X}) from {source}."
     )
     return int(version)
 
 
 def run_auto_flash(
     firmware_path: pathlib.Path,
+    signature_path: pathlib.Path | None,
     firmware_version: int,
+    serial_number: str | None,
     timeout_s: float,
     packet_retries: int,
     retry_delay_s: float,
     max_attempts: int,
 ) -> int:
     attempt = 1
+    # Once automatic discovery yields one unambiguous UID, keep it for every
+    # global retry. A later USB topology change must never redirect a retry to
+    # another physical keyboard.
+    target_serial = firmware_updater.normalize_serial_number(serial_number) or None
 
     while max_attempts == 0 or attempt <= max_attempts:
         _log(f"Flash attempt #{attempt}...")
         try:
+            if target_serial is None:
+                target_serial = firmware_updater.resolve_target_serial()
+                _log(f"Locked retry target to keyboard serial {target_serial}.")
             firmware_updater.flash_firmware(
                 str(firmware_path),
                 firmware_version,
                 timeout_s,
                 packet_retries,
+                signature_path=str(signature_path) if signature_path else None,
+                serial_number=target_serial,
                 logger=_log,
             )
             _log("Flash succeeded.")
@@ -146,7 +170,9 @@ def main() -> int:
 
     return run_auto_flash(
         firmware_path=firmware_path,
+        signature_path=pathlib.Path(args.signature).expanduser().resolve() if args.signature else None,
         firmware_version=firmware_version,
+        serial_number=args.serial,
         timeout_s=args.timeout,
         packet_retries=args.packet_retries,
         retry_delay_s=args.retry_delay,

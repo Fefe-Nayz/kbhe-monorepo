@@ -17,6 +17,7 @@ build.ninja
 .ninja_*
 
 # Firmware artifacts
+firmware/build-host-tests*/
 *.elf
 *.bin
 *.hex

@@ -1,3 +1,6 @@
 [submodule "lib/tinyusb"]
 	path = firmware/lib/tinyusb
 	url = https://github.com/hathach/tinyusb.git
+[submodule "firmware/lib/monocypher"]
+	path = firmware/lib/monocypher
+	url = https://github.com/LoupVaillant/Monocypher.git

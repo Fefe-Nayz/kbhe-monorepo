@@ -124,6 +124,7 @@ def parse_args():
     group.add_argument('--demo', action='store_true', help='Launch the PySide6 configurator with a fake demo device')
     group.add_argument('--flash', metavar='FIRMWARE_BIN', help='Flash a firmware .bin over HS HID updater')
     parser.add_argument('--fw-version', type=lambda value: int(value, 0), default=None)
+    parser.add_argument('--signature', default=None, help='Detached signature (default: <firmware>.sig)')
     parser.add_argument('--timeout', type=float, default=5.0)
     parser.add_argument('--retries', type=int, default=5)
     return parser.parse_args()
@@ -162,6 +163,7 @@ def main():
                 firmware_version=args.fw_version,
                 timeout_s=args.timeout,
                 retries=args.retries,
+                signature_path=args.signature,
                 reconnect_after=False,
             )
             reconnect_device(device, timeout_s=args.timeout)

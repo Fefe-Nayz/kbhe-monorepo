@@ -1,0 +1,2978 @@
+diff --git a/README.md b/README.md
+index 384e3e9..a00f1da 100644
+--- a/README.md
++++ b/README.md
+@@ -26,11 +26,14 @@ This repository contains libraries for building a Hall-effect keyboard firmware.
+ - [x] **Web Configurator**: Configure the firmware using [hmkconf](https://github.com/peppapighs/hmkconf) without needing to recompile the firmware.
+ - [x] **Tick Rate**: Customizable tick rate for Tap-Hold and Dynamic Keystroke.
+ - [x] **8kHz Polling Rate**: Support for 8kHz polling rate on some microcontrollers (e.g., AT32F405xx).
+-- [x] **Gamepad**: Support for XInput gamepad mode, allowing the keyboard to be used as a game controller.
++- [x] **Gamepad**: Selectable XInput or standards-based HID gamepad output.
++- [x] **RGB Lighting**: Optional non-blocking backend, basic effects, brightness/color persistence and host-controlled per-LED frames.
+ 
+ ## Limitations
+ 
+-- **RGB Lighting**: The firmware does not support RGB lighting.
++- **RGB Backends**: Addressable lighting is opt-in and each MCU family must
++  provide a non-blocking implementation of `include/hardware/rgb_api.h`. The
++  first backend supports WS2812 LEDs on STM32F723 TIM2 channel 1.
+ 
+ ## Getting Started
+ 
+@@ -59,6 +62,38 @@ This repository contains libraries for building a Hall-effect keyboard firmware.
+ 
+ 6. Flash the firmware to your keyboard using your preferred method (e.g., DFU, ISP). If your keyboard has a DFU bootloader, you can set `upload_protocol = dfu` in `platformio.ini` and use the command `pio run --target upload` or the PlatformIO IDE's "Upload" option while the keyboard is in DFU mode. If your browser supports WebUSB, you can also use [WebUSB DFU](https://devanlai.github.io/webdfu/dfu-util/) (Recommended method).
+ 
++### RGB lighting
++
++Add an `rgb` object to `keyboard.json` to opt in. It defines the LED count,
++data pin, backend, default brightness and default color. Non-RGB keyboards keep
++the same source path and do not allocate frame buffers or schedule an RGB task.
++
++The portable core provides static, breathing, rainbow, rainbow-wave and live
++effects. Live mode accepts atomic 60-byte RAW HID chunks: a new frame is shown
++only after all chunks arrive, and live frames are never written to flash. The
++wire protocol is documented by the command IDs in `include/commands.h`; hosts
++must first negotiate `COMMAND_GET_RGB_CAPABILITIES` (`0x7F`).
++
++`LED_FILL` changes the persistent base color used by static and breathing
++effects; rainbow effects keep their generated colors. Combined with the static
++effect it produces an arbitrary persistent solid color. Only arbitrary per-LED
++frames require live mode.
++
++Backends must copy a submitted logical RGB frame and return immediately. DMA or
++another asynchronous peripheral mechanism should perform the physical transfer
++so lighting cannot stall matrix processing.
++
++### Gamepad API
++
++The two low bits in `eeconfig_options_t` select one mutually exclusive gamepad
++API: legacy XInput or a standard TinyUSB HID gamepad. HID is the portable choice
++for operating systems that do not provide the XInput driver. Changing the API
++changes USB descriptors and therefore takes effect after USB re-enumeration or
++a reboot. Existing configurations remain compatible because HID uses a formerly
++reserved option bit and XInput keeps priority if malformed legacy data sets both.
++The v1.6 migration clears that bit's historical unused value, so upgrading an
++existing device cannot enable HID accidentally.
++
+ ## Development
+ 
+ The development branch is `dev`, which contains the latest features and bug fixes. The corresponding `dev` branch of [hmkconf](https://github.com/peppapighs/hmkconf/tree/dev) deployed at [https://dev.hmkconf.com](https://dev.hmkconf.com) is required to configure the `dev` branch of the firmware. To contribute, please create a pull request against the `dev` branch.
+diff --git a/hardware/stm32f723xx/board_def.h b/hardware/stm32f723xx/board_def.h
+new file mode 100644
+index 0000000..9536319
+--- /dev/null
++++ b/hardware/stm32f723xx/board_def.h
+@@ -0,0 +1,28 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#pragma once
++
++/* TinyUSB root port 1 is the F723's DWC2 high-speed controller with its
++ * integrated PHY (PB14/PB15). */
++#define CFG_TUSB_RHPORT1_MODE (OPT_MODE_DEVICE | OPT_MODE_HIGH_SPEED)
++
++#if !defined(ADC_NUM_SAMPLE_CYCLES)
++#define ADC_NUM_SAMPLE_CYCLES ADC_SAMPLETIME_3CYCLES
++#endif
++
++#if ADC_RESOLUTION == 12
++#define ADC_RESOLUTION_HAL ADC_RESOLUTION_12B
++#elif ADC_RESOLUTION == 10
++#define ADC_RESOLUTION_HAL ADC_RESOLUTION_10B
++#elif ADC_RESOLUTION == 8
++#define ADC_RESOLUTION_HAL ADC_RESOLUTION_8B
++#elif ADC_RESOLUTION == 6
++#define ADC_RESOLUTION_HAL ADC_RESOLUTION_6B
++#else
++#error "Unsupported ADC resolution"
++#endif
+diff --git a/include/commands.h b/include/commands.h
+index 051fe54..0661ccd 100644
+--- a/include/commands.h
++++ b/include/commands.h
+@@ -41,6 +41,23 @@ typedef enum {
+   COMMAND_GET_SERIAL,
+   COMMAND_SAVE_CALIBRATION_THRESHOLD,
+ 
++  /* KBHE/libhmk RGB bridge v1. Requests and responses in this range use the
++   * KBHE layout: byte 0 command, byte 1 status/reserved, payload at byte 2. */
++  COMMAND_GET_LED_ENABLED = 0x60,
++  COMMAND_SET_LED_ENABLED = 0x61,
++  COMMAND_GET_LED_BRIGHTNESS = 0x62,
++  COMMAND_SET_LED_BRIGHTNESS = 0x63,
++  COMMAND_GET_LED_PIXEL = 0x64,
++  COMMAND_SET_LED_PIXEL = 0x65,
++  COMMAND_GET_LED_ALL = 0x68,
++  COMMAND_SET_LED_ALL_CHUNK = 0x6A,
++  COMMAND_LED_CLEAR = 0x6B,
++  COMMAND_LED_FILL = 0x6C,
++  COMMAND_GET_LED_EFFECT = 0x6E,
++  COMMAND_SET_LED_EFFECT = 0x6F,
++  COMMAND_RESTORE_LED_EFFECT = 0x76,
++  COMMAND_GET_RGB_CAPABILITIES = 0x7F,
++
+   COMMAND_GET_KEYMAP = 128,
+   COMMAND_SET_KEYMAP,
+   COMMAND_GET_ACTUATION_MAP,
+diff --git a/include/eeconfig.h b/include/eeconfig.h
+index 47b443a..4bc107e 100644
+--- a/include/eeconfig.h
++++ b/include/eeconfig.h
+@@ -47,7 +47,10 @@ typedef union __attribute__((packed)) {
+   struct __attribute__((packed)) {
+     // Whether the XInput interface is enabled
+     bool xinput_enabled : 1;
+-    bool _unused0 : 1;
++    // Whether a standards-based HID gamepad interface is enabled. This is
++    // mutually exclusive with XInput and reuses a previously reserved bit. The
++    // v1.6 migration clears its historical value before enabling this meaning.
++    bool hid_gamepad_enabled : 1;
+     // Whether 8kHz polling rate is enabled. Only applicable if USB HS is
+     // enabled. If disabled, the 1kHz polling rate is used instead.
+     bool high_polling_rate_enabled : 1;
+@@ -60,6 +63,41 @@ typedef union __attribute__((packed)) {
+ _Static_assert(sizeof(eeconfig_options_t) == sizeof(uint16_t),
+                "Invalid eeconfig_options_t size");
+ 
++typedef enum {
++  GAMEPAD_API_DISABLED = 0,
++  GAMEPAD_API_XINPUT,
++  GAMEPAD_API_HID,
++} gamepad_api_t;
++
++static inline gamepad_api_t
++eeconfig_get_gamepad_api(const eeconfig_options_t *options) {
++  if (options == NULL)
++    return GAMEPAD_API_DISABLED;
++  /* Preserve the legacy bit's priority if a malformed host sets both bits. */
++  if (options->xinput_enabled)
++    return GAMEPAD_API_XINPUT;
++  return options->hid_gamepad_enabled ? GAMEPAD_API_HID
++                                      : GAMEPAD_API_DISABLED;
++}
++
++static inline bool
++eeconfig_set_gamepad_api(eeconfig_options_t *options, gamepad_api_t api) {
++  if (options == NULL || api > GAMEPAD_API_HID)
++    return false;
++  options->xinput_enabled = api == GAMEPAD_API_XINPUT;
++  options->hid_gamepad_enabled = api == GAMEPAD_API_HID;
++  return true;
++}
++
++typedef struct __attribute__((packed)) {
++  uint8_t enabled;
++  uint8_t brightness;
++  uint8_t effect;
++  uint8_t color_r;
++  uint8_t color_g;
++  uint8_t color_b;
++} eeconfig_rgb_t;
++
+ // Keyboard profile configuration
+ typedef struct __attribute__((packed)) {
+   uint8_t keymap[NUM_LAYERS][NUM_KEYS];
+@@ -74,7 +112,7 @@ typedef struct __attribute__((packed)) {
+ // Persistent configuration version. The size of the configuration must be
+ // non-decreasing, so that the migration can assume that the new version is at
+ // least as large as the previous version.
+-#define EECONFIG_VERSION 0x0105
++#define EECONFIG_VERSION 0x0106
+ 
+ // Keyboard configuration
+ // Whenever there is a change in the configuration, `EECONFIG_VERSION` must be
+@@ -98,6 +136,10 @@ typedef struct __attribute__((packed)) {
+   uint8_t current_profile;
+   // Last non-default profile index, used for profile swapping
+   uint8_t last_non_default_profile;
++  /* Board-wide RGB settings are kept in the common persistent layout so a
++   * configuration remains readable when firmware is rebuilt without an RGB
++   * backend. Live frames themselves intentionally remain in RAM. */
++  eeconfig_rgb_t rgb;
+   // End of global configurations
+ 
+   // Profiles
+@@ -156,6 +198,28 @@ extern const eeconfig_t *eeconfig;
+ #define DEFAULT_TICK_RATE 30
+ #endif
+ 
++#if !defined(RGB_DEFAULT_BRIGHTNESS)
++#define RGB_DEFAULT_BRIGHTNESS 50
++#endif
++#if !defined(RGB_DEFAULT_R)
++#define RGB_DEFAULT_R 255
++#endif
++#if !defined(RGB_DEFAULT_G)
++#define RGB_DEFAULT_G 255
++#endif
++#if !defined(RGB_DEFAULT_B)
++#define RGB_DEFAULT_B 255
++#endif
++#define DEFAULT_RGB                                                            \
++  {                                                                            \
++      .enabled = 1,                                                            \
++      .brightness = RGB_DEFAULT_BRIGHTNESS,                                    \
++      .effect = 0,                                                             \
++      .color_r = RGB_DEFAULT_R,                                                \
++      .color_g = RGB_DEFAULT_G,                                                \
++      .color_b = RGB_DEFAULT_B,                                                \
++  }
++
+ //--------------------------------------------------------------------+
+ // Persistent Configuration API
+ //--------------------------------------------------------------------+
+diff --git a/include/hardware/rgb_api.h b/include/hardware/rgb_api.h
+new file mode 100644
+index 0000000..ede5228
+--- /dev/null
++++ b/include/hardware/rgb_api.h
+@@ -0,0 +1,21 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#pragma once
++
++#include "common.h"
++
++#if defined(RGB_ENABLE)
++
++/* Backends must return immediately. `rgb` remains valid only for the duration
++ * of this call, so a backend must copy it before returning true. */
++bool rgb_backend_init(void);
++bool rgb_backend_submit(const uint8_t *rgb, uint16_t led_count);
++bool rgb_backend_is_busy(void);
++void rgb_backend_task(void);
++
++#endif
+diff --git a/include/rgb.h b/include/rgb.h
+new file mode 100644
+index 0000000..ed63e06
+--- /dev/null
++++ b/include/rgb.h
+@@ -0,0 +1,45 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#pragma once
++
++#include "common.h"
++
++#if defined(RGB_ENABLE)
++
++#if !defined(RGB_LED_COUNT)
++#error "RGB_LED_COUNT is not defined"
++#endif
++
++#define RGB_BYTES_PER_PIXEL 3u
++#define RGB_FRAME_BYTES ((uint16_t)(RGB_LED_COUNT * RGB_BYTES_PER_PIXEL))
++#define RGB_FRAME_CHUNK_BYTES 60u
++#define RGB_EFFECT_STATIC 0u
++#define RGB_EFFECT_BREATHING 1u
++#define RGB_EFFECT_RAINBOW 2u
++#define RGB_EFFECT_RAINBOW_WAVE 3u
++#define RGB_EFFECT_LIVE 7u
++
++bool rgb_init(void);
++void rgb_task(void);
++
++bool rgb_is_enabled(void);
++bool rgb_set_enabled(bool enabled, bool persist);
++uint8_t rgb_get_brightness(void);
++bool rgb_set_brightness(uint8_t brightness, bool persist);
++uint8_t rgb_get_effect(void);
++bool rgb_set_effect(uint8_t effect, bool persist);
++bool rgb_restore_effect(void);
++
++const uint8_t *rgb_get_frame(void);
++bool rgb_get_pixel(uint8_t index, uint8_t *r, uint8_t *g, uint8_t *b);
++bool rgb_set_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
++bool rgb_get_frame_chunk(uint16_t offset, uint8_t *dst, uint8_t len);
++bool rgb_set_frame_chunk(uint16_t offset, const uint8_t *src, uint8_t len);
++bool rgb_fill(uint8_t r, uint8_t g, uint8_t b, bool persist);
++
++#endif
+diff --git a/include/tusb_config.h b/include/tusb_config.h
+index 78d1259..33b4790 100644
+--- a/include/tusb_config.h
++++ b/include/tusb_config.h
+@@ -30,8 +30,8 @@
+ #define CFG_TUD_ENDPOINT0_SIZE 64
+ 
+ // Driver configuration
+-// Keyboard, generic, and raw HID interfaces
+-#define CFG_TUD_HID 3
++// Keyboard, generic, raw HID, and optional standards-based gamepad interfaces
++#define CFG_TUD_HID 4
+ 
+ // HID buffer size. Must be at least the size of the largest reports (+1 for
+ // interface with multiple reports)
+diff --git a/include/usb_descriptors.h b/include/usb_descriptors.h
+index e22d5a7..5f0016d 100644
+--- a/include/usb_descriptors.h
++++ b/include/usb_descriptors.h
+@@ -37,21 +37,24 @@ enum {
+   USB_ITF_KEYBOARD = 0,
+   USB_ITF_HID,
+   USB_ITF_RAW_HID,
+-  // We intentionally put the XInput interface last, so that if it is not
+-  // enabled, we can subtract its size from the total configuration length
+-  // without affecting the other interfaces.
+-  USB_ITF_XINPUT,
++  // The optional gamepad is last so the configuration can expose either an
++  // XInput vendor interface, a standard HID gamepad, or neither.
++  USB_ITF_GAMEPAD,
+   USB_ITF_COUNT,
+ };
+ 
++#define USB_ITF_XINPUT USB_ITF_GAMEPAD
++
+ // In endpoint addresses
+ enum {
+   EP_IN_ADDR_KEYBOARD = 0x81,
+   EP_IN_ADDR_HID,
+   EP_IN_ADDR_RAW_HID,
+-  EP_IN_ADDR_XINPUT,
++  EP_IN_ADDR_GAMEPAD,
+ };
+ 
++#define EP_IN_ADDR_XINPUT EP_IN_ADDR_GAMEPAD
++
+ // Out endpoint addresses
+ enum {
+   EP_OUT_ADDR_RAW_HID = 0x01,
+diff --git a/keyboards/kbhe-75he/keyboard.json b/keyboards/kbhe-75he/keyboard.json
+new file mode 100644
+index 0000000..54891e3
+--- /dev/null
++++ b/keyboards/kbhe-75he/keyboard.json
+@@ -0,0 +1,193 @@
++{
++  "name": "KBHE 75HE (libhmk)",
++  "manufacturer": "KBHE",
++  "maintainer": "KBHE",
++  "usb": {
++    "vid": "0x9172",
++    "pid": "0x0004",
++    "port": "hs"
++  },
++  "keyboard": {
++    "num_profiles": 4,
++    "num_layers": 4,
++    "num_keys": 82,
++    "num_advanced_keys": 32,
++    "num_dynamic_keystroke_max_bindings": 8,
++    "num_macro_nodes": 128
++  },
++  "hardware": {
++    "hse_value": 16000000,
++    "driver": "stm32f723xx"
++  },
++  "analog": {
++    "invert_adc": false,
++    "delay": 1,
++    "mux": {
++      "select": ["D4", "D5", "D6"],
++      "input": ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "B0", "B1", "C4", "C5"],
++      "matrix": [
++        [6, 7, 8, 5, 22, 19, 21, 20],
++        [10, 11, 12, 9, 0, 23, 25, 24],
++        [0, 0, 14, 13, 29, 26, 28, 27],
++        [0, 0, 44, 42, 43, 57, 58, 0],
++        [39, 40, 41, 38, 56, 53, 55, 54],
++        [82, 81, 80, 72, 79, 71, 69, 70],
++        [65, 66, 67, 64, 68, 76, 78, 77],
++        [31, 32, 33, 30, 48, 45, 47, 46],
++        [2, 3, 4, 1, 18, 15, 17, 16],
++        [35, 36, 37, 34, 52, 49, 51, 50],
++        [60, 61, 62, 59, 63, 73, 75, 74]
++      ]
++    }
++  },
++  "calibration": {
++    "initial_rest_value": 2195,
++    "initial_bottom_out_threshold": 550
++  },
++  "wear_leveling": {
++    "virtual_size": 16384,
++    "write_log_size": 65536
++  },
++  "actuation": {
++    "actuation_point": 128
++  },
++  "rgb": {
++    "num_leds": 82,
++    "data_pin": "A15",
++    "backend": "ws2812_tim2_ch1",
++    "default_brightness": 50,
++    "default_color": [255, 255, 255]
++  },
++  "layout": {
++    "keymap": [
++      [
++        { "key": 0 },
++        { "key": 1, "x": 0.5 },
++        { "key": 2 },
++        { "key": 3 },
++        { "key": 4 },
++        { "key": 5, "x": 0.25 },
++        { "key": 6 },
++        { "key": 7 },
++        { "key": 8 },
++        { "key": 9, "x": 0.25 },
++        { "key": 10 },
++        { "key": 11 },
++        { "key": 12 },
++        { "key": 13, "x": 0.25 }
++      ],
++      [
++        { "key": 14 },
++        { "key": 15 },
++        { "key": 16 },
++        { "key": 17 },
++        { "key": 18 },
++        { "key": 19 },
++        { "key": 20 },
++        { "key": 21 },
++        { "key": 22 },
++        { "key": 23 },
++        { "key": 24 },
++        { "key": 25 },
++        { "key": 26 },
++        { "key": 27, "w": 2 },
++        { "key": 28 }
++      ],
++      [
++        { "key": 29, "w": 1.5 },
++        { "key": 30 },
++        { "key": 31 },
++        { "key": 32 },
++        { "key": 33 },
++        { "key": 34 },
++        { "key": 35 },
++        { "key": 36 },
++        { "key": 37 },
++        { "key": 38 },
++        { "key": 39 },
++        { "key": 40 },
++        { "key": 41 },
++        { "key": 42, "w": 1.5, "h": 2 },
++        { "key": 43 }
++      ],
++      [
++        { "key": 44, "w": 1.75 },
++        { "key": 45 },
++        { "key": 46 },
++        { "key": 47 },
++        { "key": 48 },
++        { "key": 49 },
++        { "key": 50 },
++        { "key": 51 },
++        { "key": 52 },
++        { "key": 53 },
++        { "key": 54 },
++        { "key": 55 },
++        { "key": 56 },
++        { "key": 57 }
++      ],
++      [
++        { "key": 58, "w": 1.25 },
++        { "key": 59 },
++        { "key": 60 },
++        { "key": 61 },
++        { "key": 62 },
++        { "key": 63 },
++        { "key": 64 },
++        { "key": 65 },
++        { "key": 66 },
++        { "key": 67 },
++        { "key": 68 },
++        { "key": 69 },
++        { "key": 70, "w": 2.75 },
++        { "key": 71 }
++      ],
++      [
++        { "key": 72, "w": 1.25 },
++        { "key": 73, "w": 1.25 },
++        { "key": 74, "w": 1.25 },
++        { "key": 75, "w": 6.25 },
++        { "key": 76, "w": 1.25 },
++        { "key": 77, "w": 1.25 },
++        { "key": 78, "w": 1.25 },
++        { "key": 79 },
++        { "key": 80 },
++        { "key": 81 }
++      ]
++    ]
++  },
++  "keymap": [
++    [
++      "KC_ESC", "KC_F1", "KC_F2", "KC_F3", "KC_F4", "KC_F5", "KC_F6", "KC_F7", "KC_F8", "KC_F9", "KC_F10", "KC_F11", "KC_F12", "KC_DEL",
++      "KC_GRV", "KC_1", "KC_2", "KC_3", "KC_4", "KC_5", "KC_6", "KC_7", "KC_8", "KC_9", "KC_0", "KC_MINS", "KC_EQL", "KC_BSPC", "KC_PGUP",
++      "KC_TAB", "KC_Q", "KC_W", "KC_E", "KC_R", "KC_T", "KC_Y", "KC_U", "KC_I", "KC_O", "KC_P", "KC_LBRC", "KC_RBRC", "KC_ENT", "KC_PGDN",
++      "KC_CAPS", "KC_A", "KC_S", "KC_D", "KC_F", "KC_G", "KC_H", "KC_J", "KC_K", "KC_L", "KC_SCLN", "KC_QUOT", "KC_NUHS", "KC_HOME",
++      "KC_LSFT", "KC_NUBS", "KC_Z", "KC_X", "KC_C", "KC_V", "KC_B", "KC_N", "KC_M", "KC_COMM", "KC_DOT", "KC_SLSH", "KC_RSFT", "KC_UP",
++      "KC_LCTL", "KC_LGUI", "KC_LALT", "KC_SPC", "KC_RALT", "MO(1)", "KC_RCTL", "KC_LEFT", "KC_DOWN", "KC_RGHT"
++    ],
++    [
++      "_______", "KC_MPRV", "KC_MPLY", "KC_MNXT", "KC_MUTE", "KC_VOLD", "KC_VOLU", "_______", "_______", "_______", "PF(0)", "PF(1)", "PF(2)", "PF(3)",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "KC_HOME",
++      "KC_PSCR", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "KC_END",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "KC_PGUP",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "KC_HOME", "KC_PGDN", "KC_END"
++    ],
++    [
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______"
++    ],
++    [
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______",
++      "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______", "_______"
++    ]
++  ]
++}
+diff --git a/scripts/drivers.py b/scripts/drivers.py
+index 5fbdf50..6894976 100644
+--- a/scripts/drivers.py
++++ b/scripts/drivers.py
+@@ -191,6 +191,67 @@ STM32F446XX = Driver(
+     ),
+ )
+ 
++STM32F723XX = Driver(
++    platformio=PlatformIO(
++        # PlatformIO's maintained F723 board definition supplies the correct
++        # Cortex-M7 startup/HAL package. The project linker still constrains the
++        # image and wear-leveling area to the KBHE VET6's 512 KiB flash.
++        board="disco_f723ie",
++        # The existing generic linker layout is architecture-independent and
++        # conservatively uses only the first 128 KiB of the F723's SRAM.
++        ldscript="stm32f446retx.ld",
++        framework="stm32cube",
++        platform="ststm32@19.7.1",
++    ),
++    tinyusb=TinyUSB(mcu="stm32f7"),
++    metadata=Metadata(
++        bootloader=Bootloader(
++            address=0x1FF00000,
++            magic=0xDEADBEEF,
++        ),
++        flash=Flash(
++            sector_sizes=NonUniformSectors(
++                sizes=[
++                    16 * 1024,
++                    16 * 1024,
++                    16 * 1024,
++                    16 * 1024,
++                    64 * 1024,
++                    128 * 1024,
++                    128 * 1024,
++                    128 * 1024,
++                ]
++            ),
++            empty_value=0xFFFFFFFF,
++        ),
++        adc=ADC(
++            max_resolution=12,
++            input_pins=[
++                "A0",
++                "A1",
++                "A2",
++                "A3",
++                "A4",
++                "A5",
++                "A6",
++                "A7",
++                "B0",
++                "B1",
++                "C0",
++                "C1",
++                "C2",
++                "C3",
++                "C4",
++                "C5",
++            ],
++            to_gpio_array=lambda pins: (
++                [f"GPIO{pin[0]}" for pin in pins],
++                [f"GPIO_PIN_{pin[1:]}" for pin in pins],
++            ),
++        ),
++    ),
++)
++
+ AT32F405XX = Driver(
+     platformio=PlatformIO(
+         board="genericAT32F405RCT7",
+diff --git a/scripts/make.py b/scripts/make.py
+index aa5578b..0999750 100644
+--- a/scripts/make.py
++++ b/scripts/make.py
+@@ -152,5 +152,20 @@ if kb_json.actuation is not None:
+     if actuation.actuation_point is not None:
+         build_flags.define("ACTUATION_POINT", actuation.actuation_point)
+ 
++# Optional RGB matrix. The core stays out of non-RGB builds and the backend is
++# selected explicitly so existing libhmk keyboards remain unchanged.
++if kb_json.rgb is not None:
++    rgb = kb_json.rgb
++    ports, pin_nums = driver.metadata.adc.to_gpio_array([rgb.data_pin])
++    build_flags.define("RGB_ENABLE")
++    build_flags.define("RGB_LED_COUNT", rgb.num_leds)
++    build_flags.define("RGB_DATA_GPIO_PORT", ports[0])
++    build_flags.define("RGB_DATA_GPIO_PIN", pin_nums[0])
++    build_flags.define("RGB_DEFAULT_BRIGHTNESS", rgb.default_brightness)
++    build_flags.define("RGB_DEFAULT_R", rgb.default_color[0])
++    build_flags.define("RGB_DEFAULT_G", rgb.default_color[1])
++    build_flags.define("RGB_DEFAULT_B", rgb.default_color[2])
++    build_flags.define(f"RGB_BACKEND_{rgb.backend.upper()}")
++
+ # Add source build flags
+ env.Append(BUILD_FLAGS=build_flags.get_flags())
+diff --git a/scripts/metadata.py b/scripts/metadata.py
+index a8f7b6f..3eb75d4 100644
+--- a/scripts/metadata.py
++++ b/scripts/metadata.py
+@@ -16,7 +16,7 @@ import json
+ import os
+ import utils
+ from schema.keyboard import KeyboardUSBPort
+-from uuid import uuid4
++from uuid import NAMESPACE_URL, uuid5
+ 
+ METADATA_TEMPLATE = """#pragma once
+ 
+@@ -41,7 +41,11 @@ driver = utils.get_driver(keyboard)
+ 
+ 
+ def ms_os_20_guid_def():
+-    uuid = uuid4().hex.upper()
++    identity = (
++        f"https://github.com/peppapighs/libhmk/"
++        f"{kb_json.usb.vid}/{kb_json.usb.pid}/xinput"
++    )
++    uuid = uuid5(NAMESPACE_URL, identity).hex.upper()
+     guid = f"{{{uuid[:8]}-{uuid[8:12]}-{uuid[12:16]}-{uuid[16:20]}-{uuid[20:]}}}"
+     guid_array = [f"U16_TO_U8S_LE('{x}')" for x in guid] + ["U16_TO_U8S_LE('\\0')"] * 2
+ 
+@@ -61,22 +65,40 @@ def keyboard_metadata_def():
+         "numAdvancedKeys": kb_json.keyboard.num_advanced_keys,
+         "numDynamicKeystrokeMaxBindings": kb_json.keyboard.num_dynamic_keystroke_max_bindings,
+         "numMacroNodes": kb_json.keyboard.num_macro_nodes,
++        "gamepadApis": ["xinput", "hid"],
+         "layout": kb_json.layout.model_dump(exclude_none=True),
+         "defaultKeymaps": utils.resolve_default_keymaps(kb_json),
++        "rgb": (
++            {
++                "numLeds": kb_json.rgb.num_leds,
++                "protocolMajor": 1,
++                "protocolMinor": 0,
++                "effects": [0, 1, 2, 3, 7],
++            }
++            if kb_json.rgb is not None
++            else None
++        ),
+     }
+ 
+     uncompressed = json.dumps(metadata).encode("utf-8")
+-    compressed = gzip.compress(uncompressed)
++    compressed = gzip.compress(uncompressed, mtime=0)
+     print(f"Uncompressed metadata size: {len(uncompressed)} bytes")
+     print(f"Compressed metadata size: {len(compressed)} bytes")
+ 
+     return utils.to_slice_def("KEYBOARD_METADATA", compressed)
+ 
+ 
+-with open(os.path.join("include", "metadata.h"), "w") as f:
+-    f.write(
+-        METADATA_TEMPLATE.format(
+-            ms_os_20_guid=ms_os_20_guid_def(),
+-            keyboard_metadata=keyboard_metadata_def(),
+-        )
+-    )
++metadata_path = os.path.join("include", "metadata.h")
++metadata_contents = METADATA_TEMPLATE.format(
++    ms_os_20_guid=ms_os_20_guid_def(),
++    keyboard_metadata=keyboard_metadata_def(),
++)
++try:
++    with open(metadata_path, "r", newline="") as f:
++        current_metadata = f.read()
++except FileNotFoundError:
++    current_metadata = None
++
++if current_metadata != metadata_contents:
++    with open(metadata_path, "w", newline="") as f:
++        f.write(metadata_contents)
+diff --git a/scripts/schema/keyboard.py b/scripts/schema/keyboard.py
+index c688d03..31e3418 100644
+--- a/scripts/schema/keyboard.py
++++ b/scripts/schema/keyboard.py
+@@ -13,6 +13,10 @@
+ 
+ from enum import Enum
+ from pydantic import BaseModel, Field, NonNegativeInt, PositiveFloat, PositiveInt
++from typing import Annotated
++
++
++RGBComponent = Annotated[int, Field(ge=0, le=255)]
+ 
+ 
+ class KeyboardUSBPort(str, Enum):
+@@ -118,6 +122,17 @@ class KeyboardActuation(BaseModel):
+     actuation_point: int = Field(ge=0, le=255)
+ 
+ 
++class KeyboardRGB(BaseModel):
++    # Number of addressable RGB LEDs. The bridge protocol encodes this in one byte.
++    num_leds: int = Field(ge=1, le=255)
++    # GPIO pin used by the board-specific non-blocking backend.
++    data_pin: str = Field(pattern=r"^A(?:0|5|15)$")
++    # Currently supported by the STM32F723 driver used by KBHE.
++    backend: str = Field(pattern=r"^ws2812_tim2_ch1$")
++    default_brightness: int = Field(ge=0, le=255, default=50)
++    default_color: tuple[RGBComponent, RGBComponent, RGBComponent] = (255, 255, 255)
++
++
+ # keyboard.json Schema
+ class Keyboard(BaseModel):
+     name: str
+@@ -135,3 +150,4 @@ class Keyboard(BaseModel):
+     # Default keymaps for each profile. If not specified, the default keymap will be used for all profiles.
+     keymaps: list[list[list[str]]] | None = None
+     actuation: KeyboardActuation | None = None
++    rgb: KeyboardRGB | None = None
+diff --git a/scripts/utils.py b/scripts/utils.py
+index 30b6a98..f8fd735 100644
+--- a/scripts/utils.py
++++ b/scripts/utils.py
+@@ -60,6 +60,8 @@ def get_driver(keyboard: str):
+             return STM32F446XX
+         case "at32f405xx":
+             return AT32F405XX
++        case "stm32f723xx":
++            return STM32F723XX
+         case _:
+             raise ValueError(f"Unsupported driver: {driver}")
+ 
+diff --git a/scripts/validate.py b/scripts/validate.py
+index 62cc44c..1e8cbc9 100644
+--- a/scripts/validate.py
++++ b/scripts/validate.py
+@@ -25,6 +25,11 @@ utils.get_driver(keyboard)
+ # Load JSON files and validate
+ kb_json = utils.get_kb_json(keyboard)
+ 
++if kb_json.rgb is not None and kb_json.hardware.driver != "stm32f723xx":
++    raise ValueError(
++        "The ws2812_tim2_ch1 RGB backend currently requires stm32f723xx"
++    )
++
+ # Validate default keymaps
+ default_keymaps = utils.resolve_default_keymaps(kb_json)
+ if len(default_keymaps) != kb_json.keyboard.num_profiles:
+diff --git a/src/commands.c b/src/commands.c
+index f4d5e59..9ec0c8e 100644
+--- a/src/commands.c
++++ b/src/commands.c
+@@ -20,6 +20,9 @@
+ #include "layout.h"
+ #include "matrix.h"
+ #include "metadata.h"
++#if defined(RGB_ENABLE)
++#include "rgb.h"
++#endif
+ #include "tusb.h"
+ 
+ // Helper macro to verify command parameters
+@@ -31,6 +34,26 @@
+ 
+ static const uint8_t keyboard_metadata[] = {KEYBOARD_METADATA};
+ 
++static bool gamepad_options_are_valid(const gamepad_options_t *options) {
++  if (options == NULL)
++    return false;
++  for (uint8_t i = 0u; i < 3u; i++) {
++    if (options->analog_curve[i][0] >= options->analog_curve[i + 1u][0])
++      return false;
++  }
++  return true;
++}
++
++static bool gamepad_buttons_are_valid(const uint8_t *buttons, uint8_t len) {
++  if (buttons == NULL)
++    return false;
++  for (uint8_t i = 0u; i < len; i++) {
++    if (buttons[i] > GP_BUTTON_RT)
++      return false;
++  }
++  return true;
++}
++
+ // `volatile` to prevent compiler optimizations
+ static volatile bool command_request_pending;
+ static volatile bool command_response_pending;
+@@ -188,6 +211,10 @@ static void command_process(void) {
+   const command_in_buffer_t *in = (const command_in_buffer_t *)in_buf;
+   command_out_buffer_t *out = (command_out_buffer_t *)out_buf;
+ 
++  /* Responses are fixed-size RAW HID reports. Clear unused bytes so a short
++   * response cannot leak payload left behind by an earlier command. */
++  memset(out_buf, 0, sizeof(out_buf));
++
+   bool success = true;
+   switch (in->command_id) {
+   case COMMAND_FIRMWARE_VERSION: {
+@@ -242,7 +269,9 @@ static void command_process(void) {
+     break;
+   }
+   case COMMAND_SET_OPTIONS: {
+-    success = EECONFIG_WRITE(options, &in->options);
++    eeconfig_options_t options = in->options;
++    COMMAND_VERIFY(!(options.xinput_enabled && options.hid_gamepad_enabled));
++    success = EECONFIG_WRITE(options, &options);
+     break;
+   }
+   case COMMAND_RESET_PROFILE: {
+@@ -312,6 +341,127 @@ static void command_process(void) {
+     success = EECONFIG_WRITE(bottom_out_threshold, bottom_out_threshold);
+     break;
+   }
++#if defined(RGB_ENABLE)
++  case COMMAND_GET_LED_ENABLED: {
++    out_buf[1] = 0;
++    out_buf[2] = rgb_is_enabled() ? 1u : 0u;
++    break;
++  }
++  case COMMAND_SET_LED_ENABLED: {
++    if (in_buf[2] > 1u)
++      out_buf[1] = 3u;
++    else
++      out_buf[1] = rgb_set_enabled(in_buf[2] != 0u, true) ? 0u : 1u;
++    out_buf[2] = rgb_is_enabled() ? 1u : 0u;
++    break;
++  }
++  case COMMAND_GET_LED_BRIGHTNESS: {
++    out_buf[1] = 0;
++    out_buf[2] = rgb_get_brightness();
++    break;
++  }
++  case COMMAND_SET_LED_BRIGHTNESS: {
++    out_buf[1] = rgb_set_brightness(in_buf[2], true) ? 0u : 1u;
++    out_buf[2] = rgb_get_brightness();
++    break;
++  }
++  case COMMAND_GET_LED_PIXEL: {
++    uint8_t r = 0, g = 0, b = 0;
++    out_buf[2] = in_buf[2];
++    out_buf[1] = rgb_get_pixel(in_buf[2], &r, &g, &b) ? 0u : 3u;
++    out_buf[3] = r;
++    out_buf[4] = g;
++    out_buf[5] = b;
++    break;
++  }
++  case COMMAND_SET_LED_PIXEL: {
++    out_buf[2] = in_buf[2];
++    out_buf[3] = in_buf[3];
++    out_buf[4] = in_buf[4];
++    out_buf[5] = in_buf[5];
++    out_buf[1] = rgb_set_pixel(in_buf[2], in_buf[3], in_buf[4], in_buf[5])
++                     ? 0u
++                     : 3u;
++    break;
++  }
++  case COMMAND_GET_LED_ALL: {
++    const uint8_t chunk = in_buf[2];
++    const uint16_t offset = (uint16_t)chunk * 60u;
++    const uint16_t remaining = offset < (uint16_t)RGB_FRAME_BYTES
++                                   ? (uint16_t)((uint16_t)RGB_FRAME_BYTES -
++                                                offset)
++                                   : 0u;
++    const uint8_t len = remaining > 60u ? 60u : (uint8_t)remaining;
++    out_buf[2] = chunk;
++    out_buf[3] = len;
++    out_buf[1] = rgb_get_frame_chunk(offset, out_buf + 4, len) ? 0u : 3u;
++    break;
++  }
++  case COMMAND_SET_LED_ALL_CHUNK: {
++    const uint8_t chunk = in_buf[2];
++    const uint8_t len = in_buf[3];
++    const uint16_t offset = (uint16_t)chunk * 60u;
++    out_buf[2] = chunk;
++    out_buf[3] = len;
++    out_buf[1] = (len <= 60u && rgb_set_frame_chunk(offset, in_buf + 4, len))
++                     ? 0u
++                     : 3u;
++    break;
++  }
++  case COMMAND_LED_CLEAR: {
++    out_buf[1] = rgb_fill(0, 0, 0, rgb_get_effect() != RGB_EFFECT_LIVE)
++                     ? 0u
++                     : 1u;
++    break;
++  }
++  case COMMAND_LED_FILL: {
++    out_buf[1] = rgb_fill(in_buf[2], in_buf[3], in_buf[4],
++                          rgb_get_effect() != RGB_EFFECT_LIVE)
++                     ? 0u
++                     : 1u;
++    out_buf[2] = in_buf[2];
++    out_buf[3] = in_buf[3];
++    out_buf[4] = in_buf[4];
++    break;
++  }
++  case COMMAND_GET_LED_EFFECT: {
++    out_buf[1] = 0;
++    out_buf[2] = rgb_get_effect();
++    break;
++  }
++  case COMMAND_SET_LED_EFFECT: {
++    const uint8_t effect = in_buf[2];
++    const bool valid = effect == RGB_EFFECT_STATIC ||
++                       effect == RGB_EFFECT_BREATHING ||
++                       effect == RGB_EFFECT_RAINBOW ||
++                       effect == RGB_EFFECT_RAINBOW_WAVE ||
++                       effect == RGB_EFFECT_LIVE;
++    if (!valid)
++      out_buf[1] = 3u;
++    else
++      out_buf[1] = rgb_set_effect(effect, effect != RGB_EFFECT_LIVE) ? 0u : 1u;
++    out_buf[2] = rgb_get_effect();
++    break;
++  }
++  case COMMAND_RESTORE_LED_EFFECT: {
++    out_buf[1] = rgb_restore_effect() ? 0u : 1u;
++    out_buf[2] = rgb_get_effect();
++    break;
++  }
++  case COMMAND_GET_RGB_CAPABILITIES: {
++    out_buf[1] = 0;
++    out_buf[2] = 1; /* protocol major */
++    out_buf[3] = 0; /* protocol minor */
++    out_buf[4] = RGB_LED_COUNT;
++    out_buf[5] = RGB_BYTES_PER_PIXEL;
++    out_buf[6] = 60;
++    out_buf[7] = RGB_EFFECT_LIVE;
++    out_buf[8] = 0x7f; /* enabled..restore */
++    out_buf[9] = 0;
++    out_buf[10] = 0; /* logical RGB */
++    break;
++  }
++#endif
+     //--------------------------------------------------------------------+
+     // Per-profile commands
+     //--------------------------------------------------------------------+
+@@ -447,6 +597,7 @@ static void command_process(void) {
+     COMMAND_VERIFY(p->offset < NUM_KEYS);
+     COMMAND_VERIFY(p->len <= M_ARRAY_SIZE(p->gamepad_buttons) &&
+                    p->len <= NUM_KEYS - p->offset);
++    COMMAND_VERIFY(gamepad_buttons_are_valid(p->gamepad_buttons, p->len));
+ 
+     success = EECONFIG_WRITE_N(profiles[p->profile].gamepad_buttons[p->offset],
+                                p->gamepad_buttons, sizeof(uint8_t) * p->len);
+@@ -464,6 +615,7 @@ static void command_process(void) {
+     const command_in_gamepad_options_t *p = &in->gamepad_options;
+ 
+     COMMAND_VERIFY(p->profile < NUM_PROFILES);
++    COMMAND_VERIFY(gamepad_options_are_valid(&p->gamepad_options));
+ 
+     success = EECONFIG_WRITE(profiles[p->profile].gamepad_options,
+                              &p->gamepad_options);
+@@ -491,4 +643,4 @@ void command_task(void) {
+       tud_hid_n_report(USB_ITF_RAW_HID, 0, out_buf, RAW_HID_EP_SIZE))
+     // The command response has been sent, so clear the queue.
+     command_response_pending = false;
+-}
+\ No newline at end of file
++}
+diff --git a/src/eeconfig.c b/src/eeconfig.c
+index 3df61fa..3bc8979 100644
+--- a/src/eeconfig.c
++++ b/src/eeconfig.c
+@@ -23,6 +23,7 @@ const eeconfig_t *eeconfig;
+ // Default configuration values
+ static eeconfig_options_t default_options = DEFAULT_OPTIONS;
+ static eeconfig_calibration_t default_calibration = DEFAULT_CALIBRATION;
++static const eeconfig_rgb_t default_rgb = DEFAULT_RGB;
+ static const uint8_t default_keymaps[NUM_PROFILES][NUM_LAYERS][NUM_KEYS] =
+     DEFAULT_KEYMAPS;
+ static const macro_node_t default_macro = {
+@@ -83,6 +84,7 @@ bool eeconfig_reset(void) {
+   status &= EECONFIG_WRITE(options, &default_options);
+   EECONFIG_WRITE_LOCAL(current_profile, 0);
+   EECONFIG_WRITE_LOCAL(last_non_default_profile, M_MIN(1, NUM_PROFILES - 1));
++  status &= EECONFIG_WRITE(rgb, &default_rgb);
+   for (uint32_t i = 0; i < NUM_PROFILES; i++)
+     status &= eeconfig_write_default_profile(i);
+   EECONFIG_WRITE_LOCAL(magic_end, EECONFIG_MAGIC_END);
+diff --git a/src/hardware/stm32f723xx/analog.c b/src/hardware/stm32f723xx/analog.c
+new file mode 100644
+index 0000000..826751a
+--- /dev/null
++++ b/src/hardware/stm32f723xx/analog.c
+@@ -0,0 +1,255 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include "hardware/hardware.h"
++
++#include "stm32f7xx_hal.h"
++
++static GPIO_TypeDef *channel_ports[] = {
++    GPIOA, GPIOA, GPIOA, GPIOA, GPIOA, GPIOA, GPIOA, GPIOA,
++    GPIOB, GPIOB, GPIOC, GPIOC, GPIOC, GPIOC, GPIOC, GPIOC,
++};
++static const uint16_t channel_pins[] = {
++    GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_2, GPIO_PIN_3, GPIO_PIN_4, GPIO_PIN_5,
++    GPIO_PIN_6, GPIO_PIN_7, GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_0, GPIO_PIN_1,
++    GPIO_PIN_2, GPIO_PIN_3, GPIO_PIN_4, GPIO_PIN_5,
++};
++
++_Static_assert(M_ARRAY_SIZE(channel_ports) == ADC_NUM_CHANNELS,
++               "Invalid ADC channel port table");
++_Static_assert(M_ARRAY_SIZE(channel_pins) == ADC_NUM_CHANNELS,
++               "Invalid ADC channel pin table");
++
++#if ADC_NUM_MUX_INPUTS > 0
++static const uint32_t mux_input_channels[] = ADC_MUX_INPUT_CHANNELS;
++static GPIO_TypeDef *mux_select_ports[] = ADC_MUX_SELECT_PORTS;
++static const uint16_t mux_select_pins[] = ADC_MUX_SELECT_PINS;
++static const uint16_t mux_input_matrix[][ADC_NUM_MUX_INPUTS] =
++    ADC_MUX_INPUT_MATRIX;
++
++_Static_assert(M_ARRAY_SIZE(mux_input_channels) == ADC_NUM_MUX_INPUTS,
++               "Invalid ADC mux input table");
++_Static_assert(M_ARRAY_SIZE(mux_select_ports) == ADC_NUM_MUX_SELECT_PINS,
++               "Invalid mux select port table");
++_Static_assert(M_ARRAY_SIZE(mux_select_pins) == ADC_NUM_MUX_SELECT_PINS,
++               "Invalid mux select pin table");
++_Static_assert(M_ARRAY_SIZE(mux_input_matrix) ==
++                   (1u << ADC_NUM_MUX_SELECT_PINS),
++               "Invalid ADC mux matrix");
++#endif
++
++#if ADC_NUM_RAW_INPUTS > 0
++static const uint32_t raw_input_channels[] = ADC_RAW_INPUT_CHANNELS;
++static const uint16_t raw_input_vector[] = ADC_RAW_INPUT_VECTOR;
++
++_Static_assert(M_ARRAY_SIZE(raw_input_channels) == ADC_NUM_RAW_INPUTS,
++               "Invalid raw ADC input table");
++_Static_assert(M_ARRAY_SIZE(raw_input_vector) == ADC_NUM_RAW_INPUTS,
++               "Invalid raw ADC mapping table");
++#endif
++
++static ADC_HandleTypeDef adc_handle;
++static DMA_HandleTypeDef dma_handle;
++#if ADC_NUM_MUX_INPUTS > 0
++static TIM_HandleTypeDef tim_handle;
++#endif
++
++static volatile bool adc_initialized;
++#define ADC_DMA_SAMPLES                                                     \
++  (M_DIV_CEIL(ADC_NUM_MUX_INPUTS + ADC_NUM_RAW_INPUTS, 16u) * 16u)
++__attribute__((aligned(32))) static volatile uint16_t
++    adc_buffer[ADC_DMA_SAMPLES];
++static volatile uint16_t adc_values[NUM_KEYS];
++
++static void adc_buffer_invalidate(void) {
++  if ((SCB->CCR & SCB_CCR_DC_Msk) != 0u) {
++    const uintptr_t first = (uintptr_t)adc_buffer & ~(uintptr_t)31u;
++    const uintptr_t last =
++        ((uintptr_t)adc_buffer + sizeof(adc_buffer) + 31u) & ~(uintptr_t)31u;
++    SCB_InvalidateDCache_by_Addr((uint32_t *)first, (int32_t)(last - first));
++  }
++}
++
++void analog_init(void) {
++  ADC_ChannelConfTypeDef channel = {0};
++
++  __HAL_RCC_ADC1_CLK_ENABLE();
++  __HAL_RCC_DMA2_CLK_ENABLE();
++  __HAL_RCC_GPIOA_CLK_ENABLE();
++  __HAL_RCC_GPIOB_CLK_ENABLE();
++  __HAL_RCC_GPIOC_CLK_ENABLE();
++  __HAL_RCC_GPIOD_CLK_ENABLE();
++#if ADC_NUM_MUX_INPUTS > 0
++  __HAL_RCC_TIM10_CLK_ENABLE();
++#endif
++
++  adc_handle.Instance = ADC1;
++  adc_handle.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
++  adc_handle.Init.Resolution = ADC_RESOLUTION_HAL;
++  adc_handle.Init.ScanConvMode = ADC_SCAN_ENABLE;
++  adc_handle.Init.ContinuousConvMode = DISABLE;
++  adc_handle.Init.DiscontinuousConvMode = DISABLE;
++  adc_handle.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
++  adc_handle.Init.ExternalTrigConv = ADC_SOFTWARE_START;
++  adc_handle.Init.DataAlign = ADC_DATAALIGN_RIGHT;
++  adc_handle.Init.NbrOfConversion = ADC_NUM_MUX_INPUTS + ADC_NUM_RAW_INPUTS;
++  adc_handle.Init.DMAContinuousRequests = DISABLE;
++  adc_handle.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
++  if (HAL_ADC_Init(&adc_handle) != HAL_OK)
++    board_error_handler();
++
++#if ADC_NUM_MUX_INPUTS > 0
++  for (uint32_t i = 0; i < ADC_NUM_MUX_INPUTS; i++) {
++    GPIO_InitTypeDef gpio = {0};
++    channel.Channel = mux_input_channels[i];
++    channel.Rank = i + 1u;
++    channel.SamplingTime = ADC_NUM_SAMPLE_CYCLES;
++    if (HAL_ADC_ConfigChannel(&adc_handle, &channel) != HAL_OK)
++      board_error_handler();
++
++    gpio.Pin = channel_pins[mux_input_channels[i]];
++    gpio.Mode = GPIO_MODE_ANALOG;
++    gpio.Pull = GPIO_NOPULL;
++    HAL_GPIO_Init(channel_ports[mux_input_channels[i]], &gpio);
++  }
++
++  for (uint32_t i = 0; i < ADC_NUM_MUX_SELECT_PINS; i++) {
++    GPIO_InitTypeDef gpio = {0};
++    gpio.Pin = mux_select_pins[i];
++    gpio.Mode = GPIO_MODE_OUTPUT_PP;
++    gpio.Pull = GPIO_NOPULL;
++    gpio.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    HAL_GPIO_Init(mux_select_ports[i], &gpio);
++    HAL_GPIO_WritePin(mux_select_ports[i], mux_select_pins[i], GPIO_PIN_RESET);
++  }
++#endif
++
++#if ADC_NUM_RAW_INPUTS > 0
++  for (uint32_t i = 0; i < ADC_NUM_RAW_INPUTS; i++) {
++    GPIO_InitTypeDef gpio = {0};
++    channel.Channel = raw_input_channels[i];
++    channel.Rank = ADC_NUM_MUX_INPUTS + i + 1u;
++    channel.SamplingTime = ADC_NUM_SAMPLE_CYCLES;
++    if (HAL_ADC_ConfigChannel(&adc_handle, &channel) != HAL_OK)
++      board_error_handler();
++
++    gpio.Pin = channel_pins[raw_input_channels[i]];
++    gpio.Mode = GPIO_MODE_ANALOG;
++    gpio.Pull = GPIO_NOPULL;
++    HAL_GPIO_Init(channel_ports[raw_input_channels[i]], &gpio);
++  }
++#endif
++
++  dma_handle.Instance = DMA2_Stream0;
++  dma_handle.Init.Channel = DMA_CHANNEL_0;
++  dma_handle.Init.Direction = DMA_PERIPH_TO_MEMORY;
++  dma_handle.Init.PeriphInc = DMA_PINC_DISABLE;
++  dma_handle.Init.MemInc = DMA_MINC_ENABLE;
++  dma_handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
++  dma_handle.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
++  dma_handle.Init.Mode = DMA_CIRCULAR;
++  dma_handle.Init.Priority = DMA_PRIORITY_VERY_HIGH;
++  dma_handle.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
++  if (HAL_DMA_Init(&dma_handle) != HAL_OK)
++    board_error_handler();
++  __HAL_LINKDMA(&adc_handle, DMA_Handle, dma_handle);
++
++#if ADC_NUM_MUX_INPUTS > 0
++  tim_handle.Instance = TIM10;
++  tim_handle.Init.Prescaler = 0;
++  tim_handle.Init.CounterMode = TIM_COUNTERMODE_UP;
++  tim_handle.Init.Period =
++      (F_CPU / 1000000u) * (uint32_t)ADC_SAMPLE_DELAY - 1u;
++  tim_handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
++  tim_handle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
++  if (HAL_TIM_Base_Init(&tim_handle) != HAL_OK)
++    board_error_handler();
++#endif
++
++  HAL_NVIC_SetPriority(ADC_IRQn, 1, 0);
++  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 1, 0);
++  HAL_NVIC_EnableIRQ(ADC_IRQn);
++  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
++#if ADC_NUM_MUX_INPUTS > 0
++  HAL_NVIC_SetPriority(TIM1_UP_TIM10_IRQn, 1, 0);
++  HAL_NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn);
++#endif
++
++  adc_buffer_invalidate();
++  if (HAL_ADC_Start_DMA(&adc_handle, (uint32_t *)adc_buffer,
++                        ADC_NUM_MUX_INPUTS + ADC_NUM_RAW_INPUTS) != HAL_OK)
++    board_error_handler();
++  while (!adc_initialized)
++    ;
++}
++
++void analog_task(void) {}
++
++uint16_t analog_read(uint8_t key) { return adc_values[key]; }
++
++void ADC_IRQHandler(void) { HAL_ADC_IRQHandler(&adc_handle); }
++void DMA2_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&dma_handle); }
++#if ADC_NUM_MUX_INPUTS > 0
++void TIM1_UP_TIM10_IRQHandler(void) { HAL_TIM_IRQHandler(&tim_handle); }
++#endif
++
++void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
++#if ADC_NUM_MUX_INPUTS > 0
++  static uint8_t mux_channel;
++#endif
++  if (hadc != &adc_handle)
++    return;
++
++  adc_buffer_invalidate();
++#if ADC_NUM_MUX_INPUTS > 0
++  for (uint32_t i = 0; i < ADC_NUM_MUX_INPUTS; i++) {
++    const uint16_t key = mux_input_matrix[mux_channel][i];
++    if (key != 0u)
++      adc_values[key - 1u] = adc_buffer[i];
++  }
++#endif
++#if ADC_NUM_RAW_INPUTS > 0
++  for (uint32_t i = 0; i < ADC_NUM_RAW_INPUTS; i++) {
++    const uint16_t key = raw_input_vector[i];
++    if (key != 0u)
++      adc_values[key - 1u] = adc_buffer[ADC_NUM_MUX_INPUTS + i];
++  }
++#endif
++
++#if ADC_NUM_MUX_INPUTS > 0
++  mux_channel = (uint8_t)((mux_channel + 1u) &
++                          ((1u << ADC_NUM_MUX_SELECT_PINS) - 1u));
++  adc_initialized |= mux_channel == 0u;
++  for (uint32_t i = 0; i < ADC_NUM_MUX_SELECT_PINS; i++) {
++    HAL_GPIO_WritePin(mux_select_ports[i], mux_select_pins[i],
++                      ((((uint32_t)mux_channel) >> i) & 1u) != 0u
++                          ? GPIO_PIN_SET
++                          : GPIO_PIN_RESET);
++  }
++  if (HAL_TIM_Base_Start_IT(&tim_handle) != HAL_OK)
++    board_error_handler();
++#else
++  adc_initialized = true;
++  adc_buffer_invalidate();
++  if (HAL_ADC_Start_DMA(&adc_handle, (uint32_t *)adc_buffer,
++                        ADC_NUM_MUX_INPUTS + ADC_NUM_RAW_INPUTS) != HAL_OK)
++    board_error_handler();
++#endif
++}
++
++#if ADC_NUM_MUX_INPUTS > 0
++void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
++  if (htim != &tim_handle)
++    return;
++  if (HAL_TIM_Base_Stop_IT(&tim_handle) != HAL_OK)
++    board_error_handler();
++  adc_buffer_invalidate();
++  if (HAL_ADC_Start_DMA(&adc_handle, (uint32_t *)adc_buffer,
++                        ADC_NUM_MUX_INPUTS + ADC_NUM_RAW_INPUTS) != HAL_OK)
++    board_error_handler();
++}
++#endif
+diff --git a/src/hardware/stm32f723xx/board.c b/src/hardware/stm32f723xx/board.c
+new file mode 100644
+index 0000000..2c080d0
+--- /dev/null
++++ b/src/hardware/stm32f723xx/board.c
+@@ -0,0 +1,158 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include "hardware/hardware.h"
++
++#include "stm32f7xx_hal.h"
++#include "tusb.h"
++
++static void board_clock_init(void) {
++  RCC_OscInitTypeDef osc = {0};
++  RCC_ClkInitTypeDef clk = {0};
++
++  __HAL_RCC_PWR_CLK_ENABLE();
++  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
++
++  osc.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++  osc.HSEState = RCC_HSE_ON;
++  osc.PLL.PLLState = RCC_PLL_ON;
++  osc.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++  /* Keep the VCO input at 2 MHz. With the KBHE 16 MHz HSE this produces a
++   * 432 MHz VCO, a 216 MHz CPU clock and a valid 48 MHz PLLQ output. */
++  osc.PLL.PLLM = BOARD_HSE_VALUE / 2000000u;
++  osc.PLL.PLLN = 216;
++  osc.PLL.PLLP = RCC_PLLP_DIV2;
++  osc.PLL.PLLQ = 9;
++  if (HAL_RCC_OscConfig(&osc) != HAL_OK)
++    board_error_handler();
++
++  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
++    board_error_handler();
++
++  clk.ClockType = RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK |
++                  RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
++  clk.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
++  clk.AHBCLKDivider = RCC_SYSCLK_DIV1;
++  clk.APB1CLKDivider = RCC_HCLK_DIV4;
++  clk.APB2CLKDivider = RCC_HCLK_DIV2;
++  if (HAL_RCC_ClockConfig(&clk, FLASH_LATENCY_7) != HAL_OK)
++    board_error_handler();
++}
++
++static void board_usb_init(void) {
++  GPIO_InitTypeDef gpio = {0};
++
++#if !defined(BOARD_USB_HS)
++#error "The KBHE STM32F723 port requires the integrated high-speed PHY"
++#endif
++
++  __HAL_RCC_GPIOB_CLK_ENABLE();
++  __HAL_RCC_OTGPHYC_CLK_ENABLE();
++  __HAL_RCC_USB_OTG_HS_CLK_ENABLE();
++  /* Required by the DWC2 core reset path even when the embedded PHY is used. */
++  __HAL_RCC_USB_OTG_HS_ULPI_CLK_ENABLE();
++
++#if defined(RCC_AHB1LPENR_OTGHSULPILPEN)
++  RCC->AHB1LPENR &= ~RCC_AHB1LPENR_OTGHSULPILPEN;
++#endif
++
++  gpio.Pin = GPIO_PIN_14 | GPIO_PIN_15;
++  gpio.Mode = GPIO_MODE_AF_PP;
++  gpio.Pull = GPIO_NOPULL;
++  gpio.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++  gpio.Alternate = GPIO_AF12_OTG_HS_FS;
++  HAL_GPIO_Init(GPIOB, &gpio);
++
++  /* KBHE does not route the optional PB13 VBUS-sense input. Advertise a valid
++   * B-device session in software, as required by TinyUSB's STM32F7 BSP. */
++  USB_OTG_HS->GCCFG &= ~USB_OTG_GCCFG_VBDEN;
++  USB_OTG_HS->GOTGCTL |= USB_OTG_GOTGCTL_BVALOEN;
++  USB_OTG_HS->GOTGCTL |= USB_OTG_GOTGCTL_BVALOVAL;
++
++  HAL_NVIC_SetPriority(OTG_HS_IRQn, 0, 0);
++  HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
++}
++
++static void board_bootloader_jump(void) {
++  volatile const uint32_t *vector =
++      (volatile const uint32_t *)BOOTLOADER_ADDR;
++  const uint32_t sp = vector[0];
++  const uint32_t entry = vector[1];
++
++  SysTick->CTRL = 0;
++  SysTick->LOAD = 0;
++  SysTick->VAL = 0;
++  for (uint32_t i = 0; i < M_ARRAY_SIZE(NVIC->ICER); i++)
++    NVIC->ICER[i] = UINT32_MAX;
++
++  SCB->VTOR = (uint32_t)BOOTLOADER_ADDR;
++  __set_MSP(sp);
++  __set_PSP(sp);
++  ((void (*)(void))entry)();
++  while (1)
++    ;
++}
++
++extern uint32_t _board_bootloader_flag[];
++#define BOARD_BOOTLOADER_FLAG _board_bootloader_flag[0]
++
++void board_init(void) {
++  if (BOARD_BOOTLOADER_FLAG == BOOTLOADER_MAGIC) {
++    BOARD_BOOTLOADER_FLAG = 0;
++    board_bootloader_jump();
++  }
++
++  /* Match TinyUSB's STM32F7 policy: instruction cache materially reduces scan
++   * time, while data cache stays disabled so every current and future DMA
++   * buffer is coherent by default. Explicitly disable a cache that a chainload
++   * bootloader may have left enabled; CMSIS cleans it before switching it off.
++   * The ADC/RGB backends still perform aligned maintenance if a downstream
++   * board deliberately enables D-cache later. */
++  if ((SCB->CCR & SCB_CCR_DC_Msk) != 0u)
++    SCB_DisableDCache();
++  SCB_EnableICache();
++
++  HAL_Init();
++  board_clock_init();
++  board_usb_init();
++
++  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
++  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
++  DWT->CYCCNT = 0;
++}
++
++void board_error_handler(void) {
++  __disable_irq();
++  while (1)
++    ;
++}
++
++void board_reset(void) { NVIC_SystemReset(); }
++
++void board_enter_bootloader(void) {
++  BOARD_BOOTLOADER_FLAG = BOOTLOADER_MAGIC;
++  NVIC_SystemReset();
++}
++
++uint32_t board_serial(char *buf) {
++  const volatile uint8_t *uid = (const volatile uint8_t *)UID_BASE;
++  for (uint32_t i = 0; i < 12; i++) {
++    buf[i * 2u] = M_HEX(uid[i] >> 4);
++    buf[i * 2u + 1u] = M_HEX(uid[i] & 0x0fu);
++  }
++  return 24;
++}
++
++uint32_t board_cycle_count(void) { return DWT->CYCCNT; }
++
++uint32_t tusb_time_millis_api(void) { return HAL_GetTick(); }
++
++void tusb_time_delay_ms_api(uint32_t ms) { HAL_Delay(ms); }
++
++void SysTick_Handler(void) { HAL_IncTick(); }
++
++void OTG_HS_IRQHandler(void) { tud_int_handler(1); }
+diff --git a/src/hardware/stm32f723xx/crc32.c b/src/hardware/stm32f723xx/crc32.c
+new file mode 100644
+index 0000000..07407a5
+--- /dev/null
++++ b/src/hardware/stm32f723xx/crc32.c
+@@ -0,0 +1,31 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include "crc32.h"
++
++#include "hardware/hardware.h"
++#include "stm32f7xx_hal.h"
++
++static CRC_HandleTypeDef crc_handle;
++
++void crc32_init(void) {
++  __HAL_RCC_CRC_CLK_ENABLE();
++  crc_handle.Instance = CRC;
++  if (HAL_CRC_Init(&crc_handle) != HAL_OK)
++    board_error_handler();
++}
++uint32_t crc32_compute(const void *buf, uint32_t len, uint32_t crc) {
++  const uint8_t *bytes = buf;
++  uint32_t tail = 0;
++  (void)HAL_CRC_Calculate(&crc_handle, &crc, 1);
++  crc = HAL_CRC_Accumulate(&crc_handle, (uint32_t *)bytes, len >> 2);
++  if ((len & 3u) != 0u) {
++    memcpy(&tail, bytes + (len & ~(uint32_t)3u), len & 3u);
++    crc = HAL_CRC_Accumulate(&crc_handle, &tail, 1);
++  }
++  return crc;
++}
+diff --git a/src/hardware/stm32f723xx/flash.c b/src/hardware/stm32f723xx/flash.c
+new file mode 100644
+index 0000000..310bacf
+--- /dev/null
++++ b/src/hardware/stm32f723xx/flash.c
+@@ -0,0 +1,54 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include "hardware/hardware.h"
++
++#include "stm32f7xx_hal.h"
++
++void flash_init(void) {}
++
++bool flash_erase(uint32_t sector) {
++  if (sector >= FLASH_NUM_SECTORS)
++    return false;
++
++  FLASH_EraseInitTypeDef erase = {0};
++  uint32_t error = 0;
++  erase.TypeErase = FLASH_TYPEERASE_SECTORS;
++  erase.Sector = sector;
++  erase.NbSectors = 1;
++  erase.VoltageRange = FLASH_VOLTAGE_RANGE_3;
++
++  HAL_FLASH_Unlock();
++  const bool success = HAL_FLASHEx_Erase(&erase, &error) == HAL_OK;
++  HAL_FLASH_Lock();
++  return success;
++}
++
++bool flash_read(uint32_t addr, void *buf, uint32_t len) {
++  if (addr > FLASH_SIZE || len > (FLASH_SIZE - addr) / sizeof(uint32_t))
++    return false;
++  memcpy(buf, (const void *)(FLASH_BASE + addr), len * sizeof(uint32_t));
++  return true;
++}
++
++bool flash_write(uint32_t addr, const void *buf, uint32_t len) {
++  if (addr > FLASH_SIZE || len > (FLASH_SIZE - addr) / sizeof(uint32_t))
++    return false;
++
++  const uint32_t *words = buf;
++  HAL_FLASH_Unlock();
++  for (uint32_t i = 0; i < len; i++) {
++    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD,
++                          FLASH_BASE + addr + i * sizeof(uint32_t),
++                          words[i]) != HAL_OK) {
++      HAL_FLASH_Lock();
++      return false;
++    }
++  }
++  HAL_FLASH_Lock();
++  return true;
++}
+diff --git a/src/hardware/stm32f723xx/rgb.c b/src/hardware/stm32f723xx/rgb.c
+new file mode 100644
+index 0000000..9b50a43
+--- /dev/null
++++ b/src/hardware/stm32f723xx/rgb.c
+@@ -0,0 +1,189 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include "hardware/rgb_api.h"
++
++#if defined(RGB_ENABLE)
++
++#include "hardware/hardware.h"
++#include "rgb.h"
++#include "stm32f7xx_hal.h"
++
++#if !defined(RGB_BACKEND_WS2812_TIM2_CH1)
++#error "Unsupported RGB backend for STM32F723"
++#endif
++#define WS2812_BITS_PER_LED 24u
++/* Refill eight LEDs per half-buffer. This lowers the worst-case interrupt rate
++ * from 33.3 kHz (one callback per LED) to 4.17 kHz while keeping the buffer
++ * small and every refill deadline a comfortable 240 us. */
++#define WS2812_LEDS_PER_HALF 8u
++#define WS2812_HALF_WORDS (WS2812_BITS_PER_LED * WS2812_LEDS_PER_HALF)
++#define WS2812_DMA_WORDS (WS2812_HALF_WORDS * 2u)
++#define WS2812_PERIOD 134u
++#define WS2812_ZERO 43u
++#define WS2812_ONE 86u
++
++static TIM_HandleTypeDef tim_handle;
++static DMA_HandleTypeDef dma_handle;
++__attribute__((aligned(32))) static uint32_t dma_buffer[WS2812_DMA_WORDS];
++static uint8_t tx_frame[RGB_FRAME_BYTES];
++static volatile bool tx_busy;
++static volatile bool tx_stop_pending;
++static uint16_t tx_next_led;
++static bool half_contains_data[2];
++
++static void rgb_dma_clean(uint32_t *first, uint32_t words) {
++  if ((SCB->CCR & SCB_CCR_DC_Msk) != 0u)
++    SCB_CleanDCache_by_Addr(first,
++                           (int32_t)(words * (uint32_t)sizeof(uint32_t)));
++}
++
++static void encode_byte(uint8_t value, uint32_t **dst) {
++  for (uint8_t mask = 0x80u; mask != 0u; mask >>= 1u) {
++    **dst = (value & mask) != 0u ? WS2812_ONE : WS2812_ZERO;
++    (*dst)++;
++  }
++}
++
++static void fill_half(uint8_t half) {
++  uint32_t *dst = dma_buffer + (uint32_t)half * WS2812_HALF_WORDS;
++  bool contains_data = false;
++
++  memset(dst, 0, WS2812_HALF_WORDS * sizeof(uint32_t));
++  for (uint8_t slot = 0u;
++       slot < WS2812_LEDS_PER_HALF && tx_next_led < RGB_LED_COUNT; slot++) {
++    const uint8_t *pixel = tx_frame + tx_next_led * RGB_BYTES_PER_PIXEL;
++    /* WS2812 is GRB on the wire; the bridge remains logical RGB. */
++    encode_byte(pixel[1], &dst);
++    encode_byte(pixel[0], &dst);
++    encode_byte(pixel[2], &dst);
++    tx_next_led++;
++    contains_data = true;
++  }
++  half_contains_data[half] = contains_data;
++  rgb_dma_clean(dma_buffer + (uint32_t)half * WS2812_HALF_WORDS,
++                WS2812_HALF_WORDS);
++}
++
++static void half_completed(uint8_t half) {
++  if (!tx_busy || tx_stop_pending)
++    return;
++
++  if (!half_contains_data[half]) {
++    /* A completely-low half lasts 240 us, already exceeding the WS2812 latch
++     * requirement. Leave both circular halves low and defer HAL shutdown to
++     * the main loop: HAL_TIM_PWM_Stop_DMA() is not safe from inside its own
++     * completion callback because the DMA handle can remain in ABORT state. */
++    tx_stop_pending = true;
++    return;
++  }
++  fill_half(half);
++}
++
++bool rgb_backend_init(void) {
++  GPIO_InitTypeDef gpio = {0};
++  TIM_OC_InitTypeDef output = {0};
++
++  __HAL_RCC_GPIOA_CLK_ENABLE();
++  __HAL_RCC_DMA1_CLK_ENABLE();
++  __HAL_RCC_TIM2_CLK_ENABLE();
++
++  gpio.Pin = RGB_DATA_GPIO_PIN;
++  gpio.Mode = GPIO_MODE_AF_PP;
++  gpio.Pull = GPIO_NOPULL;
++  gpio.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++  gpio.Alternate = GPIO_AF1_TIM2;
++  HAL_GPIO_Init(RGB_DATA_GPIO_PORT, &gpio);
++
++  dma_handle.Instance = DMA1_Stream5;
++  dma_handle.Init.Channel = DMA_CHANNEL_3;
++  dma_handle.Init.Direction = DMA_MEMORY_TO_PERIPH;
++  dma_handle.Init.PeriphInc = DMA_PINC_DISABLE;
++  dma_handle.Init.MemInc = DMA_MINC_ENABLE;
++  dma_handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
++  dma_handle.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
++  dma_handle.Init.Mode = DMA_CIRCULAR;
++  dma_handle.Init.Priority = DMA_PRIORITY_HIGH;
++  dma_handle.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
++  if (HAL_DMA_Init(&dma_handle) != HAL_OK)
++    return false;
++
++  tim_handle.Instance = TIM2;
++  tim_handle.Init.Prescaler = 0;
++  tim_handle.Init.CounterMode = TIM_COUNTERMODE_UP;
++  tim_handle.Init.Period = WS2812_PERIOD;
++  tim_handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
++  tim_handle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
++  if (HAL_TIM_PWM_Init(&tim_handle) != HAL_OK)
++    return false;
++
++  output.OCMode = TIM_OCMODE_PWM1;
++  output.Pulse = 0;
++  output.OCPolarity = TIM_OCPOLARITY_HIGH;
++  output.OCFastMode = TIM_OCFAST_DISABLE;
++  if (HAL_TIM_PWM_ConfigChannel(&tim_handle, &output, TIM_CHANNEL_1) != HAL_OK)
++    return false;
++
++  __HAL_LINKDMA(&tim_handle, hdma[TIM_DMA_ID_CC1], dma_handle);
++  memset(dma_buffer, 0, sizeof(dma_buffer));
++  rgb_dma_clean(dma_buffer, WS2812_DMA_WORDS);
++
++  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 2, 0);
++  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
++  return true;
++}
++
++bool rgb_backend_submit(const uint8_t *rgb, uint16_t led_count) {
++  if (rgb == NULL || led_count != RGB_LED_COUNT || tx_busy)
++    return false;
++
++  memcpy(tx_frame, rgb, RGB_FRAME_BYTES);
++  tx_next_led = 0;
++  tx_stop_pending = false;
++  fill_half(0);
++  fill_half(1);
++  tx_busy = true;
++
++  if (HAL_TIM_PWM_Start_DMA(&tim_handle, TIM_CHANNEL_1, dma_buffer,
++                            WS2812_DMA_WORDS) != HAL_OK) {
++    tx_busy = false;
++    return false;
++  }
++  return true;
++}
++
++bool rgb_backend_is_busy(void) { return tx_busy; }
++
++void rgb_backend_task(void) {
++  if (!tx_stop_pending)
++    return;
++
++  /* Run the synchronous abort outside the DMA callback. The wire is already
++   * held low by both halves, so the few cycles spent disabling the peripheral
++   * cannot corrupt the latched LED frame. */
++  __HAL_TIM_DISABLE_DMA(&tim_handle, TIM_DMA_CC1);
++  if (HAL_DMA_Abort(&dma_handle) != HAL_OK ||
++      HAL_TIM_PWM_Stop(&tim_handle, TIM_CHANNEL_1) != HAL_OK)
++    board_error_handler();
++
++  tx_busy = false;
++  tx_stop_pending = false;
++}
++
++void DMA1_Stream5_IRQHandler(void) { HAL_DMA_IRQHandler(&dma_handle); }
++
++void HAL_TIM_PWM_PulseFinishedHalfCpltCallback(TIM_HandleTypeDef *htim) {
++  if (htim == &tim_handle)
++    half_completed(0);
++}
++
++void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim) {
++  if (htim == &tim_handle)
++    half_completed(1);
++}
++
++#endif
+diff --git a/src/hardware/stm32f723xx/timer.c b/src/hardware/stm32f723xx/timer.c
+new file mode 100644
+index 0000000..1c8657f
+--- /dev/null
++++ b/src/hardware/stm32f723xx/timer.c
+@@ -0,0 +1,14 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include "hardware/hardware.h"
++
++#include "stm32f7xx_hal.h"
++
++void timer_init(void) {}
++
++uint32_t timer_read(void) { return HAL_GetTick(); }
+diff --git a/src/layout.c b/src/layout.c
+index fc7c1e3..5ec3ae5 100644
+--- a/src/layout.c
++++ b/src/layout.c
+@@ -141,7 +141,9 @@ void layout_task(void) {
+     const key_state_t *k = &key_matrix[i];
+     const bool last_key_press = bitmap_get(key_press_states, i);
+ 
+-    if ((current_layer == 0) & eeconfig->options.xinput_enabled) {
++    if ((current_layer == 0) &
++        (eeconfig_get_gamepad_api(&eeconfig->options) !=
++         GAMEPAD_API_DISABLED)) {
+       // XInput key only applies to layer 0. We process it first since the
+       // subsequent key processing may be skipped due to the gamepad options.
+       if (CURRENT_PROFILE.gamepad_buttons[i] != GP_BUTTON_NONE) {
+diff --git a/src/main.c b/src/main.c
+index 16c07ba..1cb4817 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -22,6 +22,9 @@
+ #include "hid.h"
+ #include "layout.h"
+ #include "matrix.h"
++#if defined(RGB_ENABLE)
++#include "rgb.h"
++#endif
+ #include "tusb.h"
+ #include "wear_leveling.h"
+ #include "xinput.h"
+@@ -46,6 +49,10 @@ int main(void) {
+   xinput_init();
+   layout_init();
+   command_init();
++#if defined(RGB_ENABLE)
++  if (!rgb_init())
++    board_error_handler();
++#endif
+ 
+   tud_init(BOARD_TUD_RHPORT);
+ 
+@@ -57,6 +64,11 @@ int main(void) {
+     matrix_scan();
+     layout_task();
+     xinput_task();
++#if defined(RGB_ENABLE)
++    /* RGB copies/submits at most one complete frame and runs after the input
++     * path, so a host stream can never delay an analog scan. */
++    rgb_task();
++#endif
+   }
+ 
+   return 0;
+diff --git a/src/migration.c b/src/migration.c
+index 80ed65b..ad09e25 100644
+--- a/src/migration.c
++++ b/src/migration.c
+@@ -68,6 +68,13 @@ static bool v1_5_profile_config_func(uint8_t profile, uint8_t *dst,
+    NUM_ADVANCED_KEYS * MIGRATION_V1_5_ADVANCED_KEY_SIZE +                      \
+    NUM_MACRO_NODES * MIGRATION_V1_5_MACRO_NODE_SIZE + NUM_KEYS + 9 + 1)
+ 
++static bool v1_6_global_config_func(uint8_t *dst, const uint8_t *src);
++static bool v1_6_profile_config_func(uint8_t profile, uint8_t *dst,
++                                     const uint8_t *src);
++#define MIGRATION_V1_6_GLOBAL_CONFIG_SIZE                                      \
++  (MIGRATION_V1_5_GLOBAL_CONFIG_SIZE + sizeof(eeconfig_rgb_t))
++#define MIGRATION_V1_6_PROFILE_CONFIG_SIZE MIGRATION_V1_5_PROFILE_CONFIG_SIZE
++
+ // Migration metadata for each configuration version. The first entry is
+ // reserved for the initial version (v1.0) which does not require migration.
+ static const migration_t migrations[] = {
+@@ -111,13 +118,23 @@ static const migration_t migrations[] = {
+         .global_config_func = v1_5_global_config_func,
+         .profile_config_func = v1_5_profile_config_func,
+     },
++    {
++        .version = 0x0106,
++        .global_config_size = MIGRATION_V1_6_GLOBAL_CONFIG_SIZE,
++        .profile_config_size = MIGRATION_V1_6_PROFILE_CONFIG_SIZE,
++        .global_config_func = v1_6_global_config_func,
++        .profile_config_func = v1_6_profile_config_func,
++    },
+ };
+ 
+ // An assertion to remind us to bump the persistent configuration version, and
+ // implement a migration function if there is a change to the configuration
+ // type. Update the assertion when a new version is added.
+-_Static_assert(MIGRATION_V1_5_GLOBAL_CONFIG_SIZE +
+-                       NUM_PROFILES * MIGRATION_V1_5_PROFILE_CONFIG_SIZE ==
++#define MIGRATION_CURRENT_GLOBAL_CONFIG_SIZE MIGRATION_V1_6_GLOBAL_CONFIG_SIZE
++#define MIGRATION_CURRENT_PROFILE_CONFIG_SIZE MIGRATION_V1_6_PROFILE_CONFIG_SIZE
++
++_Static_assert(MIGRATION_CURRENT_GLOBAL_CONFIG_SIZE +
++                       NUM_PROFILES * MIGRATION_CURRENT_PROFILE_CONFIG_SIZE ==
+                    offsetof(eeconfig_t, magic_end),
+                "Invalid configuration size");
+ 
+@@ -132,6 +149,14 @@ bool migration_try_migrate(void) {
+     return false;
+ 
+   const uint16_t config_version = eeconfig->version;
++  bool version_is_supported = false;
++  for (uint32_t i = 0; i < M_ARRAY_SIZE(migrations); i++)
++    version_is_supported |= migrations[i].version == config_version;
++  /* Never reinterpret an unknown/future layout as the current one. Also do
++   * not merely repair magic_end on an otherwise corrupt current layout. */
++  if (!version_is_supported || config_version >= EECONFIG_VERSION)
++    return false;
++
+   // We alternate between two buffers to save the memory.
+   uint8_t current_buf = 0;
+   uint8_t bufs[2][sizeof(eeconfig_t)];
+@@ -390,4 +415,34 @@ bool v1_5_profile_config_func(uint8_t profile, uint8_t *dst,
+   migration_memcpy(&dst, &src, NUM_KEYS + 9 + 1);
+ 
+   return true;
+-}
+\ No newline at end of file
++}
++
++//--------------------------------------------------------------------+
++// v1.5 -> v1.6 Migration (stable optional-RGB layout)
++//--------------------------------------------------------------------+
++
++static bool v1_6_global_config_func(uint8_t *dst, const uint8_t *src) {
++  if (((const eeconfig_t *)src)->version != 0x0105)
++    return false;
++
++  uint8_t *const global_config = dst;
++  migration_memcpy(&dst, &src, MIGRATION_V1_5_GLOBAL_CONFIG_SIZE);
++  /* Bit 1 was named `_unused0` in v1.5, but historical v1.2 -> v1.3
++   * migrations deliberately set it. It must not silently enable the new HID
++   * gamepad API on existing devices. */
++  ((eeconfig_t *)global_config)->options.hid_gamepad_enabled = false;
++  migration_assign_uint8_t(&dst, 1);
++  migration_assign_uint8_t(&dst, RGB_DEFAULT_BRIGHTNESS);
++  migration_assign_uint8_t(&dst, 0);
++  migration_assign_uint8_t(&dst, RGB_DEFAULT_R);
++  migration_assign_uint8_t(&dst, RGB_DEFAULT_G);
++  migration_assign_uint8_t(&dst, RGB_DEFAULT_B);
++  return true;
++}
++
++static bool v1_6_profile_config_func(uint8_t profile, uint8_t *dst,
++                                     const uint8_t *src) {
++  (void)profile;
++  migration_memcpy(&dst, &src, MIGRATION_V1_6_PROFILE_CONFIG_SIZE);
++  return true;
++}
+diff --git a/src/rgb.c b/src/rgb.c
+new file mode 100644
+index 0000000..8f63cb8
+--- /dev/null
++++ b/src/rgb.c
+@@ -0,0 +1,352 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include "rgb.h"
++
++#if defined(RGB_ENABLE)
++
++#include "eeconfig.h"
++#include "hardware/rgb_api.h"
++#include "hardware/timer_api.h"
++
++_Static_assert(RGB_LED_COUNT <= 255, "RGB bridge encodes LED count in one byte");
++_Static_assert((RGB_FRAME_BYTES + RGB_FRAME_CHUNK_BYTES - 1u) /
++                       RGB_FRAME_CHUNK_BYTES <=
++                   16u,
++               "RGB live-frame chunk bitmap is too small");
++
++static eeconfig_rgb_t rgb_config;
++static uint8_t rgb_frame[RGB_FRAME_BYTES];
++static uint8_t rgb_live_staging[RGB_FRAME_BYTES];
++static uint8_t rgb_output[RGB_FRAME_BYTES];
++static uint8_t previous_effect;
++static uint8_t effect_phase;
++static uint16_t live_chunks_received;
++static uint32_t last_effect_ms;
++static bool frame_dirty;
++
++static bool rgb_effect_is_valid(uint8_t effect) {
++  return effect == RGB_EFFECT_STATIC || effect == RGB_EFFECT_BREATHING ||
++         effect == RGB_EFFECT_RAINBOW ||
++         effect == RGB_EFFECT_RAINBOW_WAVE || effect == RGB_EFFECT_LIVE;
++}
++
++static void rgb_write_pixel(uint8_t *frame, uint16_t index, uint8_t r,
++                            uint8_t g, uint8_t b) {
++  frame[index * RGB_BYTES_PER_PIXEL] = r;
++  frame[index * RGB_BYTES_PER_PIXEL + 1u] = g;
++  frame[index * RGB_BYTES_PER_PIXEL + 2u] = b;
++}
++
++static void rgb_fill_frame(uint8_t *frame, uint8_t r, uint8_t g, uint8_t b) {
++  for (uint16_t i = 0; i < RGB_LED_COUNT; i++)
++    rgb_write_pixel(frame, i, r, g, b);
++}
++
++/* Compact integer HSV conversion for portable effects. Saturation is fixed at
++ * 100%; callers control value through the global brightness stage. */
++static void rgb_hue_to_rgb(uint8_t hue, uint8_t *r, uint8_t *g, uint8_t *b) {
++  const uint8_t region = hue / 43u;
++  const uint8_t offset = (uint8_t)((hue - region * 43u) * 6u);
++  const uint8_t rising = offset;
++  const uint8_t falling = (uint8_t)(255u - offset);
++
++  switch (region) {
++  case 0:
++    *r = 255u;
++    *g = rising;
++    *b = 0u;
++    break;
++  case 1:
++    *r = falling;
++    *g = 255u;
++    *b = 0u;
++    break;
++  case 2:
++    *r = 0u;
++    *g = 255u;
++    *b = rising;
++    break;
++  case 3:
++    *r = 0u;
++    *g = falling;
++    *b = 255u;
++    break;
++  case 4:
++    *r = rising;
++    *g = 0u;
++    *b = 255u;
++    break;
++  default:
++    *r = 255u;
++    *g = 0u;
++    *b = falling;
++    break;
++  }
++}
++
++static void rgb_render_effect(void) {
++  uint8_t r;
++  uint8_t g;
++  uint8_t b;
++
++  switch (rgb_config.effect) {
++  case RGB_EFFECT_STATIC:
++    rgb_fill_frame(rgb_frame, rgb_config.color_r, rgb_config.color_g,
++                   rgb_config.color_b);
++    break;
++  case RGB_EFFECT_BREATHING: {
++    const uint8_t value = effect_phase < 128u
++                              ? (uint8_t)(effect_phase * 2u)
++                              : (uint8_t)((255u - effect_phase) * 2u);
++    r = (uint8_t)(((uint32_t)rgb_config.color_r * (uint32_t)value + 127u) /
++                  255u);
++    g = (uint8_t)(((uint32_t)rgb_config.color_g * (uint32_t)value + 127u) /
++                  255u);
++    b = (uint8_t)(((uint32_t)rgb_config.color_b * (uint32_t)value + 127u) /
++                  255u);
++    rgb_fill_frame(rgb_frame, r, g, b);
++    break;
++  }
++  case RGB_EFFECT_RAINBOW:
++    rgb_hue_to_rgb(effect_phase, &r, &g, &b);
++    rgb_fill_frame(rgb_frame, r, g, b);
++    break;
++  case RGB_EFFECT_RAINBOW_WAVE:
++    for (uint16_t i = 0; i < RGB_LED_COUNT; i++) {
++      const uint8_t hue =
++          (uint8_t)(effect_phase + ((uint32_t)i * 256u) / RGB_LED_COUNT);
++      rgb_hue_to_rgb(hue, &r, &g, &b);
++      rgb_write_pixel(rgb_frame, i, r, g, b);
++    }
++    break;
++  default:
++    return;
++  }
++  frame_dirty = true;
++}
++
++static bool rgb_store_config(const eeconfig_rgb_t *next) {
++  eeconfig_rgb_t stored = *next;
++
++  /* Live frames are a volatile host-owned stream. Persist the last autonomous
++   * effect when another live-mode setting (brightness, enabled, ...) is saved,
++   * without forcing the running stream out of live mode. */
++  if (stored.effect == RGB_EFFECT_LIVE) {
++    stored.effect = previous_effect == RGB_EFFECT_LIVE ? RGB_EFFECT_STATIC
++                                                        : previous_effect;
++  }
++  return EECONFIG_WRITE(rgb, &stored);
++}
++
++bool rgb_init(void) {
++  rgb_config = eeconfig->rgb;
++  if (!rgb_effect_is_valid(rgb_config.effect) ||
++      rgb_config.effect == RGB_EFFECT_LIVE)
++    rgb_config.effect = RGB_EFFECT_STATIC;
++  previous_effect = rgb_config.effect;
++  effect_phase = 0u;
++  live_chunks_received = 0u;
++  last_effect_ms = timer_read();
++  rgb_render_effect();
++  memcpy(rgb_live_staging, rgb_frame, sizeof(rgb_live_staging));
++  return rgb_backend_init();
++}
++
++void rgb_task(void) {
++  rgb_backend_task();
++
++  /* Once an off/zero-brightness frame has been submitted, freeze autonomous
++   * animation until output can be visible again. This avoids blank WS2812 DMA
++   * transfers and their interrupts every 20 ms while lighting is disabled. */
++  if (rgb_config.enabled != 0u && rgb_config.brightness != 0u &&
++      rgb_config.effect != RGB_EFFECT_STATIC &&
++      rgb_config.effect != RGB_EFFECT_LIVE &&
++      timer_elapsed(last_effect_ms) >= 20u) {
++    last_effect_ms = timer_read();
++    effect_phase++;
++    rgb_render_effect();
++  }
++
++  if (!frame_dirty || rgb_backend_is_busy())
++    return;
++
++  for (uint16_t i = 0; i < RGB_FRAME_BYTES; i++) {
++    const uint32_t scaled = (uint32_t)rgb_frame[i] *
++                                (uint32_t)rgb_config.brightness +
++                            127u;
++    rgb_output[i] =
++        rgb_config.enabled ? (uint8_t)(scaled / 255u) : (uint8_t)0u;
++  }
++
++  if (rgb_backend_submit(rgb_output, RGB_LED_COUNT))
++    frame_dirty = false;
++}
++
++bool rgb_is_enabled(void) { return rgb_config.enabled != 0u; }
++
++bool rgb_set_enabled(bool enabled, bool persist) {
++  eeconfig_rgb_t next = rgb_config;
++  next.enabled = enabled ? 1u : 0u;
++  if (persist && !rgb_store_config(&next))
++    return false;
++  rgb_config = next;
++  frame_dirty = true;
++  return true;
++}
++
++uint8_t rgb_get_brightness(void) { return rgb_config.brightness; }
++
++bool rgb_set_brightness(uint8_t brightness, bool persist) {
++  eeconfig_rgb_t next = rgb_config;
++  next.brightness = brightness;
++  if (persist && !rgb_store_config(&next))
++    return false;
++  rgb_config = next;
++  frame_dirty = true;
++  return true;
++}
++
++uint8_t rgb_get_effect(void) { return rgb_config.effect; }
++
++bool rgb_set_effect(uint8_t effect, bool persist) {
++  if (!rgb_effect_is_valid(effect))
++    return false;
++
++  eeconfig_rgb_t next = rgb_config;
++  if (effect == RGB_EFFECT_LIVE && rgb_config.effect != RGB_EFFECT_LIVE)
++    previous_effect = rgb_config.effect;
++  next.effect = effect;
++
++  /* Live streaming is deliberately runtime-only: selecting it can never
++   * generate flash traffic at frame rate or strand the board in live mode. */
++  if (persist && effect != RGB_EFFECT_LIVE && !rgb_store_config(&next))
++    return false;
++  rgb_config = next;
++  if (effect == RGB_EFFECT_LIVE) {
++    /* Entering (or explicitly restarting) live mode begins a fresh atomic
++     * transaction. An incomplete upload from an earlier live session must
++     * never be completed by a late chunk from a newer session. */
++    live_chunks_received = 0u;
++    memcpy(rgb_live_staging, rgb_frame, sizeof(rgb_live_staging));
++  } else {
++    effect_phase = 0u;
++    last_effect_ms = timer_read();
++    rgb_render_effect();
++  }
++  frame_dirty = true;
++  return true;
++}
++
++bool rgb_restore_effect(void) {
++  uint8_t effect = previous_effect;
++  if (effect == RGB_EFFECT_LIVE)
++    effect = RGB_EFFECT_STATIC;
++  return rgb_set_effect(effect, false);
++}
++
++const uint8_t *rgb_get_frame(void) { return rgb_frame; }
++
++bool rgb_get_pixel(uint8_t index, uint8_t *r, uint8_t *g, uint8_t *b) {
++  if (index >= RGB_LED_COUNT || r == NULL || g == NULL || b == NULL)
++    return false;
++  *r = rgb_frame[(uint16_t)index * 3u];
++  *g = rgb_frame[(uint16_t)index * 3u + 1u];
++  *b = rgb_frame[(uint16_t)index * 3u + 2u];
++  return true;
++}
++
++bool rgb_set_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
++  if (rgb_config.effect != RGB_EFFECT_LIVE || index >= RGB_LED_COUNT)
++    return false;
++  /* A direct pixel edit is its own publication and invalidates any incomplete
++   * chunked upload, otherwise later chunks could publish a mixed frame. */
++  live_chunks_received = 0u;
++  rgb_write_pixel(rgb_frame, index, r, g, b);
++  rgb_write_pixel(rgb_live_staging, index, r, g, b);
++  frame_dirty = true;
++  return true;
++}
++
++bool rgb_get_frame_chunk(uint16_t offset, uint8_t *dst, uint8_t len) {
++  if (dst == NULL || len == 0u || offset >= RGB_FRAME_BYTES ||
++      (uint32_t)offset + len > RGB_FRAME_BYTES)
++    return false;
++  memcpy(dst, rgb_frame + offset, len);
++  return true;
++}
++
++bool rgb_set_frame_chunk(uint16_t offset, const uint8_t *src, uint8_t len) {
++  uint16_t chunk;
++  uint16_t remaining;
++  uint8_t expected_len;
++  const uint16_t chunk_count =
++      (RGB_FRAME_BYTES + RGB_FRAME_CHUNK_BYTES - 1u) /
++      RGB_FRAME_CHUNK_BYTES;
++  const uint16_t required_chunks =
++      (uint16_t)((1u << chunk_count) - 1u);
++
++  if (rgb_config.effect != RGB_EFFECT_LIVE || src == NULL || len == 0u ||
++      offset >= RGB_FRAME_BYTES ||
++      offset % RGB_FRAME_CHUNK_BYTES != 0u)
++    return false;
++  chunk = offset / RGB_FRAME_CHUNK_BYTES;
++  remaining = RGB_FRAME_BYTES - offset;
++  expected_len = remaining > RGB_FRAME_CHUNK_BYTES
++                     ? RGB_FRAME_CHUNK_BYTES
++                     : (uint8_t)remaining;
++  if (len != expected_len)
++    return false;
++
++  /* Chunk zero starts a new transaction. The displayed frame changes only
++   * after every chunk has arrived, so a dropped/out-of-order upload never
++   * exposes a mixture of old and new pixels to DMA. */
++  if (chunk == 0u)
++    live_chunks_received = 0u;
++  memcpy(rgb_live_staging + offset, src, len);
++  live_chunks_received |= (uint16_t)(1u << chunk);
++  if (live_chunks_received == required_chunks) {
++    memcpy(rgb_frame, rgb_live_staging, sizeof(rgb_frame));
++    /* Close the transaction before accepting another chunk. In particular, a
++     * late non-zero chunk must not republish a mixture of two host frames. */
++    live_chunks_received = 0u;
++    frame_dirty = true;
++  }
++  return true;
++}
++
++bool rgb_fill(uint8_t r, uint8_t g, uint8_t b, bool persist) {
++  eeconfig_rgb_t next = rgb_config;
++
++  if (rgb_config.effect != RGB_EFFECT_LIVE) {
++    next.color_r = r;
++    next.color_g = g;
++    next.color_b = b;
++    if (persist && !rgb_store_config(&next))
++      return false;
++    rgb_config = next;
++
++    /* In autonomous modes FILL updates the effect's base color. Re-render the
++     * selected effect instead of flashing a full-color frame until its next
++     * animation tick (rainbow effects intentionally ignore the base color). */
++    rgb_render_effect();
++  } else {
++    /* A direct fill is its own publication and cancels a partial chunked
++     * transaction for the same reason as a direct pixel edit. */
++    live_chunks_received = 0u;
++    rgb_fill_frame(rgb_frame, r, g, b);
++  }
++
++  /* Publish the visual change only after its optional persistent transaction
++   * succeeds. A failed flash write therefore leaves runtime and storage in the
++   * same state. */
++  memcpy(rgb_live_staging, rgb_frame, sizeof(rgb_live_staging));
++  frame_dirty = true;
++  return true;
++}
++
++#endif
+diff --git a/src/usb_descriptors.c b/src/usb_descriptors.c
+index 752f306..26d4a26 100644
+--- a/src/usb_descriptors.c
++++ b/src/usb_descriptors.c
+@@ -22,7 +22,7 @@
+ #include "xinput.h"
+ 
+ // Device descriptor
+-static const tusb_desc_device_t desc_device = {
++static tusb_desc_device_t desc_device = {
+     .bLength = sizeof(tusb_desc_device_t),
+     .bDescriptorType = TUSB_DESC_DEVICE,
+     .bcdUSB = USB_BCD_VERSION,
+@@ -104,16 +104,22 @@ static const uint8_t desc_raw_hid_report[] = {
+ 
+ };
+ 
+-#define CONFIG_TOTAL_LEN                                                       \
+-  (TUD_CONFIG_DESC_LEN + 2 * TUD_HID_DESC_LEN + TUD_HID_INOUT_DESC_LEN +       \
+-   XINPUT_DESC_LEN)
++// Standard HID gamepad report used as the portable alternative to XInput.
++static const uint8_t desc_gamepad_report[] = {TUD_HID_REPORT_DESC_GAMEPAD()};
++
++#define CONFIG_BASE_LEN                                                        \
++  (TUD_CONFIG_DESC_LEN + 2 * TUD_HID_DESC_LEN + TUD_HID_INOUT_DESC_LEN)
++#define CONFIG_TOTAL_LEN (CONFIG_BASE_LEN + XINPUT_DESC_LEN)
++
++_Static_assert(XINPUT_DESC_LEN >= TUD_HID_DESC_LEN,
++               "configuration buffer must fit either gamepad descriptor");
+ 
+ // Configuration descriptor
+ static uint8_t desc_configuration[CONFIG_TOTAL_LEN];
+ 
+ #if defined(BOARD_USB_HS)
+ // Device qualifier descriptor for USB HS
+-static const tusb_desc_device_qualifier_t desc_device_qualifier = {
++static tusb_desc_device_qualifier_t desc_device_qualifier = {
+     .bLength = sizeof(tusb_desc_device_qualifier_t),
+     .bDescriptorType = TUSB_DESC_DEVICE_QUALIFIER,
+     .bcdUSB = USB_BCD_VERSION,
+@@ -237,25 +243,31 @@ _Static_assert(M_ARRAY_SIZE(desc_ms_os_20) == MS_OS_20_DESC_LEN,
+  *
+  * @return None
+  */
+-static void generate_desc_configuration(uint8_t *dst) {
+-  uint8_t num_interfaces = USB_ITF_COUNT;
+-  uint16_t total_length = CONFIG_TOTAL_LEN;
+-  if (!eeconfig->options.xinput_enabled) {
+-    // If XInput is not enabled, subtract the XInput descriptor length
+-    // from the total configuration length.
+-    num_interfaces--;
+-    total_length -= XINPUT_DESC_LEN;
+-  }
++static void generate_desc_configuration(uint8_t *dst, tusb_speed_t speed) {
++  const gamepad_api_t gamepad_api =
++      eeconfig_get_gamepad_api(&eeconfig->options);
++  const uint16_t gamepad_desc_len = gamepad_api == GAMEPAD_API_XINPUT
++                                        ? XINPUT_DESC_LEN
++                                    : gamepad_api == GAMEPAD_API_HID
++                                        ? TUD_HID_DESC_LEN
++                                        : 0u;
++  const uint8_t num_interfaces =
++      gamepad_api == GAMEPAD_API_DISABLED ? USB_ITF_COUNT - 1u
++                                          : USB_ITF_COUNT;
++  const uint16_t total_length = CONFIG_BASE_LEN + gamepad_desc_len;
+ 
+   uint8_t polling_interval = 1;
+ #if defined(BOARD_USB_HS)
+-  if (!eeconfig->options.high_polling_rate_enabled)
+-    // If high polling rate is not enabled, use 1kHz polling rate = 8 frames for
+-    // USB HS instead.
+-    polling_interval = 8;
++  if (speed == TUSB_SPEED_HIGH &&
++      !eeconfig->options.high_polling_rate_enabled)
++    /* At high speed bInterval is exponential: 4 means 2^(4-1) = 8
++     * microframes, i.e. 1 ms. A raw value of 8 would mean 16 ms (62.5 Hz). */
++    polling_interval = 4;
++#else
++  (void)speed;
+ #endif
+ 
+-  const uint8_t src[] = {
++  const uint8_t base[] = {
+       // Configuration descriptor header. Request maximum 500mA for the device
+       TUD_CONFIG_DESCRIPTOR(1, num_interfaces, 0, total_length,
+                             TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 500),
+@@ -272,18 +284,42 @@ static void generate_desc_configuration(uint8_t *dst) {
+                                sizeof(desc_raw_hid_report), EP_OUT_ADDR_RAW_HID,
+                                EP_IN_ADDR_RAW_HID, RAW_HID_EP_SIZE,
+                                polling_interval),
+-      // XInput interface descriptor
+-      XINPUT_DESCRIPTOR(USB_ITF_XINPUT, 0, EP_OUT_ADDR_XINPUT,
+-                        EP_IN_ADDR_XINPUT, polling_interval),
+   };
+ 
+-  _Static_assert(sizeof(src) == CONFIG_TOTAL_LEN,
+-                 "Invalid configuration descriptor size");
+-
+-  memcpy(dst, src, sizeof(src));
++  _Static_assert(sizeof(base) == CONFIG_BASE_LEN,
++                 "Invalid base configuration descriptor size");
++
++  memset(dst, 0, CONFIG_TOTAL_LEN);
++  memcpy(dst, base, sizeof(base));
++
++  if (gamepad_api == GAMEPAD_API_XINPUT) {
++    const uint8_t xinput[] = {
++        XINPUT_DESCRIPTOR(USB_ITF_GAMEPAD, 0, EP_OUT_ADDR_XINPUT,
++                          EP_IN_ADDR_GAMEPAD, polling_interval),
++    };
++    _Static_assert(sizeof(xinput) == XINPUT_DESC_LEN,
++                   "Invalid XInput descriptor size");
++    memcpy(dst + sizeof(base), xinput, sizeof(xinput));
++  } else if (gamepad_api == GAMEPAD_API_HID) {
++    const uint8_t hid_gamepad[] = {
++        TUD_HID_DESCRIPTOR(USB_ITF_GAMEPAD, 0, HID_ITF_PROTOCOL_NONE,
++                           sizeof(desc_gamepad_report), EP_IN_ADDR_GAMEPAD,
++                           CFG_TUD_HID_EP_BUFSIZE, polling_interval),
++    };
++    _Static_assert(sizeof(hid_gamepad) == TUD_HID_DESC_LEN,
++                   "Invalid HID gamepad descriptor size");
++    memcpy(dst + sizeof(base), hid_gamepad, sizeof(hid_gamepad));
++  }
+ }
+ 
+ const uint8_t *tud_descriptor_device_cb(void) {
++  /* Microsoft OS 2.0 discovery requires USB 2.1 for XInput. Standard HID and
++   * keyboard-only configurations advertise USB 2.0 and expose no BOS, so a
++   * host can never bind the XUSB compatible ID to the HID gamepad interface. */
++  desc_device.bcdUSB =
++      eeconfig_get_gamepad_api(&eeconfig->options) == GAMEPAD_API_XINPUT
++          ? USB_BCD_VERSION
++          : 0x0200;
+   return (const uint8_t *)&desc_device;
+ }
+ 
+@@ -298,6 +334,11 @@ const uint8_t *tud_hid_descriptor_report_cb(uint8_t instance) {
+   case USB_ITF_RAW_HID:
+     return desc_raw_hid_report;
+ 
++  case USB_ITF_GAMEPAD:
++    return eeconfig_get_gamepad_api(&eeconfig->options) == GAMEPAD_API_HID
++               ? desc_gamepad_report
++               : NULL;
++
+   default:
+     // Invalid interface, should be unreachable
+     return NULL;
+@@ -306,17 +347,27 @@ const uint8_t *tud_hid_descriptor_report_cb(uint8_t instance) {
+ 
+ const uint8_t *tud_descriptor_configuration_cb(uint8_t index) {
+   // We only have one configuration so we don't need to check the index
+-  generate_desc_configuration(desc_configuration);
++  generate_desc_configuration(desc_configuration, tud_speed_get());
+   return desc_configuration;
+ }
+ 
+ #if defined(BOARD_USB_HS)
+ const uint8_t *tud_descriptor_device_qualifier_cb(void) {
++  /* The qualifier describes the same device at the other bus speed and must
++   * advertise the same USB revision as the active device descriptor. Compute
++   * it directly so correctness does not depend on callback ordering. */
++  desc_device_qualifier.bcdUSB =
++      eeconfig_get_gamepad_api(&eeconfig->options) == GAMEPAD_API_XINPUT
++          ? USB_BCD_VERSION
++          : 0x0200;
+   return (const uint8_t *)&desc_device_qualifier;
+ }
+ 
+ const uint8_t *tud_descriptor_other_speed_configuration_cb(uint8_t index) {
+-  generate_desc_configuration(desc_other_speed_config);
++  const tusb_speed_t other_speed = tud_speed_get() == TUSB_SPEED_HIGH
++                                       ? TUSB_SPEED_FULL
++                                       : TUSB_SPEED_HIGH;
++  generate_desc_configuration(desc_other_speed_config, other_speed);
+   desc_other_speed_config[1] = TUSB_DESC_OTHER_SPEED_CONFIG;
+ 
+   return desc_other_speed_config;
+@@ -368,16 +419,25 @@ const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
+   return desc_str;
+ }
+ 
+-const uint8_t *tud_descriptor_bos_cb(void) { return desc_bos; }
++const uint8_t *tud_descriptor_bos_cb(void) {
++  return eeconfig_get_gamepad_api(&eeconfig->options) == GAMEPAD_API_XINPUT
++             ? desc_bos
++             : NULL;
++}
+ 
+ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
+                                 const tusb_control_request_t *request) {
++  if (eeconfig_get_gamepad_api(&eeconfig->options) != GAMEPAD_API_XINPUT)
++    return false;
++
+   if (stage != CONTROL_STAGE_SETUP)
+     // Nothing to do for other stages
+     return true;
+ 
+-  if (request->bmRequestType_bit.type == TUSB_REQ_TYPE_VENDOR &&
+-      request->bRequest == MS_OS_20_VENDOR_CODE) {
++  if (request->bmRequestType_bit.direction == TUSB_DIR_IN &&
++      request->bmRequestType_bit.type == TUSB_REQ_TYPE_VENDOR &&
++      request->bmRequestType_bit.recipient == TUSB_REQ_RCPT_DEVICE &&
++      request->bRequest == MS_OS_20_VENDOR_CODE && request->wValue == 0u) {
+     switch (request->wIndex) {
+     case 0x07:
+       // Microsoft OS 2.0 descriptor request
+diff --git a/src/xinput.c b/src/xinput.c
+index f4420e6..9fe6ff2 100644
+--- a/src/xinput.c
++++ b/src/xinput.c
+@@ -17,7 +17,6 @@
+ 
+ #include "device/usbd_pvt.h"
+ #include "eeconfig.h"
+-#include "lib/bitmap.h"
+ #include "lib/usqrt.h"
+ #include "matrix.h"
+ #include "tusb.h"
+@@ -68,6 +67,13 @@ static uint8_t apply_analog_curve(uint8_t value, bool *is_key_end_deadzone) {
+   const int16_t x1 = curve[i][0], y1 = curve[i][1];
+   const int16_t x2 = curve[i + 1][0], y2 = curve[i + 1][1];
+ 
++  /* Treat a malformed persisted curve as linear input. Host-side validation
++   * prevents new invalid curves, but this guard also makes old/corrupt storage
++   * incapable of triggering division by zero here. */
++  if (x2 <= x1) {
++    *is_key_end_deadzone = false;
++    return value;
++  }
+   return y1 + (y2 - y1) * (value - x1) / (x2 - x1);
+ }
+ 
+@@ -101,10 +107,14 @@ static const uint8_t joystick_axes[][2] = {
+ // Endpoints for XInput communication
+ static uint8_t endpoint_in;
+ static uint8_t endpoint_out;
+-
+-// We track key press states independently of the layout module in case
+-// layout processing is disabled for some keys.
+-static bitmap_t key_press_states[] = MAKE_BITMAP(NUM_KEYS);
++CFG_TUSB_MEM_SECTION CFG_TUSB_MEM_ALIGN
++static uint8_t xinput_out_report[XINPUT_EP_SIZE];
++
++/* Digital buttons are aggregated from scratch on every matrix scan. This
++ * keeps duplicate mappings pressed until their last physical key is released
++ * and cannot retain stale state across a profile/keymap change. */
++static uint16_t digital_buttons;
++static bool gamepad_report_pending;
+ // Track maximum analog values for analog buttons
+ // (2 joysticks * 4 directions + 2 triggers)
+ static uint16_t analog_states[10];
+@@ -114,7 +124,82 @@ static uint16_t analog_states[10];
+ 
+ static xinput_report_t report = {.report_size = sizeof(xinput_report_t)};
+ 
+-void xinput_init(void) {}
++static int8_t hid_axis_from_xinput(int16_t value) {
++  return (int8_t)(value / 257);
++}
++
++static uint8_t hid_hat_from_xinput(uint16_t buttons) {
++  const bool up = (buttons & XINPUT_BUTTON_UP) != 0u;
++  const bool down = (buttons & XINPUT_BUTTON_DOWN) != 0u;
++  const bool left = (buttons & XINPUT_BUTTON_LEFT) != 0u;
++  const bool right = (buttons & XINPUT_BUTTON_RIGHT) != 0u;
++  const bool effective_up = up && !down;
++  const bool effective_down = down && !up;
++  const bool effective_left = left && !right;
++  const bool effective_right = right && !left;
++
++  if (effective_up && effective_right)
++    return GAMEPAD_HAT_UP_RIGHT;
++  if (effective_down && effective_right)
++    return GAMEPAD_HAT_DOWN_RIGHT;
++  if (effective_down && effective_left)
++    return GAMEPAD_HAT_DOWN_LEFT;
++  if (effective_up && effective_left)
++    return GAMEPAD_HAT_UP_LEFT;
++  if (effective_up)
++    return GAMEPAD_HAT_UP;
++  if (effective_right)
++    return GAMEPAD_HAT_RIGHT;
++  if (effective_down)
++    return GAMEPAD_HAT_DOWN;
++  if (effective_left)
++    return GAMEPAD_HAT_LEFT;
++  return GAMEPAD_HAT_CENTERED;
++}
++
++static uint32_t hid_buttons_from_xinput(uint16_t buttons) {
++  uint32_t result = 0u;
++
++  if ((buttons & XINPUT_BUTTON_A) != 0u)
++    result |= GAMEPAD_BUTTON_0;
++  if ((buttons & XINPUT_BUTTON_B) != 0u)
++    result |= GAMEPAD_BUTTON_1;
++  if ((buttons & XINPUT_BUTTON_X) != 0u)
++    result |= GAMEPAD_BUTTON_2;
++  if ((buttons & XINPUT_BUTTON_Y) != 0u)
++    result |= GAMEPAD_BUTTON_3;
++  if ((buttons & XINPUT_BUTTON_LB) != 0u)
++    result |= GAMEPAD_BUTTON_4;
++  if ((buttons & XINPUT_BUTTON_RB) != 0u)
++    result |= GAMEPAD_BUTTON_5;
++  if ((buttons & XINPUT_BUTTON_LS) != 0u)
++    result |= GAMEPAD_BUTTON_6;
++  if ((buttons & XINPUT_BUTTON_RS) != 0u)
++    result |= GAMEPAD_BUTTON_7;
++  if ((buttons & XINPUT_BUTTON_BACK) != 0u)
++    result |= GAMEPAD_BUTTON_8;
++  if ((buttons & XINPUT_BUTTON_START) != 0u)
++    result |= GAMEPAD_BUTTON_9;
++  if ((buttons & XINPUT_BUTTON_HOME) != 0u)
++    result |= GAMEPAD_BUTTON_10;
++  return result;
++}
++
++static hid_gamepad_report_t hid_report_from_xinput(void) {
++  return (hid_gamepad_report_t){
++      .x = hid_axis_from_xinput(report.joysticks[0]),
++      /* HID's conventional positive Y direction is down. */
++      .y = (int8_t)-hid_axis_from_xinput(report.joysticks[1]),
++      .z = hid_axis_from_xinput(report.joysticks[2]),
++      .rz = (int8_t)-hid_axis_from_xinput(report.joysticks[3]),
++      .rx = (int8_t)(((uint16_t)report.lz * 254u) / 255u - 127),
++      .ry = (int8_t)(((uint16_t)report.rz * 254u) / 255u - 127),
++      .hat = hid_hat_from_xinput(report.buttons),
++      .buttons = hid_buttons_from_xinput(report.buttons),
++  };
++}
++
++void xinput_init(void) { gamepad_report_pending = true; }
+ 
+ void xinput_process(uint8_t key) {
+   const key_state_t *k = &key_matrix[key];
+@@ -125,17 +210,8 @@ void xinput_process(uint8_t key) {
+ 
+   switch (keycode) {
+   case GP_BUTTON_A ... GP_BUTTON_RB: {
+-    const bool last_key_press = bitmap_get(key_press_states, key);
+-
+-    if (k->is_pressed & !last_key_press)
+-      // Key press event
+-      report.buttons |= keycode_to_bm[keycode];
+-    else if (!k->is_pressed & last_key_press)
+-      // Key release event
+-      report.buttons &= ~keycode_to_bm[keycode];
+-
+-    // Finally, update the key state
+-    bitmap_set(key_press_states, key, k->is_pressed);
++    if (k->is_pressed)
++      digital_buttons |= keycode_to_bm[keycode];
+     break;
+   }
+   case GP_BUTTON_LS_UP ... GP_BUTTON_RT: {
+@@ -151,8 +227,23 @@ void xinput_process(uint8_t key) {
+ 
+ void xinput_task(void) {
+   static xinput_report_t last_report = {.report_size = sizeof(xinput_report_t)};
++  static hid_gamepad_report_t last_hid_report = {0};
++  static bool usb_was_ready;
++  const gamepad_api_t api = eeconfig_get_gamepad_api(&eeconfig->options);
++
++  if (api == GAMEPAD_API_DISABLED) {
++    digital_buttons = 0u;
++    memset(analog_states, 0, sizeof(analog_states));
++    return;
++  }
++
++  const bool usb_ready = tud_ready();
++  if (usb_ready && !usb_was_ready)
++    gamepad_report_pending = true;
++  usb_was_ready = usb_ready;
+ 
+   bool is_key_end_deadzone = false;
++  report.buttons = digital_buttons;
+   // Update trigger states in the report
+   report.lz =
+       apply_analog_curve(ANALOG_STATE(GP_BUTTON_LT), &is_key_end_deadzone);
+@@ -237,17 +328,30 @@ void xinput_task(void) {
+       report.joysticks[i] = -joystick_state;
+   }
+ 
+-  if (tud_ready() && endpoint_in != 0 && !usbd_edpt_busy(0, endpoint_in) &&
+-      // Only send report if it has changed
+-      memcmp(&report, &last_report, sizeof(xinput_report_t)) != 0) {
+-    usbd_edpt_claim(0, endpoint_in);
+-    usbd_edpt_xfer(0, endpoint_in, (uint8_t *)&report, sizeof(xinput_report_t));
+-    usbd_edpt_release(0, endpoint_in);
+-    // Update the last report to the current one
+-    memcpy(&last_report, &report, sizeof(xinput_report_t));
++  if (api == GAMEPAD_API_XINPUT && usb_ready && endpoint_in != 0 &&
++      !usbd_edpt_busy(0, endpoint_in) &&
++      (gamepad_report_pending ||
++       memcmp(&report, &last_report, sizeof(xinput_report_t)) != 0)) {
++    if (usbd_edpt_claim(0, endpoint_in) &&
++        usbd_edpt_xfer(0, endpoint_in, (uint8_t *)&report,
++                       sizeof(xinput_report_t))) {
++      memcpy(&last_report, &report, sizeof(xinput_report_t));
++      gamepad_report_pending = false;
++    }
++  } else if (api == GAMEPAD_API_HID) {
++    const hid_gamepad_report_t hid_report = hid_report_from_xinput();
++    if (usb_ready && tud_hid_n_ready(USB_ITF_GAMEPAD) &&
++        (gamepad_report_pending ||
++         memcmp(&hid_report, &last_hid_report, sizeof(hid_report)) != 0) &&
++        tud_hid_n_report(USB_ITF_GAMEPAD, 0, &hid_report,
++                         sizeof(hid_report))) {
++      last_hid_report = hid_report;
++      gamepad_report_pending = false;
++    }
+   }
+ 
+   // Reset analog states for the next scan
++  digital_buttons = 0u;
+   memset(analog_states, 0, sizeof(analog_states));
+ }
+ 
+@@ -257,7 +361,11 @@ void xinput_task(void) {
+ 
+ static void xinput_driver_init(void) {}
+ 
+-static void xinput_driver_reset(uint8_t rhport) {}
++static void xinput_driver_reset(uint8_t rhport) {
++  endpoint_in = 0u;
++  endpoint_out = 0u;
++  gamepad_report_pending = true;
++}
+ 
+ static uint16_t xinput_driver_open(uint8_t rhport,
+                                    const tusb_desc_interface_t *desc_intf,
+@@ -265,10 +373,16 @@ static uint16_t xinput_driver_open(uint8_t rhport,
+   if (desc_intf->bInterfaceClass == TUSB_CLASS_VENDOR_SPECIFIC &&
+       desc_intf->bInterfaceSubClass == XINPUT_SUBCLASS_DEFAULT &&
+       desc_intf->bInterfaceProtocol == XINPUT_PROTOCOL_DEFAULT) {
++    TU_ASSERT(max_len >= XINPUT_DESC_LEN, 0);
+     TU_ASSERT(usbd_open_edpt_pair(rhport, tu_desc_next(tu_desc_next(desc_intf)),
+                                   desc_intf->bNumEndpoints, TUSB_XFER_INTERRUPT,
+                                   &endpoint_out, &endpoint_in),
+               0);
++    /* Always consume the optional XInput OUT/rumble report. Leaving the OUT
++     * endpoint unarmed makes hosts retry it indefinitely. */
++    TU_ASSERT(usbd_edpt_xfer(rhport, endpoint_out, xinput_out_report,
++                             sizeof(xinput_out_report)),
++              0);
+ 
+     return XINPUT_DESC_LEN;
+   }
+@@ -285,6 +399,9 @@ xinput_driver_control_xfer_cb(uint8_t rhport, uint8_t stage,
+ static bool xinput_driver_xfer_cb(uint8_t rhport, uint8_t ep_addr,
+                                   xfer_result_t result,
+                                   uint32_t xferred_bytes) {
++  if (ep_addr == endpoint_out)
++    return usbd_edpt_xfer(rhport, endpoint_out, xinput_out_report,
++                          sizeof(xinput_out_report));
+   return true;
+ }
+ 
+@@ -298,7 +415,11 @@ static const usbd_class_driver_t xinput_driver = {
+ };
+ 
+ const usbd_class_driver_t *usbd_app_driver_get_cb(uint8_t *driver_count) {
+-  *driver_count = 1;
++  if (eeconfig_get_gamepad_api(&eeconfig->options) != GAMEPAD_API_XINPUT) {
++    *driver_count = 0;
++    return NULL;
++  }
+ 
++  *driver_count = 1;
+   return &xinput_driver;
+ }
+diff --git a/tools/rgb_core_test.c b/tools/rgb_core_test.c
+new file mode 100644
+index 0000000..5885b8d
+--- /dev/null
++++ b/tools/rgb_core_test.c
+@@ -0,0 +1,195 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#include <assert.h>
++#include <stdio.h>
++
++#define NUM_PROFILES 1
++#define NUM_LAYERS 1
++#define NUM_KEYS 1
++#define NUM_ADVANCED_KEYS 1
++#define NUM_DYNAMIC_KEYSTROKE_MAX_BINDINGS 4
++#define NUM_MACRO_NODES 1
++#define RGB_ENABLE
++#define RGB_LED_COUNT 21
++
++#include "../src/rgb.c"
++
++const eeconfig_t *eeconfig;
++
++static eeconfig_t test_config;
++static eeconfig_rgb_t last_persisted;
++static uint8_t submitted_frame[RGB_FRAME_BYTES];
++static uint32_t now_ms;
++static uint32_t submit_count;
++
++bool rgb_test_persist(const eeconfig_rgb_t *value) {
++  assert(value != NULL);
++  last_persisted = *value;
++  return true;
++}
++
++uint32_t timer_read(void) { return now_ms; }
++
++bool rgb_backend_init(void) { return true; }
++
++bool rgb_backend_submit(const uint8_t *rgb, uint16_t led_count) {
++  assert(rgb != NULL);
++  assert(led_count == RGB_LED_COUNT);
++  memcpy(submitted_frame, rgb, sizeof(submitted_frame));
++  submit_count++;
++  return true;
++}
++
++bool rgb_backend_is_busy(void) { return false; }
++
++void rgb_backend_task(void) {}
++
++static void test_effects(void) {
++  uint8_t wave_before[RGB_FRAME_BYTES];
++
++  assert(rgb_set_effect(RGB_EFFECT_RAINBOW, false));
++  assert(rgb_get_frame()[0] == 255u);
++  assert(rgb_get_frame()[1] == 0u);
++  assert(rgb_set_effect(RGB_EFFECT_RAINBOW_WAVE, false));
++  assert(memcmp(rgb_get_frame(), rgb_get_frame() + RGB_BYTES_PER_PIXEL,
++                RGB_BYTES_PER_PIXEL) != 0);
++  assert(rgb_set_effect(RGB_EFFECT_BREATHING, false));
++  assert(rgb_get_frame()[0] == 0u);
++  now_ms += 20u;
++  rgb_task();
++  assert(rgb_get_frame()[0] != 0u);
++  assert(!rgb_set_effect(4u, false));
++
++  assert(rgb_set_effect(RGB_EFFECT_RAINBOW_WAVE, false));
++  memcpy(wave_before, rgb_get_frame(), sizeof(wave_before));
++  assert(rgb_fill(11u, 22u, 33u, true));
++  assert(memcmp(wave_before, rgb_get_frame(), sizeof(wave_before)) == 0);
++  assert(last_persisted.color_r == 11u);
++  assert(last_persisted.color_g == 22u);
++  assert(last_persisted.color_b == 33u);
++
++  assert(rgb_set_effect(RGB_EFFECT_STATIC, false));
++  assert(rgb_fill(7u, 8u, 9u, false));
++  assert(rgb_get_frame()[0] == 7u);
++  assert(rgb_get_frame()[1] == 8u);
++  assert(rgb_get_frame()[2] == 9u);
++}
++
++static void test_hidden_animation_is_idle(void) {
++  uint32_t idle_submit_count;
++
++  assert(rgb_set_effect(RGB_EFFECT_BREATHING, false));
++  rgb_task();
++  assert(rgb_set_enabled(false, false));
++  rgb_task();
++  idle_submit_count = submit_count;
++  now_ms += 100u;
++  rgb_task();
++  assert(submit_count == idle_submit_count);
++
++  assert(rgb_set_enabled(true, false));
++  assert(rgb_set_brightness(0u, false));
++  rgb_task();
++  idle_submit_count = submit_count;
++  now_ms += 100u;
++  rgb_task();
++  assert(submit_count == idle_submit_count);
++  assert(rgb_set_brightness(255u, false));
++}
++
++static void test_atomic_live_frame(void) {
++  uint8_t frame[RGB_FRAME_BYTES];
++  uint8_t late_chunk[RGB_FRAME_BYTES - RGB_FRAME_CHUNK_BYTES];
++  uint8_t previous[RGB_FRAME_BYTES];
++
++  for (uint32_t i = 0u; i < sizeof(frame); i++)
++    frame[i] = (uint8_t)(i * 3u + 1u);
++  memcpy(previous, rgb_get_frame(), sizeof(previous));
++
++  assert(rgb_set_effect(RGB_EFFECT_RAINBOW_WAVE, false));
++  assert(!rgb_set_frame_chunk(0u, frame, RGB_FRAME_CHUNK_BYTES));
++  assert(!rgb_set_pixel(0u, 1u, 2u, 3u));
++  assert(rgb_set_effect(RGB_EFFECT_LIVE, false));
++  memcpy(previous, rgb_get_frame(), sizeof(previous));
++  assert(rgb_set_frame_chunk(0u, frame, RGB_FRAME_CHUNK_BYTES));
++  assert(memcmp(rgb_get_frame(), previous, sizeof(previous)) == 0);
++
++  /* A direct live edit cancels an incomplete chunk transaction. */
++  assert(rgb_set_pixel(0u, 9u, 8u, 7u));
++  memcpy(previous, rgb_get_frame(), sizeof(previous));
++  assert(rgb_set_frame_chunk(RGB_FRAME_CHUNK_BYTES,
++                             frame + RGB_FRAME_CHUNK_BYTES,
++                             RGB_FRAME_BYTES - RGB_FRAME_CHUNK_BYTES));
++  assert(memcmp(rgb_get_frame(), previous, sizeof(previous)) == 0);
++
++  assert(rgb_set_frame_chunk(0u, frame, RGB_FRAME_CHUNK_BYTES));
++  assert(rgb_set_frame_chunk(RGB_FRAME_CHUNK_BYTES,
++                             frame + RGB_FRAME_CHUNK_BYTES,
++                             RGB_FRAME_BYTES - RGB_FRAME_CHUNK_BYTES));
++  assert(memcmp(rgb_get_frame(), frame, sizeof(frame)) == 0);
++  rgb_task();
++  const uint32_t completed_publish_count = submit_count;
++
++  /* Publication closes the chunk transaction. A delayed non-zero chunk from
++   * another frame cannot modify or republish the displayed frame. */
++  memset(late_chunk, 0xa5, sizeof(late_chunk));
++  assert(rgb_set_frame_chunk(RGB_FRAME_CHUNK_BYTES, late_chunk,
++                             sizeof(late_chunk)));
++  assert(memcmp(rgb_get_frame(), frame, sizeof(frame)) == 0);
++  rgb_task();
++  assert(submit_count == completed_publish_count);
++
++  /* A direct fill likewise cancels a partial upload. */
++  assert(rgb_set_frame_chunk(0u, frame, RGB_FRAME_CHUNK_BYTES));
++  assert(rgb_fill(4u, 5u, 6u, false));
++  memcpy(previous, rgb_get_frame(), sizeof(previous));
++  assert(rgb_set_frame_chunk(RGB_FRAME_CHUNK_BYTES,
++                             frame + RGB_FRAME_CHUNK_BYTES,
++                             RGB_FRAME_BYTES - RGB_FRAME_CHUNK_BYTES));
++  assert(memcmp(rgb_get_frame(), previous, sizeof(previous)) == 0);
++
++  /* Leaving and re-entering live mode also discards an incomplete upload. */
++  assert(rgb_restore_effect());
++  assert(rgb_set_effect(RGB_EFFECT_LIVE, false));
++  memcpy(previous, rgb_get_frame(), sizeof(previous));
++  assert(rgb_set_frame_chunk(RGB_FRAME_CHUNK_BYTES, late_chunk,
++                             sizeof(late_chunk)));
++  assert(memcmp(rgb_get_frame(), previous, sizeof(previous)) == 0);
++  assert(!rgb_set_frame_chunk(1u, frame, RGB_FRAME_CHUNK_BYTES));
++
++  assert(rgb_set_brightness(128u, true));
++  assert(last_persisted.effect == RGB_EFFECT_RAINBOW_WAVE);
++  assert(rgb_get_effect() == RGB_EFFECT_LIVE);
++  assert(rgb_restore_effect());
++  assert(rgb_get_effect() == RGB_EFFECT_RAINBOW_WAVE);
++}
++
++int main(void) {
++  test_config.rgb = (eeconfig_rgb_t){
++      .enabled = 1u,
++      .brightness = 255u,
++      .effect = RGB_EFFECT_STATIC,
++      .color_r = 120u,
++      .color_g = 40u,
++      .color_b = 10u,
++  };
++  eeconfig = &test_config;
++
++  assert(rgb_init());
++  rgb_task();
++  assert(submit_count == 1u);
++  assert(submitted_frame[0] == 120u);
++  assert(submitted_frame[1] == 40u);
++  assert(submitted_frame[2] == 10u);
++
++  test_effects();
++  test_hidden_animation_is_idle();
++  test_atomic_live_frame();
++  puts("rgb_core_test: ok");
++  return 0;
++}
+diff --git a/tools/test_include/eeconfig.h b/tools/test_include/eeconfig.h
+new file mode 100644
+index 0000000..cbc9711
+--- /dev/null
++++ b/tools/test_include/eeconfig.h
+@@ -0,0 +1,28 @@
++/*
++ * This program is free software: you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option) any later
++ * version.
++ */
++
++#pragma once
++
++#include "common.h"
++
++typedef struct {
++  uint8_t enabled;
++  uint8_t brightness;
++  uint8_t effect;
++  uint8_t color_r;
++  uint8_t color_g;
++  uint8_t color_b;
++} eeconfig_rgb_t;
++
++typedef struct {
++  eeconfig_rgb_t rgb;
++} eeconfig_t;
++
++extern const eeconfig_t *eeconfig;
++bool rgb_test_persist(const eeconfig_rgb_t *value);
++
++#define EECONFIG_WRITE(field, value) rgb_test_persist(value)

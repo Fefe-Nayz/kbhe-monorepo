@@ -5,6 +5,7 @@ import {
   CALIBRATION_VALUES_PER_CHUNK,
   Command,
   DEVICE_SERIAL_MAX_LENGTH,
+  DKS_DEFAULT_ACTION_BITMAP,
   formatFirmwareVersion,
   GAMEPAD_API_MODES,
   GAMEPAD_AXES,
@@ -21,6 +22,7 @@ import {
   KEY_SETTINGS_PER_CHUNK,
   KEY_STATES_PER_CHUNK,
   LED_BYTES_PER_CHUNK,
+  LED_EFFECT_COUNT,
   LED_EFFECT_PARAM_COUNT,
   LED_EFFECT_PARAM_COLOR_R,
   LED_EFFECT_PARAM_COLOR_G,
@@ -31,7 +33,11 @@ import {
   LED_IDLE_THIRD_PARTY_STREAM_ACTIVITY_DEFAULT,
   LED_USB_SUSPEND_RGB_OFF_DEFAULT,
   LED_AUDIO_SPECTRUM_BAND_COUNT,
+  PROFILE_DOCUMENT_SCHEMA_VERSION,
+  SETTINGS_SAVE_STATUS_PROTOCOL_VERSION,
   SETTINGS_PROFILE_NAME_LENGTH,
+  SettingsSaveState,
+  type SettingsSaveStatus,
   LAYER_COUNT,
   Status,
   TRIGGER_CHATTER_GUARD_DEFAULT_MS,
@@ -44,14 +50,37 @@ import { invoke } from "@tauri-apps/api/core";
 import { KbheCommander, kbheCommander } from "./commander";
 import {
   kbheTransport,
+  selectKbheSessionDevice,
   type KbheTransport,
   type KbheTransportConnectionState,
   type KbheTransportDeviceInfo,
 } from "./transport";
+import {
+  ACTION_OVERLAY_MASK_BYTES,
+  ACTION_PROGRAM_MAX_STEPS,
+  ACTION_STEPS_PER_PACKET,
+  actionOverlayBindingSchema,
+  actionProgramHash,
+  actionProgramSchema,
+  decodeActionStep,
+  encodeActionStep,
+  type ActionCapabilities,
+  type ActionOverlayBinding,
+  type ActionProgram,
+  type ActionProgramMeta,
+} from "./action-program";
+
+/** Flash-backed action mutations can legitimately take longer than the generic RAW HID timeout. */
+const ACTION_PERSIST_COMMAND_TIMEOUT_MS = 5_000;
 
 export interface DynamicZone {
+  /**
+   * Packed DKS action bitmap (two bits per phase). The firmware wire field is
+   * historically named `end_mm_tenths`, but it has never represented travel.
+   */
   end_mm_tenths: number;
-  end_mm: number;
+  /** Deprecated app-profile field accepted for backward-compatible imports. */
+  end_mm?: number;
   hid_keycode: number;
 }
 
@@ -107,6 +136,7 @@ export interface RotaryEncoderSettings {
   rotation_action: number;
   button_action: number;
   sensitivity: number;
+  acceleration: number;
   step_size: number;
   invert_direction: boolean;
   rgb_behavior: number;
@@ -114,6 +144,7 @@ export interface RotaryEncoderSettings {
   progress_style: number;
   progress_effect_mode: number;
   progress_color: [number, number, number];
+  progress_filled_only: boolean;
   cw_binding: RotaryBinding;
   ccw_binding: RotaryBinding;
   click_binding: RotaryBinding;
@@ -216,6 +247,22 @@ export interface McuMetrics {
   work_us: number;
   load_percent: number;
   load_permille: number;
+  realtime_persistence_metrics_available: boolean;
+  max_scan_cycle_us: number;
+  p99_scan_cycle_us: number;
+  scan_deadline_miss_count: number;
+  flash_programmed_words: number;
+  flash_async_steps: number;
+  flash_gc_count: number;
+  flash_boot_erase_count: number;
+  flash_runtime_erase_count: number;
+  flash_deferred_no_space_count: number;
+  flash_max_words_per_step: number;
+  flash_async_busy: boolean;
+  flash_spare_bank_ready: boolean;
+  flash_word_program_datasheet_max_us: number;
+  flash_hard_8khz_guarantee: boolean;
+  flash_last_status: number;
 }
 
 export interface AdcChunk {
@@ -278,6 +325,29 @@ export interface DeviceOptions {
 
 type DevicePathLogger = ((message: string) => void) | undefined;
 
+type SettingsSaveStatusProbe =
+  | { kind: "supported"; status: SettingsSaveStatus }
+  | { kind: "unsupported" }
+  | { kind: "invalid" };
+
+function actionOverlayBindingsEqual(
+  left: ActionOverlayBinding,
+  right: ActionOverlayBinding,
+): boolean {
+  return left.enabled === right.enabled
+    && left.priority === right.priority
+    && left.blendMode === right.blendMode
+    && left.opacity === right.opacity
+    && left.color.every((value, index) => value === right.color[index])
+    && left.allKeys === right.allKeys
+    && left.fadeInMs === right.fadeInMs
+    && left.fadeOutMs === right.fadeOutMs
+    && left.keyMask.every((value, index) => value === right.keyMask[index])
+    && left.stateIndex === right.stateIndex
+    && left.activeValue === right.activeValue
+    && left.followsState === right.followsState;
+}
+
 export class KBHEDevice {
   private keyStatesNativeCommandAvailable: boolean | null = null;
 
@@ -295,41 +365,119 @@ export class KBHEDevice {
     return devices.filter((device) => device.kind === "runtime");
   }
 
-  async connect(path?: string, logger?: DevicePathLogger): Promise<boolean> {
+  async connect(
+    path?: string,
+    logger?: DevicePathLogger,
+    expectedSerialNumber?: string,
+  ): Promise<boolean> {
     let targetPath = path;
+    let targetSerialNumber = expectedSerialNumber?.trim() || undefined;
     if (!targetPath) {
       if (logger) {
         logger("Searching for KBHE runtime device...");
       }
-      const device = (await this.listRuntimeDevices())[0];
+      const device = selectKbheSessionDevice(
+        await this.listRuntimeDevices(),
+        targetSerialNumber,
+      );
       if (!device) {
         throw new Error("Device not found");
       }
       targetPath = device.path;
+      targetSerialNumber = device.serialNumber!.trim();
       if (logger) {
         logger(`Found runtime Raw HID path: ${targetPath}`);
       }
     }
-    await this.transport.connect(targetPath);
+    await this.transport.connect(targetPath, targetSerialNumber);
+    this.commander.resetTransportCapabilities();
+    this.keyStatesNativeCommandAvailable = null;
     return true;
   }
 
   async reconnect(logger?: DevicePathLogger): Promise<boolean> {
-    const state = await this.transport.connectionState();
-    const path = state.path;
-    await this.disconnect();
-    if (!path) {
-      return this.connect(undefined, logger);
+    const target = await this.connectedRuntimeDevice();
+    const serialNumber = target?.serialNumber?.trim();
+    if (!target || !serialNumber) {
+      throw new Error(
+        "The connected keyboard cannot be identified by a stable USB serial number",
+      );
     }
-    return this.connect(path, logger);
+
+    await this.disconnect();
+    const matching = selectKbheSessionDevice(
+      await this.listRuntimeDevices(),
+      serialNumber,
+    );
+    if (!matching) {
+      throw new Error("The original KBHE keyboard is no longer present");
+    }
+    return this.connect(matching.path, logger, serialNumber);
   }
 
   async disconnect(): Promise<void> {
     await this.transport.disconnect();
+    this.commander.resetTransportCapabilities();
+    this.keyStatesNativeCommandAvailable = null;
   }
 
   async connectionState(): Promise<KbheTransportConnectionState> {
     return this.transport.connectionState();
+  }
+
+  private async connectedRuntimeDevice(): Promise<KbheTransportDeviceInfo | null> {
+    const connection = await this.transport.connectionState();
+    if (!connection.path) return null;
+    const devices = await this.listRuntimeDevices();
+    return devices.find((device) => device.path === connection.path) ?? null;
+  }
+
+  private matchingRuntimeDevice(
+    target: KbheTransportDeviceInfo,
+    candidates: readonly KbheTransportDeviceInfo[],
+  ): KbheTransportDeviceInfo | undefined {
+    const serialNumber = target.serialNumber?.trim();
+    const matches = serialNumber
+      ? candidates.filter((device) => device.serialNumber?.trim() === serialNumber)
+      : candidates.filter((device) => device.path === target.path);
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  private async reconnectRuntimeDeviceAfterRestart(
+    target: KbheTransportDeviceInfo,
+    timeoutS: number,
+    logger: DevicePathLogger,
+    operation: string,
+  ): Promise<boolean> {
+    await this.disconnect();
+
+    /* Both restart commands acknowledge before USB teardown. Waiting avoids
+     * reconnecting the old handle during the firmware's controlled reboot. */
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    const deadline = Date.now() + Math.max(1_000, timeoutS * 1000);
+    let lastError: unknown = null;
+    while (Date.now() < deadline) {
+      try {
+        const candidates = await this.listRuntimeDevices();
+        const matching = this.matchingRuntimeDevice(target, candidates);
+        if (!matching) {
+          throw new Error("The original KBHE device has not reappeared yet");
+        }
+
+        const expectedSerialNumber = target.serialNumber?.trim() || undefined;
+        await this.connect(matching.path, logger, expectedSerialNumber);
+        return true;
+      } catch (error) {
+        lastError = error;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+
+    if (logger && lastError instanceof Error) {
+      logger(`${operation} reconnect failed: ${lastError.message}`);
+    }
+    return false;
   }
 
   private async sendCommand(
@@ -407,10 +555,10 @@ export class KBHEDevice {
 
   private defaultDynamicZones(primaryKeycode = 0x14): DynamicZone[] {
     return [
-      { end_mm_tenths: 40, end_mm: 4.0, hid_keycode: primaryKeycode },
-      { end_mm_tenths: 40, end_mm: 4.0, hid_keycode: 0 },
-      { end_mm_tenths: 40, end_mm: 4.0, hid_keycode: 0 },
-      { end_mm_tenths: 40, end_mm: 4.0, hid_keycode: 0 },
+      { end_mm_tenths: DKS_DEFAULT_ACTION_BITMAP, hid_keycode: primaryKeycode },
+      { end_mm_tenths: 0, hid_keycode: 0 },
+      { end_mm_tenths: 0, hid_keycode: 0 },
+      { end_mm_tenths: 0, hid_keycode: 0 },
     ];
   }
 
@@ -418,32 +566,34 @@ export class KBHEDevice {
     const defaults = this.defaultDynamicZones(primaryKeycode);
     const source = Array.isArray(zones) ? zones : [];
     const sanitized: DynamicZone[] = [];
-    let previousEnd = 0;
 
     for (let index = 0; index < 4; index += 1) {
-      const zone = (source[index] ?? defaults[index]) as Partial<DynamicZone> & {
-        end_mm?: number;
-      };
-      let endMmTenths =
-        typeof zone.end_mm_tenths === "number"
-          ? Math.trunc(zone.end_mm_tenths)
-          : Math.round(Number(zone.end_mm ?? defaults[index].end_mm) * 10.0);
+      const zone = (source[index] ?? defaults[index]) as Partial<DynamicZone>;
+      const actionBitmap = typeof zone.end_mm_tenths === "number"
+        ? Math.trunc(zone.end_mm_tenths) & 0xff
+        : defaults[index].end_mm_tenths;
       const hidKeycode =
         typeof zone.hid_keycode === "number"
           ? Math.trunc(zone.hid_keycode)
           : defaults[index].hid_keycode;
 
-      endMmTenths = Math.max(previousEnd || 1, Math.min(40, endMmTenths));
-      previousEnd = endMmTenths;
       sanitized.push({
-        end_mm_tenths: endMmTenths,
-        end_mm: endMmTenths / 10.0,
-        hid_keycode: hidKeycode,
+        end_mm_tenths: actionBitmap,
+        hid_keycode: hidKeycode & 0xffff,
       });
     }
 
-    if (sanitized.every((zone) => zone.hid_keycode === 0)) {
-      sanitized[0].hid_keycode = primaryKeycode;
+    if (
+      sanitized.every((zone) => zone.hid_keycode === 0)
+      || sanitized.every((zone) => zone.end_mm_tenths === 0)
+    ) {
+      return defaults;
+    }
+    if (sanitized[0].hid_keycode === 0) {
+      sanitized[0].hid_keycode = primaryKeycode & 0xffff;
+    }
+    if (sanitized[0].end_mm_tenths === 0) {
+      sanitized[0].end_mm_tenths = DKS_DEFAULT_ACTION_BITMAP;
     }
 
     return sanitized;
@@ -692,7 +842,66 @@ export class KBHEDevice {
 
   async saveSettings(): Promise<boolean> {
     const response = await this.sendCommand(Command.SAVE_SETTINGS, [], 3000);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
+    if (!response || response.length < 2 || response[1] !== Status.OK) {
+      return false;
+    }
+    /* Legacy firmware zero-fills bytes 2+, so version 0 keeps the historical
+     * accepted/queued behavior. Unknown non-zero versions fail closed. */
+    const protocolVersion = response.length < 4 ? 0 : response[3];
+    if (protocolVersion === 0) {
+      return true;
+    }
+    if (protocolVersion !== SETTINGS_SAVE_STATUS_PROTOCOL_VERSION) return false;
+    const initialState = response[2] as SettingsSaveState;
+    if (initialState === SettingsSaveState.Durable) return true;
+    if (initialState === SettingsSaveState.Failed || initialState === SettingsSaveState.RamOnly) {
+      return false;
+    }
+
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      const status = await this.getSettingsSaveStatus();
+      if (!status) return false;
+      if (status.state === SettingsSaveState.Durable) return true;
+      if (status.state === SettingsSaveState.Failed || status.state === SettingsSaveState.RamOnly) {
+        return false;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return false;
+  }
+
+  async getSettingsSaveStatus(): Promise<SettingsSaveStatus | null> {
+    const probe = await this.probeSettingsSaveStatus();
+    return probe.kind === "supported" ? probe.status : null;
+  }
+
+  private async probeSettingsSaveStatus(): Promise<SettingsSaveStatusProbe> {
+    const response = await this.sendCommand(Command.GET_SETTINGS_SAVE_STATUS);
+    if (response && response.length >= 2 && response[1] === Status.INVALID_CMD) {
+      return { kind: "unsupported" };
+    }
+    if (
+      !response
+      || response.length < 7
+      || response[1] !== Status.OK
+      || response[3] !== SETTINGS_SAVE_STATUS_PROTOCOL_VERSION
+      || response[2] > SettingsSaveState.RamOnly
+      || response[4] > 1
+      || response[5] > 1
+      || response[6] > 1
+    ) {
+      return { kind: "invalid" };
+    }
+    return {
+      kind: "supported",
+      status: {
+        state: response[2] as SettingsSaveState,
+        dirty: response[4] === 1,
+        requested: response[5] === 1,
+        inProgress: response[6] === 1,
+      },
+    };
   }
 
   async factoryReset(): Promise<boolean> {
@@ -701,31 +910,18 @@ export class KBHEDevice {
   }
 
   async usbReenumerate(timeoutS = 6.0, logger?: DevicePathLogger): Promise<boolean> {
+    const targetBefore = await this.connectedRuntimeDevice();
+    if (!targetBefore) return false;
     const response = await this.sendCommand(Command.USB_REENUMERATE, [], 500);
     if (!response || response.length < 2 || response[1] !== Status.OK) {
       return false;
     }
-
-    await this.disconnect();
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
-
-    const deadline = Date.now() + Math.max(1_000, timeoutS * 1000);
-    let lastError: unknown = null;
-
-    while (Date.now() < deadline) {
-      try {
-        await this.connect(undefined, logger);
-        return true;
-      } catch (error) {
-        lastError = error;
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
-      }
-    }
-
-    if (logger && lastError instanceof Error) {
-      logger(`USB re-enumeration reconnect failed: ${lastError.message}`);
-    }
-    return false;
+    return this.reconnectRuntimeDeviceAfterRestart(
+      targetBefore,
+      timeoutS,
+      logger,
+      "USB re-enumeration",
+    );
   }
 
   async ledGetEnabled(): Promise<boolean | null> {
@@ -764,7 +960,12 @@ export class KBHEDevice {
 
   async ledGetPixel(index: number): Promise<[number, number, number] | null> {
     const response = await this.sendCommand(Command.GET_LED_PIXEL, [0, index]);
-    if (response && response.length >= 6 && response[1] === Status.OK) {
+    if (
+      response
+      && response.length >= 6
+      && response[1] === Status.OK
+      && response[2] === (Math.trunc(index) & 0xff)
+    ) {
       return [response[3], response[4], response[5]];
     }
     return null;
@@ -772,7 +973,12 @@ export class KBHEDevice {
 
   async ledGetRow(row: number): Promise<number[] | null> {
     const response = await this.sendCommand(Command.GET_LED_ROW, [0, row]);
-    if (response && response.length >= 27 && response[1] === Status.OK) {
+    if (
+      response
+      && response.length >= 27
+      && response[1] === Status.OK
+      && response[2] === (Math.trunc(row) & 0xff)
+    ) {
       return Array.from(response.slice(3, 27));
     }
     return null;
@@ -830,7 +1036,13 @@ export class KBHEDevice {
         [0, chunkIndex, chunk.length, ...chunk],
         200,
       );
-      if (!response || response.length < 4 || response[1] !== Status.OK) {
+      if (
+        !response
+        || response.length < 4
+        || response[1] !== Status.OK
+        || response[2] !== chunkIndex
+        || response[3] !== chunk.length
+      ) {
         return false;
       }
       chunkIndex += 1;
@@ -852,7 +1064,8 @@ export class KBHEDevice {
 
       const returnedChunk = response[2];
       const chunkSize = response[3];
-      if (returnedChunk !== chunkIndex || chunkSize <= 0) {
+      const expectedChunkSize = Math.min(LED_BYTES_PER_CHUNK, totalSize - pixels.length);
+      if (returnedChunk !== chunkIndex || chunkSize !== expectedChunkSize) {
         return null;
       }
 
@@ -870,15 +1083,23 @@ export class KBHEDevice {
 
   async getKeySettings(keyIndex: number, profileIndex = 0, layerIndex = 0): Promise<KeySettings | null> {
     const response = await this.sendCommand(Command.GET_KEY_SETTINGS, [0, keyIndex, profileIndex, layerIndex]);
-    if (response && response.length >= 16 && response[1] === Status.OK) {
+    if (
+      response
+      && response.length >= 16
+      && response[1] === Status.OK
+      && response[2] === (Math.trunc(keyIndex) & 0xff)
+      && response[3] === (Math.trunc(profileIndex) & 0xff)
+      && response[4] === (Math.trunc(layerIndex) & 0xff)
+    ) {
       // New packet layout:
       // [0]=cmd, [1]=status, [2]=key_index, [3]=profile_index, [4]=layer_index,
       // [5-6]=hid_keycode (u16 LE), [7]=actuation, [8]=release, [9]=rt_press, [10]=rt_release,
       // [11]=socd_pair, [12]=socd_resolution, [13]=rapid_trigger_enabled,
       // [14]=disable_kb_on_gamepad, [15]=continuous_rapid_trigger, [16]=behavior_mode,
       // [17]=hold_threshold_10ms, [18-19]=secondary_hid_keycode,
-      // [20]=dz0.end, [21-22]=dz0.keycode, [23]=dz1.end, [24-25]=dz1.keycode,
-      // [26]=dz2.end, [27-28]=dz2.keycode, [29]=dz3.end, [30-31]=dz3.keycode,
+      // [20]=dz0.action bitmap, [21-22]=dz0.keycode, [23]=dz1.action bitmap,
+      // [24-25]=dz1.keycode, [26]=dz2.action bitmap, [27-28]=dz2.keycode,
+      // [29]=dz3.action bitmap, [30-31]=dz3.keycode,
       // [32]=tap_hold_options, [33]=dks_bottom_out_point, [34]=socd_fully_pressed_enabled,
       // [35]=socd_fully_pressed_point
       const primaryKeycode = this.unpackU16(response, 5);
@@ -932,7 +1153,13 @@ export class KBHEDevice {
       [0, boundedLayerIndex, boundedKeyIndex],
       150,
     );
-    if (response && response.length >= 6 && response[1] === Status.OK) {
+    if (
+      response
+      && response.length >= 6
+      && response[1] === Status.OK
+      && response[2] === boundedLayerIndex
+      && response[3] === boundedKeyIndex
+    ) {
       return {
         layer_index: response[2],
         key_index: response[3],
@@ -1051,19 +1278,14 @@ export class KBHEDevice {
         return null;
       }
 
-      const firstNewFlags = response[11];
-      const firstLegacyFlags = response[12];
-      const usesLegacyChunkLayout = !(firstNewFlags !== undefined && firstNewFlags <= 0x0f)
-        && firstLegacyFlags !== undefined
-        && firstLegacyFlags <= 0x0f;
-      const entrySize = usesLegacyChunkLayout ? 9 : 8;
+      const entrySize = 8;
 
       for (let index = 0; index < keyCount; index += 1) {
         const offset = 4 + index * entrySize;
-        const rapidPressIndex = usesLegacyChunkLayout ? 5 : 4;
-        const rapidReleaseIndex = usesLegacyChunkLayout ? 6 : 5;
-        const socdPairIndex = usesLegacyChunkLayout ? 7 : 6;
-        const flagsIndex = usesLegacyChunkLayout ? 8 : 7;
+        const rapidPressIndex = 4;
+        const rapidReleaseIndex = 5;
+        const socdPairIndex = 6;
+        const flagsIndex = 7;
         const hidKeycode = this.unpackU16(response, offset);
         const flags = response[offset + flagsIndex] ?? 0;
         keys.push({
@@ -1079,7 +1301,7 @@ export class KBHEDevice {
             response[offset + socdPairIndex] !== 255
               ? response[offset + socdPairIndex]
               : null,
-          socd_resolution: this.sanitizeSocdResolution((flags >> 2) & 0x03),
+          socd_resolution: this.sanitizeSocdResolution((flags >> 2) & 0x07),
           rapid_trigger_enabled: Boolean(flags & 0x01),
           continuous_rapid_trigger: false,
           behavior_mode: KEY_BEHAVIORS.Normal,
@@ -1090,7 +1312,7 @@ export class KBHEDevice {
           dks_bottom_out_point_mm: 4.0,
           socd_fully_pressed_enabled: false,
           socd_fully_pressed_point_mm: 4.0,
-          disable_kb_on_gamepad: false,
+          disable_kb_on_gamepad: Boolean(flags & 0x02),
         });
       }
 
@@ -1102,7 +1324,7 @@ export class KBHEDevice {
 
   async getGamepadSettings(): Promise<GamepadSettings | null> {
     const response = await this.sendCommand(Command.GET_GAMEPAD_SETTINGS);
-    if (response && response.length >= 14 && response[1] === Status.OK) {
+    if (response && response.length >= 18 && response[1] === Status.OK) {
       // New layout (radial_deadzone removed):
       // [2]=keyboard_routing, [3]=square_mode, [4]=reactive_stick, [5]=api_mode,
       // [6+]=curve points (3 bytes each: x01mm lo, x01mm hi, y)
@@ -1179,13 +1401,46 @@ export class KBHEDevice {
     payload.push(binding.layer_mode & 0xff, binding.layer_index & 0xff);
   }
 
+  private isValidRotaryBinding(binding: RotaryBinding): boolean {
+    return binding.mode >= 0
+      && binding.mode <= 1
+      && binding.layer_mode >= 0
+      && binding.layer_mode <= 1
+      && binding.layer_index >= 0
+      && binding.layer_index < LAYER_COUNT;
+  }
+
   async getRotaryEncoderSettings(): Promise<RotaryEncoderSettings | null> {
     const response = await this.sendCommand(Command.GET_ROTARY_ENCODER_SETTINGS);
     if (response && response.length >= 14 && response[1] === Status.OK) {
+      const acceleration = response.length >= 39 ? (response[38] ?? 0) : 0;
+      const progressFilledOnly = response.length >= 40 ? (response[39] ?? 0) : 0;
+      const rgbEffectMode = response[8] ?? 0;
+      const progressEffectMode = response[10] ?? 0;
+      if (
+        (response[2] ?? 0) > 4
+        || (response[3] ?? 0) > 4
+        || (response[4] ?? 0) < 1
+        || (response[4] ?? 0) > 16
+        || (response[5] ?? 0) < 1
+        || (response[5] ?? 0) > 64
+        || (response[6] ?? 0) > 1
+        || (response[7] ?? 0) > 3
+        || rgbEffectMode >= LED_EFFECT_COUNT
+        || rgbEffectMode === 7
+        || (response[9] ?? 0) > 2
+        || progressEffectMode >= LED_EFFECT_COUNT
+        || progressEffectMode === 7
+        || acceleration > 3
+        || progressFilledOnly > 1
+      ) {
+        return null;
+      }
       const base = {
         rotation_action: response[2] ?? 0,
         button_action: response[3] ?? 0,
         sensitivity: response[4] ?? 1,
+        acceleration,
         step_size: response[5] ?? 1,
         invert_direction: Boolean(response[6]),
         rgb_behavior: response[7] ?? 0,
@@ -1193,6 +1448,7 @@ export class KBHEDevice {
         progress_style: response[9] ?? 0,
         progress_effect_mode: response[10] ?? 0,
         progress_color: [response[11] ?? 0, response[12] ?? 0, response[13] ?? 0] as [number, number, number],
+        progress_filled_only: Boolean(progressFilledOnly),
         cw_binding: this.defaultRotaryBinding(),
         ccw_binding: this.defaultRotaryBinding(),
         click_binding: this.defaultRotaryBinding(),
@@ -1203,6 +1459,13 @@ export class KBHEDevice {
         base.cw_binding = this.parseRotaryBinding(response, 14);
         base.ccw_binding = this.parseRotaryBinding(response, 22);
         base.click_binding = this.parseRotaryBinding(response, 30);
+        if (
+          !this.isValidRotaryBinding(base.cw_binding)
+          || !this.isValidRotaryBinding(base.ccw_binding)
+          || !this.isValidRotaryBinding(base.click_binding)
+        ) {
+          return null;
+        }
       }
 
       return base;
@@ -1237,6 +1500,8 @@ export class KBHEDevice {
     this.pushRotaryBinding(payload, cwBinding);
     this.pushRotaryBinding(payload, ccwBinding);
     this.pushRotaryBinding(payload, clickBinding);
+    payload.push(Math.trunc(settings.acceleration ?? 0) & 0xff);
+    payload.push(settings.progress_filled_only ? 1 : 0);
 
     const response = await this.sendCommand(Command.SET_ROTARY_ENCODER_SETTINGS, payload);
     return !!response && response.length >= 2 && response[1] === Status.OK;
@@ -1403,7 +1668,12 @@ export class KBHEDevice {
 
   async getKeyCurve(keyIndex: number): Promise<KeyCurveSettings | null> {
     const response = await this.sendCommand(Command.GET_KEY_CURVE, [0, keyIndex]);
-    if (response && response.length >= 8 && response[1] === Status.OK) {
+    if (
+      response
+      && response.length >= 8
+      && response[1] === Status.OK
+      && response[2] === (Math.trunc(keyIndex) & 0xff)
+    ) {
       return {
         key_index: response[2],
         curve_enabled: response[3] !== 0,
@@ -1438,7 +1708,12 @@ export class KBHEDevice {
 
   async getKeyGamepadMap(keyIndex: number): Promise<KeyGamepadMap | null> {
     const response = await this.sendCommand(Command.GET_KEY_GAMEPAD_MAP, [0, keyIndex]);
-    if (response && response.length >= 6 && response[1] === Status.OK) {
+    if (
+      response
+      && response.length >= 6
+      && response[1] === Status.OK
+      && response[2] === (Math.trunc(keyIndex) & 0xff)
+    ) {
       const rawLayerMask = response.length >= 7 ? response[6] : GAMEPAD_LAYER_MASK_ALL;
       return {
         key_index: response[2],
@@ -1749,7 +2024,12 @@ export class KBHEDevice {
 
   async getProfileName(profileIndex: number): Promise<{ name: string; profile_used_mask: number } | null> {
     const response = await this.sendCommand(Command.GET_PROFILE_NAME, [0, profileIndex & 0xff]);
-    if (response && response.length >= 20 && response[1] === Status.OK) {
+    if (
+      response
+      && response.length >= 20
+      && response[1] === Status.OK
+      && response[2] === (profileIndex & 0xff)
+    ) {
       return {
         profile_used_mask: response[3] ?? 0,
         name: this.decodeCString(response, 4, SETTINGS_PROFILE_NAME_LENGTH),
@@ -1851,16 +2131,53 @@ export class KBHEDevice {
    */
   async enterRamOnlyMode(): Promise<boolean> {
     const response = await this.sendCommand(Command.SET_RAM_ONLY_MODE, [0, 1], 300);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
+    if (!response || response.length < 2 || response[1] !== Status.OK) {
+      return false;
+    }
+
+    /* A pre-existing journal transaction cannot be aborted once it owns the
+     * Flash writer. New firmware drains that transaction before allowing
+     * another persistent commit. Only an explicit INVALID_CMD identifies
+     * legacy firmware; transport and malformed-response failures stay errors. */
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      const probe = await this.probeSettingsSaveStatus();
+      if (probe.kind === "unsupported") return true;
+      if (probe.kind === "invalid") return false;
+      if (!probe.status.inProgress) return true;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    return false;
+  }
+
+  /** Leave RAM-only mode without reloading or writing settings. */
+  async leaveRamOnlyMode(): Promise<boolean> {
+    const response = await this.sendCommand(Command.SET_RAM_ONLY_MODE, [2, 0, 1], 300);
+    return Boolean(
+      response
+      && response.length >= 3
+      && response[1] === Status.OK
+      && response[2] === 0,
+    );
   }
 
   /**
    * Exit RAM-only mode and reload the last-saved flash settings, discarding
    * any RAM-only changes.  Call this when switching back to an active profile.
    */
-  async exitRamOnlyMode(): Promise<boolean> {
+  async exitRamOnlyMode(timeoutS = 6.0, logger?: DevicePathLogger): Promise<boolean> {
+    const targetBefore = await this.connectedRuntimeDevice();
+    if (!targetBefore) return false;
     const response = await this.sendCommand(Command.RELOAD_SETTINGS_FROM_FLASH, [], 1000);
-    return !!response && response.length >= 2 && response[1] === Status.OK;
+    if (!response || response.length < 2 || response[1] !== Status.OK) {
+      return false;
+    }
+    return this.reconnectRuntimeDeviceAfterRestart(
+      targetBefore,
+      timeoutS,
+      logger,
+      "Settings reload",
+    );
   }
 
   async getFilterEnabled(): Promise<boolean | null> {
@@ -2002,6 +2319,23 @@ export class KBHEDevice {
     const workUs = this.unpackU16(response, 14);
     const loadPermille = this.unpackU16(response, 16);
     const tempValid = Boolean(response[18]);
+    const maxScanCycleUs = response.length >= 21 ? this.unpackU16(response, 19) : 0;
+    const scanDeadlineMissCount = response.length >= 25 ? u32le(response, 21) : 0;
+    const flashProgrammedWords = response.length >= 29 ? u32le(response, 25) : 0;
+    const flashAsyncSteps = response.length >= 33 ? u32le(response, 29) : 0;
+    const flashGcCount = response.length >= 37 ? u32le(response, 33) : 0;
+    const flashBootEraseCount = response.length >= 41 ? u32le(response, 37) : 0;
+    const flashRuntimeEraseCount = response.length >= 45 ? u32le(response, 41) : 0;
+    const flashDeferredNoSpaceCount = response.length >= 49 ? u32le(response, 45) : 0;
+    const flashMaxWordsPerStep = response.length >= 51 ? this.unpackU16(response, 49) : 0;
+    const flashAsyncBusy = response.length >= 52 && Boolean(response[51]);
+    const flashSpareBankReady = response.length >= 53 && Boolean(response[52]);
+    const flashWordProgramDatasheetMaxUs = response.length >= 55
+      ? this.unpackU16(response, 53)
+      : 0;
+    const flashHard8khzGuarantee = response.length >= 56 && Boolean(response[55]);
+    const p99ScanCycleUs = response.length >= 58 ? this.unpackU16(response, 56) : 0;
+    const flashLastStatus = response.length >= 59 ? (response[58] ?? 0) : 0;
 
     return {
       temperature_c: tempValid ? temperatureRaw : null,
@@ -2013,6 +2347,22 @@ export class KBHEDevice {
       work_us: workUs,
       load_percent: loadPermille / 10.0,
       load_permille: loadPermille,
+      realtime_persistence_metrics_available: flashWordProgramDatasheetMaxUs > 0,
+      max_scan_cycle_us: maxScanCycleUs,
+      p99_scan_cycle_us: p99ScanCycleUs,
+      scan_deadline_miss_count: scanDeadlineMissCount,
+      flash_programmed_words: flashProgrammedWords,
+      flash_async_steps: flashAsyncSteps,
+      flash_gc_count: flashGcCount,
+      flash_boot_erase_count: flashBootEraseCount,
+      flash_runtime_erase_count: flashRuntimeEraseCount,
+      flash_deferred_no_space_count: flashDeferredNoSpaceCount,
+      flash_max_words_per_step: flashMaxWordsPerStep,
+      flash_async_busy: flashAsyncBusy,
+      flash_spare_bank_ready: flashSpareBankReady,
+      flash_word_program_datasheet_max_us: flashWordProgramDatasheetMaxUs,
+      flash_hard_8khz_guarantee: flashHard8khzGuarantee,
+      flash_last_status: flashLastStatus,
     };
   }
 
@@ -2276,6 +2626,334 @@ export class KBHEDevice {
       };
     }
     return null;
+  }
+
+  async getActionCapabilities(): Promise<ActionCapabilities | null> {
+    const response = await this.sendCommand(Command.GET_ACTION_CAPABILITIES);
+    if (!response || response.length < 10 || response[1] !== Status.OK) {
+      return null;
+    }
+    return {
+      programVersion: response[2],
+      profileCount: response[3],
+      programCount: response[4],
+      maxSteps: response[5],
+      stateCount: response[6],
+      overlayCount: response[7],
+      stepSize: response[8],
+      maxInstances: response[9],
+      profileDocumentSchemaVersion: response.length > 10 ? response[10] : 0,
+      atomicProfileDocumentCommit: response.length > 11 && response[11] === 1,
+    };
+  }
+
+  async getActionProgramMeta(profileIndex: number, programIndex: number): Promise<ActionProgramMeta | null> {
+    const response = await this.sendCommand(
+      Command.GET_ACTION_PROGRAM_META,
+      [2, profileIndex & 0xff, programIndex & 0xff],
+    );
+    if (
+      !response
+      || response.length < 12
+      || response[1] !== Status.OK
+      || response[2] !== (profileIndex & 0xff)
+      || response[3] !== (programIndex & 0xff)
+    ) {
+      return null;
+    }
+    return {
+      profileIndex: response[2],
+      programIndex: response[3],
+      version: response[4],
+      flags: response[5],
+      stepCount: response[6],
+      validationResult: response[7],
+      hash: u32le(response, 8),
+    };
+  }
+
+  async getActionProgram(profileIndex: number, programIndex: number): Promise<ActionProgram | null> {
+    const meta = await this.getActionProgramMeta(profileIndex, programIndex);
+    if (!meta || meta.stepCount < 1 || meta.stepCount > ACTION_PROGRAM_MAX_STEPS) {
+      return null;
+    }
+
+    const steps = [];
+    for (let start = 0; start < meta.stepCount;) {
+      const requested = Math.min(ACTION_STEPS_PER_PACKET, meta.stepCount - start);
+      const response = await this.sendCommand(
+        Command.GET_ACTION_PROGRAM_CHUNK,
+        [4, profileIndex & 0xff, programIndex & 0xff, start & 0xff, requested & 0xff],
+      );
+      if (
+        !response
+        || response.length < 6
+        || response[1] !== Status.OK
+        || response[2] !== (profileIndex & 0xff)
+        || response[3] !== (programIndex & 0xff)
+      ) {
+        return null;
+      }
+      const returnedStart = response[4];
+      const count = response[5];
+      if (returnedStart !== start || count < 1 || count > requested || response.length < 6 + count * 4) {
+        return null;
+      }
+      for (let index = 0; index < count; index += 1) {
+        steps.push(decodeActionStep(response, 6 + index * 4));
+      }
+      start += count;
+    }
+
+    const parsed = actionProgramSchema.safeParse({ version: meta.version, flags: meta.flags, steps });
+    if (!parsed.success || actionProgramHash(parsed.data) !== meta.hash) {
+      return null;
+    }
+    return parsed.data;
+  }
+
+  async setActionProgram(
+    profileIndex: number,
+    programIndex: number,
+    programInput: ActionProgram,
+    persist = true,
+  ): Promise<boolean> {
+    const parsed = actionProgramSchema.safeParse(programInput);
+    if (!parsed.success) {
+      return false;
+    }
+    const program = parsed.data;
+    const hash = actionProgramHash(program);
+    const begin = await this.sendCommand(Command.BEGIN_SET_ACTION_PROGRAM, [
+      9,
+      profileIndex & 0xff,
+      programIndex & 0xff,
+      program.version,
+      program.flags,
+      program.steps.length,
+      hash & 0xff,
+      (hash >>> 8) & 0xff,
+      (hash >>> 16) & 0xff,
+      (hash >>> 24) & 0xff,
+    ]);
+    if (!begin || begin.length < 4 || begin[1] !== Status.OK) {
+      return false;
+    }
+
+    let committed = false;
+    try {
+      for (let start = 0; start < program.steps.length; start += ACTION_STEPS_PER_PACKET) {
+        const chunk = program.steps.slice(start, start + ACTION_STEPS_PER_PACKET);
+        const encoded = chunk.flatMap(encodeActionStep);
+        const response = await this.sendCommand(Command.SET_ACTION_PROGRAM_CHUNK, [
+          4 + encoded.length,
+          profileIndex & 0xff,
+          programIndex & 0xff,
+          start & 0xff,
+          chunk.length & 0xff,
+          ...encoded,
+        ]);
+        if (!response || response.length < 6 || response[1] !== Status.OK) {
+          return false;
+        }
+      }
+
+      const commit = await this.sendCommand(Command.COMMIT_ACTION_PROGRAM, [
+        3,
+        profileIndex & 0xff,
+        programIndex & 0xff,
+        persist ? 1 : 0,
+      ], ACTION_PERSIST_COMMAND_TIMEOUT_MS);
+      committed = Boolean(
+        commit
+        && commit.length >= 8
+        && commit[1] === Status.OK
+        && commit[2] === (profileIndex & 0xff)
+        && commit[3] === (programIndex & 0xff)
+        && u32le(commit, 4) === hash,
+      );
+      const explicitlyRejected = Boolean(commit && commit.length >= 2 && commit[1] !== Status.OK);
+      if (!committed && !explicitlyRejected) {
+        /* Never replay COMMIT: its response can be lost after flash accepted it.
+         * Reconcile the final state through the retry-safe metadata command. */
+        const meta = await this.getActionProgramMeta(profileIndex, programIndex);
+        committed = Boolean(
+          meta
+          && meta.version === program.version
+          && meta.flags === program.flags
+          && meta.stepCount === program.steps.length
+          && meta.validationResult === 0
+          && meta.hash === hash,
+        );
+      }
+      return committed;
+    } finally {
+      if (!committed) {
+        await this.sendCommand(Command.ABORT_ACTION_PROGRAM, [], 300).catch(() => null);
+      }
+    }
+  }
+
+  async getActionOverlay(profileIndex: number, overlayIndex: number): Promise<ActionOverlayBinding | null> {
+    const response = await this.sendCommand(
+      Command.GET_ACTION_OVERLAY,
+      [2, profileIndex & 0xff, overlayIndex & 0xff],
+    );
+    if (
+      !response
+      || response.length < 5
+      || response[1] !== Status.OK
+      || response[2] !== (profileIndex & 0xff)
+      || response[3] !== (overlayIndex & 0xff)
+    ) {
+      return null;
+    }
+    const size = response[4];
+    const expectedSize = 16 + ACTION_OVERLAY_MASK_BYTES;
+    if (size !== expectedSize || response.length < 5 + size) {
+      return null;
+    }
+    const offset = 5;
+    const parsed = actionOverlayBindingSchema.safeParse({
+      enabled: Boolean(response[offset]),
+      priority: response[offset + 1],
+      blendMode: response[offset + 2],
+      opacity: response[offset + 3],
+      color: [response[offset + 4], response[offset + 5], response[offset + 6]],
+      allKeys: Boolean(response[offset + 7] & 0x01),
+      fadeInMs: u16le(response, offset + 8),
+      fadeOutMs: u16le(response, offset + 10),
+      keyMask: Array.from(response.slice(offset + 12, offset + 12 + ACTION_OVERLAY_MASK_BYTES)),
+      stateIndex: response[offset + 12 + ACTION_OVERLAY_MASK_BYTES],
+      activeValue: response[offset + 13 + ACTION_OVERLAY_MASK_BYTES],
+      followsState: Boolean(response[offset + 14 + ACTION_OVERLAY_MASK_BYTES]),
+    });
+    return parsed.success ? parsed.data : null;
+  }
+
+  async setActionOverlay(
+    profileIndex: number,
+    overlayIndex: number,
+    bindingInput: ActionOverlayBinding,
+    persist = true,
+  ): Promise<boolean> {
+    const parsed = actionOverlayBindingSchema.safeParse(bindingInput);
+    if (!parsed.success) {
+      return false;
+    }
+    const binding = parsed.data;
+    const payload = [
+      binding.enabled ? 1 : 0,
+      binding.priority,
+      binding.blendMode,
+      binding.opacity,
+      ...binding.color,
+      binding.allKeys ? 1 : 0,
+      binding.fadeInMs & 0xff,
+      (binding.fadeInMs >>> 8) & 0xff,
+      binding.fadeOutMs & 0xff,
+      (binding.fadeOutMs >>> 8) & 0xff,
+      ...binding.keyMask,
+      binding.stateIndex,
+      binding.activeValue,
+      binding.followsState ? 1 : 0,
+      0,
+    ];
+    const response = await this.sendCommand(Command.SET_ACTION_OVERLAY, [
+      4 + payload.length,
+      profileIndex & 0xff,
+      overlayIndex & 0xff,
+      payload.length,
+      persist ? 1 : 0,
+      ...payload,
+    ], ACTION_PERSIST_COMMAND_TIMEOUT_MS);
+    const applied = Boolean(
+      response
+      && response.length >= 4
+      && response[1] === Status.OK
+      && response[2] === (profileIndex & 0xff)
+      && response[3] === (overlayIndex & 0xff),
+    );
+    if (applied) return true;
+
+    const explicitlyRejected = Boolean(response && response.length >= 2 && response[1] !== Status.OK);
+    if (explicitlyRejected) return false;
+
+    /* SET is intentionally not replayed after a lost response. Confirm its
+     * postcondition with the retry-safe GET command instead. */
+    const current = await this.getActionOverlay(profileIndex, overlayIndex);
+    return current !== null && actionOverlayBindingsEqual(current, binding);
+  }
+
+  async getActionStates(): Promise<{ bits: number; activeProfileIndex: number } | null> {
+    const response = await this.sendCommand(Command.GET_ACTION_STATES);
+    if (!response || response.length < 5 || response[1] !== Status.OK) {
+      return null;
+    }
+    return { bits: u16le(response, 2), activeProfileIndex: response[4] };
+  }
+
+  async setActionState(stateIndex: number, value: boolean): Promise<boolean> {
+    const response = await this.sendCommand(
+      Command.SET_ACTION_STATE,
+      [2, stateIndex & 0xff, value ? 1 : 0],
+    );
+    return Boolean(response && response.length >= 4 && response[1] === Status.OK);
+  }
+
+  async getProfileDocumentMeta(
+    profileIndex: number,
+  ): Promise<{ profileIndex: number; schemaVersion: number; generation: number } | null> {
+    const response = await this.sendCommand(
+      Command.GET_PROFILE_DOCUMENT_META,
+      [1, profileIndex & 0xff],
+    );
+    if (
+      !response
+      || response.length < 8
+      || response[1] !== Status.OK
+      || response[2] !== (profileIndex & 0xff)
+      || response[3] !== PROFILE_DOCUMENT_SCHEMA_VERSION
+    ) {
+      return null;
+    }
+    return {
+      profileIndex: response[2],
+      schemaVersion: response[3],
+      generation: u32le(response, 4),
+    };
+  }
+
+  async commitProfileDocument(
+    profileIndex: number,
+    expectedGeneration: number,
+  ): Promise<{ profileIndex: number; schemaVersion: number; generation: number } | null> {
+    const response = await this.sendCommand(
+      Command.COMMIT_PROFILE_DOCUMENT,
+      [
+        5,
+        profileIndex & 0xff,
+        expectedGeneration & 0xff,
+        (expectedGeneration >>> 8) & 0xff,
+        (expectedGeneration >>> 16) & 0xff,
+        (expectedGeneration >>> 24) & 0xff,
+      ],
+      3000,
+    );
+    if (
+      !response
+      || response.length < 8
+      || response[1] !== Status.OK
+      || response[2] !== (profileIndex & 0xff)
+      || response[3] !== PROFILE_DOCUMENT_SCHEMA_VERSION
+    ) {
+      return null;
+    }
+    return {
+      profileIndex: response[2],
+      schemaVersion: response[3],
+      generation: u32le(response, 4),
+    };
   }
 }
 

@@ -29,6 +29,73 @@
 #include "color_values.h"
 
 static uint8_t ws2812_led_storage[WS2812_MAX_LEDS * 3];
+static uint8_t ws2812_frame_a_storage[WS2812_MAX_LEDS * 3];
+static uint8_t ws2812_frame_b_storage[WS2812_MAX_LEDS * 3];
+
+#if !WS2812_USE_SOFTWARE_BACKEND
+static uint32_t ws2812_dma_request_for_channel(uint32_t channel) {
+    switch (channel) {
+        case TIM_CHANNEL_1:
+            return TIM_DMA_CC1;
+        case TIM_CHANNEL_2:
+            return TIM_DMA_CC2;
+        case TIM_CHANNEL_3:
+            return TIM_DMA_CC3;
+        case TIM_CHANNEL_4:
+            return TIM_DMA_CC4;
+        default:
+            return 0u;
+    }
+}
+
+static void ws2812_pause_dma_at_idle_boundary(ws2812_handleTypeDef *ws2812) {
+    uint32_t dma_request = ws2812_dma_request_for_channel(ws2812->channel);
+
+    if (dma_request == 0u || ws2812->dma_paused) {
+        return;
+    }
+
+    /* The latch buffer contains only zero-duty PWM slots here.  Gate the
+     * request and timer directly so the circular DMA remains armed, but idle
+     * LEDs generate no DMA traffic or half/full interrupts. */
+    __HAL_TIM_DISABLE_DMA(ws2812->timer, dma_request);
+    ws2812->timer->Instance->CR1 &= ~TIM_CR1_CEN;
+    __DMB();
+    ws2812->dma_paused = true;
+}
+
+static void ws2812_resume_dma(ws2812_handleTypeDef *ws2812) {
+    uint32_t dma_request = ws2812_dma_request_for_channel(ws2812->channel);
+
+    if (dma_request == 0u || !ws2812->dma_paused) {
+        return;
+    }
+
+    /* Called with interrupts masked by ws2812_show().  Resume the existing
+     * circular transfer instead of invoking HAL Stop/Start in an ISR. */
+    __HAL_TIM_SET_COUNTER(ws2812->timer, 0u);
+    ws2812->dma_paused = false;
+    __DMB();
+    __HAL_TIM_ENABLE_DMA(ws2812->timer, dma_request);
+    __HAL_TIM_ENABLE(ws2812->timer);
+}
+#endif
+
+static bool ws2812_activate_pending_frame(ws2812_handleTypeDef *ws2812) {
+    uint8_t *previous_active = NULL;
+
+    if (ws2812 == NULL || ws2812->active_led == NULL ||
+        ws2812->pending_led == NULL || !ws2812->is_dirty) {
+        return false;
+    }
+    __DMB();
+    previous_active = ws2812->active_led;
+    ws2812->active_led = ws2812->pending_led;
+    ws2812->pending_led = previous_active;
+    __DMB();
+    ws2812->is_dirty = false;
+    return true;
+}
 
 #if WS2812_USE_SOFTWARE_BACKEND
 static inline void ws2812_enable_cycle_counter(void) {
@@ -48,6 +115,12 @@ static inline void ws2812_wait_until(uint32_t target_cycles) {
  * this function is handled by the dma callbacks.
  */
 inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint32_t *dma_buffer_pointer) {
+
+    if (ws2812 == NULL || dma_buffer_pointer == NULL ||
+        ws2812->active_led == NULL || ws2812->pending_led == NULL ||
+        ws2812->leds == 0u || ws2812->leds > WS2812_MAX_LEDS) {
+        return;
+    }
 
 #ifdef BUFF_GPIO_Port
 	HAL_GPIO_WritePin(BUFF_GPIO_Port, BUFF_Pin, GPIO_PIN_SET);
@@ -72,19 +145,24 @@ inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint32_t *dma_buf
 
         if (ws2812->res_cnt >= LED_RESET_CYCLES) { // done enough reset cycles - move to next state
             ws2812->led_cnt = 0;	// prepare to send data
-            if (ws2812->is_dirty) {
-                ws2812->is_dirty = false;
+            if (ws2812_activate_pending_frame(ws2812)) {
                 ws2812->led_state = LED_DAT;
             } else {
                 ws2812->led_state = LED_IDL;
+#if !WS2812_USE_SOFTWARE_BACKEND
+                ws2812_pause_dma_at_idle_boundary(ws2812);
+#endif
             }
         }
 
     } else if (ws2812->led_state == LED_IDL) { // idle state
 
-        if (ws2812->is_dirty) { // we do nothing here except waiting for a dirty flag
-            ws2812->is_dirty = false;
+        if (ws2812_activate_pending_frame(ws2812)) { // start only at a frame boundary
             ws2812->led_state = LED_DAT; // when dirty - start processing data
+#if !WS2812_USE_SOFTWARE_BACKEND
+        } else {
+            ws2812_pause_dma_at_idle_boundary(ws2812);
+#endif
         }
 
     } else { // LED_DAT
@@ -92,7 +170,7 @@ inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint32_t *dma_buf
         ++ws2812->dat_cbs;
 
         // First let's deal with the current LED
-        uint8_t *led = (uint8_t*) &ws2812->led[3 * ws2812->led_cnt];
+        uint8_t *led = (uint8_t*) &ws2812->active_led[3 * ws2812->led_cnt];
 
         for (uint8_t c = 0; c < 3; c++) { // Deal with the 3 color leds in one led package
 
@@ -121,16 +199,21 @@ inline void ws2812_update_buffer(ws2812_handleTypeDef *ws2812, uint32_t *dma_buf
 
 ws2812_resultTypeDef zeroLedValues(ws2812_handleTypeDef *ws2812) {
     ws2812_resultTypeDef res = WS2812_Ok;
+    if (ws2812 == NULL || ws2812->led == NULL || ws2812->leds == 0u ||
+        ws2812->leds > WS2812_MAX_LEDS) {
+        return WS2812_Err;
+    }
     memset(ws2812->led, 0, ws2812->leds * 3); // Zero it all
-    ws2812->is_dirty = true; // Mark buffer dirty
+    ws2812->staging_dirty = true;
     return res;
 }
 
 ws2812_resultTypeDef setLedValue(ws2812_handleTypeDef *ws2812, uint16_t led, uint8_t col, uint8_t value) {
     ws2812_resultTypeDef res = WS2812_Ok;
-    if (led < ws2812->leds) {
+    if (ws2812 != NULL && ws2812->led != NULL &&
+        ws2812->leds <= WS2812_MAX_LEDS && led < ws2812->leds && col < 3u) {
         ws2812->led[3 * led + col] = value;
-        ws2812->is_dirty = true; // Mark buffer dirty
+        ws2812->staging_dirty = true;
     } else {
         res = WS2812_Err;
     }
@@ -141,11 +224,12 @@ ws2812_resultTypeDef setLedValue(ws2812_handleTypeDef *ws2812, uint16_t led, uin
 // handle updating the dma buffer when needed
 ws2812_resultTypeDef setLedValues(ws2812_handleTypeDef *ws2812, uint16_t led, uint8_t r, uint8_t g, uint8_t b) {
     ws2812_resultTypeDef res = WS2812_Ok;
-    if (led < ws2812->leds) {
+    if (ws2812 != NULL && ws2812->led != NULL &&
+        ws2812->leds <= WS2812_MAX_LEDS && led < ws2812->leds) {
         ws2812->led[3 * led + RL] = r;
         ws2812->led[3 * led + GL] = g;
         ws2812->led[3 * led + BL] = b;
-        ws2812->is_dirty = true; // Mark buffer dirty
+        ws2812->staging_dirty = true;
     } else {
         res = WS2812_Err;
     }
@@ -156,7 +240,8 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
 
     ws2812_resultTypeDef res = WS2812_Ok;
 
-    if (leds > WS2812_MAX_LEDS) {
+    if (ws2812 == NULL || timer == NULL || leds == 0u ||
+        leds > WS2812_MAX_LEDS) {
         return WS2812_Err;
     }
 
@@ -172,12 +257,18 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
     ws2812->led_cnt = 0;
     ws2812->res_cnt = 0;
     ws2812->is_dirty = 0;
+    ws2812->staging_dirty = 0;
+    ws2812->dma_paused = 0;
     ws2812->zero_halves = 2;
     ws2812->dma_cbs = 0;
     ws2812->dat_cbs = 0;
 
     ws2812->led = ws2812_led_storage;
     memset(ws2812->led, 0, leds * 3);
+    ws2812->active_led = ws2812_frame_a_storage;
+    ws2812->pending_led = ws2812_frame_b_storage;
+    memset(ws2812->active_led, 0, leds * 3);
+    memset(ws2812->pending_led, 0, leds * 3);
 
 #if WS2812_USE_SOFTWARE_BACKEND
     GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -211,7 +302,9 @@ ws2812_resultTypeDef ws2812_init(ws2812_handleTypeDef *ws2812, TIM_HandleTypeDef
 }
 
 void ws2812_show(ws2812_handleTypeDef *ws2812) {
-    if (ws2812 == NULL || ws2812->led == NULL) {
+    if (ws2812 == NULL || ws2812->led == NULL ||
+        ws2812->active_led == NULL || ws2812->pending_led == NULL ||
+        ws2812->leds == 0u || ws2812->leds > WS2812_MAX_LEDS) {
         return;
     }
 
@@ -256,12 +349,24 @@ void ws2812_show(ws2812_handleTypeDef *ws2812) {
     uint32_t reset_start_cycles = DWT->CYCCNT;
     port->BSRR = pin_reset_mask;
     ws2812_wait_until(reset_start_cycles + reset_cycles);
+    ws2812->staging_dirty = false;
 
     if (primask == 0U) {
         __enable_irq();
     }
 #else
-    ws2812->is_dirty = true;
+    if (ws2812->staging_dirty) {
+        uint32_t primask = __get_PRIMASK();
+        __disable_irq();
+        memcpy(ws2812->pending_led, ws2812->led, ws2812->leds * 3u);
+        __DMB();
+        ws2812->is_dirty = true;
+        ws2812->staging_dirty = false;
+        ws2812_resume_dma(ws2812);
+        if (primask == 0U) {
+            __enable_irq();
+        }
+    }
 #endif
 }
 

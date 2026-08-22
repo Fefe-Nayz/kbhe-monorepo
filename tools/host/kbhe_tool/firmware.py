@@ -7,16 +7,16 @@ import zlib
 
 _UPDATER_TRAILER_MAGIC = 0x55445452
 _UPDATER_TRAILER_MAGIC_BYTES = struct.pack("<I", _UPDATER_TRAILER_MAGIC)
-_UPDATER_TRAILER_STRUCT = struct.Struct("<IIIHHI")
+_UPDATER_TRAILER_STRUCT = struct.Struct("<III4B64sI")
 
 # Mirrors firmware/Core/Inc/updater_shared.h
-_UPDATER_APP_SLOT_SIZE = 0x00050000
+_UPDATER_APP_SLOT_SIZE = 0x00030000
 _UPDATER_TRAILER_RESERVED_SIZE = 0x00000100
 _UPDATER_APP_MAX_IMAGE_SIZE = _UPDATER_APP_SLOT_SIZE - _UPDATER_TRAILER_RESERVED_SIZE
 
 _KBHE_FW_VERSION_RECORD_MAGIC = 0x4B465756
 _KBHE_FW_VERSION_RECORD_MAGIC_BYTES = struct.pack("<I", _KBHE_FW_VERSION_RECORD_MAGIC)
-_KBHE_FW_VERSION_RECORD_STRUCT = struct.Struct("<IHH")
+_KBHE_FW_VERSION_RECORD_STRUCT = struct.Struct("<III")
 
 _DEBUG_GET_FW_PREFIX = b"\x80\xb4\x00\xaf"
 _DEBUG_GET_FW_SUFFIX = b"\x18\x46\xbd\x46\x5d\xf8\x04\x7b\x70\x47"
@@ -29,23 +29,37 @@ _RELEASE_NEXT_FN_PREFIXES = (
 
 
 def _read_repo_firmware_version() -> int | None:
-    repo_root = pathlib.Path(__file__).resolve().parent.parent
-    settings_path = repo_root.parent / "firmware" / "Core" / "Src" / "settings.c"
+    settings_path = (
+        pathlib.Path(__file__).resolve().parents[3]
+        / "firmware"
+        / "Core"
+        / "Src"
+        / "settings.c"
+    )
     if not settings_path.exists():
         return None
 
     text = settings_path.read_text(encoding="utf-8", errors="replace")
-    match = re.search(r"#define\s+FIRMWARE_VERSION\s+(0x[0-9A-Fa-f]+|\d+)", text)
-    if not match:
-        return None
-
-    return int(match.group(1), 0)
+    values = []
+    for name in ("MAJOR", "MINOR", "PATCH"):
+        match = re.search(
+            rf"#define\s+FIRMWARE_VERSION_{name}\s+(0x[0-9A-Fa-f]+|\d+)u?",
+            text,
+        )
+        if not match:
+            return None
+        value = int(match.group(1), 0)
+        if not 0 <= value <= 0xFF:
+            return None
+        values.append(value)
+    return (values[0] << 16) | (values[1] << 8) | values[2]
 
 
 def format_firmware_version(version: int) -> str:
-    major = (int(version) >> 8) & 0xFF
-    minor = int(version) & 0xFF
-    return f"{major}.{minor}"
+    major = (int(version) >> 16) & 0xFF
+    minor = (int(version) >> 8) & 0xFF
+    patch = int(version) & 0xFF
+    return f"{major}.{minor}.{patch}"
 
 
 def _thumb_expand_imm12(imm12: int) -> int:
@@ -116,8 +130,11 @@ def _try_read_fw_version_from_image_trailer_bytes(data: bytes) -> tuple[int, str
             magic,
             image_size,
             image_crc32,
-            fw_version,
+            fw_major,
+            fw_minor,
+            fw_patch,
             _reserved,
+            _signature,
             trailer_crc32,
         ) = _UPDATER_TRAILER_STRUCT.unpack(data[trailer_offset:trailer_end])
 
@@ -134,7 +151,8 @@ def _try_read_fw_version_from_image_trailer_bytes(data: bytes) -> tuple[int, str
         if computed_image_crc != image_crc32:
             continue
 
-        candidates.append((trailer_offset, int(fw_version)))
+        fw_version = (int(fw_major) << 16) | (int(fw_minor) << 8) | int(fw_patch)
+        candidates.append((trailer_offset, fw_version))
 
     if not candidates:
         return None
@@ -166,7 +184,7 @@ def _try_read_fw_version_from_metadata_bytes(data: bytes) -> tuple[int, str] | N
         )
         if magic != _KBHE_FW_VERSION_RECORD_MAGIC:
             continue
-        if (version ^ version_xor) != 0xFFFF:
+        if (version ^ version_xor) != 0xFFFFFFFF:
             continue
 
         candidates.append((record_offset, int(version)))
@@ -176,7 +194,7 @@ def _try_read_fw_version_from_metadata_bytes(data: bytes) -> tuple[int, str] | N
 
     versions = {version for _offset, version in candidates}
     if len(versions) > 1:
-        formatted = ", ".join(f"0x{v:04X}" for v in sorted(versions))
+        formatted = ", ".join(f"0x{v:06X}" for v in sorted(versions))
         raise RuntimeError(f"ambiguous firmware version metadata in binary: {formatted}")
 
     record_offset, version = candidates[0]
@@ -233,7 +251,7 @@ def _try_read_fw_version_from_code_signature(data: bytes) -> tuple[int, str] | N
     if strong_candidates:
         versions = {version for version, _source, _offset in strong_candidates}
         if len(versions) > 1:
-            formatted = ", ".join(f"0x{v:04X}" for v in sorted(versions))
+            formatted = ", ".join(f"0x{v:06X}" for v in sorted(versions))
             raise RuntimeError(f"ambiguous firmware version candidates in binary: {formatted}")
         version, source, _offset = strong_candidates[0]
         return version, source
@@ -247,7 +265,7 @@ def _try_read_fw_version_from_code_signature(data: bytes) -> tuple[int, str] | N
         if len(versions) == 1:
             version = next(iter(versions))
             return version, "binary code signature (consistent return-immediate)"
-        formatted = ", ".join(f"0x{v:04X}" for v in sorted(versions))
+        formatted = ", ".join(f"0x{v:06X}" for v in sorted(versions))
         raise RuntimeError(f"ambiguous firmware version candidates in binary: {formatted}")
 
     return None
@@ -296,7 +314,8 @@ def resolve_firmware_version(firmware_path: str | pathlib.Path, explicit_version
     )
 
 def perform_firmware_update(device, firmware_path, firmware_version=None,
-                            timeout_s=5.0, retries=5, reconnect_after=True, logger=None):
+                            timeout_s=5.0, retries=5, reconnect_after=True,
+                            signature_path=None, logger=None):
     import firmware_updater
 
     firmware_version, version_source = resolve_firmware_version(firmware_path, firmware_version)
@@ -305,12 +324,16 @@ def perform_firmware_update(device, firmware_path, firmware_version=None,
     log(
         f"Flashing {firmware_path} with firmware version "
         f"{firmware_updater.format_fw_version(firmware_version)} "
-        f"(0x{firmware_version:04X})"
+        f"(0x{firmware_version:06X})"
     )
     if version_source != "manual":
         log(f"Version source: {version_source}")
 
+    target_serial = None
     if device is not None:
+        if device.path is None:
+            raise RuntimeError("connected device has no HID path for safe updater targeting")
+        target_serial = firmware_updater.serial_for_runtime_path(device.path)
         device.disconnect()
 
     firmware_updater.flash_firmware(
@@ -318,6 +341,8 @@ def perform_firmware_update(device, firmware_path, firmware_version=None,
         firmware_version,
         timeout_s,
         retries,
+        signature_path=signature_path,
+        serial_number=target_serial,
         logger=log,
     )
 

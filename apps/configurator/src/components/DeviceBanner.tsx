@@ -3,6 +3,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheTransport } from "@/lib/kbhe/transport";
+import { libhmkRgbBridge } from "@/lib/kbhe/rgb-bridge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
   IconLoader2,
   IconAlertTriangle,
   IconRefresh,
+  IconBulb,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +77,28 @@ export function DeviceBanner() {
 
   const bootloaderDetected = status !== "connected" && status !== "updater" && Boolean(bootloaderPresenceQ.data);
 
+  const rgbBridgePresenceQ = useQuery({
+    queryKey: ["libhmk-rgb-bridge", "devices"],
+    queryFn: () => libhmkRgbBridge.listDevices(),
+    enabled: isTauri() && status !== "connected" && status !== "updater",
+    refetchInterval: 3000,
+    staleTime: 1000,
+  });
+  const rgbBridgeDevice = rgbBridgePresenceQ.data?.[0];
+
   if (status === "connected" || status === "updater" || bootloaderDetected) return null;
+
+  if (rgbBridgeDevice) {
+    return (
+      <div className="flex min-h-11 items-center gap-2 border-b border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm">
+        <IconBulb className="size-4 shrink-0 text-blue-500" />
+        <span className="truncate">
+          {rgbBridgeDevice.product ?? "libhmk keyboard"} detected in isolated RGB bridge mode.
+          Lighting controls are available; native profiles and firmware updates stay disabled.
+        </span>
+      </div>
+    );
+  }
 
   const isError = status === "error";
 

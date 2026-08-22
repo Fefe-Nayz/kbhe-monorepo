@@ -7,6 +7,7 @@
 #include "layout/keycodes.h"
 #include "layout/layout.h"
 #include "main.h"
+#include "rotary_tap_scheduler.h"
 #include "settings.h"
 #include "stm32f7xx_hal_gpio.h"
 
@@ -31,8 +32,10 @@ static bool button_stable_pressed = false;
 static bool button_raw_pressed = false;
 static uint32_t button_last_change_ms = 0u;
 static uint32_t last_quad_transition_ms = 0u;
+static uint32_t last_rotation_step_ms = 0u;
 static int8_t last_rotation_direction = 0;
 static uint32_t rotation_step_counter = 0u;
+static rotary_tap_scheduler_t rotary_tap_scheduler;
 
 static const uint8_t ROTARY_CYCLABLE_LED_EFFECTS[] = {
     LED_EFFECT_NONE,
@@ -131,6 +134,30 @@ static uint8_t rotary_transition_threshold(uint8_t sensitivity) {
   return 4u;
 }
 
+static uint8_t rotary_acceleration_multiplier(
+    const settings_rotary_encoder_t *rotary, uint32_t now_ms) {
+  uint8_t level = settings_rotary_get_acceleration(rotary);
+  uint32_t elapsed_ms = now_ms - last_rotation_step_ms;
+
+  if (level == 0u || last_rotation_step_ms == 0u || elapsed_ms > 240u) {
+    return 1u;
+  }
+  if (level == 1u) {
+    return elapsed_ms <= 90u ? 2u : 1u;
+  }
+  if (level == 2u) {
+    return elapsed_ms <= 55u ? 3u : (elapsed_ms <= 140u ? 2u : 1u);
+  }
+  return elapsed_ms <= 45u ? 4u : (elapsed_ms <= 100u ? 3u : 2u);
+}
+
+static uint8_t rotary_effective_step_size(
+    const settings_rotary_encoder_t *rotary, uint32_t now_ms) {
+  uint16_t steps = (uint16_t)rotary_step_size(rotary) *
+                   rotary_acceleration_multiplier(rotary, now_ms);
+  return steps > 64u ? 64u : (uint8_t)steps;
+}
+
 static uint8_t rotary_effect_index(uint8_t effect) {
   uint8_t effect_count = (uint8_t)(sizeof(ROTARY_CYCLABLE_LED_EFFECTS) /
                                    sizeof(ROTARY_CYCLABLE_LED_EFFECTS[0]));
@@ -195,9 +222,9 @@ static void rotary_rgb_to_hsv(uint8_t r, uint8_t g, uint8_t b, uint8_t *h,
       }
 
       if (hue < 0) {
-        hue += 255;
+        hue += 256;
       } else if (hue > 255) {
-        hue -= 255;
+        hue -= 256;
       }
 
       *h = (uint8_t)hue;
@@ -345,8 +372,8 @@ static void rotary_show_action_overlay(const settings_rotary_encoder_t *rotary) 
 }
 
 static void rotary_apply_rgb_customizer(
-    const settings_rotary_encoder_t *rotary, int8_t direction) {
-  uint8_t amount = rotary_step_size(rotary);
+    const settings_rotary_encoder_t *rotary, int8_t direction,
+    uint8_t amount) {
 
   if (rotary->rgb_behavior != ROTARY_RGB_BEHAVIOR_EFFECT_CYCLE &&
       settings_get_led_effect_mode() != rotary->rgb_effect_mode) {
@@ -416,6 +443,25 @@ static uint16_t rotary_binding_resolve_keycode(
   return KC_NO;
 }
 
+static bool rotary_tap_enqueue(uint16_t keycode) {
+  if (keycode == KC_NO || keycode == KC_TRANSPARENT) {
+    return false;
+  }
+  return rotary_tap_scheduler_enqueue(&rotary_tap_scheduler, keycode);
+}
+
+static void rotary_tap_task(uint32_t now_ms) {
+  uint16_t keycode = KC_NO;
+  rotary_tap_event_t event =
+      rotary_tap_scheduler_step(&rotary_tap_scheduler, now_ms, &keycode);
+
+  if (event == ROTARY_TAP_EVENT_PRESS) {
+    layout_press_action(keycode);
+  } else if (event == ROTARY_TAP_EVENT_RELEASE) {
+    layout_release_action(keycode);
+  }
+}
+
 static bool rotary_binding_tap(const settings_rotary_binding_t *binding,
                                uint8_t active_modifiers,
                                uint8_t active_layer) {
@@ -426,7 +472,10 @@ static bool rotary_binding_tap(const settings_rotary_binding_t *binding,
     return false;
   }
 
-  layout_tap_action(keycode);
+  /* A synchronous press+release is never observable by the later keyboard
+   * HID task and cancels macro bindings before their first engine tick. Keep
+   * a real report-visible hold/gap while bounding queued rotary work. */
+  (void)rotary_tap_enqueue(keycode);
   return true;
 }
 
@@ -472,11 +521,12 @@ static void rotary_handle_button_action(void) {
 }
 
 static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
-                               int8_t direction) {
+                               int8_t direction, uint32_t now_ms) {
   settings_rotary_encoder_t rotary = {0};
   const settings_rotary_binding_t *binding = NULL;
   uint8_t active_modifiers = 0u;
   uint8_t active_layer = 0u;
+  uint8_t effective_steps = 1u;
   if (rotary_cfg == NULL) {
     settings_get_rotary_encoder(&rotary);
   } else {
@@ -486,6 +536,9 @@ static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
   if (rotary.invert_direction) {
     direction = (int8_t)-direction;
   }
+
+  effective_steps = rotary_effective_step_size(&rotary, now_ms);
+  last_rotation_step_ms = now_ms;
 
   led_matrix_notify_user_activity();
 
@@ -497,8 +550,7 @@ static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
   active_layer = layout_get_active_layer_top();
 
   if (binding->mode == (uint8_t)ROTARY_BINDING_MODE_KEYCODE) {
-    uint8_t steps = rotary_step_size(&rotary);
-    for (uint8_t i = 0u; i < steps; i++) {
+    for (uint8_t i = 0u; i < effective_steps; i++) {
       (void)rotary_binding_tap(binding, active_modifiers, active_layer);
     }
     rotary_show_action_overlay(&rotary);
@@ -508,36 +560,37 @@ static void emit_rotation_step(const settings_rotary_encoder_t *rotary_cfg,
   switch ((rotary_action_t)rotary.rotation_action) {
   case ROTARY_ACTION_VOLUME:
     {
-      uint8_t steps = rotary_step_size(&rotary);
-      for (uint8_t i = 0; i < steps; i++) {
-        if (direction > 0) {
-          (void)consumer_hid_volume_up();
-        } else {
-          (void)consumer_hid_volume_down();
+      uint8_t emitted_steps = 0u;
+      for (uint8_t i = 0; i < effective_steps; i++) {
+        bool emitted = direction > 0 ? consumer_hid_volume_up()
+                                     : consumer_hid_volume_down();
+        if (!emitted) {
+          break;
         }
+        emitted_steps++;
       }
-      led_matrix_nudge_host_volume_overlay(direction, steps);
+      led_matrix_nudge_host_volume_overlay(direction, emitted_steps);
     }
     break;
   case ROTARY_ACTION_LED_BRIGHTNESS:
     rotary_adjust_led_brightness((int16_t)direction *
-                                 (int16_t)(rotary_step_size(&rotary) *
+                                 (int16_t)(effective_steps *
                                            ROTARY_BRIGHTNESS_STEP_UNIT));
     break;
   case ROTARY_ACTION_LED_EFFECT_SPEED:
     rotary_adjust_effect_speed((int16_t)direction *
-                               (int16_t)(rotary_step_size(&rotary) *
+                               (int16_t)(effective_steps *
                                          ROTARY_EFFECT_SPEED_STEP_UNIT));
     break;
   case ROTARY_ACTION_LED_EFFECT_CYCLE: {
     uint8_t next_effect =
         rotary_cycle_led_effect(settings_get_led_effect_mode(), direction,
-                                rotary_step_size(&rotary));
+                                effective_steps);
     (void)settings_set_led_effect_mode(next_effect);
     break;
   }
   case ROTARY_ACTION_RGB_CUSTOMIZER:
-    rotary_apply_rgb_customizer(&rotary, direction);
+    rotary_apply_rgb_customizer(&rotary, direction, effective_steps);
     break;
   default:
     break;
@@ -554,8 +607,10 @@ void rotary_encoder_init(void) {
   button_stable_pressed = button_raw_pressed;
   button_last_change_ms = HAL_GetTick();
   last_quad_transition_ms = button_last_change_ms;
+  last_rotation_step_ms = 0u;
   last_rotation_direction = 0;
   rotation_step_counter = 0u;
+  rotary_tap_scheduler_init(&rotary_tap_scheduler);
 }
 
 bool rotary_encoder_is_button_pressed(void) { return button_stable_pressed; }
@@ -567,13 +622,18 @@ int8_t rotary_encoder_get_last_direction(void) {
 uint32_t rotary_encoder_get_step_counter(void) { return rotation_step_counter; }
 
 void rotary_encoder_task(uint32_t now_ms) {
-  settings_rotary_encoder_t rotary = {0};
-
-  settings_get_rotary_encoder(&rotary);
+  rotary_tap_task(now_ms);
   uint8_t ab_state = read_ab_state();
   if (ab_state != last_ab_state) {
+    settings_rotary_encoder_t rotary = {0};
     int8_t delta = QUAD_TABLE[(last_ab_state << 2) | ab_state];
-    uint8_t threshold = rotary_transition_threshold(rotary.sensitivity);
+    uint8_t threshold = 4u;
+
+    /* Sanitizing the complete rotary settings structure is unnecessary on
+     * every 8 kHz scan. Reload only for a real encoder edge. */
+    settings_get_rotary_encoder(&rotary);
+    threshold =
+        rotary_transition_threshold(settings_rotary_get_sensitivity(&rotary));
 
     if ((uint32_t)(now_ms - last_quad_transition_ms) > ROTARY_QUAD_TIMEOUT_MS) {
       quadrature_accum = 0;
@@ -586,11 +646,15 @@ void rotary_encoder_task(uint32_t now_ms) {
       quadrature_accum += delta;
       if (quadrature_accum >= (int8_t)threshold) {
         quadrature_accum = 0;
-        emit_rotation_step(&rotary, +1);
+        emit_rotation_step(&rotary, +1, now_ms);
       } else if (quadrature_accum <= -(int8_t)threshold) {
         quadrature_accum = 0;
-        emit_rotation_step(&rotary, -1);
+        emit_rotation_step(&rotary, -1, now_ms);
       }
+    } else {
+      /* A two-bit jump is not a valid Gray-code edge. Keeping a partial
+       * accumulator here lets contact bounce complete a phantom detent. */
+      quadrature_accum = 0;
     }
   } else if (quadrature_accum != 0 &&
              (uint32_t)(now_ms - last_quad_transition_ms) > ROTARY_QUAD_TIMEOUT_MS) {

@@ -17,6 +17,7 @@ bool consumer_hid_mute(void);
 bool consumer_hid_play_pause(void);
 void consumer_hid_task(void);
 void consumer_hid_on_report_complete(void);
+void consumer_hid_on_umount(void);
 
 #ifdef __cplusplus
 }

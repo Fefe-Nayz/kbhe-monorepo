@@ -25,11 +25,22 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
+import { requireDeviceSuccess } from "@/lib/kbhe/mutation-result";
 import {
   patchActiveAppProfileAdvancedTickRate,
   patchActiveAppProfileKeySettings,
 } from "@/lib/kbhe/profile-snapshot-store";
-import { KEY_BEHAVIORS, HID_KEYCODE_NAMES, SOCD_RESOLUTIONS, KEY_COUNT } from "@/lib/kbhe/protocol";
+import {
+  DKS_ACTIONS,
+  DKS_DEFAULT_ACTION_BITMAP,
+  DKS_PHASES,
+  HID_KEYCODE_NAMES,
+  KEY_BEHAVIORS,
+  KEY_COUNT,
+  SOCD_RESOLUTIONS,
+  dksActionAtPhase,
+  setDksActionAtPhase,
+} from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import { cn, selectItems } from "@/lib/utils";
 import {
@@ -766,9 +777,18 @@ export default function AdvancedKeys() {
                 step={1}
                 value={tickRateQ.data ?? 1}
                 onCommit={async (v) => {
-                  const ok = await kbheDevice.setAdvancedTickRate(v);
-                  if (ok) {
+                  markSaving();
+                  try {
+                    const ok = await kbheDevice.setAdvancedTickRate(v);
+                    requireDeviceSuccess(ok, "advanced tick rate");
                     patchActiveAppProfileAdvancedTickRate(v);
+                    queryClient.setQueryData(queryKeys.device.advancedTickRate(), v);
+                    markSaved();
+                  } catch (error) {
+                    markError(error);
+                    void queryClient.invalidateQueries({
+                      queryKey: queryKeys.device.advancedTickRate(),
+                    });
                   }
                 }}
                 disabled={!connected}
@@ -849,8 +869,10 @@ export default function AdvancedKeys() {
   function renderDynamicConfig() {
     if (!settings) return null;
     const zones = settings.dynamic_zones ?? [];
-    const zone = zones[selectedDynamicZone] ?? { end_mm: 4.0, end_mm_tenths: 40, hid_keycode: 0 };
-    const isLastZone = selectedDynamicZone === 3;
+    const zone = zones[selectedDynamicZone] ?? {
+      end_mm_tenths: selectedDynamicZone === 0 ? DKS_DEFAULT_ACTION_BITMAP : 0,
+      hid_keycode: 0,
+    };
 
     const patchZone = (i: number, patch: Partial<typeof zone>) => {
       const next = zones.map((z, idx) => (idx === i ? { ...z, ...patch } : z));
@@ -858,20 +880,20 @@ export default function AdvancedKeys() {
     };
 
     return (
-      <Tabs defaultValue="zones" className="w-full">
+      <Tabs defaultValue="bindings" className="w-full">
         <TabsList className="w-full">
-          <TabsTrigger value="zones">Zones</TabsTrigger>
+          <TabsTrigger value="bindings">Bindings</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="tester">Key Tester</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="zones" className="mt-4">
+        <TabsContent value="bindings" className="mt-4">
           <div className="flex flex-col gap-4">
             <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md px-3 py-2">
               Rapid Trigger is automatically disabled for Dynamic Mapping keys. Bottom Out Point controls the "fully pressed" threshold.
             </p>
 
-            {/* Zone selector */}
+            {/* Binding selector */}
             <div className="flex gap-1">
               {zones.slice(0, 4).map((z, i) => (
                 <button
@@ -886,7 +908,7 @@ export default function AdvancedKeys() {
                       : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
                   }`}
                 >
-                  Zone {i + 1}
+                  Binding {i + 1}
                   {z.hid_keycode !== 0 && (
                     <span className="ml-1 opacity-70 hidden sm:inline">
                       · {keycodeDisplayName(z.hid_keycode)}
@@ -896,32 +918,48 @@ export default function AdvancedKeys() {
               ))}
             </div>
 
-            {/* Selected zone config */}
+            {/* Selected binding config */}
             <div className="flex flex-col gap-3 rounded-lg border p-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Zone {selectedDynamicZone + 1} Action</span>
+                <span className="text-sm font-medium">Binding {selectedDynamicZone + 1}</span>
                 {zone.hid_keycode !== 0 && (
                   <Badge variant="secondary">{keycodeDisplayName(zone.hid_keycode)}</Badge>
                 )}
               </div>
-
-              {!isLastZone && (
-                <DistanceSlider
-                  label="Zone travel end"
-                  value={zone.end_mm}
-                  onChange={(v) => patchZone(selectedDynamicZone, { end_mm: v, end_mm_tenths: Math.round(v * 10) })}
-                  disabled={!connected}
-                />
-              )}
-              {isLastZone && (
-                <p className="text-xs text-muted-foreground">Zone 4 covers travel from Zone 3 end to bottom-out.</p>
-              )}
 
               <KeycodeAccordion
                 selectedCode={zone.hid_keycode}
                 onSelect={(code) => patchZone(selectedDynamicZone, { hid_keycode: code })}
                 className="max-h-56"
               />
+
+              <div className="grid gap-2">
+                {DKS_PHASES.map((phase) => (
+                  <FormRow key={phase.index} label={phase.label} description={phase.description}>
+                    <Select
+                      value={String(dksActionAtPhase(zone.end_mm_tenths, phase.index))}
+                      disabled={!connected || zone.hid_keycode === 0}
+                      items={selectItems(DKS_ACTIONS)}
+                      onValueChange={(value) => patchZone(selectedDynamicZone, {
+                        end_mm_tenths: setDksActionAtPhase(
+                          zone.end_mm_tenths,
+                          phase.index,
+                          Number(value),
+                        ),
+                      })}
+                    >
+                      <SelectTrigger className="h-8 w-40 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {Object.entries(DKS_ACTIONS).map(([name, value]) => (
+                            <SelectItem key={value} value={String(value)}>{name}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </FormRow>
+                ))}
+              </div>
             </div>
           </div>
         </TabsContent>

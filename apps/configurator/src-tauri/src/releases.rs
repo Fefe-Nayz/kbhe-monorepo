@@ -1,14 +1,50 @@
+use crate::signing::{verify_app_asset, verify_firmware_asset};
 use reqwest::blocking::Client;
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::io::{copy, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{copy, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 const APP_TAG_PREFIX: &str = "app-v";
 const FIRMWARE_TAG_PREFIX: &str = "firmware-v";
+const MAX_APP_INSTALLER_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_FIRMWARE_BYTES: u64 = 0x0002_FF00;
+const ED25519_SIGNATURE_BYTES: u64 = 64;
+static APP_INSTALLER_LAUNCHED: AtomicBool = AtomicBool::new(false);
+
+struct AppInstallerLaunchGuard {
+    reset_on_drop: bool,
+}
+
+impl AppInstallerLaunchGuard {
+    fn acquire() -> Result<Self, String> {
+        APP_INSTALLER_LAUNCHED
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| {
+                "an app installer has already been launched; restart the configurator to retry"
+                    .to_string()
+            })?;
+        Ok(Self {
+            reset_on_drop: true,
+        })
+    }
+
+    fn mark_launched(&mut self) {
+        self.reset_on_drop = false;
+    }
+}
+
+impl Drop for AppInstallerLaunchGuard {
+    fn drop(&mut self) {
+        if self.reset_on_drop {
+            APP_INSTALLER_LAUNCHED.store(false, Ordering::Release);
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 struct GithubRelease {
@@ -47,6 +83,7 @@ pub struct ReleaseUpdateInfo {
 #[serde(rename_all = "camelCase")]
 pub struct DownloadedFirmware {
     path: String,
+    signature_path: String,
     file_name: String,
     version_tag: String,
 }
@@ -95,7 +132,24 @@ fn fetch_releases() -> Result<Vec<GithubRelease>, String> {
 
 fn parse_prefixed_version(tag: &str, prefix: &str) -> Option<Version> {
     let raw = tag.strip_prefix(prefix)?;
-    Version::parse(raw.trim_start_matches('v')).ok()
+    // APP_TAG_PREFIX/FIRMWARE_TAG_PREFIX already include the single canonical
+    // `v`. Accepting more `v` characters creates release-tag aliases that can
+    // replay the same signed asset under a misleading GitHub release name.
+    if raw.starts_with('v') {
+        return None;
+    }
+    let version = Version::parse(raw).ok()?;
+    if !version.pre.is_empty() || !version.build.is_empty() {
+        return None;
+    }
+    if prefix == FIRMWARE_TAG_PREFIX
+        && (version.major > u64::from(u8::MAX)
+            || version.minor > u64::from(u8::MAX)
+            || version.patch > u64::from(u8::MAX))
+    {
+        return None;
+    }
+    Some(version)
 }
 
 fn newer_than_current(candidate: &Version, current: Option<&str>) -> bool {
@@ -114,7 +168,7 @@ fn installer_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
     } else if cfg!(target_os = "macos") {
         [".dmg", ".app.tar.gz"].as_slice()
     } else {
-        [".AppImage", ".deb", ".rpm"].as_slice()
+        [".appimage", ".deb", ".rpm"].as_slice()
     };
 
     for ext in preferred_ext {
@@ -126,18 +180,21 @@ fn installer_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
         }
     }
 
-    assets.first().cloned()
+    None
 }
 
 fn firmware_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
     assets
         .iter()
         .find(|asset| asset.name == "kbhe-app.bin")
-        .or_else(|| {
-            assets
-                .iter()
-                .find(|asset| asset.name.to_lowercase().ends_with(".bin"))
-        })
+        .cloned()
+}
+
+fn signature_asset(assets: &[GithubAsset], signed_asset: &GithubAsset) -> Option<GithubAsset> {
+    let expected_name = format!("{}.sig", signed_asset.name);
+    assets
+        .iter()
+        .find(|asset| asset.name == expected_name && asset.size == ED25519_SIGNATURE_BYTES)
         .cloned()
 }
 
@@ -164,6 +221,9 @@ fn latest_release_with_asset(
         let Some(asset) = pick_asset(&release.assets) else {
             continue;
         };
+        if signature_asset(&release.assets, &asset).is_none() {
+            continue;
+        }
 
         candidates.push((release, version, asset));
     }
@@ -242,10 +302,89 @@ fn sanitize_filename(name: &str) -> String {
         .collect()
 }
 
-fn download_asset(asset: &GithubAsset, directory: &Path) -> Result<PathBuf, String> {
-    std::fs::create_dir_all(directory).map_err(|error| error.to_string())?;
+fn secure_download_directory(kind: &str) -> Result<PathBuf, String> {
+    let parent = std::env::temp_dir().join("kbhe-configurator").join(kind);
+    std::fs::create_dir_all(&parent).map_err(|error| error.to_string())?;
+    reject_reparse_point(&parent)?;
+    for _ in 0..16 {
+        let mut nonce = [0u8; 16];
+        getrandom::fill(&mut nonce)
+            .map_err(|error| format!("secure random generation failed: {error}"))?;
+        let suffix = nonce
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let directory = parent.join(suffix);
+        #[cfg(unix)]
+        let builder = {
+            use std::os::unix::fs::DirBuilderExt;
+            let mut builder = std::fs::DirBuilder::new();
+            builder.mode(0o700);
+            builder
+        };
+        #[cfg(not(unix))]
+        let builder = std::fs::DirBuilder::new();
+        match builder.create(&directory) {
+            Ok(()) => return Ok(directory),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Err("failed to allocate a unique secure download directory".to_string())
+}
+
+fn reject_reparse_point(path: &Path) -> Result<(), String> {
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if metadata.file_type().is_symlink() {
+        return Err(format!("refusing symbolic link: {}", path.display()));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(format!(
+                "refusing Windows reparse point: {}",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn lock_verified_installer(path: &Path) -> Result<File, String> {
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+    OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ)
+        .open(path)
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(not(windows))]
+fn lock_verified_installer(path: &Path) -> Result<File, String> {
+    OpenOptions::new()
+        .read(true)
+        .open(path)
+        .map_err(|error| error.to_string())
+}
+
+fn download_asset(
+    asset: &GithubAsset,
+    directory: &Path,
+    maximum_size: u64,
+) -> Result<PathBuf, String> {
+    if asset.size == 0 || asset.size > maximum_size {
+        return Err(format!(
+            "refusing {}: release metadata size {} is outside the allowed range",
+            asset.name, asset.size
+        ));
+    }
+    reject_reparse_point(directory)?;
     let destination = directory.join(sanitize_filename(&asset.name));
-    let mut response = client()?
+    let response = client()?
         .get(&asset.browser_download_url)
         .send()
         .map_err(|error| format!("failed to download {}: {error}", asset.name))?;
@@ -258,38 +397,83 @@ fn download_asset(asset: &GithubAsset, directory: &Path) -> Result<PathBuf, Stri
         ));
     }
 
-    let mut file = File::create(&destination).map_err(|error| error.to_string())?;
-    copy(&mut response, &mut file).map_err(|error| error.to_string())?;
+    if let Some(content_length) = response.content_length() {
+        if content_length != asset.size || content_length > maximum_size {
+            return Err(format!(
+                "refusing {}: response size {} does not match release metadata {}",
+                asset.name, content_length, asset.size
+            ));
+        }
+    }
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&destination)
+        .map_err(|error| format!("refusing non-unique download target: {error}"))?;
+    let copied =
+        copy(&mut response.take(maximum_size + 1), &mut file).map_err(|error| error.to_string())?;
+    if copied != asset.size || copied > maximum_size {
+        drop(file);
+        let _ = std::fs::remove_file(&destination);
+        return Err(format!(
+            "refusing {}: downloaded {} bytes, expected {}",
+            asset.name, copied, asset.size
+        ));
+    }
     file.flush().map_err(|error| error.to_string())?;
+    file.sync_all().map_err(|error| error.to_string())?;
+    reject_reparse_point(&destination)?;
     Ok(destination)
 }
 
-fn release_asset_by_tag(
+fn release_assets_by_tag(
     tag: &str,
     prefix: &str,
     pick_asset: fn(&[GithubAsset]) -> Option<GithubAsset>,
-) -> Result<GithubAsset, String> {
+) -> Result<(GithubAsset, GithubAsset), String> {
     if parse_prefixed_version(tag, prefix).is_none() {
         return Err(format!("unexpected release tag for {prefix}: {tag}"));
     }
 
-    fetch_releases()?
+    let release = fetch_releases()?
         .into_iter()
-        .find(|release| release.tag_name == tag && !release.draft)
-        .and_then(|release| pick_asset(&release.assets))
-        .ok_or_else(|| format!("no downloadable asset found for release {tag}"))
+        .find(|release| release.tag_name == tag && !release.draft && !release.prerelease)
+        .ok_or_else(|| format!("stable release {tag} was not found"))?;
+    let asset = pick_asset(&release.assets)
+        .ok_or_else(|| format!("no downloadable asset found for release {tag}"))?;
+    let signature = signature_asset(&release.assets, &asset)
+        .ok_or_else(|| format!("release {tag} has no valid {}.sig asset", asset.name))?;
+    Ok((asset, signature))
 }
 
 #[tauri::command]
 pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFirmware, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let asset = release_asset_by_tag(&tag, FIRMWARE_TAG_PREFIX, firmware_asset)?;
-        let directory = std::env::temp_dir()
-            .join("kbhe-configurator")
-            .join("firmware");
-        let path = download_asset(&asset, &directory)?;
+        let version = parse_prefixed_version(&tag, FIRMWARE_TAG_PREFIX)
+            .ok_or_else(|| format!("invalid firmware release tag: {tag}"))?;
+        let version_bytes = [
+            u8::try_from(version.major).map_err(|_| "firmware major version exceeds 255")?,
+            u8::try_from(version.minor).map_err(|_| "firmware minor version exceeds 255")?,
+            u8::try_from(version.patch).map_err(|_| "firmware patch version exceeds 255")?,
+        ];
+        let (asset, signature_asset) =
+            release_assets_by_tag(&tag, FIRMWARE_TAG_PREFIX, firmware_asset)?;
+        let directory = secure_download_directory("firmware")?;
+        let path = download_asset(&asset, &directory, MAX_FIRMWARE_BYTES)?;
+        let signature_path = download_asset(&signature_asset, &directory, ED25519_SIGNATURE_BYTES)?;
+        let firmware = std::fs::read(&path)
+            .map_err(|error| format!("failed to read downloaded firmware: {error}"))?;
+        let signature = std::fs::read(&signature_path)
+            .map_err(|error| format!("failed to read firmware signature: {error}"))?;
+        if let Err(error) = verify_firmware_asset(&firmware, version_bytes, &signature) {
+            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(&signature_path);
+            return Err(format!("downloaded firmware is not authentic: {error}"));
+        }
         Ok(DownloadedFirmware {
             path: path.to_string_lossy().into_owned(),
+            signature_path: signature_path.to_string_lossy().into_owned(),
             file_name: asset.name,
             version_tag: tag,
         })
@@ -300,12 +484,46 @@ pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFir
 
 #[tauri::command]
 pub async fn kbhe_download_and_run_app_installer(tag: String) -> Result<String, String> {
+    let launch_guard = AppInstallerLaunchGuard::acquire()?;
     tauri::async_runtime::spawn_blocking(move || {
-        let asset = release_asset_by_tag(&tag, APP_TAG_PREFIX, installer_asset)?;
-        let directory = std::env::temp_dir()
-            .join("kbhe-configurator")
-            .join("app-update");
-        let path = download_asset(&asset, &directory)?;
+        let mut launch_guard = launch_guard;
+        let version = parse_prefixed_version(&tag, APP_TAG_PREFIX)
+            .ok_or_else(|| format!("invalid app release tag: {tag}"))?;
+        let current = Version::parse(env!("CARGO_PKG_VERSION"))
+            .map_err(|error| format!("invalid built-in app version: {error}"))?;
+        if version <= current {
+            return Err(format!(
+                "refusing app rollback/replay from {current} to {version}"
+            ));
+        }
+        let (asset, signature_asset) =
+            release_assets_by_tag(&tag, APP_TAG_PREFIX, installer_asset)?;
+        let directory = secure_download_directory("app-update")?;
+        let path = download_asset(&asset, &directory, MAX_APP_INSTALLER_BYTES)?;
+        let signature_path = download_asset(&signature_asset, &directory, ED25519_SIGNATURE_BYTES)?;
+        let mut installer_file = lock_verified_installer(&path)
+            .map_err(|error| format!("failed to lock downloaded installer: {error}"))?;
+        installer_file
+            .seek(SeekFrom::Start(0))
+            .map_err(|error| error.to_string())?;
+        let mut installer = Vec::new();
+        installer_file
+            .read_to_end(&mut installer)
+            .map_err(|error| format!("failed to read downloaded installer: {error}"))?;
+        let signature = std::fs::read(&signature_path)
+            .map_err(|error| format!("failed to read installer signature: {error}"))?;
+        if let Err(error) = verify_app_asset(
+            &installer,
+            &version.to_string(),
+            std::env::consts::OS,
+            std::env::consts::ARCH,
+            &asset.name,
+            &signature,
+        ) {
+            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(&signature_path);
+            return Err(format!("downloaded installer is not authentic: {error}"));
+        }
 
         #[cfg(target_os = "windows")]
         {
@@ -339,8 +557,45 @@ pub async fn kbhe_download_and_run_app_installer(tag: String) -> Result<String, 
             .spawn()
             .map_err(|error| error.to_string())?;
 
+        // Keep the no-write/no-delete Windows handle alive while the external
+        // installer consumes the verified path. The configurator normally
+        // exits for the update, so this bounded one-handle leak closes the
+        // verify/execute replacement window without deleting an in-use MSI.
+        std::mem::forget(installer_file);
+        launch_guard.mark_launched();
+
         Ok(path.to_string_lossy().into_owned())
     })
     .await
     .map_err(|error| format!("app installer worker failed: {error}"))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_prefixed_version, APP_TAG_PREFIX, FIRMWARE_TAG_PREFIX};
+
+    #[test]
+    fn release_tags_are_canonical_and_stable() {
+        assert_eq!(
+            parse_prefixed_version("app-v1.2.3", APP_TAG_PREFIX)
+                .unwrap()
+                .to_string(),
+            "1.2.3"
+        );
+        assert_eq!(
+            parse_prefixed_version("firmware-v255.0.7", FIRMWARE_TAG_PREFIX)
+                .unwrap()
+                .to_string(),
+            "255.0.7"
+        );
+        for tag in [
+            "app-vv1.2.3",
+            "app-v01.2.3",
+            "app-v1.2.3-rc.1",
+            "app-v1.2.3+build",
+        ] {
+            assert!(parse_prefixed_version(tag, APP_TAG_PREFIX).is_none());
+        }
+        assert!(parse_prefixed_version("firmware-v256.0.0", FIRMWARE_TAG_PREFIX).is_none());
+    }
 }

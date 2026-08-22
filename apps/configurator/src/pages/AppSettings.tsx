@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getVersion } from "@tauri-apps/api/app";
 import { isTauri } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PageContent } from "@/components/shared/PageLayout";
 import { FormRow, SectionCard } from "@/components/shared/SectionCard";
 import { useTheme } from "@/components/theme-provider";
@@ -89,6 +89,7 @@ export default function AppSettings() {
   const micaSupported = isWindowsMicaSupported();
   const [micaEnabled, setMicaEnabled] = useState<boolean>(() => getWindowsMicaEnabled());
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const appUpdateLaunchRef = useRef(false);
 
   const startupPrefsQ = useQuery({
     queryKey: APP_QUERY_KEYS.startupPreferences,
@@ -228,7 +229,13 @@ export default function AppSettings() {
                   disabled={!appUpdateQ.data?.tag || !appUpdateQ.data.updateAvailable || appUpdateMutation.isPending}
                   onClick={() => {
                     const tag = appUpdateQ.data?.tag;
-                    if (tag) appUpdateMutation.mutate(tag);
+                    if (!tag || appUpdateLaunchRef.current) return;
+                    appUpdateLaunchRef.current = true;
+                    appUpdateMutation.mutate(tag, {
+                      onSettled: () => {
+                        appUpdateLaunchRef.current = false;
+                      },
+                    });
                   }}
                 >
                   <IconDownload className="size-4" />

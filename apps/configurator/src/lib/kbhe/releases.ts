@@ -15,6 +15,7 @@ export interface ReleaseUpdateInfo {
 
 export interface DownloadedFirmware {
   path: string;
+  signaturePath: string;
   fileName: string;
   versionTag: string;
 }

@@ -70,7 +70,7 @@ Codes status updater:
 
 `FACTORY_RESET` retourne une erreur en mode RAM-only: le reset usine est une operation persistante.
 
-### 3.2 Options globales (0x20..0x2F)
+### 3.2 Options globales et persistance (0x20..0x37)
 
 | Commande | ID | Parametres requete | Reponse |
 |---|---:|---|---|
@@ -80,7 +80,7 @@ Codes status updater:
 | SET_KEYBOARD_ENABLED | 0x23 | value (0/1) | status + value courant |
 | GET_GAMEPAD_ENABLED | 0x24 | aucun | status + value (0/1) |
 | SET_GAMEPAD_ENABLED | 0x25 | value (0/1) | status + value courant |
-| SAVE_SETTINGS | 0x26 | aucun | status |
+| SAVE_SETTINGS | 0x26 | aucun | status + save_state + extension_version |
 | GET_NKRO_ENABLED | 0x27 | aucun | status + value (0/1) |
 | SET_NKRO_ENABLED | 0x28 | value (0/1) | status + value courant |
 | GET_ADVANCED_TICK_RATE | 0x29 | aucun | status + tick_rate |
@@ -90,8 +90,49 @@ Codes status updater:
 | SET_KEYBOARD_NAME | 0x2D | keyboard_name[32] | status + keyboard_name applique |
 | COPY_PROFILE_SLOT | 0x2E | source_profile_index, target_profile_index | status + source + target + profile_used_mask |
 | RESET_PROFILE_SLOT | 0x2F | profile_index | status + profile_index + profile_used_mask |
+| GET_DEFAULT_PROFILE | 0x30 | aucun | status + profile_index + profile_used_mask |
+| SET_DEFAULT_PROFILE | 0x31 | profile_index (0..3 ou 0xFF) | status + profile_index + profile_used_mask |
+| GET_RAM_ONLY_MODE | 0x32 | aucun | status + enabled |
+| SET_RAM_ONLY_MODE | 0x33 | enabled; extension leave: request_len=2, enabled=0, keep_live=1 | status + enabled courant |
+| RELOAD_SETTINGS_FROM_FLASH | 0x34 | aucun | status + ram_only courant, puis reboot controle |
+| GET_TRIGGER_CHATTER_GUARD | 0x35 | aucun | status + enabled + duration_ms |
+| SET_TRIGGER_CHATTER_GUARD | 0x36 | enabled + duration_ms | status + valeurs appliquees |
+| GET_SETTINGS_SAVE_STATUS | 0x37 | aucun | status + save_state + extension_version + dirty + requested + in_progress |
 
-`SAVE_SETTINGS` retourne une erreur en mode RAM-only: ce mode interdit toute planification d'ecriture flash.
+`SAVE_SETTINGS` retourne une erreur en mode RAM-only: ce mode interdit toute
+planification d'ecriture flash. Sur le protocole etendu v1, l'acceptation de la
+commande ne signifie pas encore que les octets sont durables:
+
+- octet 2 `save_state`: 0 durable, 1 queued, 2 writing, 3 failed, 4 RAM-only;
+- octet 3 `extension_version`: 1;
+- `GET_SETTINGS_SAVE_STATUS` repete ces deux champs puis expose `dirty`,
+  `requested` et `in_progress` en octets 4..6. `in_progress` agrege le batch
+  settings, le singleton ProfileDocument et le writer flash global;
+- un client v1 doit poller jusqu'a `durable` ou une erreur terminale. Un ancien
+  firmware laisse l'octet 3 a zero; le succes historique reste alors seulement
+  un acquittement de mise en file.
+
+Apres `SET_RAM_ONLY_MODE(enabled=1)`, un client v1 attend egalement que
+`in_progress` passe a zero avant sa premiere mutation. Le firmware peut devoir
+terminer l'unique transaction journal deja engagee, puis abandonne le reste du
+batch afin qu'aucun changement RAM-only ne fuite vers la flash. Par defense en
+profondeur, le firmware refuse aussi toute autre commande pendant cette courte
+transition, meme si un client tiers omet le polling requis.
+`RELOAD_SETTINGS_FROM_FLASH` refuse la requete et conserve le mode RAM-only tant
+que cette transaction est en cours. Une fois acceptee, la reponse HID est envoyee,
+puis le clavier redemarre et recharge atomiquement settings, macros et overlays au
+boot; le client doit attendre la deconnexion/reconnexion. Aucun gros decodage Flash
+n'est donc execute dans la boucle de scan. Un client legacy sans commande 0x37
+conserve le comportement historique.
+
+Apres un `COMMIT_PROFILE_DOCUMENT` durable, un client v1 peut quitter RAM-only
+sans reload ni reboot avec l'extension `SET_RAM_ONLY_MODE(request_len=2,
+enabled=0, keep_live=1)`. Ce chemin O(1) conserve l'etat live deja publie. La
+forme legacy `enabled=0` garde la semantique discard/reload par reboot.
+
+Le chatter guard est par profil. `duration_ms` vaut 1..20 quand il est active;
+le desactiver conserve le chemin de scan sans latence ajoutee. La valeur
+recommandee pour un capteur qui oscille exactement autour d'un seuil est 5 ms.
 
 Note option `raw_hid_echo`:
 
@@ -427,11 +468,13 @@ GET_ROTARY_ENCODER_SETTINGS (0x54)
   - rotation_action
   - button_action
   - sensitivity
+  - acceleration
   - step_size
   - invert_direction
   - rgb_behavior
   - rgb_effect_mode
   - progress_style
+  - progress_filled_only
   - progress_effect_mode
   - progress_color_r/g/b
   - cw_binding:
@@ -450,6 +493,7 @@ SET_ROTARY_ENCODER_SETTINGS (0x55)
 - Validation:
   - enums dans bornes
   - sensitivity 1..16
+  - acceleration 0..3
   - step_size 1..64
   - effect_mode != THIRD_PARTY pour rgb/progress
   - binding.mode/layer_mode/layer_index valides
@@ -467,6 +511,11 @@ Notes:
 - Commande runtime (polling), non persistante.
 - `step_counter` est remis a zero au redemarrage.
 - En mode keycode, les bindings rotary appliquent `modifier_mask_exact`; si non-match, le firmware tente `fallback_no_mod_keycode`.
+- `acceleration` augmente le multiplicateur lors des rotations rapides sans
+  bloquer le scan; les taps HID sont planifies et relaches de facon asynchrone.
+- Avec `progress_filled_only=1`, seule la partie remplie de la barre de volume
+  est dessinee. Les pixels non remplis restent transparents et laissent visible
+  l'effet RGB de base; avec 0, le fond attenue classique est conserve.
 
 #### 3.3.8 Profils persistants (metadata)
 
@@ -570,7 +619,7 @@ RESET_KEY_TRIGGER_SETTINGS (0x58)
   - status
   - echo complet du key settings (meme format que GET_KEY_SETTINGS)
 
-### 3.4 LED matrix et effets (0x60..0x7E)
+### 3.4 LED matrix et effets (0x60..0x7F)
 
 | Commande | ID | Parametres requete | Reponse |
 |---|---:|---|---|
@@ -605,6 +654,7 @@ RESET_KEY_TRIGGER_SETTINGS (0x58)
 | SET_LED_IDLE_OPTIONS | 0x7C | idle_timeout_seconds + allow_system_when_disabled + third_party_stream_counts_as_activity | status + echo des valeurs appliquees |
 | GET_LED_USB_SUSPEND_RGB_OFF | 0x7D | aucun | status + value (0/1) |
 | SET_LED_USB_SUSPEND_RGB_OFF | 0x7E | value (0/1) | status + value courant |
+| GET_RGB_CAPABILITIES | 0x7F | aucun | status + version bridge + geometrie + bitmap capabilities |
 
 Notes generales LED:
 - La vitesse et les couleurs des effets sont uniquement transportees via
@@ -616,6 +666,11 @@ Notes generales LED:
   `id`, `type`, `min`, `max`, `default`, `step`.
 - Si `LED_USB_SUSPEND_RGB_OFF` est active, la matrice RGB est forcee a noir
   pendant `USB suspend` puis restauree au `USB resume`.
+- `GET_RGB_CAPABILITIES` est un descripteur read-only stable pour les clients
+  natifs/libhmk. La reponse annonce actuellement bridge 1.0, 82 LED, RGB
+  logique, chunks de 60 octets, live effect 7 et les bits enabled, brightness,
+  pixel, frame, fill, live et restore. Le contrat complet et le client de
+  reference sont dans `integrations/libhmk/PROTOCOL.md`.
 
 Params effets par categorie:
 
@@ -670,7 +725,66 @@ Splash / Multi-splash:
 | GET_FILTER_PARAMS | 0x82 | aucun | status + noise_band + alpha_min_denom + alpha_max_denom |
 | SET_FILTER_PARAMS | 0x83 | noise_band + alpha_min_denom + alpha_max_denom | status + valeurs courantes |
 
-### 3.6 Debug et telemetrie (0xE0..0xE9)
+### 3.6 Programmes d'actions, macros et ProfileDocument (0x90..0x9C)
+
+Les programmes et les reglages d'un profil sont publies ensemble dans un
+`ProfileDocument` atomique. Le schema courant vaut 3. Une reponse differee de
+commit n'est envoyee qu'apres publication durable; RAW HID reste en
+stop-and-wait pendant cette operation.
+
+| Commande | ID | Parametres requete | Reponse |
+|---|---:|---|---|
+| GET_ACTION_CAPABILITIES | 0x90 | aucun | version, profile_count, program_count, max_steps, state_count, overlay_count, step_size, max_instances, document_schema, atomic_commit |
+| GET_ACTION_PROGRAM_META | 0x91 | profile, slot | profile, slot, version, flags, step_count, validation, hash32 |
+| GET_ACTION_PROGRAM_CHUNK | 0x92 | profile, slot, start, count | profile, slot, start, count, steps |
+| BEGIN_SET_ACTION_PROGRAM | 0x93 | profile, slot, version, flags, step_count, hash32 | profile + slot |
+| SET_ACTION_PROGRAM_CHUNK | 0x94 | profile, slot, start, count, steps | profile, slot, start, count |
+| COMMIT_ACTION_PROGRAM | 0x95 | profile, slot, persist | profile, slot, hash32 (differee si persist=1) |
+| ABORT_ACTION_PROGRAM | 0x96 | aucun | status |
+| GET_ACTION_OVERLAY | 0x97 | profile, overlay | profile, overlay, taille, binding |
+| SET_ACTION_OVERLAY | 0x98 | profile, overlay, taille, persist, binding | profile + overlay (differee si persist=1) |
+| GET_ACTION_STATES | 0x99 | aucun | state_bits u16 + active_profile |
+| SET_ACTION_STATE | 0x9A | state_index, value | state_index + value |
+| COMMIT_PROFILE_DOCUMENT | 0x9B | profile + expected_generation u32 | profile + schema + new_generation u32 (differee) |
+| GET_PROFILE_DOCUMENT_META | 0x9C | profile | profile + schema + generation u32 |
+
+Un `action_step_t` fait 4 octets: `opcode`, `arg8`, `arg16` little-endian. Un
+programme contient au plus 32 etapes. Les opcodes v1 sont:
+
+| Opcode | Nom | Arguments |
+|---:|---|---|
+| 0 | NOP | aucun |
+| 1 | END | aucun |
+| 2 | KEY_DOWN | arg16=keycode |
+| 3 | KEY_UP | arg16=keycode |
+| 4 | KEY_TAP | arg16=keycode |
+| 5 | DELAY_MS | arg16=delai |
+| 6 | STATE_SET | arg8=state, arg16=0/1 |
+| 7 | STATE_TOGGLE | arg8=state |
+| 8 | IF_STATE_SKIP | arg8 bits 0..3=state, bit 7=valeur attendue, arg16=nombre d'etapes a sauter |
+| 9 | OVERLAY_SET | arg8=overlay, arg16=0 off, 1 on, >1 pulse en ms |
+
+Les keycodes `0xF400..0xF40F` declenchent Macro 1..16. Le firmware valide le
+graphe complet et refuse toute recursion directe ou indirecte, ainsi que tout
+chemin d'imbrication depassant `max_instances` (16 actuellement). Les resultats
+de validation 6 et 7 designent respectivement `MACRO_CYCLE` et `MACRO_DEPTH`.
+Le bitmap de reception doit couvrir toutes les etapes avant le commit; `hash32`
+est le FNV-1a du programme wire complet. Une generation attendue differente de
+la generation courante provoque un echec CAS, sauf retransmission idempotente
+d'un document deja identique.
+
+`STATE_SET` et `STATE_TOGGLE` modifient uniquement l'etat runtime de la session
+et les overlays qui le suivent; ils ne changent ni `initial_state_bits` ni la
+revision persistante du profil. `SET_ACTION_STATE` configure a la fois l'etat
+runtime et la valeur initiale du profil, qui sera incluse au prochain commit du
+`ProfileDocument`.
+
+Les 16 etats pilotent jusqu'a 8 overlays. Chaque binding contient une couleur,
+un masque de touches, priorite, opacite, mode de blend, temps fade-in/fade-out,
+index d'etat et valeur active. Les transitions sont rendues par-dessus l'effet
+RGB de base sans remplacer ses pixels non masques.
+
+### 3.7 Debug et telemetrie (0xE0..0xE9)
 
 GET_ADC_VALUES (0xE0)
 
@@ -748,8 +862,24 @@ GET_MCU_METRICS (0xE9)
   - work_us u16
   - load_permille u16
   - temp_valid u8
+  - max_scan_cycle_us u16
+  - scan_deadline_miss_count u32 (cycles >= 125 us)
+  - flash_programmed_words u32
+  - flash_async_steps u32
+  - flash_gc_count u32
+  - flash_boot_erase_count u32
+  - flash_runtime_erase_count u32 (doit rester a 0 en fonctionnement)
+  - flash_deferred_no_space_count u32
+  - flash_max_words_per_step u16 (doit rester <= 1)
+  - flash_async_busy u8
+  - flash_spare_bank_ready u8
+  - flash_word_program_datasheet_max_us u16 (100 us sur STM32F723)
+  - flash_hard_8khz_guarantee u8 (0: la Flash interne single-bank ne permet
+    pas une garantie silicium absolue pendant une programmation)
+  - p99_scan_cycle_us u16 (borne superieure d'un bucket de 4 us)
+  - flash_last_status u8 (`NO_SPACE` = 5)
 
-### 3.7 Test et erreurs
+### 3.8 Test et erreurs
 
 ECHO (0xFE)
 
@@ -766,11 +896,20 @@ Commande inconnue
 
 Constantes updater:
 
-- protocol_version: 0x0001
+- protocol_version: 0x0003
 - payload max: 56 octets
 - align write flash: 4 octets
 - app_base: 0x08010000
-- app_max_size: 0x00050000 - 0x00000100
+- app slot: 0x00030000 octets (secteurs flash 4 et 5)
+- app_max_size: 0x0002FF00 octets
+- trailer signe: 0x0803FF00..0x0803FFFF
+- code bootloader: 0x08000000..0x0800BFFF (secteurs 0 a 2)
+- journal anti-rollback append-only: 0x0800C000..0x0800FFFF (secteur 3)
+
+Toutes les mises a jour v3 sont authentifiees par Ed25519. Le bootloader
+n'efface jamais le slot application avant d'avoir valide le manifeste et sa
+signature. Apres installation, la signature est conservee dans le trailer et
+est revalidee avec le CRC32 et le SHA-512 de l'image a chaque boot.
 
 ### 4.1 HELLO (0x01)
 
@@ -782,30 +921,69 @@ Constantes updater:
   - app_base u32
   - app_max_size u32
   - write_align u32
-  - installed_fw_version u16
-  - reserved u16
+  - installed_fw_version_major u8
+  - installed_fw_version_minor u8
+  - installed_fw_version_patch u8
+  - reserved u8 (doit valoir 0)
 - flags:
   - bit0 app valide
   - bit1 session active
+  - bit2 signature obligatoire
+  - bit3 manifeste authentifie pour la session courante
 
-### 4.2 BEGIN (0x02)
+Le host doit verifier exactement la version de protocole, l'adresse, la taille
+maximale, l'alignement et le bit `signature obligatoire` avant de poursuivre.
+
+### 4.2 AUTH (0x07)
+
+- Requete chunkee par `offset`, dans l'ordre, sur exactement 148 octets:
+  - manifeste canonique de 84 octets
+  - signature Ed25519 de 64 octets
+- Manifeste canonique (entiers little-endian):
+  - contexte exact `KBHEFW3\0` (8 octets)
+  - image_size u32
+  - image_crc32 u32
+  - fw_version_major u8
+  - fw_version_minor u8
+  - fw_version_patch u8
+  - reserved u8 = 0
+  - SHA-512 des `image_size` octets exacts de l'image (64 octets)
+- Le premier chunk utilise `offset = 0` et redemarre toute tentative AUTH.
+- Les chunks suivants utilisent l'offset local precedent plus la longueur
+  acceptee. Le champ `offset` de la reponse reste l'offset DATA (0 avant BEGIN),
+  tandis que `accepted_length` confirme la longueur du chunk AUTH accepte.
+- A reception des 148 octets, le bootloader verifie la signature avec la cle
+  publique embarquee. Une signature invalide retourne `AUTH_FAILED` et efface
+  le contexte d'authentification en RAM.
+- AUTH est refusee pendant une session BEGIN/DATA active.
+
+### 4.3 BEGIN (0x02)
 
 - Requete payload updater_begin_request_t:
   - image_size u32
   - image_crc32 u32
-  - fw_version u16
-  - reserved u16
+  - fw_version_major u8
+  - fw_version_minor u8
+  - fw_version_patch u8
+  - reserved u8 = 0
 - Validation:
+  - AUTH complete et validee
+  - tous les champs identiques au manifeste authentifie
   - image_size > 0
   - image_size <= app_max_size
 - Effet:
-  - erase slot app
+  - relevement transactionnel du plancher de version durable avant tout
+    effacement; une version inferieure au plancher est refusee
+  - un journal entierement efface autorise la premiere image signee; un journal
+    programme sans enregistrement valide echoue ferme avec `STORAGE_ERROR` et
+    impose une reprise physique de l'image factory
+  - effacement des seuls secteurs 4 et 5 du slot app
   - ouverture session
 - Reponse:
   - status
   - payload progress (next_offset, accepted_length, flags)
 
-### 4.3 DATA (0x03)
+### 4.4 DATA (0x03)
 
 - Requete:
   - offset aligne 4
@@ -815,6 +993,9 @@ Constantes updater:
   - session active
   - offset == next_offset attendu
   - offset + length <= aligned_size
+  - dans le dernier chunk, les octets de padding entre `image_size` et
+    `aligned_size` valent obligatoirement `0xFF`; ils ne font pas partie du
+    CRC32, du SHA-512 ni du manifeste signe
 - Reponse:
   - status
   - payload progress:
@@ -823,7 +1004,7 @@ Constantes updater:
     - flags u32
     - reserved u32
 
-### 4.4 FINISH (0x04)
+### 4.5 FINISH (0x04)
 
 - Requete: payload vide
 - Validation:
@@ -831,28 +1012,44 @@ Constantes updater:
   - next_offset == aligned_size
   - vecteur app valide
   - crc32 image == crc attendu
+  - manifeste reconstruit avec le SHA-512 de la flash strictement identique au
+    manifeste AUTH
+  - signature Ed25519 encore valide
 - Effet:
-  - ecriture trailer (magic, size, crc, fw_version)
+  - ecriture du trailer de 84 octets: magic, taille, CRC32 image, version
+    semantique, signature Ed25519 et CRC32 du trailer
   - fermeture session
 - Reponse:
   - status
   - progress payload
 
-### 4.5 ABORT (0x05)
+### 4.6 ABORT (0x05)
 
 - Requete: payload vide
 - Effet: reset session updater
 - Reponse: status + progress payload
 
-### 4.6 BOOT (0x06)
+### 4.7 BOOT (0x06)
 
 - Requete: payload vide
-- Validation: image application valide
+- Validation: vecteur, CRC32, SHA-512, signature Ed25519 et CRC32 trailer
+  valides, et version non inferieure au plancher durable
 - Reponse:
   - OK puis saut applique apres envoi reponse
   - ou INVALID_IMAGE
 
-### 4.7 Idempotence
+### 4.8 Statuts d'authentification
+
+- `AUTH_REQUIRED` (0x07): BEGIN/FINISH sans AUTH validee
+- `AUTH_FAILED` (0x08): manifeste ou signature non valides
+- `ROLLBACK_REJECTED` (0x09): version signee inferieure ou egale a l'image
+  valide actuellement installee, ou inferieure au plancher durable. La version
+  exactement egale au plancher reste autorisee si l'image est invalide afin de
+  reprendre une mise a jour interrompue.
+- `STORAGE_ERROR` (0x0A): impossible de valider durablement le nouveau plancher
+  avant effacement; le slot application reste intact
+
+### 4.9 Idempotence
 
 Le bootloader memorise la derniere requete complete.
 
@@ -866,15 +1063,19 @@ Le bootloader memorise la derniere requete complete.
   - incrementer sequence a chaque requete
   - respecter alignement 4 octets
   - sur timeout, retransmettre la meme requete (dedup cote bootloader)
+  - verifier localement la signature avant de demander le reboot updater
+  - envoyer AUTH completement avant BEGIN
+  - ne jamais ajouter le padding 0xFF au CRC32/SHA-512/manifeste signe
 
 ## 6. Resume rapide IDs
 
 - Systeme: 0x00..0x04
-- Settings: 0x20..0x2F
+- Settings et persistance: 0x20..0x37
 - Keys/Calibration/Gamepad/Rotary/Layer/Profile: 0x40..0x5F
   - 0x4D, 0x4E: reserves (anciens GET/SET_GAMEPAD_WITH_KB, supprimes)
-- LED: 0x60..0x79
+- LED: 0x60..0x7F
 - Filter: 0x80..0x83
+- Actions/macros/ProfileDocument: 0x90..0x9C
 - Debug: 0xE0..0xE9
 - Echo: 0xFE
-- Updater: 0x01..0x06 sur PID 0x0003
+- Updater: 0x01..0x07 sur PID 0x0003

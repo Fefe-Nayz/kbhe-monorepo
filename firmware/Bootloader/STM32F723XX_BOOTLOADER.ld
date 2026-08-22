@@ -4,8 +4,9 @@
 **  File        : STM32F723XX_BOOTLOADER.ld
 **
 **  Abstract    : Linker script for the KBHE bootloader on STM32F723VETx.
-**                Reserves sectors 0-3 (64KB) for the bootloader and the
-**                top 256 bytes of RAM for the shared boot request region.
+**                Uses sectors 0-2 (48KB) for executable code. Sector 3 is an
+**                append-only anti-rollback journal and must never be linked.
+**                The top 256 bytes of RAM hold the shared boot request.
 **
 ******************************************************************************
 */
@@ -16,7 +17,7 @@ MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 0x3FF00
 BOOTRAM (rw)   : ORIGIN = 0x2003FF00, LENGTH = 0x100
-FLASH (rx)     : ORIGIN = 0x08000000, LENGTH = 0x10000
+FLASH (rx)     : ORIGIN = 0x08000000, LENGTH = 0x0C000
 }
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);

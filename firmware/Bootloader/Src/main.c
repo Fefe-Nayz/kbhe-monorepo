@@ -3,6 +3,7 @@
 #include "tusb.h"
 #include "updater_bootloader.h"
 #include "updater_shared.h"
+#include "updater_version_floor.h"
 #include "usb_descriptors.h"
 
 static bool s_hal_initialized = false;
@@ -10,6 +11,8 @@ static bool s_hal_initialized = false;
 static void SystemClock_Config(void);
 static void USB_HS_Init(void);
 static void jump_to_application(bool runtime_cleanup);
+__attribute__((naked, noreturn, noinline)) static void
+jump_to_application_trampoline(uint32_t app_stack, uint32_t app_entry);
 static void reboot_to_application(void);
 void Error_Handler(void);
 
@@ -83,6 +86,7 @@ static void clear_interrupt_state(void) {
   SysTick->CTRL = 0;
   SysTick->LOAD = 0;
   SysTick->VAL = 0;
+  SCB->ICSR = SCB_ICSR_PENDSTCLR_Msk | SCB_ICSR_PENDSVCLR_Msk;
 
   for (uint32_t i = 0; i < 8u; i++) {
     NVIC->ICER[i] = 0xFFFFFFFFu;
@@ -91,12 +95,24 @@ static void clear_interrupt_state(void) {
 }
 
 static void restore_core_state_for_application(void) {
-  /* Match the architectural reset state before entering Reset_Handler. */
+  /* Match the architectural reset state while still using the bootloader's
+   * stack. PRIMASK stays set until the final stackless trampoline. */
   __set_CONTROL(0u);
   __set_BASEPRI(0u);
-  __enable_irq();
+  __set_FAULTMASK(0u);
   __DSB();
   __ISB();
+}
+
+__attribute__((naked, noreturn, noinline)) static void
+jump_to_application_trampoline(
+    uint32_t app_stack __attribute__((unused)),
+    uint32_t app_entry __attribute__((unused))) {
+  __asm volatile("msr msp, r0\n"
+                 "cpsie i\n"
+                 "dsb\n"
+                 "isb\n"
+                 "bx r1\n");
 }
 
 static void jump_to_application(bool runtime_cleanup) {
@@ -124,15 +140,11 @@ static void jump_to_application(bool runtime_cleanup) {
   __disable_irq();
   clear_interrupt_state();
   SCB->VTOR = UPDATER_APP_BASE;
-  __set_MSP(app_stack);
   __set_PSP(app_stack);
   restore_core_state_for_application();
   __DSB();
   __ISB();
-
-  ((void (*)(void))app_entry)();
-  while (1) {
-  }
+  jump_to_application_trampoline(app_stack, app_entry);
 }
 
 static void reboot_to_application(void) {
@@ -156,8 +168,10 @@ static void reboot_to_application(void) {
 
 int main(void) {
   bool stay_in_updater = boot_request_take(BOOT_REQUEST_ACTION_ENTER_UPDATER);
+  updater_fw_version_t installed = {0};
 
-  if (!stay_in_updater && updater_is_app_image_valid()) {
+  if (!stay_in_updater && updater_read_valid_app_version(&installed) &&
+      updater_version_floor_allows(installed)) {
     jump_to_application(false);
   }
 

@@ -253,6 +253,9 @@ function Update-FirmwareVersionFile {
 
     $settingsPath = Join-Path $RepoRoot "firmware/Core/Src/settings.c"
     $parsed = Parse-SemVer -Value $Version
+    if ($parsed.Major -gt 255 -or $parsed.Minor -gt 255 -or $parsed.Patch -gt 255) {
+        throw "Firmware version components must fit one byte: $Version"
+    }
 
     Replace-FirstMatchInFile -Path $settingsPath -Pattern '^(#define\s+FIRMWARE_VERSION_MAJOR\s+)\d+u\s*$' -Replacement ('${1}' + $parsed.Major + 'u') -Label "FIRMWARE_VERSION_MAJOR"
     Replace-FirstMatchInFile -Path $settingsPath -Pattern '^(#define\s+FIRMWARE_VERSION_MINOR\s+)\d+u\s*$' -Replacement ('${1}' + $parsed.Minor + 'u') -Label "FIRMWARE_VERSION_MINOR"
@@ -336,6 +339,14 @@ if ($needsFirmware) {
 }
 
 Invoke-External -Name "Fetch remote tags" -WorkingDirectory $repoRoot -Executable "git" -Arguments @("fetch", "--tags", "origin")
+
+# The script stages everything after running the release checks. Refuse to
+# start from a dirty tree so unrelated work, generated artifacts, or secrets
+# can never be swept into the release commit by `git add -A`.
+$initialStatus = @(Invoke-GitCapture -RepoRoot $repoRoot -Arguments @("status", "--porcelain=v1", "--untracked-files=all"))
+if ($initialStatus.Count -gt 0) {
+    throw "Release automation requires a clean working tree. Commit or stash existing changes first."
+}
 
 $branchName = (Invoke-GitCapture -RepoRoot $repoRoot -Arguments @("rev-parse", "--abbrev-ref", "HEAD") | Select-Object -First 1).Trim()
 if ($branchName -eq "HEAD") {

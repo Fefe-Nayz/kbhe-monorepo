@@ -5,11 +5,20 @@ import {
   isFirmwareProfileSnapshot,
   type FirmwareProfileSnapshot,
 } from "@/lib/kbhe/profile-sync"
+import {
+  getProfileStorageItem,
+  getProfileStorageKeys,
+  initializeProfilePersistence,
+  removeProfileStorageItem,
+  setProfileStorageItem,
+  subscribeProfilePersistenceErrors,
+} from "@/lib/kbhe/profile-persistence"
 
 const APP_STORAGE_PREFIX = "keyboard-profile:"
 const DEVICE_STORAGE_PREFIX = "keyboard-device-profile:"
 const ACTIVE_APP_PROFILE_KEY = "keyboard-active-app-profile"
 const LEGACY_ACTIVE_APP_PROFILE_KEY = "keyboard-active-profile"
+let profileStoreInitialized = false
 
 export type RuntimeSource = "device" | "app"
 
@@ -44,6 +53,7 @@ export interface DeviceProfileRef {
 
 interface DeviceProfileMirror {
   source: "device"
+  deviceId: string
   slot: number
   name: string
   used: boolean
@@ -73,6 +83,8 @@ interface ProfileStore {
   defaultDeviceSlot: number | null
   profileUsedMask: number
   ramOnlyActive: boolean
+  deviceId: string | null
+  persistenceError: string | null
 
   // Legacy compatibility for existing UI surface
   profiles: KeyboardProfile[]
@@ -80,6 +92,7 @@ interface ProfileStore {
 
   // Runtime controls
   setRuntimeSource: (source: RuntimeSource) => void
+  setDeviceId: (deviceId: string | null) => void
   setRuntimeDeviceState: (next: RuntimeDeviceState) => void
   setDeviceProfiles: (profiles: Array<{ slot: number; name: string; used: boolean }>) => void
   setActiveDeviceSlot: (slot: number | null) => void
@@ -115,9 +128,18 @@ function toStoredProfileData(
   data: Partial<KeyboardProfileData> | KeyboardState,
   options?: { firmwareSnapshot?: FirmwareProfileSnapshot | null },
 ): KeyboardProfileData {
-  const directSnapshot = isFirmwareProfileSnapshot((data as Partial<KeyboardProfileData>).firmwareSnapshot)
-    ? (data as Partial<KeyboardProfileData>).firmwareSnapshot
-    : undefined
+  const snapshotCandidate = (data as Partial<KeyboardProfileData>).firmwareSnapshot
+  if (snapshotCandidate !== undefined && !isFirmwareProfileSnapshot(snapshotCandidate)) {
+    throw new Error("Invalid firmware profile document")
+  }
+  if (
+    options?.firmwareSnapshot !== undefined
+    && options.firmwareSnapshot !== null
+    && !isFirmwareProfileSnapshot(options.firmwareSnapshot)
+  ) {
+    throw new Error("Invalid firmware profile document")
+  }
+  const directSnapshot = snapshotCandidate
   const selectedSnapshot = options?.firmwareSnapshot === null
     ? undefined
     : options?.firmwareSnapshot ?? directSnapshot
@@ -162,10 +184,10 @@ function readProfileData(raw: string): KeyboardProfileData | null {
 function loadAppProfilesFromStorage(): AppProfile[] {
   const profiles: AppProfile[] = []
 
-  for (const key of Object.keys(localStorage)) {
+  for (const key of getProfileStorageKeys()) {
     if (!key.startsWith(APP_STORAGE_PREFIX)) continue
 
-    const raw = localStorage.getItem(key)
+    const raw = getProfileStorageItem(key)
     if (!raw) continue
 
     const data = readProfileData(raw)
@@ -185,8 +207,16 @@ function loadAppProfilesFromStorage(): AppProfile[] {
   return profiles
 }
 
-function readDeviceProfileMirror(slot: number): DeviceProfileMirror | null {
-  const raw = localStorage.getItem(DEVICE_STORAGE_PREFIX + slot)
+function deviceMirrorStorageKey(deviceId: string, slot: number): string {
+  return `${DEVICE_STORAGE_PREFIX}${encodeURIComponent(deviceId)}:${slot}`
+}
+
+function readDeviceProfileMirror(deviceId: string | null, slot: number): DeviceProfileMirror | null {
+  if (!deviceId) {
+    return null
+  }
+
+  const raw = getProfileStorageItem(deviceMirrorStorageKey(deviceId, slot))
   if (!raw) {
     return null
   }
@@ -199,6 +229,7 @@ function readDeviceProfileMirror(slot: number): DeviceProfileMirror | null {
 
     return {
       source: "device",
+      deviceId,
       slot,
       name: parsed.name,
       used: Boolean(parsed.used),
@@ -213,18 +244,24 @@ function readDeviceProfileMirror(slot: number): DeviceProfileMirror | null {
 }
 
 function writeDeviceProfileMirror(
+  deviceId: string | null,
   slot: number,
   name: string,
   used: boolean,
   firmwareSnapshot?: FirmwareProfileSnapshot | null,
 ) {
-  const existing = readDeviceProfileMirror(slot)
+  if (!deviceId) {
+    return
+  }
+
+  const existing = readDeviceProfileMirror(deviceId, slot)
   const snapshot = firmwareSnapshot === undefined
     ? existing?.firmwareSnapshot
     : firmwareSnapshot ?? undefined
 
   const record: DeviceProfileMirror = {
     source: "device",
+    deviceId,
     slot,
     name,
     used,
@@ -232,7 +269,7 @@ function writeDeviceProfileMirror(
     ...(snapshot ? { firmwareSnapshot: snapshot } : {}),
   }
 
-  localStorage.setItem(DEVICE_STORAGE_PREFIX + slot, JSON.stringify(record))
+  setProfileStorageItem(deviceMirrorStorageKey(deviceId, slot), JSON.stringify(record))
 }
 
 function applyDeviceProfileFlags(
@@ -248,18 +285,18 @@ function applyDeviceProfileFlags(
 }
 
 function getPersistedActiveAppName(): string | null {
-  return localStorage.getItem(ACTIVE_APP_PROFILE_KEY)
-    ?? localStorage.getItem(LEGACY_ACTIVE_APP_PROFILE_KEY)
+  return getProfileStorageItem(ACTIVE_APP_PROFILE_KEY)
+    ?? getProfileStorageItem(LEGACY_ACTIVE_APP_PROFILE_KEY)
 }
 
 function persistActiveAppName(name: string) {
-  localStorage.setItem(ACTIVE_APP_PROFILE_KEY, name)
-  localStorage.setItem(LEGACY_ACTIVE_APP_PROFILE_KEY, name)
+  setProfileStorageItem(ACTIVE_APP_PROFILE_KEY, name)
+  setProfileStorageItem(LEGACY_ACTIVE_APP_PROFILE_KEY, name)
 }
 
 function clearPersistedActiveAppName() {
-  localStorage.removeItem(ACTIVE_APP_PROFILE_KEY)
-  localStorage.removeItem(LEGACY_ACTIVE_APP_PROFILE_KEY)
+  removeProfileStorageItem(ACTIVE_APP_PROFILE_KEY)
+  removeProfileStorageItem(LEGACY_ACTIVE_APP_PROFILE_KEY)
 }
 
 export const useProfileStore = create<ProfileStore>((set, get) => ({
@@ -271,11 +308,23 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   defaultDeviceSlot: null,
   profileUsedMask: 0,
   ramOnlyActive: false,
+  deviceId: null,
+  persistenceError: null,
 
   profiles: [],
   selectedProfile: null,
 
   setRuntimeSource: (runtimeSource) => set({ runtimeSource }),
+
+  setDeviceId: (deviceId) => set((state) => ({
+    deviceId,
+    deviceProfiles: state.deviceProfiles.map((profile) => ({
+      ...(readDeviceProfileMirror(deviceId, profile.slot) ?? {}),
+      ...profile,
+      isActive: profile.isActive,
+      isDefault: profile.isDefault,
+    })),
+  })),
 
   setRuntimeDeviceState: (next) => {
     set((state) => {
@@ -293,7 +342,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 
       const baseProfiles = next.deviceProfiles
         ? next.deviceProfiles.map((profile) => ({
-            ...(readDeviceProfileMirror(profile.slot) ?? {}),
+            ...(readDeviceProfileMirror(state.deviceId, profile.slot) ?? {}),
             source: "device" as const,
             slot: profile.slot,
             name: profile.name,
@@ -316,7 +365,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   setDeviceProfiles: (profiles) => {
     set((state) => {
       const nextProfiles = profiles.map((profile) => ({
-        ...(readDeviceProfileMirror(profile.slot) ?? {}),
+        ...(readDeviceProfileMirror(state.deviceId, profile.slot) ?? {}),
         source: "device" as const,
         slot: profile.slot,
         name: profile.name,
@@ -362,14 +411,15 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   upsertDeviceProfileMirror: (slot, name, used, firmwareSnapshot) => {
-    writeDeviceProfileMirror(slot, name, used, firmwareSnapshot)
+    const deviceId = get().deviceId
+    writeDeviceProfileMirror(deviceId, slot, name, used, firmwareSnapshot)
     set((state) => ({
       deviceProfiles: applyDeviceProfileFlags(
         state.deviceProfiles.map((profile) => {
           if (profile.slot !== slot) {
             return profile
           }
-          const mirror = readDeviceProfileMirror(slot)
+          const mirror = readDeviceProfileMirror(deviceId, slot)
           return {
             ...profile,
             name,
@@ -385,7 +435,10 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   removeDeviceProfileMirror: (slot) => {
-    localStorage.removeItem(DEVICE_STORAGE_PREFIX + slot)
+    const deviceId = get().deviceId
+    if (deviceId) {
+      removeProfileStorageItem(deviceMirrorStorageKey(deviceId, slot))
+    }
     set((state) => ({
       deviceProfiles: state.deviceProfiles.map((profile) => {
         if (profile.slot !== slot) {
@@ -406,7 +459,10 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   getNumberOfProfiles: () => get().appProfiles.length,
 
   init: () => {
-    get().refresh()
+    if (profileStoreInitialized) return
+    profileStoreInitialized = true
+    subscribeProfilePersistenceErrors((persistenceError) => set({ persistenceError }))
+    void initializeProfilePersistence().then(() => get().refresh())
   },
 
   refresh: () => {
@@ -444,7 +500,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       state = { ...state, layout: cloneDefaultLayout() }
     }
 
-    localStorage.setItem(
+    setProfileStorageItem(
       APP_STORAGE_PREFIX + name,
       JSON.stringify(toStoredProfileData(state, { firmwareSnapshot: options?.firmwareSnapshot })),
     )
@@ -455,7 +511,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   remove: (name) => {
-    localStorage.removeItem(APP_STORAGE_PREFIX + name)
+    removeProfileStorageItem(APP_STORAGE_PREFIX + name)
     const wasActive = get().activeAppProfileName === name
 
     get().refresh()
@@ -474,11 +530,11 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     if (!newName.trim() || oldName === newName) return
     if (get().appProfiles.some((profile) => profile.name === newName)) return
 
-    const raw = localStorage.getItem(APP_STORAGE_PREFIX + oldName)
+    const raw = getProfileStorageItem(APP_STORAGE_PREFIX + oldName)
     if (!raw) return
 
-    localStorage.setItem(APP_STORAGE_PREFIX + newName, raw)
-    localStorage.removeItem(APP_STORAGE_PREFIX + oldName)
+    setProfileStorageItem(APP_STORAGE_PREFIX + newName, raw)
+    removeProfileStorageItem(APP_STORAGE_PREFIX + oldName)
 
     const wasActive = get().activeAppProfileName === oldName
     if (get().activeAppProfileName === oldName) {
@@ -493,17 +549,17 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   duplicate: (from, to) => {
-    const raw = localStorage.getItem(APP_STORAGE_PREFIX + from)
+    const raw = getProfileStorageItem(APP_STORAGE_PREFIX + from)
     if (!raw) return
 
-    localStorage.setItem(APP_STORAGE_PREFIX + to, raw)
+    setProfileStorageItem(APP_STORAGE_PREFIX + to, raw)
     get().refresh()
   },
 
   getAppProfileByName: (name) => get().appProfiles.find((profile) => profile.name === name) ?? null,
 
   upsertAppProfileData: (name, data, options) => {
-    localStorage.setItem(
+    setProfileStorageItem(
       APP_STORAGE_PREFIX + name,
       JSON.stringify(toStoredProfileData(data, { firmwareSnapshot: options?.firmwareSnapshot })),
     )
@@ -538,7 +594,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     const { selectedProfile } = get()
     if (!selectedProfile) return
 
-    localStorage.setItem(
+    setProfileStorageItem(
       APP_STORAGE_PREFIX + selectedProfile.name,
       JSON.stringify(
         toStoredProfileData(data, {

@@ -22,27 +22,18 @@ extern TIM_HandleTypeDef htim4;
 
 static volatile updater_app_action_t s_pending_action = UPDATER_APP_ACTION_NONE;
 static volatile bool s_response_sent = false;
+typedef enum {
+  USB_REENUMERATE_IDLE = 0,
+  USB_REENUMERATE_WAIT_DISCONNECT,
+  USB_REENUMERATE_WAIT_REINIT,
+} usb_reenumerate_phase_t;
+static usb_reenumerate_phase_t s_usb_reenumerate_phase = USB_REENUMERATE_IDLE;
+static uint32_t s_usb_reenumerate_deadline_ms = 0u;
 
-#if KBHE_CUSTOM_BOOTLOADER_ENABLED
-static void clear_interrupt_state(void) {
-  SysTick->CTRL = 0;
-  SysTick->LOAD = 0;
-  SysTick->VAL = 0;
-
-  for (uint32_t i = 0; i < 8u; i++) {
-    NVIC->ICER[i] = 0xFFFFFFFFu;
-    NVIC->ICPR[i] = 0xFFFFFFFFu;
-  }
+static bool updater_app_deadline_reached(uint32_t now_ms,
+                                         uint32_t deadline_ms) {
+  return (int32_t)(now_ms - deadline_ms) >= 0;
 }
-
-static void restore_core_state_for_bootloader(void) {
-  __set_CONTROL(0u);
-  __set_BASEPRI(0u);
-  __enable_irq();
-  __DSB();
-  __ISB();
-}
-#endif
 
 static void updater_app_shutdown_peripherals(void) {
   (void)HAL_ADC_Stop_DMA(&hadc1);
@@ -62,10 +53,8 @@ static void updater_app_shutdown_peripherals(void) {
   __HAL_RCC_OTGPHYC_CLK_DISABLE();
 }
 
-static void updater_app_shutdown_usb_only(void) {
+static void updater_app_deinit_usb_only(void) {
   if (tusb_inited()) {
-    (void)tud_disconnect();
-    HAL_Delay(120);
     (void)tusb_deinit(USB_RHPORT_HS);
   }
 
@@ -98,7 +87,7 @@ static void updater_app_reinit_usb_only(void) {
   GPIO_InitStruct.Alternate = GPIO_AF12_OTG_HS_FS;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  HAL_NVIC_SetPriority(OTG_HS_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(OTG_HS_IRQn, KBHE_NVIC_PRIORITY_USB, 0);
   HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
 
   (void)tusb_init(USB_RHPORT_HS, &rhport_init);
@@ -113,30 +102,14 @@ static void updater_app_reinit_usb_only(void) {
   (void)tud_connect();
 }
 
-#if KBHE_CUSTOM_BOOTLOADER_ENABLED
-static void jump_to_bootloader(void) {
-  const uint32_t *boot_vector = (const uint32_t *)UPDATER_BOOTLOADER_BASE;
-  uint32_t boot_stack = boot_vector[0];
-  uint32_t boot_entry = boot_vector[1];
-
-  HAL_RCC_DeInit();
-  HAL_DeInit();
-
-  __disable_irq();
-  clear_interrupt_state();
-  SCB->VTOR = UPDATER_BOOTLOADER_BASE;
-  __set_MSP(boot_stack);
-  __set_PSP(boot_stack);
-  restore_core_state_for_bootloader();
-
-  ((void (*)(void))boot_entry)();
-  while (1) {
-  }
-}
-#endif
-
 bool updater_app_schedule_action(updater_app_action_t action) {
   if (action == UPDATER_APP_ACTION_NONE) {
+    return false;
+  }
+
+  /* Do not replace a partially executed re-enumeration with another action:
+   * doing so could leave USB disconnected or its clocks disabled. */
+  if (s_pending_action != UPDATER_APP_ACTION_NONE) {
     return false;
   }
 
@@ -148,6 +121,8 @@ bool updater_app_schedule_action(updater_app_action_t action) {
 
   s_pending_action = action;
   s_response_sent = false;
+  s_usb_reenumerate_phase = USB_REENUMERATE_IDLE;
+  s_usb_reenumerate_deadline_ms = 0u;
   return true;
 }
 
@@ -163,11 +138,44 @@ void updater_app_task(void) {
   }
 
   if (s_pending_action == UPDATER_APP_ACTION_USB_REENUMERATE) {
-    updater_app_shutdown_usb_only();
-    HAL_Delay(120);
+    uint32_t now_ms = HAL_GetTick();
+
+    if (s_usb_reenumerate_phase == USB_REENUMERATE_IDLE) {
+      if (tusb_inited()) {
+        (void)tud_disconnect();
+      }
+      s_usb_reenumerate_deadline_ms = now_ms + 120u;
+      s_usb_reenumerate_phase = USB_REENUMERATE_WAIT_DISCONNECT;
+      return;
+    }
+
+    if (s_usb_reenumerate_phase == USB_REENUMERATE_WAIT_DISCONNECT) {
+      if (!updater_app_deadline_reached(now_ms,
+                                        s_usb_reenumerate_deadline_ms)) {
+        return;
+      }
+      updater_app_deinit_usb_only();
+      s_usb_reenumerate_deadline_ms = now_ms + 120u;
+      s_usb_reenumerate_phase = USB_REENUMERATE_WAIT_REINIT;
+      return;
+    }
+
+    if (!updater_app_deadline_reached(now_ms,
+                                      s_usb_reenumerate_deadline_ms)) {
+      return;
+    }
     updater_app_reinit_usb_only();
+    s_usb_reenumerate_phase = USB_REENUMERATE_IDLE;
     s_pending_action = UPDATER_APP_ACTION_NONE;
     s_response_sent = false;
+    return;
+  }
+
+  /* Reboot only after the budgeted persistence state machine has committed.
+   * This keeps the 8 kHz input loop alive while settings drain instead of
+   * performing a multi-kilobyte synchronous flash write in the HID handler. */
+  if (!settings_is_ram_only_mode() && settings_has_unsaved_changes()) {
+    (void)settings_request_save();
     return;
   }
 
@@ -176,7 +184,16 @@ void updater_app_task(void) {
 #if KBHE_CUSTOM_BOOTLOADER_ENABLED
   if (s_pending_action == UPDATER_APP_ACTION_ENTER_UPDATER) {
     boot_request_set(BOOT_REQUEST_ACTION_ENTER_UPDATER);
-    jump_to_bootloader();
+    __disable_irq();
+#if (__DCACHE_PRESENT == 1U)
+    /* The boot request lives in retained SRAM. Commit its cache line before
+     * reset so the bootloader cannot observe stale memory. Reset also gives
+     * the bootloader clean I/D-cache and peripheral state. */
+    SCB_CleanDCache();
+#endif
+    __DSB();
+    __ISB();
+    NVIC_SystemReset();
   } else {
     boot_request_clear();
     __disable_irq();

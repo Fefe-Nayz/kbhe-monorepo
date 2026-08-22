@@ -73,6 +73,7 @@ Follow the instructions in [docs/firmware/INSTALLATION.md](docs/firmware/INSTALL
 
 - `firmware/` - STM32F723 firmware, custom RAW HID bootloader, CMake toolchain and CubeMX-generated support files.
 - `apps/configurator/` - Tauri desktop configurator for key settings, calibration, lighting, firmware flashing and app updates.
+- `integrations/libhmk/` - pinned KBHE libhmk fork, portable RGB/HID protocol client, and reproducible upstream patch mirror.
 - `hardware/pcb/75he/` - KiCad PCB project with project-local libraries, 3D models, documentation and legacy PCB revisions.
 - `hardware/3d/` - mechanical source files and exported models. Large mechanical formats are tracked with Git LFS.
 - `assets/presentation/` - TIPE PDFs (synoptic, English paper, part-label drawing) and a short workbench **.mp4** clip.

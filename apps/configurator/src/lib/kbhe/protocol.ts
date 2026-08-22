@@ -25,6 +25,8 @@ export const LED_EFFECT_PARAM_SPEED = 14;
 export const LED_AUDIO_SPECTRUM_BAND_COUNT = 16;
 export const SETTINGS_PROFILE_COUNT = 4;
 export const SETTINGS_PROFILE_NAME_LENGTH = 16;
+/** Canonical on-device settings + actions document schema. */
+export const PROFILE_DOCUMENT_SCHEMA_VERSION = 3;
 export const FILTER_DEFAULT_ENABLED = true;
 export const FILTER_DEFAULT_NOISE_BAND = 30;
 export const FILTER_DEFAULT_ALPHA_MIN_DENOM = 32;
@@ -38,7 +40,35 @@ export const ADVANCED_TICK_RATE_MAX = 100;
 export const ADVANCED_TICK_RATE_DEFAULT = 1;
 export const TRIGGER_CHATTER_GUARD_MAX_MS = 20;
 export const TRIGGER_CHATTER_GUARD_DEFAULT_MS = 0;
+export const TRIGGER_CHATTER_GUARD_RECOMMENDED_MS = 5;
 export const TRIGGER_CHATTER_GUARD_DEFAULT_ENABLED = false;
+export const DKS_DEFAULT_ACTION_BITMAP = 0x81;
+
+export const DKS_ACTIONS = {
+  Hold: 0,
+  Press: 1,
+  Release: 2,
+  Tap: 3,
+} as const;
+
+export const DKS_PHASES = [
+  { label: "Key press", description: "When the key first actuates", index: 0 },
+  { label: "Bottom out", description: "When the bottom-out point is crossed", index: 1 },
+  { label: "Release from bottom", description: "When travel rises above bottom-out", index: 2 },
+  { label: "Key release", description: "When the key fully releases", index: 3 },
+] as const;
+
+export function dksActionAtPhase(bitmap: number, phaseIndex: number): number {
+  const phase = Math.max(0, Math.min(3, Math.trunc(phaseIndex)));
+  return (Math.trunc(bitmap) >>> (phase * 2)) & 0x03;
+}
+
+export function setDksActionAtPhase(bitmap: number, phaseIndex: number, action: number): number {
+  const phase = Math.max(0, Math.min(3, Math.trunc(phaseIndex)));
+  const shift = phase * 2;
+  const mask = 0x03 << shift;
+  return ((Math.trunc(bitmap) & ~mask) | ((Math.trunc(action) & 0x03) << shift)) & 0xff;
+}
 export const LED_IDLE_TIMEOUT_MAX_SECONDS = 255;
 export const LED_IDLE_TIMEOUT_DEFAULT_SECONDS = 0;
 export const LED_ALLOW_SYSTEM_WHEN_DISABLED_DEFAULT = false;
@@ -77,6 +107,7 @@ export enum Command {
   RELOAD_SETTINGS_FROM_FLASH = 0x34,
   GET_TRIGGER_CHATTER_GUARD = 0x35,
   SET_TRIGGER_CHATTER_GUARD = 0x36,
+  GET_SETTINGS_SAVE_STATUS = 0x37,
 
   GET_KEY_SETTINGS = 0x40,
   SET_KEY_SETTINGS = 0x41,
@@ -145,6 +176,20 @@ export enum Command {
   SET_FILTER_ENABLED = 0x81,
   GET_FILTER_PARAMS = 0x82,
   SET_FILTER_PARAMS = 0x83,
+
+  GET_ACTION_CAPABILITIES = 0x90,
+  GET_ACTION_PROGRAM_META = 0x91,
+  GET_ACTION_PROGRAM_CHUNK = 0x92,
+  BEGIN_SET_ACTION_PROGRAM = 0x93,
+  SET_ACTION_PROGRAM_CHUNK = 0x94,
+  COMMIT_ACTION_PROGRAM = 0x95,
+  ABORT_ACTION_PROGRAM = 0x96,
+  GET_ACTION_OVERLAY = 0x97,
+  SET_ACTION_OVERLAY = 0x98,
+  GET_ACTION_STATES = 0x99,
+  SET_ACTION_STATE = 0x9a,
+  COMMIT_PROFILE_DOCUMENT = 0x9b,
+  GET_PROFILE_DOCUMENT_META = 0x9c,
 
   GET_ADC_VALUES = 0xe0,
   GET_KEY_STATES = 0xe1,
@@ -233,6 +278,23 @@ export enum LEDEffect {
   SOLID_MULTI_SPLASH = 62,
   BASS_RIPPLE = 63,
   MATRIX = LEDEffect.NONE,
+}
+
+export const SETTINGS_SAVE_STATUS_PROTOCOL_VERSION = 1;
+
+export enum SettingsSaveState {
+  Durable = 0,
+  Queued = 1,
+  Writing = 2,
+  Failed = 3,
+  RamOnly = 4,
+}
+
+export interface SettingsSaveStatus {
+  state: SettingsSaveState;
+  dirty: boolean;
+  requested: boolean;
+  inProgress: boolean;
 }
 
 export const LED_EFFECT_COUNT = LEDEffect.BASS_RIPPLE + 1;
@@ -574,6 +636,12 @@ export const HID_KEYCODES: Record<string, number> = {
   "Set Layer 2": 0xf01a,
   "Set Layer 3": 0xf01b,
   "Clear Layer Toggles": 0xf01c,
+  "Profile Previous": 0xf020,
+  "Profile Next": 0xf021,
+  "Profile Set 1": 0xf022,
+  "Profile Set 2": 0xf023,
+  "Profile Set 3": 0xf024,
+  "Profile Set 4": 0xf025,
   "LED Toggle": 0xf200,
   "LED Brightness Down": 0xf201,
   "LED Brightness Up": 0xf202,
@@ -610,6 +678,22 @@ export const HID_KEYCODES: Record<string, number> = {
   "GP RS Left": 0xf345,
   "GP RS Down": 0xf346,
   "GP RS Up": 0xf347,
+  "Macro 1": 0xf400,
+  "Macro 2": 0xf401,
+  "Macro 3": 0xf402,
+  "Macro 4": 0xf403,
+  "Macro 5": 0xf404,
+  "Macro 6": 0xf405,
+  "Macro 7": 0xf406,
+  "Macro 8": 0xf407,
+  "Macro 9": 0xf408,
+  "Macro 10": 0xf409,
+  "Macro 11": 0xf40a,
+  "Macro 12": 0xf40b,
+  "Macro 13": 0xf40c,
+  "Macro 14": 0xf40d,
+  "Macro 15": 0xf40e,
+  "Macro 16": 0xf40f,
   MOUSE_LEFT: 0xf100,
   MOUSE_RIGHT: 0xf101,
   MOUSE_MIDDLE: 0xf102,
@@ -659,10 +743,16 @@ export function pushI16(target: number[], value: number): void {
 }
 
 export function buildCommandReport(command: number, data: ArrayLike<number> = []): Uint8Array {
+  const maximumPayloadLength = REPORT_SIZE - 2;
+  if (data.length > maximumPayloadLength) {
+    throw new RangeError(
+      `RAW HID command payload has ${data.length} bytes; maximum is ${maximumPayloadLength}`,
+    );
+  }
   const report = new Uint8Array(REPORT_SIZE);
   report[0] = REPORT_ID;
   report[1] = command & 0xff;
-  for (let index = 0; index < data.length && index + 2 < report.length; index += 1) {
+  for (let index = 0; index < data.length; index += 1) {
     report[index + 2] = data[index] ?? 0;
   }
   return report;

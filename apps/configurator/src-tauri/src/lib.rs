@@ -1,6 +1,7 @@
 mod audio;
 mod commands;
 mod releases;
+mod signing;
 mod startup;
 mod volume;
 
@@ -57,8 +58,8 @@ fn rasterize_svg_icon(svg_source: &str, color_hex: &str, size: u32) -> Option<Im
     let scale = scale_x.min(scale_y);
     let offset_x = (size as f32 - tree_size.width() as f32 * scale) * 0.5;
     let offset_y = (size as f32 - tree_size.height() as f32 * scale) * 0.5;
-    let transform = resvg::tiny_skia::Transform::from_scale(scale, scale)
-        .post_translate(offset_x, offset_y);
+    let transform =
+        resvg::tiny_skia::Transform::from_scale(scale, scale).post_translate(offset_x, offset_y);
 
     let _ = resvg::render(&tree, transform, &mut pixmap.as_mut());
     Some(Image::new_owned(pixmap.data().to_vec(), size, size))
@@ -271,6 +272,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::kbhe_list_devices,
+            commands::kbhe_list_rgb_bridge_devices,
             commands::kbhe_connect,
             commands::kbhe_disconnect,
             commands::kbhe_connection_state,
@@ -279,6 +281,15 @@ pub fn run() {
             commands::kbhe_read_report,
             commands::kbhe_send_command,
             commands::kbhe_get_key_states,
+            commands::kbhe_rgb_bridge_get_state,
+            commands::kbhe_rgb_bridge_set_enabled,
+            commands::kbhe_rgb_bridge_set_brightness,
+            commands::kbhe_rgb_bridge_fill,
+            commands::kbhe_rgb_bridge_clear,
+            commands::kbhe_rgb_bridge_restore_effect,
+            commands::kbhe_rgb_bridge_set_effect,
+            commands::kbhe_rgb_bridge_set_pixel,
+            commands::kbhe_rgb_bridge_write_frame,
             commands::kbhe_wait_for_device,
             commands::kbhe_wait_for_disconnect,
             commands::kbhe_detect_bootloader_presence,

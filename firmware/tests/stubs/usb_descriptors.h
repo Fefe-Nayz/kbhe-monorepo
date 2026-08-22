@@ -1,0 +1,7 @@
+#ifndef KBHE_HOST_USB_DESCRIPTORS_STUB_H_
+#define KBHE_HOST_USB_DESCRIPTORS_STUB_H_
+
+#define HID_EP_SIZE 64u
+#define HID_ITF_CONSUMER 2u
+
+#endif

@@ -58,11 +58,15 @@ typedef struct {
     uint32_t channel;                       // Timer channel
     uint32_t *dma_buffer;                   // Pointer to DMA buffer (non-cacheable, defined elsewhere)
     uint16_t leds;                          // Number of LEDs on the string
-    uint8_t *led;                           // LED RGB storage
+    uint8_t *led;                           // Main-loop staging RGB storage
+    uint8_t *active_led;                    // Immutable frame read by DMA ISR
+    uint8_t *pending_led;                   // Complete frame waiting for boundary
     ws2812_stateTypeDef led_state;          // LED Transfer state machine
     uint8_t led_cnt;                        // Counts through the leds starting from zero up to "leds"
     uint8_t res_cnt;                        // Counts reset cycles when in reset state
-    uint8_t is_dirty;                       // Indicates to the call back that the led color values have been updated
+    volatile uint8_t is_dirty;              // A complete pending frame is ready
+    uint8_t staging_dirty;                  // Staging differs from pending frame
+    volatile uint8_t dma_paused;             // TIM/DMA requests are gated while idle
     uint8_t zero_halves;                    // Counts halves send during reset
     uint32_t dma_cbs;                       // Just used for statistics
     uint32_t dat_cbs;                       // Also used for statistics

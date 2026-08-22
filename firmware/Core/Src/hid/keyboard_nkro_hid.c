@@ -4,6 +4,7 @@
  */
 
 #include "hid/keyboard_nkro_hid.h"
+#include "layout/layout.h"
 #include "stm32f7xx_hal.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
@@ -15,6 +16,7 @@
 
 // NKRO report
 static nkro_keyboard_report_t nkro_report = {0};
+static uint8_t key_reference_counts[256] = {0};
 
 // Flag indicating report has changed
 static volatile bool report_changed = false;
@@ -37,8 +39,6 @@ static void keyboard_nkro_hid_update_runtime_state(void) {
     runtime_state = NKRO_RUNTIME_DISCONNECTED;
     mount_timestamp_ms = 0u;
     last_nkro_progress_ms = 0u;
-    memset(&nkro_report, 0, sizeof(nkro_report));
-    report_changed = false;
     return;
   }
 
@@ -46,8 +46,8 @@ static void keyboard_nkro_hid_update_runtime_state(void) {
     runtime_state = NKRO_RUNTIME_PENDING;
     mount_timestamp_ms = HAL_GetTick();
     last_nkro_progress_ms = mount_timestamp_ms;
-    memset(&nkro_report, 0, sizeof(nkro_report));
-    report_changed = false;
+    /* Preserve desired state across USB re-enumeration. */
+    report_changed = true;
   }
 
   if (runtime_state == NKRO_RUNTIME_PENDING) {
@@ -59,8 +59,6 @@ static void keyboard_nkro_hid_update_runtime_state(void) {
 
     if ((HAL_GetTick() - mount_timestamp_ms) >= NKRO_ENUMERATION_TIMEOUT_MS) {
       runtime_state = NKRO_RUNTIME_FALLBACK;
-      memset(&nkro_report, 0, sizeof(nkro_report));
-      report_changed = false;
     }
   }
 
@@ -74,8 +72,6 @@ static void keyboard_nkro_hid_update_runtime_state(void) {
 
     if ((now_ms - last_nkro_progress_ms) >= NKRO_ACTIVE_STALL_TIMEOUT_MS) {
       runtime_state = NKRO_RUNTIME_FALLBACK;
-      memset(&nkro_report, 0, sizeof(nkro_report));
-      report_changed = false;
     }
   }
 }
@@ -103,6 +99,11 @@ static inline bool get_key_bit(uint8_t keycode) {
   return false;
 }
 
+static bool keyboard_nkro_hid_report_is_neutral(void) {
+  static const nkro_keyboard_report_t neutral = {0};
+  return memcmp(&nkro_report, &neutral, sizeof(neutral)) == 0;
+}
+
 //--------------------------------------------------------------------+
 // Public API
 //--------------------------------------------------------------------+
@@ -112,6 +113,14 @@ bool keyboard_nkro_hid_is_ready(void) { return tud_hid_n_ready(HID_ITF_NKRO); }
 void keyboard_nkro_hid_key_press(uint8_t keycode) {
   if (keycode == 0)
     return;
+
+  if (key_reference_counts[keycode] == 0xFFu) {
+    return;
+  }
+  key_reference_counts[keycode]++;
+  if (key_reference_counts[keycode] > 1u) {
+    return;
+  }
 
   // Handle modifier keys (224-231)
   if (keycode >= 224 && keycode <= 231) {
@@ -133,6 +142,14 @@ void keyboard_nkro_hid_key_release(uint8_t keycode) {
   if (keycode == 0)
     return;
 
+  if (key_reference_counts[keycode] == 0u) {
+    return;
+  }
+  key_reference_counts[keycode]--;
+  if (key_reference_counts[keycode] > 0u) {
+    return;
+  }
+
   // Handle modifier keys (224-231)
   if (keycode >= 224 && keycode <= 231) {
     uint8_t modifier_bit = 1 << (keycode - 224);
@@ -150,7 +167,9 @@ void keyboard_nkro_hid_key_release(uint8_t keycode) {
 }
 
 bool keyboard_nkro_hid_send_report_if_changed(void) {
-  if (runtime_state != NKRO_RUNTIME_ACTIVE) {
+  if (runtime_state != NKRO_RUNTIME_ACTIVE &&
+      !(runtime_state == NKRO_RUNTIME_FALLBACK &&
+        keyboard_nkro_hid_report_is_neutral())) {
     return false;
   }
 
@@ -188,10 +207,14 @@ bool keyboard_nkro_hid_is_runtime_fallback_active(void) {
 
 void keyboard_nkro_hid_task(void) {
   keyboard_nkro_hid_update_runtime_state();
+  /* USB protocol/readiness can change without a key edge. Reconcile the
+   * immutable per-press routes here so held keys migrate transactionally. */
+  layout_refresh_output_routes();
   keyboard_nkro_hid_send_report_if_changed();
 }
 
 void keyboard_nkro_hid_release_all(void) {
   memset(&nkro_report, 0, sizeof(nkro_report));
+  memset(key_reference_counts, 0, sizeof(key_reference_counts));
   report_changed = true;
 }

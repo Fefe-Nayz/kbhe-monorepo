@@ -35,6 +35,11 @@ extern "C" {
 #define ANALOG_CURVE_POINTS 4 // 4-point bezier curve (P0, P1, P2, P3)
 #define GAMEPAD_CURVE_POINT_COUNT 4u
 #define GAMEPAD_CURVE_MAX_DISTANCE_01MM 400u // 4.00 mm
+#define SETTINGS_LOGICAL_TRAVEL_UM 4000u
+#define SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS 1u
+#define SETTINGS_RAPID_TRIGGER_MIN_HUNDREDTHS 1u
+#define SETTINGS_CALIBRATION_MIN_SPAN_ADC 24u
+#define SETTINGS_ADC_MAX_VALUE 4095u
 #define SETTINGS_LAYER_COUNT 4u
 #define SETTINGS_PROFILE_COUNT 4u
 #define SETTINGS_PROFILE_NAME_LENGTH 16u
@@ -189,6 +194,66 @@ typedef struct __attribute__((packed)) {
   settings_rotary_binding_t ccw_binding;
   settings_rotary_binding_t click_binding;
 } settings_rotary_encoder_t;
+
+/* Keep the persisted rotary structure byte-compatible while exposing motion
+ * acceleration and progress-track behavior. Sensitivity occupies bits 0..4,
+ * acceleration bits 5..6, and bit 7 selects a transparent unfilled track. */
+#define SETTINGS_ROTARY_SENSITIVITY_MASK 0x1Fu
+#define SETTINGS_ROTARY_ACCELERATION_SHIFT 5u
+#define SETTINGS_ROTARY_ACCELERATION_MASK 0x60u
+#define SETTINGS_ROTARY_ACCELERATION_MAX 3u
+#define SETTINGS_ROTARY_PROGRESS_FILLED_ONLY_MASK 0x80u
+
+static inline uint8_t settings_rotary_get_sensitivity(
+    const settings_rotary_encoder_t *rotary) {
+  return rotary == 0
+             ? 0u
+             : (uint8_t)(rotary->sensitivity &
+                         SETTINGS_ROTARY_SENSITIVITY_MASK);
+}
+
+static inline uint8_t settings_rotary_get_acceleration(
+    const settings_rotary_encoder_t *rotary) {
+  return rotary == 0
+             ? 0u
+             : (uint8_t)((rotary->sensitivity &
+                          SETTINGS_ROTARY_ACCELERATION_MASK) >>
+                         SETTINGS_ROTARY_ACCELERATION_SHIFT);
+}
+
+static inline bool settings_rotary_is_progress_filled_only(
+    const settings_rotary_encoder_t *rotary) {
+  return rotary != 0 &&
+         (rotary->sensitivity &
+          SETTINGS_ROTARY_PROGRESS_FILLED_ONLY_MASK) != 0u;
+}
+
+static inline void settings_rotary_set_progress_filled_only(
+    settings_rotary_encoder_t *rotary, bool filled_only) {
+  if (rotary == 0) {
+    return;
+  }
+  if (filled_only) {
+    rotary->sensitivity |= SETTINGS_ROTARY_PROGRESS_FILLED_ONLY_MASK;
+  } else {
+    rotary->sensitivity &=
+        (uint8_t)~SETTINGS_ROTARY_PROGRESS_FILLED_ONLY_MASK;
+  }
+}
+
+static inline void settings_rotary_set_motion(
+    settings_rotary_encoder_t *rotary, uint8_t sensitivity,
+    uint8_t acceleration) {
+  if (rotary == 0) {
+    return;
+  }
+  rotary->sensitivity =
+      (uint8_t)((rotary->sensitivity &
+                 SETTINGS_ROTARY_PROGRESS_FILLED_ONLY_MASK) |
+                (sensitivity & SETTINGS_ROTARY_SENSITIVITY_MASK) |
+                ((acceleration << SETTINGS_ROTARY_ACCELERATION_SHIFT) &
+                 SETTINGS_ROTARY_ACCELERATION_MASK));
+}
 
 //--------------------------------------------------------------------+
 // Settings Structure
@@ -731,12 +796,39 @@ bool settings_save(void);
  */
 bool settings_request_save(void);
 
+/** Durable persistence state exposed to RAW HID clients. */
+typedef enum {
+  SETTINGS_SAVE_DURABLE = 0,
+  SETTINGS_SAVE_QUEUED = 1,
+  SETTINGS_SAVE_WRITING = 2,
+  SETTINGS_SAVE_FAILED = 3,
+  SETTINGS_SAVE_RAM_ONLY = 4,
+} settings_save_state_t;
+
+typedef struct {
+  settings_save_state_t state;
+  bool dirty;
+  bool requested;
+  bool in_progress;
+} settings_save_status_t;
+
+/** Snapshot the deferred save state without blocking or touching Flash. */
+void settings_get_save_status(settings_save_status_t *status_out);
+
 /**
  * @brief Service deferred autosave work.
  * Call periodically from the main loop.
  * @param now_ms Current HAL tick in milliseconds
  */
 void settings_task(uint32_t now_ms);
+
+/**
+ * @brief Service deferred autosave work with a caller-owned Flash budget.
+ * @param now_ms Current HAL tick in milliseconds
+ * @param flash_word_budget Maximum Flash words this call may program; zero
+ *                          advances no Flash transaction
+ */
+void settings_task_budgeted(uint32_t now_ms, uint16_t flash_word_budget);
 
 /**
  * @brief Check if there are unsaved settings changes pending autosave.
@@ -822,23 +914,31 @@ bool settings_set_default_profile_index(uint8_t profile_index);
  *
  * In RAM-only mode every settings write goes to RAM only; explicit save
  * requests are rejected and autosave does not schedule flash writes. The mode
- * is cleared on reboot or by calling settings_exit_ram_only_mode().
+ * is cleared on reboot or by calling settings_leave_ram_only_mode().
  */
 bool settings_is_ram_only_mode(void);
 
-/**
- * @brief Enter RAM-only mode (suppresses all flash saves).
- */
-void settings_enter_ram_only_mode(void);
+/** True while RAM-only has been requested but an older persistence owner is
+ * still draining. Only status/control queries are safe during this window. */
+bool settings_ram_only_transition_pending(void);
 
 /**
- * @brief Exit RAM-only mode and reload the last persisted settings from flash.
- *
- * After this call the in-RAM state reflects what was last saved to flash,
- * discarding any RAM-only changes.  Returns false if the flash reload fails
- * (in which case RAM-only mode is still cleared and defaults are applied).
+ * @brief Enter RAM-only mode, suppressing all subsequent flash saves.
+ * @return false when a non-settings persistence transaction owns the shared
+ * Flash writer and must first be completed or consumed by its initiating
+ * protocol command.
  */
-bool settings_exit_ram_only_mode(void);
+bool settings_enter_ram_only_mode(void);
+
+/**
+ * @brief Leave RAM-only mode without reloading the live state.
+ *
+ * This O(1) path is used after an explicit ProfileDocument commit: the
+ * already-published live state remains active and subsequent changes may be
+ * saved normally. The call fails and leaves RAM-only enabled while any global
+ * persistence owner is active.
+ */
+bool settings_leave_ram_only_mode(void);
 
 /**
  * @brief Set currently active persistent profile slot.
@@ -846,6 +946,40 @@ bool settings_exit_ram_only_mode(void);
  * @return true if successful
  */
 bool settings_set_active_profile_index(uint8_t profile_index);
+
+/** Stable byte size used by the profile-document transaction service. */
+uint32_t settings_profile_snapshot_size(void);
+
+/** Copy one complete settings profile snapshot into caller-owned storage. */
+bool settings_profile_snapshot_read(uint8_t profile_index, void *snapshot_out,
+                                    uint32_t snapshot_capacity);
+
+/* Verb-first aliases used by transaction/object-store callers. */
+bool settings_read_profile_snapshot(uint8_t profile_index, void *snapshot_out,
+                                    uint32_t snapshot_capacity);
+
+/** Borrow the live in-RAM profile view. Callers copying it asynchronously must
+ * also track settings_profile_snapshot_revision_source(). */
+const settings_profile_t *
+settings_profile_snapshot_view(uint8_t profile_index);
+
+/** Monotonic revision source paired with settings_profile_snapshot_view().
+ * The pointed-to counter remains valid for the process lifetime and changes
+ * after every main-loop mutation of that profile. */
+const volatile uint32_t *
+settings_profile_snapshot_revision_source(uint8_t profile_index);
+
+/**
+ * Replace one complete profile snapshot as a single main-loop transaction.
+ * The active profile is re-applied immediately after replacement.
+ */
+bool settings_profile_snapshot_replace(uint8_t profile_index,
+                                       const void *snapshot,
+                                       uint32_t snapshot_length);
+
+bool settings_replace_profile_snapshot(uint8_t profile_index,
+                                       const void *snapshot,
+                                       uint32_t snapshot_length);
 
 /**
  * @brief Return bitmask of profile slots currently used/persisted on MCU.

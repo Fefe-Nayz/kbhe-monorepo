@@ -2,6 +2,7 @@
 
 #include "tusb.h"
 #include "usb_descriptors.h"
+#include <string.h>
 
 #define MOUSE_HID_PULSE_QUEUE_CAPACITY 32u
 
@@ -17,10 +18,12 @@ static mouse_hid_report_t pulse_queue[MOUSE_HID_PULSE_QUEUE_CAPACITY];
 static uint8_t pulse_head = 0u;
 static uint8_t pulse_tail = 0u;
 static uint8_t current_buttons = 0u;
+static uint8_t button_reference_counts[5] = {0};
 static uint8_t last_sent_buttons = 0u;
 static uint8_t state_report_buttons_in_flight = 0u;
 static bool report_in_flight = false;
 static bool state_report_in_flight = false;
+static bool button_resync_required = false;
 
 static inline bool mouse_hid_pulse_queue_is_empty(void) {
   return pulse_head == pulse_tail;
@@ -61,9 +64,19 @@ static void mouse_hid_pump_queue(void) {
   }
 
   if (mouse_hid_pulse_queue_pop(&report)) {
+    /* Relative motion was queued, but button ownership is live state. Using
+     * the enqueue-time mask can briefly release or resurrect a button while
+     * the endpoint drains an older scroll pulse. */
+    report.buttons = current_buttons;
     if (mouse_hid_send_report(report)) {
       report_in_flight = true;
-      state_report_in_flight = false;
+      /* Every mouse report, including relative pulses, publishes the button
+       * bitmap. Track that acknowledged state too: otherwise a button
+       * released while a scroll report is in flight can compare equal to the
+       * older `last_sent_buttons` value and never emit its compensating
+       * release, leaving the host button stuck. */
+      state_report_in_flight = true;
+      state_report_buttons_in_flight = report.buttons;
     } else {
       pulse_head =
           (uint8_t)((pulse_head + MOUSE_HID_PULSE_QUEUE_CAPACITY - 1u) %
@@ -73,7 +86,7 @@ static void mouse_hid_pump_queue(void) {
     return;
   }
 
-  if (current_buttons != last_sent_buttons) {
+  if (button_resync_required || current_buttons != last_sent_buttons) {
     report.buttons = current_buttons;
     if (mouse_hid_send_report(report)) {
       report_in_flight = true;
@@ -87,10 +100,12 @@ void mouse_hid_init(void) {
   pulse_head = 0u;
   pulse_tail = 0u;
   current_buttons = 0u;
+  memset(button_reference_counts, 0, sizeof(button_reference_counts));
   last_sent_buttons = 0u;
   state_report_buttons_in_flight = 0u;
   report_in_flight = false;
   state_report_in_flight = false;
+  button_resync_required = false;
 }
 
 bool mouse_hid_is_ready(void) {
@@ -98,7 +113,18 @@ bool mouse_hid_is_ready(void) {
 }
 
 void mouse_hid_button_press(uint8_t button_mask) {
-  uint8_t next_buttons = (uint8_t)(current_buttons | button_mask);
+  uint8_t next_buttons = current_buttons;
+
+  for (uint8_t bit = 0u; bit < 5u; bit++) {
+    uint8_t mask = (uint8_t)(1u << bit);
+    if ((button_mask & mask) == 0u ||
+        button_reference_counts[bit] == 0xFFu) {
+      continue;
+    }
+    if (button_reference_counts[bit]++ == 0u) {
+      next_buttons = (uint8_t)(next_buttons | mask);
+    }
+  }
   if (next_buttons == current_buttons) {
     return;
   }
@@ -108,7 +134,18 @@ void mouse_hid_button_press(uint8_t button_mask) {
 }
 
 void mouse_hid_button_release(uint8_t button_mask) {
-  uint8_t next_buttons = (uint8_t)(current_buttons & (uint8_t)(~button_mask));
+  uint8_t next_buttons = current_buttons;
+
+  for (uint8_t bit = 0u; bit < 5u; bit++) {
+    uint8_t mask = (uint8_t)(1u << bit);
+    if ((button_mask & mask) == 0u || button_reference_counts[bit] == 0u) {
+      continue;
+    }
+    button_reference_counts[bit]--;
+    if (button_reference_counts[bit] == 0u) {
+      next_buttons = (uint8_t)(next_buttons & (uint8_t)(~mask));
+    }
+  }
   if (next_buttons == current_buttons) {
     return;
   }
@@ -120,6 +157,7 @@ void mouse_hid_button_release(uint8_t button_mask) {
 bool mouse_hid_scroll(int8_t vertical, int8_t horizontal) {
   mouse_hid_report_t pulse = {0};
   mouse_hid_report_t release = {0};
+  uint8_t original_tail = pulse_tail;
 
   if ((vertical == 0) && (horizontal == 0)) {
     return false;
@@ -129,12 +167,14 @@ bool mouse_hid_scroll(int8_t vertical, int8_t horizontal) {
     return false;
   }
 
-  pulse.buttons = current_buttons;
   pulse.vertical = vertical;
   pulse.horizontal = horizontal;
-  release.buttons = current_buttons;
 
-  if (!mouse_hid_pulse_queue_push(pulse) || !mouse_hid_pulse_queue_push(release)) {
+  /* Reserve the pulse/neutral pair transactionally. A half-enqueued pair can
+   * reorder later mouse state and makes caller retry behavior ambiguous. */
+  if (!mouse_hid_pulse_queue_push(pulse) ||
+      !mouse_hid_pulse_queue_push(release)) {
+    pulse_tail = original_tail;
     return false;
   }
 
@@ -146,6 +186,7 @@ void mouse_hid_release_all(void) {
   pulse_head = 0u;
   pulse_tail = 0u;
   current_buttons = 0u;
+  memset(button_reference_counts, 0, sizeof(button_reference_counts));
   mouse_hid_pump_queue();
 }
 
@@ -158,6 +199,19 @@ void mouse_hid_on_report_complete(void) {
   if (state_report_in_flight) {
     last_sent_buttons = state_report_buttons_in_flight;
     state_report_in_flight = false;
+    button_resync_required = false;
   }
   mouse_hid_pump_queue();
+}
+
+void mouse_hid_on_umount(void) {
+  /* Relative pulses are stale after a disconnect, while button ownership is
+   * still meaningful if a key remains held. An aborted report will never get
+   * its completion callback, so explicitly unlock and force the desired
+   * button bitmap to be republished after enumeration. */
+  pulse_head = 0u;
+  pulse_tail = 0u;
+  report_in_flight = false;
+  state_report_in_flight = false;
+  button_resync_required = true;
 }

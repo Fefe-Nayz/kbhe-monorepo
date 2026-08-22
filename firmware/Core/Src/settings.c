@@ -4,10 +4,13 @@
  */
 
 #include "settings.h"
+#include "action_engine.h"
 #include "analog/calibration.h"
 #include "analog/filter.h"
 #include "analog/lut.h"
 #include "flash_storage.h"
+#include "profile_document_store.h"
+#include "settings_save_policy.h"
 #include "layout/keycodes.h"
 #include "layout/layout.h"
 #include "led_matrix.h"
@@ -16,6 +19,7 @@
 #include "hid/gamepad_hid.h"
 #include "hid/keyboard_hid.h"
 #include "hid/keyboard_nkro_hid.h"
+#include <stddef.h>
 #include <string.h>
 
 //--------------------------------------------------------------------+
@@ -55,11 +59,44 @@ static settings_t current_settings;
 static bool settings_dirty = false;
 static bool settings_save_requested = false;
 static bool settings_save_in_progress = false;
+static bool settings_last_save_failed = false;
+/* ENTER_RAM_ONLY may arrive after an atomic journal transaction has started.
+ * Finish that one owned transaction, then stop the batch before it can copy or
+ * publish any RAM-only mutation. */
+static bool settings_save_abandon_after_owned_transaction = false;
+static settings_save_phase_t settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+static uint32_t settings_save_crc_state = 0xFFFFFFFFu;
+static uint32_t settings_save_crc_offset = 0u;
+static uint32_t settings_save_copy_offset = 0u;
 static uint32_t settings_save_snapshot_change_counter = 0u;
-static settings_t settings_save_snapshot;
+static settings_profile_t settings_save_profile_snapshot;
+static action_profile_t settings_save_action_snapshot;
+typedef struct __attribute__((packed)) {
+  uint32_t magic_start;
+  uint16_t version;
+  uint8_t default_profile_index;
+  uint8_t reserved_pad;
+  settings_options_t options;
+  settings_calibration_t calibration;
+  char keyboard_name[SETTINGS_KEYBOARD_NAME_LENGTH];
+  uint8_t active_profile_index;
+  uint8_t profile_used_mask;
+  char profile_names[SETTINGS_PROFILE_COUNT][SETTINGS_PROFILE_NAME_LENGTH];
+  uint32_t magic_end;
+  uint32_t crc32;
+} settings_storage_compact_t;
+static settings_storage_compact_t settings_save_compact_snapshot;
+static uint8_t settings_profile_document_dirty_mask = 0u;
+static uint8_t settings_save_profile_remaining_mask = 0u;
+static uint8_t settings_save_profile_index = 0u;
+static bool settings_aggregate_dirty = false;
+static bool settings_save_aggregate_snapshot = false;
+static bool settings_loaded_full_storage = false;
 // When true, explicit flash saves are rejected (inactive/RAM-only profile active)
 static bool settings_ram_only_mode = false;
 static uint32_t settings_change_counter = 0u;
+static volatile uint32_t
+    settings_profile_revision_counters[SETTINGS_PROFILE_COUNT];
 static uint32_t settings_last_seen_change_counter = 0u;
 static uint32_t settings_last_change_ms = 0u;
 static char settings_keyboard_name_cache[SETTINGS_KEYBOARD_NAME_LENGTH + 1u];
@@ -68,8 +105,10 @@ static char settings_profile_name_cache[SETTINGS_PROFILE_COUNT]
 
 #define SETTINGS_AUTOSAVE_DELAY_MS 750u
 #define SETTINGS_REQUEST_SAVE_DELAY_MS 100u
-#define SETTINGS_FLASH_WORDS_PER_STEP 16u
+#define SETTINGS_FLASH_WORDS_PER_STEP 1u
+#define SETTINGS_CRC_BYTES_PER_STEP 32u
 #define SETTINGS_PROFILE_MASK_ALL ((1u << SETTINGS_PROFILE_COUNT) - 1u)
+#define SETTINGS_STORAGE_COMPACT_SIZE ((uint32_t)sizeof(settings_storage_compact_t))
 #define SETTINGS_LED_META_TRIGGER_CHATTER_GUARD_DURATION_INDEX 0u
 #define SETTINGS_LED_META_FLAGS_INDEX 1u
 #define SETTINGS_LED_META_LED_IDLE_TIMEOUT_SECONDS_INDEX 2u
@@ -87,6 +126,12 @@ static void settings_default_effect_params(uint8_t effect_mode,
                                            uint8_t *params);
 static uint8_t settings_sanitize_effect_speed(uint8_t speed);
 static void settings_sanitize_options(settings_options_t *options);
+static void settings_build_compact(const settings_t *settings,
+                                   settings_storage_compact_t *compact);
+static uint32_t
+settings_compact_crc32(const settings_storage_compact_t *compact);
+static bool
+settings_validate_compact(const settings_storage_compact_t *compact);
 
 static void settings_default_rotary_binding(settings_rotary_binding_t *binding) {
   if (binding == NULL) {
@@ -316,7 +361,7 @@ static void settings_gamepad_sanitize(settings_gamepad_t *gamepad) {
       gamepad->curve[i].x_01mm = previous_x;
     }
 
-    if (gamepad->curve[i].x_01mm != previous_x || i == 0u) {
+    if (i > 0u && gamepad->curve[i].x_01mm > previous_x) {
       has_any_span = true;
     }
 
@@ -325,6 +370,11 @@ static void settings_gamepad_sanitize(settings_gamepad_t *gamepad) {
 
   if (!has_any_span) {
     memcpy(gamepad->curve, defaults.curve, sizeof(defaults.curve));
+  } else {
+    /* A non-zero origin causes stick/trigger drift while every key is at
+     * rest.  The canonical travel domain always begins at zero. */
+    gamepad->curve[0].x_01mm = 0u;
+    gamepad->curve[0].y = 0u;
   }
 }
 
@@ -462,6 +512,9 @@ static void settings_sanitize_trigger_chatter_guard_storage(settings_led_t *led)
   }
 
   settings_read_trigger_chatter_guard_from_led(led, &enabled, &duration_ms);
+  if (enabled && duration_ms == 0u) {
+    enabled = false;
+  }
   settings_write_trigger_chatter_guard_to_led(led, enabled, duration_ms);
 }
 
@@ -626,6 +679,8 @@ static void settings_sanitize_options(settings_options_t *options) {
 
 static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) {
   settings_rotary_encoder_t defaults = {0};
+  uint8_t sensitivity = 0u;
+  uint8_t acceleration = 0u;
   if (rotary == NULL) {
     return;
   }
@@ -638,11 +693,17 @@ static void settings_rotary_encoder_sanitize(settings_rotary_encoder_t *rotary) 
   if (rotary->button_action >= ROTARY_BUTTON_ACTION_MAX) {
     rotary->button_action = defaults.button_action;
   }
-  if (rotary->sensitivity == 0u) {
-    rotary->sensitivity = defaults.sensitivity;
-  } else if (rotary->sensitivity > 16u) {
-    rotary->sensitivity = 16u;
+  sensitivity = settings_rotary_get_sensitivity(rotary);
+  acceleration = settings_rotary_get_acceleration(rotary);
+  if (sensitivity == 0u) {
+    sensitivity = settings_rotary_get_sensitivity(&defaults);
+  } else if (sensitivity > 16u) {
+    sensitivity = 16u;
   }
+  if (acceleration > SETTINGS_ROTARY_ACCELERATION_MAX) {
+    acceleration = SETTINGS_ROTARY_ACCELERATION_MAX;
+  }
+  settings_rotary_set_motion(rotary, sensitivity, acceleration);
   if (rotary->step_size == 0u) {
     rotary->step_size = defaults.step_size;
   } else if (rotary->step_size > 64u) {
@@ -1057,37 +1118,43 @@ static void settings_populate_profile_defaults(settings_profile_t *profile) {
   settings_sanitize_profile_advanced_layers(profile);
 }
 
-static void settings_profile_capture_current_slot(uint8_t profile_index) {
+static void settings_profile_capture_slot(settings_t *settings,
+                                          uint8_t profile_index) {
   settings_profile_t *profile = NULL;
 
-  if (profile_index >= SETTINGS_PROFILE_COUNT) {
+  if (settings == NULL || profile_index >= SETTINGS_PROFILE_COUNT) {
     return;
   }
 
-  profile = &current_settings.profiles[profile_index];
-  memcpy(profile->keys, current_settings.keys, sizeof(profile->keys));
-  memcpy(profile->layer_keycodes, current_settings.layer_keycodes,
+  profile = &settings->profiles[profile_index];
+  memcpy(profile->keys, settings->keys, sizeof(profile->keys));
+  memcpy(profile->layer_keycodes, settings->layer_keycodes,
          sizeof(profile->layer_keycodes));
   for (uint8_t key_index = 0u; key_index < NUM_KEYS; key_index++) {
-    profile->advanced_by_layer[0u][key_index] = current_settings.keys[key_index].advanced;
+    profile->advanced_by_layer[0u][key_index] =
+        settings->keys[key_index].advanced;
   }
-  profile->gamepad = current_settings.gamepad;
-  profile->led = current_settings.led;
-  profile->led_effect_mode = current_settings.led_effect_mode;
-  profile->led_effect_speed = current_settings.led_effect_speed;
-  profile->led_effect_color_r = current_settings.led_effect_color_r;
-  profile->led_effect_color_g = current_settings.led_effect_color_g;
-  profile->led_effect_color_b = current_settings.led_effect_color_b;
-  memcpy(profile->led_effect_params, current_settings.led_effect_params,
+  profile->gamepad = settings->gamepad;
+  profile->led = settings->led;
+  profile->led_effect_mode = settings->led_effect_mode;
+  profile->led_effect_speed = settings->led_effect_speed;
+  profile->led_effect_color_r = settings->led_effect_color_r;
+  profile->led_effect_color_g = settings->led_effect_color_g;
+  profile->led_effect_color_b = settings->led_effect_color_b;
+  memcpy(profile->led_effect_params, settings->led_effect_params,
          sizeof(profile->led_effect_params));
-  profile->led_fps_limit = current_settings.led_fps_limit;
-  profile->filter_enabled = current_settings.filter_enabled;
-  profile->filter_noise_band = current_settings.filter_noise_band;
-  profile->filter_alpha_min = current_settings.filter_alpha_min;
-  profile->filter_alpha_max = current_settings.filter_alpha_max;
-  profile->advanced_tick_rate = current_settings.advanced_tick_rate;
-  profile->rotary = current_settings.rotary;
+  profile->led_fps_limit = settings->led_fps_limit;
+  profile->filter_enabled = settings->filter_enabled;
+  profile->filter_noise_band = settings->filter_noise_band;
+  profile->filter_alpha_min = settings->filter_alpha_min;
+  profile->filter_alpha_max = settings->filter_alpha_max;
+  profile->advanced_tick_rate = settings->advanced_tick_rate;
+  profile->rotary = settings->rotary;
   settings_sanitize_profile_advanced_layers(profile);
+}
+
+static void settings_profile_capture_current_slot(uint8_t profile_index) {
+  settings_profile_capture_slot(&current_settings, profile_index);
 }
 
 static void settings_profile_apply_slot(uint8_t profile_index) {
@@ -1126,22 +1193,6 @@ static void settings_profile_apply_slot(uint8_t profile_index) {
                                         &current_settings.led_effect_color_r,
                                         &current_settings.led_effect_color_g,
                                         &current_settings.led_effect_color_b);
-}
-
-static void settings_profile_sync_active_slot(void) {
-  uint8_t used_mask =
-      (uint8_t)(current_settings.profile_used_mask & SETTINGS_PROFILE_MASK_ALL);
-
-  if (current_settings.active_profile_index >= SETTINGS_PROFILE_COUNT) {
-    return;
-  }
-
-  if ((used_mask & (uint8_t)(1u << current_settings.active_profile_index)) ==
-      0u) {
-    return;
-  }
-
-  settings_profile_capture_current_slot(current_settings.active_profile_index);
 }
 
 static void settings_apply_runtime_from_current_profile(void) {
@@ -1189,10 +1240,95 @@ static void settings_apply_runtime_from_current_profile(void) {
   settings_reset_led_effect_restore_state();
 }
 
-static void settings_mark_dirty(void) {
-  settings_profile_sync_active_slot();
+static void settings_note_change(uint8_t profile_mask, bool aggregate_dirty) {
   settings_dirty = true;
+  settings_profile_document_dirty_mask |=
+      (uint8_t)(profile_mask & SETTINGS_PROFILE_MASK_ALL);
+  settings_aggregate_dirty |= aggregate_dirty;
+  for (uint8_t profile = 0u; profile < SETTINGS_PROFILE_COUNT; profile++) {
+    if ((profile_mask & (uint8_t)(1u << profile)) != 0u) {
+      settings_profile_revision_counters[profile]++;
+    }
+  }
   settings_change_counter++;
+}
+
+static settings_profile_t *settings_active_profile_mut(void) {
+  uint8_t profile_index = current_settings.active_profile_index;
+  if (profile_index >= SETTINGS_PROFILE_COUNT ||
+      (current_settings.profile_used_mask & (uint8_t)(1u << profile_index)) ==
+          0u) {
+    return NULL;
+  }
+  return &current_settings.profiles[profile_index];
+}
+
+static void settings_mirror_active_led(void) {
+  settings_profile_t *profile = settings_active_profile_mut();
+  if (profile != NULL) {
+    profile->led = current_settings.led;
+  }
+}
+
+static void settings_mirror_active_effect(void) {
+  settings_profile_t *profile = settings_active_profile_mut();
+  if (profile == NULL) {
+    return;
+  }
+  profile->led_effect_mode = current_settings.led_effect_mode;
+  profile->led_effect_speed = current_settings.led_effect_speed;
+  profile->led_effect_color_r = current_settings.led_effect_color_r;
+  profile->led_effect_color_g = current_settings.led_effect_color_g;
+  profile->led_effect_color_b = current_settings.led_effect_color_b;
+  memcpy(profile->led_effect_params, current_settings.led_effect_params,
+         sizeof(profile->led_effect_params));
+}
+
+static void settings_mirror_active_filter(void) {
+  settings_profile_t *profile = settings_active_profile_mut();
+  if (profile == NULL) {
+    return;
+  }
+  profile->filter_enabled = current_settings.filter_enabled;
+  profile->filter_noise_band = current_settings.filter_noise_band;
+  profile->filter_alpha_min = current_settings.filter_alpha_min;
+  profile->filter_alpha_max = current_settings.filter_alpha_max;
+}
+
+static void settings_mirror_active_key(uint8_t key_index) {
+  settings_profile_t *profile = settings_active_profile_mut();
+  if (profile != NULL && key_index < NUM_KEYS) {
+    profile->keys[key_index] = current_settings.keys[key_index];
+    profile->advanced_by_layer[0u][key_index] =
+        current_settings.keys[key_index].advanced;
+  }
+}
+
+/* Most setting setters mutate the active per-profile top-level view. */
+static void settings_mark_dirty(void) {
+  uint8_t active_profile = current_settings.active_profile_index;
+  uint8_t mask = active_profile < SETTINGS_PROFILE_COUNT
+                     ? (uint8_t)(1u << active_profile)
+                     : 0u;
+  settings_note_change(mask, false);
+}
+
+static void settings_mark_global_dirty(void) {
+  settings_note_change(0u, true);
+}
+
+static void settings_mark_profile_dirty(uint8_t profile_index,
+                                        bool aggregate_dirty) {
+  settings_note_change(profile_index < SETTINGS_PROFILE_COUNT
+                           ? (uint8_t)(1u << profile_index)
+                           : 0u,
+                       aggregate_dirty);
+}
+
+static void settings_mark_all_profiles_dirty(void) {
+  settings_note_change(
+      (uint8_t)(current_settings.profile_used_mask & SETTINGS_PROFILE_MASK_ALL),
+      true);
 }
 
 static void settings_set_default_keyboard_name(char *dst,
@@ -1418,9 +1554,8 @@ static void settings_sanitize_profile_names(void) {
 //--------------------------------------------------------------------+
 // CRC32 Implementation (Simple polynomial)
 //--------------------------------------------------------------------+
-static uint32_t crc32_compute(const void *data, uint32_t len) {
+static uint32_t crc32_update(uint32_t crc, const void *data, uint32_t len) {
   const uint8_t *buf = (const uint8_t *)data;
-  uint32_t crc = 0xFFFFFFFF;
 
   while (len--) {
     crc ^= *buf++;
@@ -1429,7 +1564,11 @@ static uint32_t crc32_compute(const void *data, uint32_t len) {
     }
   }
 
-  return ~crc;
+  return crc;
+}
+
+static uint32_t crc32_compute(const void *data, uint32_t len) {
+  return ~crc32_update(0xFFFFFFFFu, data, len);
 }
 
 //--------------------------------------------------------------------+
@@ -1443,7 +1582,7 @@ static settings_key_t settings_default_key(uint8_t key_index) {
   settings_key_t key = {
       .hid_keycode = layout_get_default_keycode(key_index),
   .actuation_point_mm = 12,
-  .release_point_mm = 12,
+  .release_point_mm = 11,
       .rapid_trigger_press = 30,
       .rapid_trigger_release = 30,
       .socd_pair = 255,
@@ -1474,14 +1613,158 @@ static void settings_sanitize_key_config(uint8_t key_index, settings_key_t *key)
     key->actuation_point_mm = 1u;
   }
 
-  if (key->release_point_mm > key->actuation_point_mm) {
-    key->release_point_mm = key->actuation_point_mm;
+  if (key->actuation_point_mm >
+      (uint8_t)(SETTINGS_LOGICAL_TRAVEL_UM / 100u)) {
+    key->actuation_point_mm =
+        (uint8_t)(SETTINGS_LOGICAL_TRAVEL_UM / 100u);
+  }
+
+  if ((uint16_t)key->release_point_mm +
+          SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS >
+      key->actuation_point_mm) {
+    key->release_point_mm =
+        key->actuation_point_mm > SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS
+            ? (uint8_t)(key->actuation_point_mm -
+                        SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS)
+            : 0u;
+  }
+
+  if (key->rapid_trigger_press < SETTINGS_RAPID_TRIGGER_MIN_HUNDREDTHS) {
+    key->rapid_trigger_press = SETTINGS_RAPID_TRIGGER_MIN_HUNDREDTHS;
+  }
+  if (key->rapid_trigger_release < SETTINGS_RAPID_TRIGGER_MIN_HUNDREDTHS) {
+    key->rapid_trigger_release = SETTINGS_RAPID_TRIGGER_MIN_HUNDREDTHS;
+  }
+
+  key->curve_enabled = key->curve_enabled ? 1u : 0u;
+  if (key->curve.p1.x > key->curve.p2.x) {
+    key->curve.p2.x = key->curve.p1.x;
   }
 
   resolution = settings_key_get_socd_resolution(key);
   settings_key_set_socd_resolution(key, resolution);
   settings_gamepad_sanitize_mapping(&key->gamepad_map);
   settings_sanitize_key_advanced(key->hid_keycode, key);
+}
+
+static void settings_sanitize_socd_pairs(settings_key_t keys[NUM_KEYS]) {
+  if (keys == NULL) {
+    return;
+  }
+
+  /* Only a reciprocal relationship is a valid pair. Clear half-pairs first
+   * so malformed snapshots cannot form order-dependent SOCD graphs. */
+  for (uint8_t key_index = 0u; key_index < NUM_KEYS; key_index++) {
+    uint8_t partner_index = keys[key_index].socd_pair;
+    if (partner_index == SETTINGS_SOCD_PAIR_NONE) {
+      continue;
+    }
+    if (partner_index >= NUM_KEYS || partner_index == key_index ||
+        keys[partner_index].socd_pair != key_index) {
+      keys[key_index].socd_pair = SETTINGS_SOCD_PAIR_NONE;
+    }
+  }
+
+  /* Runtime canonicalises pair settings from the lower key index. Mirror that
+   * canonical value into the partner so later single-key reads/edits agree. */
+  for (uint8_t key_index = 0u; key_index < NUM_KEYS; key_index++) {
+    uint8_t partner_index = keys[key_index].socd_pair;
+    if (partner_index <= key_index || partner_index >= NUM_KEYS) {
+      continue;
+    }
+    settings_key_set_socd_resolution(
+        &keys[partner_index], settings_key_get_socd_resolution(&keys[key_index]));
+    settings_key_set_socd_fully_pressed_enabled(
+        &keys[partner_index],
+        settings_key_is_socd_fully_pressed_enabled(&keys[key_index]));
+    keys[partner_index].advanced.socd_fully_pressed_point_tenths =
+        keys[key_index].advanced.socd_fully_pressed_point_tenths;
+  }
+}
+
+static void
+settings_sanitize_profile_snapshot(settings_profile_t *profile) {
+  if (profile == NULL) {
+    return;
+  }
+
+  for (uint8_t key_index = 0u; key_index < NUM_KEYS; key_index++) {
+    settings_sanitize_key_config(key_index, &profile->keys[key_index]);
+  }
+  settings_sanitize_profile_advanced_layers(profile);
+  settings_sanitize_socd_pairs(profile->keys);
+  for (uint8_t key_index = 0u; key_index < NUM_KEYS; key_index++) {
+    profile->advanced_by_layer[0u][key_index] =
+        profile->keys[key_index].advanced;
+  }
+  for (uint8_t layer = 1u; layer < SETTINGS_LAYER_COUNT; layer++) {
+    for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+      if (profile->layer_keycodes[layer - 1u][key] == 0xFFFFu) {
+        profile->layer_keycodes[layer - 1u][key] = KC_TRANSPARENT;
+      }
+    }
+  }
+  settings_gamepad_sanitize(&profile->gamepad);
+  settings_rotary_encoder_sanitize(&profile->rotary);
+  profile->filter_enabled = profile->filter_enabled ? 1u : 0u;
+  profile->advanced_tick_rate =
+      settings_sanitize_advanced_tick_rate(profile->advanced_tick_rate);
+  settings_sanitize_trigger_chatter_guard_storage(&profile->led);
+  settings_sanitize_led_usb_suspend_rgb_off_storage(&profile->led);
+  settings_sanitize_led_idle_timeout_storage(&profile->led);
+  if (profile->led_effect_mode >= LED_EFFECT_MAX) {
+    profile->led_effect_mode = (uint8_t)LED_EFFECT_SOLID_COLOR;
+  }
+  for (uint8_t effect = 0u; effect < LED_EFFECT_MAX; effect++) {
+    uint8_t speed =
+        profile->led_effect_params[effect][LED_EFFECT_PARAM_SPEED];
+    if (speed == 0u) {
+      uint8_t defaults[LED_EFFECT_PARAM_COUNT];
+      memset(defaults, 0, sizeof(defaults));
+      settings_default_effect_params(effect, defaults);
+      speed = defaults[LED_EFFECT_PARAM_SPEED];
+      if (speed == 0u) {
+        speed = 50u;
+      }
+    }
+    profile->led_effect_params[effect][LED_EFFECT_PARAM_SPEED] =
+        settings_sanitize_effect_speed(speed);
+  }
+  profile->led_effect_speed = settings_sanitize_effect_speed(
+      profile->led_effect_params[profile->led_effect_mode]
+                                [LED_EFFECT_PARAM_SPEED]);
+}
+
+/* A committed profile document is the canonical pairing of settings and
+ * actions. Hydrate its settings half before any active-profile runtime state
+ * is applied, so a reset between the document commit and the legacy aggregate
+ * settings autosave cannot split the two halves across generations. */
+static void settings_hydrate_profile_documents(void) {
+  bool hydrated_active_profile = false;
+  settings_profile_t staging_storage;
+  settings_profile_t *staging = &staging_storage;
+
+  for (uint8_t profile_index = 0u; profile_index < SETTINGS_PROFILE_COUNT;
+       profile_index++) {
+    /* The aggregate used-mask owns slot lifecycle. A stale document left by a
+     * deleted slot must never resurrect it during boot hydration. */
+    if (!settings_is_profile_slot_used(profile_index)) {
+      continue;
+    }
+    if (!profile_document_store_load(profile_index, staging, NULL, NULL)) {
+      continue;
+    }
+    settings_sanitize_profile_snapshot(staging);
+    memcpy(&current_settings.profiles[profile_index], staging,
+           sizeof(*staging));
+    current_settings.profile_used_mask |= (uint8_t)(1u << profile_index);
+    hydrated_active_profile |=
+        profile_index == current_settings.active_profile_index;
+  }
+
+  if (hydrated_active_profile) {
+    settings_profile_apply_slot(current_settings.active_profile_index);
+  }
 }
 
 static void settings_set_defaults(void) {
@@ -1606,46 +1889,92 @@ static bool settings_validate_current(const settings_t *s) {
 
 static bool settings_load_from_flash(void) {
   settings_t temp;
-  uint16_t source_version = 0u;
+  settings_storage_compact_t compact;
+  uint8_t marker = 0u;
+  uint32_t stored_length = 0u;
+  uint16_t stored_schema = 0u;
   uint8_t original_used_mask = 0u;
-  bool needs_resave = false;
 
-  // Read settings from flash
-  if (!flash_storage_read(0, &temp, sizeof(settings_t))) {
+  /* The journal validates its own envelope CRC and commit marker first.  The
+   * legacy schema value (zero) is accepted only for the old KBFS envelope;
+   * payload magic/version/CRC are still mandatory below. */
+  if (flash_storage_object_read_range(
+          FLASH_STORAGE_NAMESPACE_SETTINGS,
+          FLASH_STORAGE_SETTINGS_OBJECT_ID, 0u, &marker, sizeof(marker),
+          &stored_length, &stored_schema, NULL) != FLASH_STORAGE_STATUS_OK ||
+      (stored_schema != 0u && stored_schema != SETTINGS_VERSION)) {
     return false;
   }
 
-  source_version = temp.version;
-
-  if (!settings_validate_current(&temp)) {
-    /* Full validation failed.  If the magic bytes are intact but the version or
-     * CRC has changed (e.g. after a firmware update), accept the raw data and
-     * sanitise it rather than resetting everything to defaults.
-     * A version mismatch means the struct layout may have changed, but any
-     * byte that falls inside a still-valid field will be sanitised by the loop
-     * below; out-of-range values are clamped to defaults.  The migrated image
-     * is re-saved immediately so future boots do not repeat the migration. */
-    if (temp.magic_start != SETTINGS_MAGIC_START ||
-        temp.magic_end != SETTINGS_MAGIC_END) {
+  memset(&temp, 0, sizeof(temp));
+  memset(&compact, 0, sizeof(compact));
+  if (stored_length == sizeof(temp)) {
+    if (flash_storage_object_read(
+            FLASH_STORAGE_NAMESPACE_SETTINGS,
+            FLASH_STORAGE_SETTINGS_OBJECT_ID, &temp, sizeof(temp), NULL, NULL,
+            NULL) != FLASH_STORAGE_STATUS_OK ||
+        !settings_validate_current(&temp)) {
       return false;
     }
-    temp.version = SETTINGS_VERSION;
-    /* Old reserved byte (now default_profile_index) was always 0, which would
-     * silently force boot-to-profile-0.  Reset it to NONE so behaviour is
-     * identical to pre-migration firmware. */
-    temp.default_profile_index = SETTINGS_DEFAULT_PROFILE_NONE;
-    if (source_version < SETTINGS_VERSION) {
-      temp.options.led_thermal_protection_enabled = 1u;
-      settings_write_led_usb_suspend_rgb_off_to_led(
-          &temp.led, SETTINGS_DEFAULT_LED_USB_SUSPEND_RGB_OFF != 0u);
-      for (uint8_t profile_index = 0u; profile_index < SETTINGS_PROFILE_COUNT;
-           profile_index++) {
-        settings_write_led_usb_suspend_rgb_off_to_led(
-            &temp.profiles[profile_index].led,
-            SETTINGS_DEFAULT_LED_USB_SUSPEND_RGB_OFF != 0u);
+    settings_loaded_full_storage = true;
+  } else if (stored_length == sizeof(compact) &&
+             stored_schema == SETTINGS_VERSION) {
+    if (flash_storage_object_read(
+            FLASH_STORAGE_NAMESPACE_SETTINGS,
+            FLASH_STORAGE_SETTINGS_OBJECT_ID, &compact, sizeof(compact), NULL,
+            NULL, NULL) != FLASH_STORAGE_STATUS_OK ||
+        !settings_validate_compact(&compact)) {
+      return false;
+    }
+
+    /* Compact SETTINGS owns only global metadata. Slot settings and actions
+     * are hydrated from atomic ProfileDocuments below, so changing one profile
+     * never rewrites a duplicated 49 KiB aggregate. */
+    settings_set_defaults();
+    current_settings.default_profile_index = compact.default_profile_index;
+    current_settings.reserved_pad = compact.reserved_pad;
+    current_settings.options = compact.options;
+    current_settings.calibration = compact.calibration;
+    memcpy(current_settings.keyboard_name, compact.keyboard_name,
+           sizeof(current_settings.keyboard_name));
+    current_settings.active_profile_index = compact.active_profile_index;
+    current_settings.profile_used_mask =
+        (uint8_t)(compact.profile_used_mask & SETTINGS_PROFILE_MASK_ALL);
+    memcpy(current_settings.profile_names, compact.profile_names,
+           sizeof(current_settings.profile_names));
+    current_settings.magic_end = SETTINGS_MAGIC_END;
+    current_settings.crc32 = 0u;
+
+    settings_sanitize_options(&current_settings.options);
+    settings_sanitize_keyboard_name();
+    settings_sanitize_profile_names();
+    if (current_settings.profile_used_mask == 0u) {
+      current_settings.profile_used_mask = 0x01u;
+      current_settings.active_profile_index = 0u;
+    }
+    if (current_settings.active_profile_index >= SETTINGS_PROFILE_COUNT ||
+        !settings_is_profile_slot_used(current_settings.active_profile_index)) {
+      current_settings.active_profile_index = settings_profile_first_used_slot(
+          settings_get_profile_used_mask());
+    }
+
+    memset(current_settings.profiles, 0, sizeof(current_settings.profiles));
+    for (uint8_t profile_index = 0u; profile_index < SETTINGS_PROFILE_COUNT;
+         profile_index++) {
+      if (settings_is_profile_slot_used(profile_index)) {
+        settings_populate_profile_defaults(
+            &current_settings.profiles[profile_index]);
       }
     }
-    needs_resave = true;
+    settings_profile_apply_slot(current_settings.active_profile_index);
+    settings_reset_led_effect_restore_state();
+    settings_loaded_full_storage = false;
+    return true;
+  } else {
+    /* Never reinterpret a CRC failure or an unknown struct version as a
+     * migration.  Future migrations must add an explicit historical struct,
+     * exact-size check and CRC validation before conversion. */
+    return false;
   }
 
   memcpy(&current_settings, &temp, sizeof(settings_t));
@@ -1664,6 +1993,12 @@ static bool settings_load_from_flash(void) {
     settings_profile_capture_current_slot(0u);
   }
 
+  if (current_settings.active_profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(current_settings.active_profile_index)) {
+    current_settings.active_profile_index =
+        settings_profile_first_used_slot(settings_get_profile_used_mask());
+  }
+
   for (uint8_t profile_index = 0u; profile_index < SETTINGS_PROFILE_COUNT;
        profile_index++) {
     if (!settings_is_profile_slot_used(profile_index)) {
@@ -1677,6 +2012,7 @@ static bool settings_load_from_flash(void) {
     for (uint8_t key_index = 0u; key_index < NUM_KEYS; key_index++) {
       settings_sanitize_key_config(key_index, &current_settings.keys[key_index]);
     }
+    settings_sanitize_socd_pairs(current_settings.keys);
     settings_sanitize_layer_keycodes();
     settings_gamepad_sanitize(&current_settings.gamepad);
     settings_rotary_encoder_sanitize(&current_settings.rotary);
@@ -1696,11 +2032,46 @@ static bool settings_load_from_flash(void) {
   settings_profile_apply_slot(current_settings.active_profile_index);
   settings_reset_led_effect_restore_state();
 
-  if (needs_resave) {
-    (void)settings_save();
-  }
-
   return true;
+}
+
+static void settings_build_compact(const settings_t *settings,
+                                   settings_storage_compact_t *compact) {
+  if (settings == NULL || compact == NULL) {
+    return;
+  }
+  memset(compact, 0, sizeof(*compact));
+  compact->magic_start = SETTINGS_MAGIC_START;
+  compact->version = SETTINGS_VERSION;
+  compact->default_profile_index = settings->default_profile_index;
+  compact->reserved_pad = settings->reserved_pad;
+  compact->options = settings->options;
+  compact->calibration = settings->calibration;
+  memcpy(compact->keyboard_name, settings->keyboard_name,
+         sizeof(compact->keyboard_name));
+  compact->active_profile_index = settings->active_profile_index;
+  compact->profile_used_mask =
+      (uint8_t)(settings->profile_used_mask & SETTINGS_PROFILE_MASK_ALL);
+  memcpy(compact->profile_names, settings->profile_names,
+         sizeof(compact->profile_names));
+  compact->magic_end = SETTINGS_MAGIC_END;
+  compact->crc32 = 0u;
+}
+
+static uint32_t
+settings_compact_crc32(const settings_storage_compact_t *compact) {
+  return compact == NULL
+             ? 0u
+             : crc32_compute(compact, (uint32_t)offsetof(
+                                         settings_storage_compact_t, crc32));
+}
+
+static bool
+settings_validate_compact(const settings_storage_compact_t *compact) {
+  return compact != NULL && compact->magic_start == SETTINGS_MAGIC_START &&
+         compact->magic_end == SETTINGS_MAGIC_END &&
+         compact->version == SETTINGS_VERSION &&
+         compact->crc32 == settings_compact_crc32(compact);
 }
 
 //--------------------------------------------------------------------+
@@ -1708,20 +2079,32 @@ static bool settings_load_from_flash(void) {
 //--------------------------------------------------------------------+
 
 void settings_init(void) {
+  bool boot_persistence_failed = false;
+
   flash_storage_init();
 
 #if SETTINGS_FORCE_DEFAULTS
   // Force defaults (useful for development or recovery)
   settings_set_defaults();
-  settings_save();
+  boot_persistence_failed = !settings_save();
 #else
   // Try to load settings from flash
   if (!settings_load_from_flash()) {
     // Load failed, use defaults and save
     settings_set_defaults();
-    settings_save();
+    boot_persistence_failed = !settings_save();
   }
 #endif
+
+  settings_hydrate_profile_documents();
+
+  /* Reclaim the four duplicated profile snapshots from legacy SETTINGS
+   * objects before ADC/USB startup. Runtime then has enough bank headroom to
+   * update canonical documents plus the compact aggregate with one spare. */
+  if (settings_loaded_full_storage) {
+    boot_persistence_failed |= !settings_save();
+    settings_loaded_full_storage = false;
+  }
 
   // If a default boot profile is configured and that slot is used, switch to it
   // now so the device always starts on the designated profile regardless of what
@@ -1740,8 +2123,25 @@ void settings_init(void) {
   settings_sanitize_profile_names();
 
   settings_ram_only_mode = false;
-  settings_dirty = false;
-  settings_change_counter = 0u;
+  /* A synchronous boot migration/default publication may fail closed (for
+   * example after an interrupted GC). Do not report DURABLE merely because
+   * init has completed: retain a dirty/failed state so the budgeted runtime
+   * writer retries it and the host can observe the failure. */
+  settings_dirty = boot_persistence_failed;
+  settings_last_save_failed = boot_persistence_failed;
+  settings_save_abandon_after_owned_transaction = false;
+  settings_profile_document_dirty_mask =
+      boot_persistence_failed
+          ? (uint8_t)(current_settings.profile_used_mask &
+                      SETTINGS_PROFILE_MASK_ALL)
+          : 0u;
+  settings_save_profile_remaining_mask = 0u;
+  settings_aggregate_dirty = boot_persistence_failed;
+  settings_save_aggregate_snapshot = false;
+  settings_change_counter = boot_persistence_failed ? 1u : 0u;
+  for (uint8_t profile = 0u; profile < SETTINGS_PROFILE_COUNT; profile++) {
+    settings_profile_revision_counters[profile] = 0u;
+  }
   settings_last_seen_change_counter = 0u;
   settings_last_change_ms = 0u;
 }
@@ -1757,15 +2157,21 @@ bool settings_is_gamepad_enabled(void) {
 }
 
 bool settings_set_gamepad_enabled_live(bool enabled) {
+  if (settings_is_gamepad_enabled() == enabled) {
+    return true;
+  }
   current_settings.options.gamepad_enabled = enabled ? 1u : 0u;
   gamepad_hid_set_enabled(enabled);
   gamepad_hid_reload_settings();
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
 bool settings_set_keyboard_enabled(bool enabled) {
   bool was_enabled = current_settings.options.keyboard_enabled != 0u;
+  if (was_enabled == enabled) {
+    return true;
+  }
   current_settings.options.keyboard_enabled = enabled ? 1u : 0u;
 
   if (was_enabled && !enabled) {
@@ -1775,7 +2181,7 @@ bool settings_set_keyboard_enabled(bool enabled) {
     keyboard_nkro_hid_release_all();
   }
 
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -1788,10 +2194,13 @@ bool settings_is_nkro_enabled(void) {
 }
 
 bool settings_set_nkro_enabled(bool enabled) {
+  if (settings_is_nkro_enabled() == enabled) {
+    return true;
+  }
   current_settings.options.nkro_enabled = enabled ? 1 : 0;
   // Auto mode state is runtime-based; re-enumeration may be required to retry
   // NKRO after a runtime fallback has already been selected.
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -1800,14 +2209,20 @@ bool settings_is_led_thermal_protection_enabled(void) {
 }
 
 bool settings_set_led_thermal_protection_enabled(bool enabled) {
+  if (settings_is_led_thermal_protection_enabled() == enabled) {
+    return true;
+  }
   current_settings.options.led_thermal_protection_enabled = enabled ? 1u : 0u;
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
 bool settings_set_options(settings_options_t options) {
   bool was_enabled = current_settings.options.keyboard_enabled != 0u;
   settings_sanitize_options(&options);
+  if (memcmp(&current_settings.options, &options, sizeof(options)) == 0) {
+    return true;
+  }
   current_settings.options = options;
 
   if (was_enabled && current_settings.options.keyboard_enabled == 0u) {
@@ -1823,7 +2238,7 @@ bool settings_set_options(settings_options_t options) {
   led_matrix_set_idle_third_party_stream_counts_as_activity(
       settings_options_led_idle_third_party_stream_activity(
           &current_settings.options));
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -1837,26 +2252,235 @@ bool settings_reset(void) {
   }
 
   settings_set_defaults();
+  action_engine_reset_all_profiles();
   calibration_load_settings();
   settings_apply_runtime_from_current_profile();
-  return settings_save();
+  (void)action_engine_activate_profile(
+      current_settings.active_profile_index);
+  settings_mark_all_profiles_dirty();
+  return settings_request_save();
+}
+
+static flash_storage_async_result_t
+settings_advance_async_save(uint32_t crc_byte_budget,
+                            uint16_t flash_word_budget) {
+  if (!settings_save_in_progress) {
+    return FLASH_STORAGE_ASYNC_DONE;
+  }
+
+  if (settings_save_phase == SETTINGS_SAVE_PHASE_CRC) {
+    const uint32_t crc_length = (uint32_t)offsetof(
+        settings_storage_compact_t, crc32);
+    uint32_t remaining = crc_length - settings_save_crc_offset;
+    uint32_t chunk = remaining > crc_byte_budget ? crc_byte_budget : remaining;
+    const uint8_t *crc_source = NULL;
+
+    if (chunk == 0u && remaining != 0u) {
+      chunk = 1u;
+    }
+    crc_source = (const uint8_t *)&settings_save_compact_snapshot +
+                 settings_save_crc_offset;
+    settings_save_crc_state = crc32_update(
+        settings_save_crc_state, crc_source, chunk);
+    settings_save_crc_offset += chunk;
+    if (settings_save_crc_offset < crc_length) {
+      return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+    }
+    settings_save_compact_snapshot.crc32 = ~settings_save_crc_state;
+    settings_save_phase = SETTINGS_SAVE_PHASE_PROFILE_BEGIN;
+  }
+
+  if (settings_save_phase == SETTINGS_SAVE_PHASE_PROFILE_BEGIN) {
+    if (settings_save_profile_remaining_mask == 0u) {
+      if (!settings_save_aggregate_snapshot) {
+        settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+        return FLASH_STORAGE_ASYNC_DONE;
+      }
+      settings_save_phase = SETTINGS_SAVE_PHASE_WAIT_FLASH;
+    } else {
+      for (settings_save_profile_index = 0u;
+           settings_save_profile_index < SETTINGS_PROFILE_COUNT;
+           settings_save_profile_index++) {
+        if ((settings_save_profile_remaining_mask &
+             (uint8_t)(1u << settings_save_profile_index)) != 0u) {
+          break;
+        }
+      }
+      if (settings_save_profile_index >= SETTINGS_PROFILE_COUNT) {
+        settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+        return FLASH_STORAGE_ASYNC_ERROR;
+      }
+      settings_save_copy_offset = 0u;
+      settings_save_phase = SETTINGS_SAVE_PHASE_PROFILE_COPY;
+      return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+    }
+  }
+
+  if (settings_save_phase == SETTINGS_SAVE_PHASE_PROFILE_COPY) {
+    uint32_t remaining =
+        sizeof(settings_save_profile_snapshot) - settings_save_copy_offset;
+    uint32_t chunk =
+        remaining > crc_byte_budget ? crc_byte_budget : remaining;
+
+    if (chunk == 0u && remaining != 0u) {
+      chunk = 1u;
+    }
+    memcpy((uint8_t *)&settings_save_profile_snapshot +
+               settings_save_copy_offset,
+           (const uint8_t *)&current_settings
+                   .profiles[settings_save_profile_index] +
+               settings_save_copy_offset,
+           chunk);
+    settings_save_copy_offset += chunk;
+    if (settings_save_copy_offset < sizeof(settings_save_profile_snapshot)) {
+      return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+    }
+    if (settings_change_counter != settings_save_snapshot_change_counter) {
+      /* Rebuild the small global snapshot and retry dirty profiles from the
+       * newest generation. Already committed documents remain valid. */
+      settings_save_snapshot_change_counter = settings_change_counter;
+      settings_save_aggregate_snapshot = settings_aggregate_dirty;
+      settings_build_compact(&current_settings,
+                             &settings_save_compact_snapshot);
+      settings_save_profile_remaining_mask =
+          (uint8_t)(settings_profile_document_dirty_mask &
+                    current_settings.profile_used_mask &
+                    SETTINGS_PROFILE_MASK_ALL);
+      settings_save_crc_state = 0xFFFFFFFFu;
+      settings_save_crc_offset = 0u;
+      settings_save_phase = SETTINGS_SAVE_PHASE_CRC;
+      return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+    }
+    if (!action_engine_get_profile(settings_save_profile_index,
+                                   &settings_save_action_snapshot)) {
+      settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+      return FLASH_STORAGE_ASYNC_ERROR;
+    }
+    {
+      /* Another owner (for example a durable RAW HID macro commit) keeps its
+       * terminal result until it has built its response. Wait without ever
+       * consuming that result. */
+      if (!profile_document_store_save_async_begin(
+              settings_save_profile_index,
+              &settings_save_profile_snapshot,
+              &settings_save_action_snapshot,
+              FLASH_STORAGE_GENERATION_ANY)) {
+        return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+      }
+      settings_save_phase = SETTINGS_SAVE_PHASE_PROFILE_WAIT;
+      return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+    }
+  }
+
+  if (settings_save_phase == SETTINGS_SAVE_PHASE_PROFILE_WAIT) {
+    profile_document_async_result_t document_result =
+        profile_document_store_async_result(NULL);
+    if (document_result == PROFILE_DOCUMENT_ASYNC_IN_PROGRESS) {
+      return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+    }
+    if (document_result != PROFILE_DOCUMENT_ASYNC_DONE) {
+      if (document_result == PROFILE_DOCUMENT_ASYNC_ERROR) {
+        profile_document_store_async_consume();
+      }
+      settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+      return FLASH_STORAGE_ASYNC_ERROR;
+    }
+    profile_document_store_async_consume();
+    settings_save_profile_remaining_mask &=
+        (uint8_t)~(uint8_t)(1u << settings_save_profile_index);
+    if (settings_save_abandon_after_owned_transaction) {
+      settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+      return FLASH_STORAGE_ASYNC_DONE;
+    }
+    settings_save_phase = SETTINGS_SAVE_PHASE_PROFILE_BEGIN;
+    return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+  }
+
+  if (settings_save_phase == SETTINGS_SAVE_PHASE_WAIT_FLASH) {
+    const flash_storage_segment_t segments[] = {
+        {.data = &settings_save_compact_snapshot,
+         .length = sizeof(settings_save_compact_snapshot)},
+    };
+    flash_storage_status_t begin =
+        flash_storage_object_write_segments_async_begin(
+        FLASH_STORAGE_NAMESPACE_SETTINGS, FLASH_STORAGE_SETTINGS_OBJECT_ID,
+            SETTINGS_VERSION, segments,
+            (uint8_t)(sizeof(segments) / sizeof(segments[0])),
+            FLASH_STORAGE_GENERATION_ANY, NULL);
+    if (begin == FLASH_STORAGE_STATUS_BUSY) {
+      return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+    }
+    if (begin != FLASH_STORAGE_STATUS_OK) {
+      settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+      return FLASH_STORAGE_ASYNC_ERROR;
+    }
+    settings_save_phase = SETTINGS_SAVE_PHASE_FLASH;
+    return FLASH_STORAGE_ASYNC_IN_PROGRESS;
+  }
+
+  if (settings_save_phase == SETTINGS_SAVE_PHASE_FLASH) {
+    if (!flash_storage_write_async_is_owner(
+            FLASH_STORAGE_NAMESPACE_SETTINGS,
+            FLASH_STORAGE_SETTINGS_OBJECT_ID)) {
+      /* The journal has one global async writer. Never advance or interpret a
+       * transaction started by another persistence client. */
+      settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+      return FLASH_STORAGE_ASYNC_ERROR;
+    }
+    return flash_storage_write_async_step(flash_word_budget);
+  }
+  return FLASH_STORAGE_ASYNC_ERROR;
+}
+
+static bool settings_finish_async_save(void) {
+  /* Synchronous saves are boot-only compatibility. Once an operational save
+   * is queued, never spin through ProfileDocument/Flash work in caller context. */
+  return !settings_save_in_progress;
+}
+
+static void settings_default_action_profile(action_profile_t *actions) {
+  if (actions == NULL) {
+    return;
+  }
+  memset(actions, 0, sizeof(*actions));
+  for (uint8_t program = 0u; program < ACTION_PROGRAM_COUNT; program++) {
+    actions->programs[program].version = ACTION_PROGRAM_VERSION;
+    actions->programs[program].step_count = 1u;
+    actions->programs[program].steps[0].opcode = (uint8_t)ACTION_OP_END;
+  }
+}
+
+static bool settings_ensure_profile_documents_at_boot(void) {
+  action_profile_t default_actions;
+
+  settings_default_action_profile(&default_actions);
+  for (uint8_t profile_index = 0u; profile_index < SETTINGS_PROFILE_COUNT;
+       profile_index++) {
+    uint32_t generation = 0u;
+    if (!settings_is_profile_slot_used(profile_index)) {
+      continue;
+    }
+    if (!profile_document_store_get_generation(profile_index, &generation)) {
+      return false;
+    }
+    if (generation != 0u) {
+      continue;
+    }
+    if (!profile_document_store_save(
+            profile_index, &current_settings.profiles[profile_index],
+            &default_actions, 0u, NULL)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool settings_save(void) {
-  if (settings_save_in_progress) {
-    while (true) {
-      flash_storage_async_result_t step =
-          flash_storage_write_async_step(256u);
-      if (step == FLASH_STORAGE_ASYNC_IN_PROGRESS) {
-        continue;
-      }
+  settings_storage_compact_t compact;
+  flash_storage_segment_t segment;
 
-      settings_save_in_progress = false;
-      if (step == FLASH_STORAGE_ASYNC_ERROR) {
-        return false;
-      }
-      break;
-    }
+  if (!settings_finish_async_save()) {
+    return false;
   }
 
   // RAM-only mode: writes stay in RAM and are never persisted to flash.
@@ -1864,19 +2488,33 @@ bool settings_save(void) {
     return false;
   }
 
-  settings_profile_sync_active_slot();
+  /* Publish every missing canonical profile before the compact used-mask can
+   * make it visible. This path is used only during boot migration/factory
+   * initialization; runtime callers use settings_request_save(). */
+  if (!settings_ensure_profile_documents_at_boot()) {
+    return false;
+  }
 
-  // Compute CRC before saving
-  current_settings.crc32 =
-      crc32_compute(&current_settings, sizeof(settings_t) - sizeof(uint32_t));
+  /* Slot payloads live in canonical ProfileDocuments. SETTINGS contains only
+   * global metadata and calibration, avoiding all per-profile duplication. */
+  settings_build_compact(&current_settings, &compact);
+  compact.crc32 = settings_compact_crc32(&compact);
+  segment.data = &compact;
+  segment.length = sizeof(compact);
 
   // Append a new settings snapshot. The storage backend consolidates only
   // when the reserved flash sector is full, which keeps normal saves cheap.
-  if (!flash_storage_write(0, &current_settings, sizeof(settings_t))) {
+  if (flash_storage_object_write_segments(
+          FLASH_STORAGE_NAMESPACE_SETTINGS,
+          FLASH_STORAGE_SETTINGS_OBJECT_ID, SETTINGS_VERSION,
+          &segment, 1u,
+          FLASH_STORAGE_GENERATION_ANY, NULL) != FLASH_STORAGE_STATUS_OK) {
     return false;
   }
 
   settings_dirty = false;
+  settings_aggregate_dirty = false;
+  settings_profile_document_dirty_mask = 0u;
   settings_save_requested = false;
   settings_last_seen_change_counter = settings_change_counter;
   return true;
@@ -1890,11 +2528,43 @@ bool settings_request_save(void) {
 
   if (!settings_dirty) {
     settings_save_requested = false;
+    settings_last_save_failed = false;
     return true;
   }
 
   settings_save_requested = true;
+  settings_last_save_failed = false;
   return true;
+}
+
+static bool settings_persistence_is_busy(void) {
+  return settings_persistence_busy_from_sources(
+      settings_save_in_progress,
+      profile_document_store_async_result(NULL) != PROFILE_DOCUMENT_ASYNC_IDLE,
+      flash_storage_write_async_is_busy());
+}
+
+void settings_get_save_status(settings_save_status_t *status_out) {
+  bool persistence_busy;
+
+  if (status_out == NULL) {
+    return;
+  }
+  persistence_busy = settings_persistence_is_busy();
+  status_out->dirty = settings_dirty;
+  status_out->requested = settings_save_requested;
+  status_out->in_progress = persistence_busy;
+  if (settings_ram_only_mode) {
+    status_out->state = SETTINGS_SAVE_RAM_ONLY;
+  } else if (persistence_busy) {
+    status_out->state = SETTINGS_SAVE_WRITING;
+  } else if (settings_last_save_failed && settings_dirty) {
+    status_out->state = SETTINGS_SAVE_FAILED;
+  } else if (settings_dirty || settings_save_requested) {
+    status_out->state = SETTINGS_SAVE_QUEUED;
+  } else {
+    status_out->state = SETTINGS_SAVE_DURABLE;
+  }
 }
 
 static bool settings_start_async_save(void) {
@@ -1906,27 +2576,30 @@ static bool settings_start_async_save(void) {
   if (settings_ram_only_mode) {
     settings_dirty = false;
     settings_save_requested = false;
+    settings_profile_document_dirty_mask = 0u;
+    settings_aggregate_dirty = false;
     settings_last_seen_change_counter = settings_change_counter;
     return true;
   }
 
-  settings_profile_sync_active_slot();
-  memcpy(&settings_save_snapshot, &current_settings, sizeof(settings_t));
-  settings_save_snapshot.crc32 =
-      crc32_compute(&settings_save_snapshot,
-                    sizeof(settings_t) - sizeof(uint32_t));
-
-  if (!flash_storage_write_async_begin(0u, &settings_save_snapshot,
-                                       sizeof(settings_t))) {
-    return false;
-  }
-
   settings_save_in_progress = true;
+  settings_last_save_failed = false;
+  settings_save_abandon_after_owned_transaction = false;
   settings_save_snapshot_change_counter = settings_change_counter;
+  settings_save_aggregate_snapshot = settings_aggregate_dirty;
+  settings_build_compact(&current_settings, &settings_save_compact_snapshot);
+  settings_save_profile_remaining_mask =
+      (uint8_t)(settings_profile_document_dirty_mask &
+                current_settings.profile_used_mask &
+                SETTINGS_PROFILE_MASK_ALL);
+  settings_save_phase = SETTINGS_SAVE_PHASE_CRC;
+  settings_save_copy_offset = 0u;
+  settings_save_crc_state = 0xFFFFFFFFu;
+  settings_save_crc_offset = 0u;
   return true;
 }
 
-void settings_task(uint32_t now_ms) {
+void settings_task_budgeted(uint32_t now_ms, uint16_t flash_word_budget) {
   uint32_t save_delay_ms = SETTINGS_AUTOSAVE_DELAY_MS;
 
   if (settings_change_counter != settings_last_seen_change_counter) {
@@ -1936,23 +2609,39 @@ void settings_task(uint32_t now_ms) {
   }
 
   if (settings_save_in_progress) {
-    flash_storage_async_result_t step =
-        flash_storage_write_async_step(SETTINGS_FLASH_WORDS_PER_STEP);
+    flash_storage_async_result_t step = settings_advance_async_save(
+        SETTINGS_CRC_BYTES_PER_STEP, flash_word_budget);
 
     if (step == FLASH_STORAGE_ASYNC_IN_PROGRESS) {
       return;
     }
 
     settings_save_in_progress = false;
-    if (step == FLASH_STORAGE_ASYNC_ERROR) {
+    settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+    if (settings_save_abandon_after_owned_transaction) {
+      /* The one transaction that was already atomic has completed (or ended
+       * locally). Do not advance this pre-mode batch into another profile or
+       * aggregate object. RAM-only changes remain volatile until reload. */
+      settings_save_abandon_after_owned_transaction = false;
+      settings_save_requested = false;
+      settings_last_save_failed = false;
       settings_last_change_ms = now_ms;
       settings_dirty = true;
       return;
     }
+    if (step == FLASH_STORAGE_ASYNC_ERROR) {
+      settings_last_change_ms = now_ms;
+      settings_dirty = true;
+      settings_last_save_failed = true;
+      return;
+    }
 
     settings_save_requested = false;
+    settings_last_save_failed = false;
     if (settings_change_counter == settings_save_snapshot_change_counter) {
       settings_dirty = false;
+      settings_profile_document_dirty_mask = 0u;
+      settings_aggregate_dirty = false;
       settings_last_seen_change_counter = settings_change_counter;
       return;
     }
@@ -1979,6 +2668,10 @@ void settings_task(uint32_t now_ms) {
   }
 
   (void)settings_start_async_save();
+}
+
+void settings_task(uint32_t now_ms) {
+  settings_task_budgeted(now_ms, SETTINGS_FLASH_WORDS_PER_STEP);
 }
 
 bool settings_has_unsaved_changes(void) { return settings_dirty; }
@@ -2011,7 +2704,7 @@ bool settings_set_keyboard_name(const char *name, uint8_t length) {
   memcpy(current_settings.keyboard_name, sanitized,
          SETTINGS_KEYBOARD_NAME_LENGTH);
   settings_keyboard_name_cache_refresh();
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2020,9 +2713,16 @@ uint8_t settings_get_advanced_tick_rate(void) {
 }
 
 bool settings_set_advanced_tick_rate(uint8_t tick_rate) {
-  current_settings.advanced_tick_rate =
-      settings_sanitize_advanced_tick_rate(tick_rate);
-  trigger_reload_settings();
+  settings_profile_t *profile = settings_active_profile_mut();
+  uint8_t sanitized = settings_sanitize_advanced_tick_rate(tick_rate);
+
+  if (current_settings.advanced_tick_rate == sanitized) {
+    return true;
+  }
+  current_settings.advanced_tick_rate = sanitized;
+  if (profile != NULL) {
+    profile->advanced_tick_rate = current_settings.advanced_tick_rate;
+  }
   settings_mark_dirty();
   return true;
 }
@@ -2033,14 +2733,27 @@ void settings_get_trigger_chatter_guard(bool *enabled, uint8_t *duration_ms) {
 }
 
 bool settings_set_trigger_chatter_guard(bool enabled, uint8_t duration_ms) {
-  if (duration_ms > SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS) {
+  bool previous_enabled = false;
+  uint8_t previous_duration_ms = 0u;
+
+  if (duration_ms > SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS ||
+      (enabled && duration_ms == 0u)) {
     return false;
   }
 
   duration_ms = settings_sanitize_trigger_chatter_guard_duration(duration_ms);
+  settings_get_trigger_chatter_guard(&previous_enabled,
+                                     &previous_duration_ms);
+  if (previous_enabled == enabled &&
+      previous_duration_ms == duration_ms) {
+    return true;
+  }
   settings_write_trigger_chatter_guard_to_led(&current_settings.led, enabled,
                                               duration_ms);
-  (void)trigger_set_chatter_guard(enabled, duration_ms);
+  if (!trigger_set_chatter_guard(enabled, duration_ms)) {
+    return false;
+  }
+  settings_mirror_active_led();
   settings_mark_dirty();
   return true;
 }
@@ -2067,12 +2780,97 @@ bool settings_set_active_profile_index(uint8_t profile_index) {
     return true;
   }
 
-  settings_profile_sync_active_slot();
   current_settings.active_profile_index = profile_index;
   settings_profile_apply_slot(profile_index);
   settings_apply_runtime_from_current_profile();
-  settings_mark_dirty();
+  if (!action_engine_activate_profile(profile_index)) {
+    return false;
+  }
+  settings_mark_global_dirty();
   return true;
+}
+
+uint32_t settings_profile_snapshot_size(void) {
+  return (uint32_t)sizeof(settings_profile_t);
+}
+
+bool settings_profile_snapshot_read(uint8_t profile_index, void *snapshot_out,
+                                    uint32_t snapshot_capacity) {
+  if (profile_index >= SETTINGS_PROFILE_COUNT || snapshot_out == NULL ||
+      snapshot_capacity < sizeof(settings_profile_t) ||
+      !settings_is_profile_slot_used(profile_index)) {
+    return false;
+  }
+
+  memcpy(snapshot_out, &current_settings.profiles[profile_index],
+         sizeof(settings_profile_t));
+  return true;
+}
+
+bool settings_read_profile_snapshot(uint8_t profile_index, void *snapshot_out,
+                                    uint32_t snapshot_capacity) {
+  return settings_profile_snapshot_read(profile_index, snapshot_out,
+                                        snapshot_capacity);
+}
+
+const settings_profile_t *
+settings_profile_snapshot_view(uint8_t profile_index) {
+  if (profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(profile_index)) {
+    return NULL;
+  }
+  return &current_settings.profiles[profile_index];
+}
+
+const volatile uint32_t *
+settings_profile_snapshot_revision_source(uint8_t profile_index) {
+  if (profile_index >= SETTINGS_PROFILE_COUNT ||
+      !settings_is_profile_slot_used(profile_index)) {
+    return NULL;
+  }
+  return &settings_profile_revision_counters[profile_index];
+}
+
+bool settings_profile_snapshot_replace(uint8_t profile_index,
+                                       const void *snapshot,
+                                       uint32_t snapshot_length) {
+  settings_profile_t staging;
+  settings_profile_t *profile = &staging;
+  bool profile_was_used = false;
+
+  if (profile_index >= SETTINGS_PROFILE_COUNT || snapshot == NULL ||
+      snapshot_length != sizeof(settings_profile_t)) {
+    return false;
+  }
+
+  /* All users run in the main loop. Validate/sanitise in a private staging
+   * buffer first.  In particular, never expose a partially sanitised profile
+   * to trigger/HID consumers if the source aliases the active slot. */
+  memmove(profile, snapshot, sizeof(*profile));
+  settings_sanitize_profile_snapshot(profile);
+  profile_was_used = settings_is_profile_slot_used(profile_index);
+  if (!profile_was_used && !action_engine_reset_profile(profile_index)) {
+    return false;
+  }
+
+  /* The complete, valid snapshot becomes visible in one main-loop operation.
+   * No fallible work remains after this publication point. */
+  memcpy(&current_settings.profiles[profile_index], profile, sizeof(*profile));
+  current_settings.profile_used_mask |= (uint8_t)(1u << profile_index);
+  if (profile_index == settings_get_active_profile_index()) {
+    settings_profile_apply_slot(profile_index);
+    settings_apply_runtime_from_current_profile();
+    (void)action_engine_activate_profile(profile_index);
+  }
+  settings_mark_profile_dirty(profile_index, true);
+  return true;
+}
+
+bool settings_replace_profile_snapshot(uint8_t profile_index,
+                                       const void *snapshot,
+                                       uint32_t snapshot_length) {
+  return settings_profile_snapshot_replace(profile_index, snapshot,
+                                           snapshot_length);
 }
 
 uint8_t settings_get_default_profile_index(void) {
@@ -2085,7 +2883,7 @@ bool settings_set_default_profile_index(uint8_t profile_index) {
     return false;
   }
   current_settings.default_profile_index = profile_index;
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2093,27 +2891,72 @@ bool settings_is_ram_only_mode(void) {
   return settings_ram_only_mode;
 }
 
-void settings_enter_ram_only_mode(void) {
-  settings_ram_only_mode = true;
-  settings_save_requested = false;
+bool settings_ram_only_transition_pending(void) {
+  return settings_ram_only_mode && settings_persistence_is_busy();
 }
 
-bool settings_exit_ram_only_mode(void) {
-  settings_ram_only_mode = false;
-  settings_save_requested = false;
-  if (!settings_load_from_flash()) {
-    settings_set_defaults();
-    settings_save();
-    settings_dirty = false;
-    settings_last_seen_change_counter = settings_change_counter;
+bool settings_enter_ram_only_mode(void) {
+  profile_document_async_result_t profile_result =
+      profile_document_store_async_result(NULL);
+  bool profile_document_busy = profile_result != PROFILE_DOCUMENT_ASYNC_IDLE;
+  bool flash_writer_busy = flash_storage_write_async_is_busy();
+
+  if (settings_ram_only_mode) {
+    return true;
+  }
+
+  /* ProfileDocument/action commands own their completion handshake. Entering
+   * RAM-only while one is running (or while its terminal result awaits
+   * consumption) would make the transition guard block the very command that
+   * releases it. A raw writer not owned by the settings state machine has the
+   * same problem. */
+  if (settings_ram_only_entry_blocked(
+          settings_save_in_progress, settings_save_phase,
+          profile_document_busy, flash_writer_busy)) {
     return false;
   }
-  calibration_load_settings();
-  settings_apply_runtime_from_current_profile();
-  // Discard any dirty state accumulated during the RAM-only session; the RAM
-  // contents now match flash so there is nothing new to save.
-  settings_dirty = false;
-  settings_last_seen_change_counter = settings_change_counter;
+
+  switch (settings_ram_only_save_transition(settings_save_in_progress,
+                                            settings_save_phase)) {
+  case SETTINGS_RAM_ONLY_SAVE_DRAIN_OWNED:
+    /* These phases already own an atomic transaction. It is unsafe to
+     * abandon it, but it is equally unsafe to resume the multi-object batch
+     * afterwards because current_settings may then contain RAM-only edits. */
+    settings_save_abandon_after_owned_transaction = true;
+    break;
+  case SETTINGS_RAM_ONLY_SAVE_CANCEL:
+    /* CRC, profile copy/begin, and aggregate WAIT_FLASH have not acquired a
+     * journal transaction and can be discarded immediately. */
+    settings_save_in_progress = false;
+    settings_save_phase = SETTINGS_SAVE_PHASE_IDLE;
+    settings_save_abandon_after_owned_transaction = false;
+    break;
+  case SETTINGS_RAM_ONLY_SAVE_NOOP:
+  default:
+    break;
+  }
+  settings_ram_only_mode = true;
+  settings_save_requested = false;
+  return true;
+}
+
+bool settings_leave_ram_only_mode(void) {
+  if (!settings_ram_only_mode) {
+    return true;
+  }
+  if (settings_persistence_is_busy()) {
+    /* A settings batch, ProfileDocument, or raw Flash transaction still owns
+     * persistence. Never enable normal autosave until it is fully released. */
+    return false;
+  }
+
+  settings_ram_only_mode = false;
+  settings_save_requested = false;
+  /* RAM-only maintenance may have cleared transient dirty flags while the
+   * explicit profile document was being committed. Re-publish the compact
+   * aggregate so active/default slot metadata cannot be lost, even when an
+   * imported legacy snapshot has no global options to touch afterwards. */
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2139,7 +2982,6 @@ int8_t settings_create_profile(const char *name, uint8_t length) {
     return -1;
   }
 
-  settings_profile_sync_active_slot();
   if (!settings_is_profile_slot_used(source_profile_index)) {
     source_profile_index = settings_profile_first_used_slot(used_mask);
   }
@@ -2152,12 +2994,17 @@ int8_t settings_create_profile(const char *name, uint8_t length) {
     memcpy(&current_settings.profiles[i],
            &current_settings.profiles[source_profile_index],
            sizeof(current_settings.profiles[i]));
+    if (!action_engine_copy_profile(source_profile_index, i)) {
+      memset(&current_settings.profiles[i], 0,
+             sizeof(current_settings.profiles[i]));
+      return -1;
+    }
     settings_sanitize_profile_name_from_bytes(i, sanitized, name, length);
     memcpy(current_settings.profile_names[i], sanitized,
            SETTINGS_PROFILE_NAME_LENGTH);
     current_settings.profile_used_mask = (uint8_t)(used_mask | (uint8_t)(1u << i));
     settings_profile_name_cache_refresh_slot(i);
-    settings_mark_dirty();
+    settings_mark_profile_dirty(i, true);
     return (int8_t)i;
   }
 
@@ -2176,8 +3023,8 @@ bool settings_delete_profile(uint8_t profile_index) {
     return false;
   }
 
-  if (current_settings.active_profile_index == profile_index) {
-    settings_profile_sync_active_slot();
+  if (!action_engine_reset_profile(profile_index)) {
+    return false;
   }
 
   used_mask = (uint8_t)(used_mask & (uint8_t)(~(uint8_t)(1u << profile_index)));
@@ -2193,6 +3040,8 @@ bool settings_delete_profile(uint8_t profile_index) {
         settings_profile_first_used_slot(used_mask);
     settings_profile_apply_slot(current_settings.active_profile_index);
     settings_apply_runtime_from_current_profile();
+    (void)action_engine_activate_profile(
+        current_settings.active_profile_index);
   }
 
   // If the deleted slot was the designated boot default, clear the preference
@@ -2201,7 +3050,9 @@ bool settings_delete_profile(uint8_t profile_index) {
     current_settings.default_profile_index = SETTINGS_DEFAULT_PROFILE_NONE;
   }
 
-  settings_mark_dirty();
+  /* The slot bytes were cleared as well as the aggregate used-mask. Bump the
+   * live source revision so an in-flight bounded snapshot cannot miss it. */
+  settings_mark_profile_dirty(profile_index, true);
   return true;
 }
 
@@ -2223,7 +3074,10 @@ bool settings_copy_profile_slot(uint8_t source_profile_index,
     return true;
   }
 
-  settings_profile_sync_active_slot();
+  if (!action_engine_copy_profile(source_profile_index,
+                                  target_profile_index)) {
+    return false;
+  }
 
   target_was_used =
       (used_mask & (uint8_t)(1u << target_profile_index)) != 0u;
@@ -2248,7 +3102,7 @@ bool settings_copy_profile_slot(uint8_t source_profile_index,
     settings_apply_runtime_from_current_profile();
   }
 
-  settings_mark_dirty();
+  settings_mark_profile_dirty(target_profile_index, true);
   return true;
 }
 
@@ -2258,7 +3112,9 @@ bool settings_reset_profile_slot(uint8_t profile_index) {
     return false;
   }
 
-  settings_profile_sync_active_slot();
+  if (!action_engine_reset_profile(profile_index)) {
+    return false;
+  }
   settings_populate_profile_defaults(&current_settings.profiles[profile_index]);
 
   if (settings_get_active_profile_index() == profile_index) {
@@ -2266,7 +3122,7 @@ bool settings_reset_profile_slot(uint8_t profile_index) {
     settings_apply_runtime_from_current_profile();
   }
 
-  settings_mark_dirty();
+  settings_mark_profile_dirty(profile_index, false);
   return true;
 }
 
@@ -2298,7 +3154,7 @@ bool settings_set_profile_name(uint8_t profile_index, const char *name,
   memcpy(current_settings.profile_names[profile_index], sanitized,
          SETTINGS_PROFILE_NAME_LENGTH);
   settings_profile_name_cache_refresh_slot(profile_index);
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2311,9 +3167,12 @@ bool settings_is_led_enabled(void) {
 }
 
 bool settings_set_led_enabled(bool enabled) {
+  if (settings_is_led_enabled() == enabled) {
+    return true;
+  }
   current_settings.options.led_enabled = enabled ? 1 : 0;
   led_matrix_set_enabled(enabled);
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2327,8 +3186,12 @@ bool settings_set_led_idle_timeout_seconds(uint8_t timeout_seconds) {
   }
 
   timeout_seconds = settings_sanitize_led_idle_timeout_seconds(timeout_seconds);
+  if (settings_get_led_idle_timeout_seconds() == timeout_seconds) {
+    return true;
+  }
   settings_write_led_idle_timeout_seconds_to_led(&current_settings.led,
                                                  timeout_seconds);
+  settings_mirror_active_led();
   led_matrix_set_idle_timeout_seconds(timeout_seconds);
   settings_mark_dirty();
   return true;
@@ -2339,10 +3202,13 @@ bool settings_is_led_system_indicators_allowed_when_disabled(void) {
 }
 
 bool settings_set_led_system_indicators_allowed_when_disabled(bool enabled) {
+  if (settings_is_led_system_indicators_allowed_when_disabled() == enabled) {
+    return true;
+  }
   settings_options_set_led_system_when_disabled(&current_settings.options,
                                                 enabled);
   led_matrix_set_allow_system_indicators_when_disabled(enabled);
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2352,10 +3218,13 @@ bool settings_is_led_idle_third_party_stream_counts_as_activity(void) {
 }
 
 bool settings_set_led_idle_third_party_stream_counts_as_activity(bool enabled) {
+  if (settings_is_led_idle_third_party_stream_counts_as_activity() == enabled) {
+    return true;
+  }
   settings_options_set_led_idle_third_party_stream_activity(
       &current_settings.options, enabled);
   led_matrix_set_idle_third_party_stream_counts_as_activity(enabled);
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2364,7 +3233,11 @@ bool settings_is_led_usb_suspend_rgb_off_enabled(void) {
 }
 
 bool settings_set_led_usb_suspend_rgb_off_enabled(bool enabled) {
+  if (settings_is_led_usb_suspend_rgb_off_enabled() == enabled) {
+    return true;
+  }
   settings_write_led_usb_suspend_rgb_off_to_led(&current_settings.led, enabled);
+  settings_mirror_active_led();
   if (!enabled) {
     led_matrix_set_usb_suspend_state(false);
   }
@@ -2377,7 +3250,11 @@ uint8_t settings_get_led_brightness(void) {
 }
 
 bool settings_set_led_brightness(uint8_t brightness) {
+  if (current_settings.led.brightness == brightness) {
+    return true;
+  }
   current_settings.led.brightness = brightness;
+  settings_mirror_active_led();
   led_matrix_set_brightness(brightness);
   settings_mark_dirty();
   return true;
@@ -2391,7 +3268,12 @@ bool settings_set_led_pixels(const uint8_t *pixels) {
   if (pixels == NULL)
     return false;
 
+  if (memcmp(current_settings.led.pixels, pixels, LED_MATRIX_DATA_BYTES) == 0) {
+    return true;
+  }
+
   memcpy(current_settings.led.pixels, pixels, LED_MATRIX_DATA_BYTES);
+  settings_mirror_active_led();
   led_matrix_set_raw_data(pixels);
   settings_mark_dirty();
   return true;
@@ -2401,9 +3283,16 @@ bool settings_set_led_pixel(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
   if (index >= LED_MATRIX_SIZE)
     return false;
 
+  if (current_settings.led.pixels[index * 3 + 0] == r &&
+      current_settings.led.pixels[index * 3 + 1] == g &&
+      current_settings.led.pixels[index * 3 + 2] == b) {
+    return true;
+  }
+
   current_settings.led.pixels[index * 3 + 0] = r;
   current_settings.led.pixels[index * 3 + 1] = g;
   current_settings.led.pixels[index * 3 + 2] = b;
+  settings_mirror_active_led();
 
   led_matrix_set_pixel_idx(index, r, g, b);
   settings_mark_dirty();
@@ -2447,6 +3336,7 @@ bool settings_set_led_effect_mode(uint8_t mode) {
                                         &current_settings.led_effect_color_r,
                                         &current_settings.led_effect_color_g,
                                         &current_settings.led_effect_color_b);
+  settings_mirror_active_effect();
   settings_mark_dirty();
   return true;
 }
@@ -2470,10 +3360,15 @@ bool settings_set_led_effect_speed(uint8_t speed) {
   }
 
   speed = settings_sanitize_effect_speed(speed);
+  if (current_settings.led_effect_params[effect_mode][LED_EFFECT_PARAM_SPEED] ==
+      speed) {
+    return true;
+  }
   current_settings.led_effect_params[effect_mode][LED_EFFECT_PARAM_SPEED] =
       speed;
   settings_sync_led_effect_speed_cache();
   led_matrix_set_effect_speed(speed);
+  settings_mirror_active_effect();
   settings_mark_dirty();
   return true;
 }
@@ -2483,7 +3378,14 @@ uint8_t settings_get_led_fps_limit(void) {
 }
 
 bool settings_set_led_fps_limit(uint8_t fps_limit) {
+  settings_profile_t *profile = settings_active_profile_mut();
+  if (current_settings.led_fps_limit == fps_limit) {
+    return true;
+  }
   current_settings.led_fps_limit = fps_limit;
+  if (profile != NULL) {
+    profile->led_fps_limit = fps_limit;
+  }
   led_matrix_set_fps_limit(fps_limit);
   settings_mark_dirty();
   return true;
@@ -2496,11 +3398,21 @@ void settings_get_led_effect_color(uint8_t *r, uint8_t *g, uint8_t *b) {
 
 bool settings_set_led_effect_color(uint8_t r, uint8_t g, uint8_t b) {
   uint8_t effect_mode = current_settings.led_effect_mode;
+  uint8_t previous_r = 0u;
+  uint8_t previous_g = 0u;
+  uint8_t previous_b = 0u;
   if (effect_mode >= (uint8_t)LED_EFFECT_MAX) {
     return false;
   }
 
+  settings_get_effect_color_from_params(effect_mode, &previous_r, &previous_g,
+                                        &previous_b);
+  if (previous_r == r && previous_g == g && previous_b == b) {
+    return true;
+  }
+
   settings_set_effect_color_in_params(effect_mode, r, g, b);
+  settings_mirror_active_effect();
   led_matrix_set_effect_params(current_settings.led_effect_params[effect_mode]);
   settings_mark_dirty();
   return true;
@@ -2525,6 +3437,11 @@ bool settings_set_led_effect_params(uint8_t effect_mode, const uint8_t *params) 
     return false;
   }
 
+  if (memcmp(current_settings.led_effect_params[effect_mode], params,
+             LED_EFFECT_PARAM_COUNT) == 0) {
+    return true;
+  }
+
   memcpy(current_settings.led_effect_params[effect_mode], params,
          LED_EFFECT_PARAM_COUNT);
 
@@ -2537,6 +3454,7 @@ bool settings_set_led_effect_params(uint8_t effect_mode, const uint8_t *params) 
                                           &current_settings.led_effect_color_b);
   }
 
+  settings_mirror_active_effect();
   settings_mark_dirty();
   return true;
 }
@@ -2558,7 +3476,11 @@ bool settings_is_filter_enabled(void) {
 }
 
 bool settings_set_filter_enabled(bool enabled) {
+  if (settings_is_filter_enabled() == enabled) {
+    return true;
+  }
   current_settings.filter_enabled = enabled ? 1 : 0;
+  settings_mirror_active_filter();
   filter_set_enabled(enabled);
   settings_mark_dirty();
   return true;
@@ -2579,10 +3501,20 @@ void settings_get_filter_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
 
 bool settings_set_filter_params(uint8_t noise_band, uint8_t alpha_min_denom,
                                 uint8_t alpha_max_denom) {
+  uint8_t previous_noise_band = current_settings.filter_noise_band;
+  uint8_t previous_alpha_min = current_settings.filter_alpha_min;
+  uint8_t previous_alpha_max = current_settings.filter_alpha_max;
+
   filter_set_params(noise_band, alpha_min_denom, alpha_max_denom);
   filter_get_params(&current_settings.filter_noise_band,
                     &current_settings.filter_alpha_min,
                     &current_settings.filter_alpha_max);
+  if (current_settings.filter_noise_band == previous_noise_band &&
+      current_settings.filter_alpha_min == previous_alpha_min &&
+      current_settings.filter_alpha_max == previous_alpha_max) {
+    return true;
+  }
+  settings_mirror_active_filter();
   settings_mark_dirty();
   return true;
 }
@@ -2652,6 +3584,7 @@ bool settings_set_profile_layer_key_settings(uint8_t profile_index,
   settings_profile_t *profile = settings_profile_slot_mut(profile_index);
   bool is_active_profile =
       (settings_get_active_profile_index() == profile_index);
+  bool socd_runtime_changed = false;
 
   if (profile == NULL || key == NULL || key_index >= NUM_KEYS ||
       layer_index >= SETTINGS_LAYER_COUNT) {
@@ -2660,11 +3593,54 @@ bool settings_set_profile_layer_key_settings(uint8_t profile_index,
 
   if (layer_index == 0u) {
     settings_key_t sanitized = *key;
+    settings_key_t previous = profile->keys[key_index];
+    uint8_t previous_pair = profile->keys[key_index].socd_pair;
     settings_sanitize_key_config(key_index, &sanitized);
+    socd_runtime_changed =
+        previous.socd_pair != sanitized.socd_pair ||
+        settings_key_get_socd_resolution(&previous) !=
+            settings_key_get_socd_resolution(&sanitized) ||
+        settings_key_is_socd_fully_pressed_enabled(&previous) !=
+            settings_key_is_socd_fully_pressed_enabled(&sanitized) ||
+        previous.advanced.socd_fully_pressed_point_tenths !=
+            sanitized.advanced.socd_fully_pressed_point_tenths;
+
+    /* Store SOCD as a reciprocal pair.  A half-pair makes resolution depend
+     * on key ordering and is not a meaningful runtime state. */
+    if (previous_pair < NUM_KEYS && previous_pair != sanitized.socd_pair &&
+        profile->keys[previous_pair].socd_pair == key_index) {
+      profile->keys[previous_pair].socd_pair = SETTINGS_SOCD_PAIR_NONE;
+    }
+
+    if (sanitized.socd_pair < NUM_KEYS) {
+      uint8_t partner_index = sanitized.socd_pair;
+      uint8_t partner_previous = profile->keys[partner_index].socd_pair;
+      settings_key_t *partner = &profile->keys[partner_index];
+
+      socd_runtime_changed |= partner_previous != key_index;
+
+      if (partner_previous < NUM_KEYS && partner_previous != key_index &&
+          profile->keys[partner_previous].socd_pair == partner_index) {
+        profile->keys[partner_previous].socd_pair = SETTINGS_SOCD_PAIR_NONE;
+      }
+
+      partner->socd_pair = key_index;
+      settings_key_set_socd_resolution(
+          partner, settings_key_get_socd_resolution(&sanitized));
+      settings_key_set_socd_fully_pressed_enabled(
+          partner, settings_key_is_socd_fully_pressed_enabled(&sanitized));
+      partner->advanced.socd_fully_pressed_point_tenths =
+          sanitized.advanced.socd_fully_pressed_point_tenths;
+      profile->advanced_by_layer[0u][partner_index] = partner->advanced;
+    }
+
     profile->keys[key_index] = sanitized;
     profile->advanced_by_layer[0u][key_index] = sanitized.advanced;
   } else {
     settings_key_t temp = profile->keys[key_index];
+    uint8_t previous_fully_pressed_point =
+        profile->advanced_by_layer[layer_index][key_index]
+            .socd_fully_pressed_point_tenths;
     profile->layer_keycodes[layer_index - 1u][key_index] = key->hid_keycode;
     if (profile->layer_keycodes[layer_index - 1u][key_index] == 0xFFFFu) {
       profile->layer_keycodes[layer_index - 1u][key_index] = KC_TRANSPARENT;
@@ -2674,24 +3650,34 @@ bool settings_set_profile_layer_key_settings(uint8_t profile_index,
     settings_sanitize_key_advanced(
         settings_profile_layer_primary_keycode(profile, layer_index, key_index),
         &temp);
+    socd_runtime_changed =
+        previous_fully_pressed_point !=
+        temp.advanced.socd_fully_pressed_point_tenths;
     profile->advanced_by_layer[layer_index][key_index] = temp.advanced;
   }
 
   if (is_active_profile) {
     if (layer_index == 0u) {
-      current_settings.keys[key_index] = profile->keys[key_index];
-      current_settings.keys[key_index].advanced =
-          profile->advanced_by_layer[0u][key_index];
-      gamepad_hid_reload_settings();
+      /* Pair reconciliation can affect up to three keys, so mirror the full
+       * base-key table instead of only the directly edited element. */
+      memcpy(current_settings.keys, profile->keys,
+             sizeof(current_settings.keys));
+      for (uint8_t i = 0u; i < NUM_KEYS; i++) {
+        current_settings.keys[i].advanced =
+            profile->advanced_by_layer[0u][i];
+      }
     } else {
       current_settings.layer_keycodes[layer_index - 1u][key_index] =
           profile->layer_keycodes[layer_index - 1u][key_index];
     }
 
-    trigger_reload_settings();
+    trigger_reload_key_settings(key_index);
+    if (socd_runtime_changed) {
+      socd_load_settings();
+    }
   }
 
-  settings_mark_dirty();
+  settings_mark_profile_dirty(profile_index, false);
   return true;
 }
 
@@ -2776,12 +3762,21 @@ const settings_gamepad_t *settings_get_gamepad(void) {
 }
 
 bool settings_set_gamepad(const settings_gamepad_t *gamepad) {
+  settings_profile_t *profile = settings_active_profile_mut();
+  settings_gamepad_t sanitized;
   if (gamepad == NULL) {
     return false;
   }
 
-  memcpy(&current_settings.gamepad, gamepad, sizeof(settings_gamepad_t));
-  settings_gamepad_sanitize(&current_settings.gamepad);
+  sanitized = *gamepad;
+  settings_gamepad_sanitize(&sanitized);
+  if (memcmp(&current_settings.gamepad, &sanitized, sizeof(sanitized)) == 0) {
+    return true;
+  }
+  current_settings.gamepad = sanitized;
+  if (profile != NULL) {
+    profile->gamepad = current_settings.gamepad;
+  }
   gamepad_hid_reload_settings();
   settings_mark_dirty();
   return true;
@@ -2796,11 +3791,19 @@ gamepad_api_mode_t settings_get_gamepad_api_mode(void) {
 }
 
 bool settings_set_gamepad_api_mode(gamepad_api_mode_t mode) {
+  settings_profile_t *profile = settings_active_profile_mut();
   if ((uint8_t)mode >= (uint8_t)GAMEPAD_API_MAX) {
     return false;
   }
 
+  if (current_settings.gamepad.api_mode == (uint8_t)mode) {
+    return true;
+  }
+
   current_settings.gamepad.api_mode = (uint8_t)mode;
+  if (profile != NULL) {
+    profile->gamepad = current_settings.gamepad;
+  }
   gamepad_hid_reload_settings();
   settings_mark_dirty();
   return true;
@@ -2818,7 +3821,16 @@ bool settings_set_rotary_encoder(const settings_rotary_encoder_t *rotary) {
 
   memcpy(&sanitized, rotary, sizeof(sanitized));
   settings_rotary_encoder_sanitize(&sanitized);
+  if (memcmp(&current_settings.rotary, &sanitized, sizeof(sanitized)) == 0) {
+    return true;
+  }
   current_settings.rotary = sanitized;
+  {
+    settings_profile_t *profile = settings_active_profile_mut();
+    if (profile != NULL) {
+      profile->rotary = sanitized;
+    }
+  }
   settings_mark_dirty();
   return true;
 }
@@ -2831,35 +3843,69 @@ const settings_calibration_t *settings_get_calibration(void) {
   return &current_settings.calibration;
 }
 
-bool settings_set_calibration(const settings_calibration_t *calibration) {
-  if (calibration == NULL)
+static bool settings_calibration_is_valid(
+    const settings_calibration_t *calibration) {
+  if (calibration == NULL || calibration->lut_zero_value < 0 ||
+      calibration->lut_zero_value > (int16_t)SETTINGS_ADC_MAX_VALUE) {
     return false;
+  }
+
+  for (uint8_t i = 0u; i < NUM_KEYS; i++) {
+    int32_t zero = calibration->key_zero_values[i];
+    int32_t maximum = calibration->key_max_values[i];
+    if (zero < 0 || maximum < 0 ||
+        zero > (int32_t)SETTINGS_ADC_MAX_VALUE ||
+        maximum > (int32_t)SETTINGS_ADC_MAX_VALUE ||
+        maximum - zero < (int32_t)SETTINGS_CALIBRATION_MIN_SPAN_ADC) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool settings_set_calibration(const settings_calibration_t *calibration) {
+  if (!settings_calibration_is_valid(calibration))
+    return false;
+
+  if (memcmp(&current_settings.calibration, calibration,
+             sizeof(*calibration)) == 0) {
+    return true;
+  }
 
   memcpy(&current_settings.calibration, calibration,
          sizeof(settings_calibration_t));
   calibration_load_settings();
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
 bool settings_set_key_calibration(uint8_t key_index, int16_t zero_value) {
-  if (key_index >= NUM_KEYS)
+  if (key_index >= NUM_KEYS || zero_value < 0 ||
+      zero_value > (int16_t)SETTINGS_ADC_MAX_VALUE ||
+      (int32_t)current_settings.calibration.key_max_values[key_index] -
+              zero_value <
+          (int32_t)SETTINGS_CALIBRATION_MIN_SPAN_ADC)
     return false;
 
   current_settings.calibration.key_zero_values[key_index] = zero_value;
   calibration_load_settings();
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
 bool settings_set_key_calibration_max(uint8_t key_index, int16_t max_value) {
-  if (key_index >= NUM_KEYS) {
+  if (key_index >= NUM_KEYS || max_value < 0 ||
+      max_value > (int16_t)SETTINGS_ADC_MAX_VALUE ||
+      (int32_t)max_value -
+              current_settings.calibration.key_zero_values[key_index] <
+          (int32_t)SETTINGS_CALIBRATION_MIN_SPAN_ADC) {
     return false;
   }
 
   current_settings.calibration.key_max_values[key_index] = max_value;
   calibration_load_settings();
-  settings_mark_dirty();
+  settings_mark_global_dirty();
   return true;
 }
 
@@ -2877,8 +3923,13 @@ bool settings_set_key_curve(uint8_t key_index, const settings_curve_t *curve) {
   if (key_index >= NUM_KEYS || curve == NULL)
     return false;
 
-  memcpy(&current_settings.keys[key_index].curve, curve,
-         sizeof(settings_curve_t));
+  current_settings.keys[key_index].curve = *curve;
+  if (current_settings.keys[key_index].curve.p1.x >
+      current_settings.keys[key_index].curve.p2.x) {
+    current_settings.keys[key_index].curve.p2.x =
+        current_settings.keys[key_index].curve.p1.x;
+  }
+  settings_mirror_active_key(key_index);
   settings_mark_dirty();
   return true;
 }
@@ -2888,6 +3939,7 @@ bool settings_set_key_curve_enabled(uint8_t key_index, bool enabled) {
     return false;
 
   current_settings.keys[key_index].curve_enabled = enabled ? 1 : 0;
+  settings_mirror_active_key(key_index);
   settings_mark_dirty();
   return true;
 }
@@ -2929,7 +3981,11 @@ static uint8_t bezier_cubic(uint8_t t_byte, uint8_t p0, uint8_t p1, uint8_t p2,
   return (uint8_t)result;
 }
 
-uint8_t settings_apply_curve(uint8_t key_index, uint8_t input) {
+__attribute__((optimize("O3"))) uint8_t
+settings_apply_curve(uint8_t key_index, uint8_t input) {
+  uint8_t low = 0u;
+  uint8_t high = 255u;
+
   if (key_index >= NUM_KEYS)
     return input;
 
@@ -2939,16 +3995,23 @@ uint8_t settings_apply_curve(uint8_t key_index, uint8_t input) {
 
   const settings_curve_t *curve = &current_settings.keys[key_index].curve;
 
-  // For bezier curve, we need to find t such that bezier_x(t) = input
-  // Then return bezier_y(t)
-  // Since this is computationally expensive, we use a simpler approach:
-  // Assume X is roughly linear and just compute Y at t=input/255
+  /* Invert the monotonic X curve with an eight-step integer binary search,
+   * then evaluate Y at the same parameter. */
+  for (uint8_t iteration = 0u; iteration < 8u && low < high; iteration++) {
+    uint8_t mid = (uint8_t)(low + ((uint8_t)(high - low) / 2u));
+    uint8_t x = bezier_cubic(mid, 0u, curve->p1.x, curve->p2.x, 255u);
+    if (x < input) {
+      low = (uint8_t)(mid + 1u);
+    } else {
+      high = mid;
+    }
+  }
 
-  // P0 = (0, 0), P1 = curve->p1, P2 = curve->p2, P3 = (255, 255)
-  return bezier_cubic(input, 0, curve->p1.y, curve->p2.y, 255);
+  return bezier_cubic(high, 0u, curve->p1.y, curve->p2.y, 255u);
 }
 
-uint8_t settings_gamepad_apply_curve(uint16_t distance_01mm) {
+__attribute__((optimize("O3"))) uint8_t
+settings_gamepad_apply_curve(uint16_t distance_01mm) {
   const settings_gamepad_t *gamepad = &current_settings.gamepad;
   const settings_gamepad_curve_point_t *curve = gamepad->curve;
 
@@ -3002,12 +4065,20 @@ settings_get_key_gamepad_mapping(uint8_t key_index) {
 
 bool settings_set_key_gamepad_mapping(
     uint8_t key_index, const settings_gamepad_mapping_t *mapping) {
+  settings_gamepad_mapping_t sanitized;
+
   if (key_index >= NUM_KEYS || mapping == NULL)
     return false;
 
-  memcpy(&current_settings.keys[key_index].gamepad_map, mapping,
-         sizeof(settings_gamepad_mapping_t));
-  settings_gamepad_sanitize_mapping(&current_settings.keys[key_index].gamepad_map);
+  sanitized = *mapping;
+  settings_gamepad_sanitize_mapping(&sanitized);
+  if (memcmp(&current_settings.keys[key_index].gamepad_map, &sanitized,
+             sizeof(sanitized)) == 0) {
+    return true;
+  }
+
+  current_settings.keys[key_index].gamepad_map = sanitized;
+  settings_mirror_active_key(key_index);
   gamepad_hid_reload_settings();
   settings_mark_dirty();
   return true;

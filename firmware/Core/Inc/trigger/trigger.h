@@ -1,3 +1,6 @@
+#ifndef TRIGGER_TRIGGER_H_
+#define TRIGGER_TRIGGER_H_
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -41,7 +44,12 @@ typedef struct {
     uint32_t press_start_ms;
     uint16_t active_keycode;
     uint16_t pending_release_keycode;
+    key_behavior_mode_t pressed_behavior_mode;
+    uint16_t dks_generation;
+    uint32_t dks_candidate_since_ms;
     bool dks_is_bottomed_out;
+    bool dks_candidate_active;
+    bool dks_candidate_bottomed_out;
     bool dks_binding_pressed[SETTINGS_DYNAMIC_ZONE_COUNT];
     bool tap_hold_secondary_active;
     bool tap_hold_uppercase_active;
@@ -49,6 +57,7 @@ typedef struct {
     bool toggle_latched;
     bool toggle_hold_active;
     bool toggle_pending;
+    bool socd_output_suppressed;
 } key_behavior_runtime_t;
 
 typedef enum key_state_e {
@@ -77,8 +86,14 @@ uint16_t trigger_get_distance_01mm(uint8_t key);
 
 void trigger_reload_settings(void);
 
+/* Refresh one key from the currently active layer. This keeps interactive HID
+ * edits bounded instead of rebuilding all NUM_KEYS trigger records. */
+void trigger_reload_key_settings(uint8_t key);
+
 void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings);
 
 bool trigger_set_chatter_guard(bool enabled, uint8_t duration_ms);
 
 void trigger_get_chatter_guard(bool *enabled, uint8_t *duration_ms);
+
+#endif /* TRIGGER_TRIGGER_H_ */

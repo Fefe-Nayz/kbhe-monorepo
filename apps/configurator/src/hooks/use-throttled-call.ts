@@ -1,4 +1,115 @@
-import { useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
+
+export interface ThrottledCall<T> {
+  (value: T): void;
+  /** Drop a queued preview value without attempting to cancel the in-flight write. */
+  cancelPending: () => void;
+  /** Drop queued work and resolve after the current transport write settles. */
+  cancelAndWait: () => Promise<void>;
+  /** Resolve once both the in-flight and queued preview work are empty. */
+  waitForIdle: () => Promise<void>;
+}
+
+interface LatestWinsDispatcher<T> extends ThrottledCall<T> {
+  dispose: () => void;
+  setHandler: (handler: (value: T) => Promise<void>) => void;
+}
+
+const activeDispatchers = new Set<LatestWinsDispatcher<unknown>>();
+
+/**
+ * Profile switches and disconnects are transport barriers. A preview captured
+ * for the previous runtime context must never be replayed after that barrier.
+ */
+export function cancelAllThrottledCalls(): void {
+  for (const dispatcher of activeDispatchers) {
+    dispatcher.cancelPending();
+  }
+}
+
+export async function cancelAndDrainAllThrottledCalls(): Promise<void> {
+  const dispatchers = [...activeDispatchers];
+  for (const dispatcher of dispatchers) {
+    dispatcher.cancelPending();
+  }
+  await Promise.all(dispatchers.map((dispatcher) => dispatcher.waitForIdle()));
+}
+
+export function createLatestWinsDispatcher<T>(
+  fn: (value: T) => Promise<void>,
+): LatestWinsDispatcher<T> {
+  let handler = fn;
+  let inFlight = false;
+  let pending: T | undefined;
+  let hasPending = false;
+  let disposed = false;
+  let idleWaiters: Array<() => void> = [];
+
+  const resolveIdleWaiters = () => {
+    if (inFlight || hasPending) return;
+    const waiters = idleWaiters;
+    idleWaiters = [];
+    for (const resolve of waiters) resolve();
+  };
+
+  const cancelPending = () => {
+    hasPending = false;
+    pending = undefined;
+    resolveIdleWaiters();
+  };
+
+  const waitForIdle = (): Promise<void> => {
+    if (!inFlight && !hasPending) return Promise.resolve();
+    return new Promise((resolve) => idleWaiters.push(resolve));
+  };
+
+  const fire = async (value: T): Promise<void> => {
+    if (disposed) return;
+    inFlight = true;
+    hasPending = false;
+    try {
+      await handler(value);
+    } catch {
+      // Live previews are best effort. The final commit surfaces failures.
+    } finally {
+      inFlight = false;
+      if (!disposed && hasPending) {
+        const next = pending as T;
+        hasPending = false;
+        pending = undefined;
+        void fire(next);
+      } else {
+        resolveIdleWaiters();
+      }
+    }
+  };
+
+  const dispatch = ((value: T) => {
+    if (disposed) return;
+    if (inFlight) {
+      pending = value;
+      hasPending = true;
+      return;
+    }
+    void fire(value);
+  }) as LatestWinsDispatcher<T>;
+
+  dispatch.cancelPending = cancelPending;
+  dispatch.waitForIdle = waitForIdle;
+  dispatch.cancelAndWait = () => {
+    cancelPending();
+    return waitForIdle();
+  };
+  dispatch.setHandler = (nextHandler) => {
+    handler = nextHandler;
+  };
+  dispatch.dispose = () => {
+    disposed = true;
+    cancelPending();
+    resolveIdleWaiters();
+  };
+  return dispatch;
+}
 
 /**
  * Returns a stable dispatcher that executes `fn` with "latest-wins" throttling:
@@ -11,43 +122,20 @@ import { useRef, useCallback } from "react";
  */
 export function useThrottledCall<T>(
   fn: (value: T) => Promise<void>,
-): (value: T) => void {
-  // Always call the latest fn so closures over props/state stay fresh.
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
+): ThrottledCall<T> {
+  const [dispatcher] = useState(() => createLatestWinsDispatcher<T>(fn));
 
-  const inFlightRef = useRef(false);
-  const pendingRef = useRef<T | undefined>(undefined);
-  const hasPendingRef = useRef(false);
+  useEffect(() => {
+    dispatcher.setHandler(fn);
+  }, [dispatcher, fn]);
 
-  const fire = useCallback(async (value: T) => {
-    inFlightRef.current = true;
-    hasPendingRef.current = false;
-    try {
-      await fnRef.current(value);
-    } catch {
-      // Silently swallow errors from live preview calls — the commit
-      // mutation (on pointer-up) will surface errors properly.
-    } finally {
-      inFlightRef.current = false;
-      if (hasPendingRef.current) {
-        const next = pendingRef.current as T;
-        hasPendingRef.current = false;
-        pendingRef.current = undefined;
-        void fire(next);
-      }
-    }
-  }, []);
+  useEffect(() => {
+    activeDispatchers.add(dispatcher as LatestWinsDispatcher<unknown>);
+    return () => {
+      activeDispatchers.delete(dispatcher as LatestWinsDispatcher<unknown>);
+      dispatcher.dispose();
+    };
+  }, [dispatcher]);
 
-  return useCallback(
-    (value: T) => {
-      if (inFlightRef.current) {
-        pendingRef.current = value;
-        hasPendingRef.current = true;
-        return;
-      }
-      void fire(value);
-    },
-    [fire],
-  );
+  return dispatcher;
 }

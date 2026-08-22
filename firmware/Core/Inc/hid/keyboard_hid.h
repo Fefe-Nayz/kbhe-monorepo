@@ -159,6 +159,9 @@ uint8_t keyboard_hid_get_modifier_state(void);
  */
 void keyboard_hid_task(void);
 
+/** Preserve desired keys but force a fresh report after USB re-enumeration. */
+void keyboard_hid_on_umount(void);
+
 #ifdef __cplusplus
 }
 #endif

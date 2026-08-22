@@ -61,6 +61,7 @@ void adc_capture_process_scan(const uint16_t *adc_filtered_values,
     g_capture.sample_count++;
   } else {
     g_capture.overflow_count++;
+    g_capture.active = 0u;
   }
 
   if ((now_ms - g_capture.start_time_ms) >= g_capture.duration_ms) {

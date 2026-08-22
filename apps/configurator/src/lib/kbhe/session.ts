@@ -9,9 +9,19 @@
 
 import { create } from "zustand";
 import { kbheDevice } from "./device";
-import type { KbheTransportDeviceInfo } from "./transport";
+import { kbheCommander } from "./commander";
+import {
+  kbheDeviceStorageId,
+  selectKbheSessionDevice,
+  type KbheTransportDeviceInfo,
+} from "./transport";
 import { startVolumeService, stopVolumeService } from "./volume-service";
 import { SETTINGS_PROFILE_COUNT } from "./protocol";
+import { setKbheQueryScope } from "@/lib/query/keys";
+import {
+  cancelAllThrottledCalls,
+  cancelAndDrainAllThrottledCalls,
+} from "@/hooks/use-throttled-call";
 
 export type DeviceSessionStatus =
   | "disconnected"
@@ -85,6 +95,7 @@ let connectPromise: Promise<void> | null = null;
 let initialized = false;
 let generation = 0;
 let presenceFailures = 0;
+let preferredSerialNumber: string | null = null;
 
 const CONNECTED_PRESENCE_POLL_MS = 3000;
 const CONNECTED_PRESENCE_POLL_HIDDEN_MS = 6000;
@@ -136,6 +147,7 @@ function resetDisconnectedState() {
   _setFirmwareVersion(null);
   _setError(null);
   _clearRuntimeProfileState();
+  setKbheQueryScope(null, null);
 }
 
 function scheduleReconnect(delayMs = 2500) {
@@ -192,6 +204,10 @@ export const DeviceSessionManager = {
         ramOnlyMode,
         lastRuntimeSyncAt: Date.now(),
       });
+      setKbheQueryScope(
+        state.deviceInfo ? kbheDeviceStorageId(state.deviceInfo) : null,
+        active?.profile_index ?? null,
+      );
     } catch {
       if (expectedGeneration != null && expectedGeneration !== generation) {
         return;
@@ -214,7 +230,7 @@ export const DeviceSessionManager = {
     }, 0);
   },
 
-  async connect() {
+  async connect(expectedSerialNumber?: string) {
     const state = useDeviceSession.getState();
     if (state.status === "connecting" || connectPromise) {
       return connectPromise ?? Promise.resolve();
@@ -239,15 +255,30 @@ export const DeviceSessionManager = {
           return;
         }
 
-        const runtimeDevice = devices.find((device) => device.kind === "runtime");
-        const device = runtimeDevice ?? devices[0]!;
+        const requestedSerial = expectedSerialNumber?.trim() || preferredSerialNumber;
+        const device = selectKbheSessionDevice(devices, requestedSerial);
+        if (!device) {
+          resetDisconnectedState();
+          scheduleReconnect();
+          return;
+        }
+        const serialNumber = device.serialNumber!.trim();
 
-        await kbheDevice.connect(device.path);
+        await kbheDevice.connect(device.path, undefined, serialNumber);
         if (currentGeneration !== generation) {
+          // disconnect() may have won the race before the HID open completed.
+          // Do not leave an untracked backend handle connected in that case.
+          try {
+            await kbheDevice.disconnect();
+          } catch {
+            // The superseding session owns subsequent recovery.
+          }
           return;
         }
 
+        preferredSerialNumber = serialNumber;
         _setDeviceInfo(device);
+        setKbheQueryScope(kbheDeviceStorageId(device), null);
 
         if (device.kind === "updater") {
           _setFirmwareVersion(null);
@@ -294,23 +325,112 @@ export const DeviceSessionManager = {
   },
 
   async disconnect() {
+    const supersededConnect = connectPromise;
+    cancelAllThrottledCalls();
+    preferredSerialNumber = null;
     generation += 1;
     clearReconnectTimer();
     stopPresencePolling();
     stopVolumeService();
 
     try {
+      await cancelAndDrainAllThrottledCalls();
+      await kbheCommander.waitForIdle();
       await kbheDevice.disconnect();
     } catch {
       // Ignore disconnect errors during teardown/reconnect.
+    }
+
+    // A connect that was already enumerating/opening may finish after the
+    // first backend disconnect. Wait for its generation-guarded cleanup so a
+    // following reconnect cannot inherit (or be closed by) that stale open.
+    if (supersededConnect) {
+      try {
+        await supersededConnect;
+      } catch {
+        // The disconnected state below is authoritative.
+      }
     }
 
     resetDisconnectedState();
   },
 
   async reconnect() {
+    const serialNumber = useDeviceSession.getState().deviceInfo?.serialNumber?.trim()
+      || preferredSerialNumber
+      || undefined;
     await DeviceSessionManager.disconnect();
-    await DeviceSessionManager.connect();
+    await DeviceSessionManager.connect(serialNumber);
+  },
+
+  async reenumerate(timeoutSeconds = 8): Promise<boolean> {
+    const supersededConnect = connectPromise;
+    const currentGeneration = ++generation;
+    clearReconnectTimer();
+    stopPresencePolling();
+    stopVolumeService();
+    cancelAllThrottledCalls();
+
+    const state = useDeviceSession.getState();
+    const expectedSerialNumber = state.deviceInfo?.serialNumber?.trim()
+      || preferredSerialNumber;
+    if (!expectedSerialNumber) {
+      state._setStatus("error");
+      state._setError("The connected keyboard has no stable USB serial number");
+      return false;
+    }
+    state._setStatus("connecting");
+    state._setError(null);
+
+    try {
+      if (supersededConnect) {
+        await supersededConnect;
+      }
+      await cancelAndDrainAllThrottledCalls();
+      await kbheCommander.waitForIdle();
+      const ok = await kbheDevice.usbReenumerate(timeoutSeconds);
+      if (!ok || currentGeneration !== generation) {
+        if (!ok && currentGeneration === generation) {
+          throw new Error("The keyboard did not reconnect after USB re-enumeration");
+        }
+        return false;
+      }
+
+      const [connection, devices] = await Promise.all([
+        kbheDevice.connectionState(),
+        kbheDevice.listDevices(),
+      ]);
+      if (currentGeneration !== generation) {
+        return false;
+      }
+
+      const device = devices.find(
+        (candidate) => candidate.path === connection.path
+          && candidate.serialNumber?.trim() === expectedSerialNumber,
+      );
+      if (!device || device.kind !== "runtime") {
+        throw new Error("The re-enumerated keyboard could not be identified");
+      }
+
+      preferredSerialNumber = expectedSerialNumber;
+      state._setDeviceInfo(device);
+      setKbheQueryScope(kbheDeviceStorageId(device), null);
+      state._setStatus("connected");
+      await DeviceSessionManager.refreshRuntimeProfileState(currentGeneration);
+      DeviceSessionManager.startPresencePolling(currentGeneration);
+      void DeviceSessionManager.syncVolumeService();
+      return true;
+    } catch (error) {
+      if (currentGeneration !== generation) {
+        return false;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      state._setStatus("error");
+      state._setError(message);
+      scheduleReconnect(1500);
+      return false;
+    }
   },
 
   async syncVolumeService() {
@@ -356,6 +476,14 @@ export const DeviceSessionManager = {
 
       try {
         const connectedPath = state.deviceInfo?.path;
+        const connectedSerialNumber = state.deviceInfo?.serialNumber?.trim()
+          || preferredSerialNumber;
+        const connectedKind = state.deviceInfo?.kind;
+        const matchesConnectedIdentity = (device: KbheTransportDeviceInfo) => Boolean(
+          connectedSerialNumber
+          && device.serialNumber?.trim() === connectedSerialNumber
+          && (!connectedKind || device.kind === connectedKind),
+        );
         let stillPresent = false;
 
         if (state.status === "connected") {
@@ -367,18 +495,18 @@ export const DeviceSessionManager = {
             if (expectedGeneration !== generation) {
               return;
             }
-            stillPresent = connectedPath
-              ? devices.some((device) => device.path === connectedPath)
-              : devices.length > 0;
+            stillPresent = connectedSerialNumber
+              ? devices.some(matchesConnectedIdentity)
+              : Boolean(connectedPath && devices.some((device) => device.path === connectedPath));
           }
         } else {
           const devices = await kbheDevice.listDevices();
           if (expectedGeneration !== generation) {
             return;
           }
-          stillPresent = connectedPath
-            ? devices.some((device) => device.path === connectedPath)
-            : devices.length > 0;
+          stillPresent = connectedSerialNumber
+            ? devices.some(matchesConnectedIdentity)
+            : Boolean(connectedPath && devices.some((device) => device.path === connectedPath));
         }
 
         if (expectedGeneration !== generation) {
@@ -396,6 +524,23 @@ export const DeviceSessionManager = {
         }
 
         presenceFailures = 0;
+        if (state.status === "connected") {
+          const active = await kbheDevice.getActiveProfile();
+          if (expectedGeneration !== generation) {
+            return;
+          }
+          if (active && active.profile_index !== useDeviceSession.getState().activeProfileIndex) {
+            useDeviceSession.getState()._setRuntimeProfileState({
+              activeProfileIndex: active.profile_index,
+              profileUsedMask: active.profile_used_mask,
+              lastRuntimeSyncAt: Date.now(),
+            });
+            setKbheQueryScope(
+              state.deviceInfo ? kbheDeviceStorageId(state.deviceInfo) : null,
+              active.profile_index,
+            );
+          }
+        }
       } catch {
         if (expectedGeneration !== generation) {
           return;

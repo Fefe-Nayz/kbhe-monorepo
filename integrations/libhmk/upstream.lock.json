@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "fork": {
+    "repository": "https://github.com/Fefedu973/libhmk.git",
+    "commit": "57074ac3e790ca5b1446aaa3aaef5b5f60afbabe",
+    "branch": "feature/rgb-hid-gamepad",
+    "license": "GPL-3.0"
+  },
+  "upstream": {
+    "repository": "https://github.com/peppapighs/libhmk.git",
+    "commit": "0a44cdbd7816c590c025ed0cb5950e9852623e21",
+    "branch": "dev",
+    "license": "GPL-3.0"
+  },
+  "hmkconf": {
+    "repository": "https://github.com/peppapighs/hmkconf.git",
+    "commitReviewed": "fb9cfa47667f40d6df2fb09753e34e1d0511b71a",
+    "license": "GPL-3.0"
+  },
+  "toolchain": {
+    "platformioPlatform": "ststm32@19.7.1",
+    "tinyusb": "0.20.0"
+  },
+  "patch": {
+    "file": "patches/libhmk-kbhe-rgb.patch",
+    "baseCommit": "0a44cdbd7816c590c025ed0cb5950e9852623e21",
+    "resultCommit": "57074ac3e790ca5b1446aaa3aaef5b5f60afbabe",
+    "sha256": "dd4b3a8bf4e3dd397d88d1a942db7263932abe50e1aeb14d675044f35fc8e7e1"
+  }
+}

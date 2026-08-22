@@ -3,7 +3,9 @@
 #include "analog/filter.h"
 #include "analog/lut.h"
 #include "analog/calibration.h"
+#include "adc_capture.h"
 #include "diagnostics.h"
+#include "settings.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -24,9 +26,10 @@ static uint16_t distance_values[NUM_KEYS];
 
 static uint8_t normalized_values[NUM_KEYS];
 
-static uint8_t current_mux_channel = 0;
+static volatile uint8_t current_mux_channel = 0;
 
-static bool is_scan_complete = false;
+static volatile bool is_scan_complete = false;
+static volatile bool scan_fault_pending = false;
 
 static analog_task_monitor_t analog_task_monitor;
 static uint8_t analog_profile_counter = 0u;
@@ -80,6 +83,9 @@ static const uint8_t LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[NUM_KEYS] = {
 void analog_init(AnalogConfig_t* config) {
     // Copy the configuration to the static variable
     analog_config = *config;
+    current_mux_channel = 0u;
+    is_scan_complete = false;
+    scan_fault_pending = false;
     // Initialize adc buffer to 0
     for (uint8_t i = 0; i < NUM_MUX; i++) {
         adc_buffer[i] = 0;
@@ -226,6 +232,8 @@ void analog_task() {
     if (!filter_is_initialized()) {
         filter_set_initialized(true);
     }
+
+    adc_capture_process_scan(filtered_values, NUM_KEYS, HAL_GetTick());
 }
 
 /*
@@ -283,6 +291,28 @@ int16_t analog_read_distance_value(uint8_t key) {
     return distance_values[key];
 }
 
+int16_t analog_read_travel_distance_value(uint8_t key) {
+    uint32_t distance = 0u;
+    uint32_t calibrated_max = 0u;
+
+    if (key >= NUM_KEYS) {
+        return 0;
+    }
+
+    distance = distance_values[key];
+    calibrated_max = calibration_get_max_distance_um(key);
+    if (distance == 0u || calibrated_max == 0u) {
+        return 0;
+    }
+    if (distance >= calibrated_max) {
+        return (int16_t)SETTINGS_LOGICAL_TRAVEL_UM;
+    }
+
+    return (int16_t)(((distance * (uint32_t)SETTINGS_LOGICAL_TRAVEL_UM) +
+                      (calibrated_max / 2u)) /
+                     calibrated_max);
+}
+
 uint8_t analog_read_normalized_value(uint8_t key) {
     if (key >= NUM_KEYS) {
         return 0u;
@@ -311,6 +341,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     // Reset to channel 0 if we've reached the end of the channels
     if (current_mux_channel >= NUM_MUX_CHANNELS) {
         current_mux_channel = 0;
+        __DMB();
         is_scan_complete = true;
     }
 
@@ -326,11 +357,50 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 }
 
 bool analog_is_scan_complete() {
-    return is_scan_complete;
+    bool complete = is_scan_complete;
+    if (complete) {
+        __DMB();
+    }
+    return complete;
 }
 
 void analog_set_scan_complete(bool complete) {
+    __DMB();
     is_scan_complete = complete;
+    __DMB();
+}
+
+void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc) {
+    if (hadc == NULL || analog_config.hadc == NULL ||
+        hadc->Instance != analog_config.hadc->Instance) {
+        return;
+    }
+    scan_fault_pending = true;
+}
+
+bool analog_take_scan_fault(void) {
+    uint32_t primask = __get_PRIMASK();
+    bool pending = false;
+    __disable_irq();
+    pending = scan_fault_pending;
+    scan_fault_pending = false;
+    if (primask == 0u) {
+        __enable_irq();
+    }
+    return pending;
+}
+
+void analog_reset_scan_state(void) {
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    current_mux_channel = 0u;
+    is_scan_complete = false;
+    scan_fault_pending = false;
+    __DMB();
+    multiplexer_select_mux_channel(0u);
+    if (primask == 0u) {
+        __enable_irq();
+    }
 }
 
 uint16_t* analog_get_adc_buffer_ptr(void) {

@@ -29,12 +29,15 @@
 #include "diagnostics.h"
 
 #include "settings.h"
+#include "profile_document_store.h"
+#include "flash_storage.h"
 
 #include "stm32f7xx_hal_gpio.h"
 #include "trigger/trigger.h"
 #include "trigger/socd.h"
 
 #include "adc_capture.h"
+#include "action_engine.h"
 // #include "adc_ema.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
@@ -68,9 +71,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define KBHE_TIMING_PROFILE_DECIMATION 32u
+#define KBHE_SCAN_DEADLINE_US 125u
 #define MCU_LED_THERMAL_LIMIT_C 70
 #define MCU_LED_THERMAL_HYSTERESIS_C 3
 #define MCU_LED_THERMAL_BRIGHTNESS_MAX 96u
+#define ADC_SCAN_WATCHDOG_MS 100u
 
 /* USER CODE END PD */
 
@@ -173,6 +178,12 @@ uint32_t task_gamepad_us = 0;
 uint32_t task_led_us = 0;
 uint32_t task_total_us = 0;
 uint32_t mcu_scan_cycle_us_live = 0;
+uint32_t mcu_scan_cycle_us_max = 0;
+uint32_t mcu_scan_deadline_miss_count = 0;
+#define MCU_SCAN_HISTOGRAM_BIN_US 4u
+#define MCU_SCAN_HISTOGRAM_BIN_COUNT 256u
+static uint64_t mcu_scan_cycle_histogram[MCU_SCAN_HISTOGRAM_BIN_COUNT];
+static uint64_t mcu_scan_cycle_sample_count = 0u;
 uint32_t mcu_work_us_live = 0;
 uint16_t mcu_load_permille_live = 0;
 int16_t mcu_temperature_c_live = 0;
@@ -180,6 +191,8 @@ uint16_t mcu_vref_mv_live = 0;
 uint8_t mcu_temperature_valid_live = 0;
 static uint8_t timing_profile_counter = 0u;
 static uint32_t mcu_metrics_next_sample_ms = 0u;
+static uint32_t mcu_metrics_conversion_started_ms = 0u;
+static bool mcu_metrics_conversion_pending = false;
 static bool mcu_led_thermal_limit_active = false;
 static uint8_t mcu_led_last_applied_brightness = 0xFFu;
 
@@ -355,6 +368,41 @@ static void mcu_init_injected_sensors(void) {
 }
 
 static void mcu_sample_internal_sensors(uint32_t now_ms) {
+  if (mcu_metrics_conversion_pending) {
+    if (HAL_ADCEx_InjectedPollForConversion(&hadc1, 0u) == HAL_OK) {
+      uint32_t vref_raw =
+          HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
+      uint32_t temp_raw =
+          HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_2);
+      (void)HAL_ADCEx_InjectedStop(&hadc1);
+      mcu_metrics_conversion_pending = false;
+
+      if (vref_raw == 0u || temp_raw == 0u) {
+        mcu_temperature_valid_live = 0u;
+        return;
+      }
+
+      uint32_t vref_mv =
+          __LL_ADC_CALC_VREFANALOG_VOLTAGE(vref_raw, LL_ADC_RESOLUTION_12B);
+      int32_t temperature_c =
+          __LL_ADC_CALC_TEMPERATURE(vref_mv, temp_raw, LL_ADC_RESOLUTION_12B);
+
+      mcu_vref_mv_live = (uint16_t)vref_mv;
+      mcu_temperature_c_live = (int16_t)temperature_c;
+      mcu_temperature_valid_live = 1u;
+      return;
+    }
+
+    /* A peripheral fault must not turn the 4 ms diagnostic timeout into a
+     * blocking hole in the scan loop. Poll once per loop and abort later. */
+    if ((uint32_t)(now_ms - mcu_metrics_conversion_started_ms) >= 4u) {
+      (void)HAL_ADCEx_InjectedStop(&hadc1);
+      mcu_metrics_conversion_pending = false;
+      mcu_temperature_valid_live = 0u;
+    }
+    return;
+  }
+
   if (!diagnostics_is_perf_active() &&
       !settings_is_led_thermal_protection_enabled()) {
     return;
@@ -368,30 +416,29 @@ static void mcu_sample_internal_sensors(uint32_t now_ms) {
     mcu_temperature_valid_live = 0u;
     return;
   }
+  mcu_metrics_conversion_started_ms = now_ms;
+  mcu_metrics_conversion_pending = true;
+}
 
-  if (HAL_ADCEx_InjectedPollForConversion(&hadc1, 4u) != HAL_OK) {
-    (void)HAL_ADCEx_InjectedStop(&hadc1);
-    mcu_temperature_valid_live = 0u;
-    return;
+uint16_t mcu_scan_cycle_p99_us(void) {
+  uint64_t target = 0u;
+  uint64_t cumulative = 0u;
+
+  if (mcu_scan_cycle_sample_count == 0u) {
+    return 0u;
   }
-
-  uint32_t vref_raw = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
-  uint32_t temp_raw = HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_2);
-  (void)HAL_ADCEx_InjectedStop(&hadc1);
-
-  if (vref_raw == 0u || temp_raw == 0u) {
-    mcu_temperature_valid_live = 0u;
-    return;
+  target = (mcu_scan_cycle_sample_count * 99u + 99u) / 100u;
+  for (uint16_t bin = 0u; bin < MCU_SCAN_HISTOGRAM_BIN_COUNT; bin++) {
+    cumulative += mcu_scan_cycle_histogram[bin];
+    if (cumulative >= target) {
+      /* Report the conservative upper edge of the 4 us bucket. */
+      return (uint16_t)(bin * MCU_SCAN_HISTOGRAM_BIN_US +
+                        (MCU_SCAN_HISTOGRAM_BIN_US - 1u));
+    }
   }
-
-  uint32_t vref_mv =
-      __LL_ADC_CALC_VREFANALOG_VOLTAGE(vref_raw, LL_ADC_RESOLUTION_12B);
-  int32_t temperature_c =
-      __LL_ADC_CALC_TEMPERATURE(vref_mv, temp_raw, LL_ADC_RESOLUTION_12B);
-
-  mcu_vref_mv_live = (uint16_t)vref_mv;
-  mcu_temperature_c_live = (int16_t)temperature_c;
-  mcu_temperature_valid_live = 1u;
+  return (uint16_t)(MCU_SCAN_HISTOGRAM_BIN_COUNT *
+                        MCU_SCAN_HISTOGRAM_BIN_US -
+                    1u);
 }
 
 static void mcu_apply_led_thermal_protection(void) {
@@ -638,6 +685,10 @@ int main(void) {
    * descriptors reflect the saved gamepad API mode on the next enumeration.
    */
   settings_init();
+  /* Action profiles share the flash journal and drive LED overlays, so both
+   * settings/flash and the LED matrix must be ready before loading them. */
+  action_engine_init();
+  (void)action_engine_activate_profile(settings_get_active_profile_index());
 
   // Initialisation TinyUSB - RHPORT 1 = USB HS avec PHY intégré
   const tusb_rhport_init_t rhport_init = {.role = TUSB_ROLE_DEVICE,
@@ -663,7 +714,14 @@ int main(void) {
   if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) != HAL_OK) {
     Error_Handler();
   }
+  /* HAL enables the DMA half-transfer IRQ even though this scanner consumes
+   * only complete mux rows.  Disable it before arming TIM4: otherwise every
+   * row produces an empty ISR in addition to the completion ISR (64 kHz at an
+   * 8 kHz full-board scan rate). */
+  __HAL_DMA_DISABLE_IT(hadc1.DMA_Handle, DMA_IT_HT);
   TIM4_StartOneShot_TRGO();
+  uint32_t adc_last_progress_ms = HAL_GetTick();
+  bool adc_recovery_pending = false;
 
   /* USER CODE END 2 */
 
@@ -676,16 +734,46 @@ int main(void) {
     uint32_t live_task_start_cycles = 0;
     uint32_t live_scan_cycle_us = 0;
 
-    tud_task(); // TinyUSB device task
-    raw_hid_task();
-    consumer_hid_task();
-    mouse_hid_task();
-    updater_app_task();
+    uint32_t adc_now_ms = HAL_GetTick();
+    if (analog_take_scan_fault() ||
+        (!analog_is_scan_complete() &&
+         (uint32_t)(adc_now_ms - adc_last_progress_ms) >=
+             ADC_SCAN_WATCHDOG_MS)) {
+      adc_recovery_pending = true;
+    }
+    if (adc_recovery_pending) {
+      TIM4->CR1 &= ~TIM_CR1_CEN;
+      (void)HAL_ADC_Stop_DMA(&hadc1);
+      analog_reset_scan_state();
+      if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) == HAL_OK) {
+        /* HAL_ADC_Start_DMA() re-enables both transfer callbacks. */
+        __HAL_DMA_DISABLE_IT(hadc1.DMA_Handle, DMA_IT_HT);
+        adc_full_cycle_start_cycles = DWT->CYCCNT;
+        adc_last_progress_ms = adc_now_ms;
+        adc_recovery_pending = false;
+        TIM4_StartOneShot_TRGO();
+      }
+    }
 
     // If a full ADC scan is complete, process keys and restart
     if (analog_is_scan_complete()) {
       uint32_t now = DWT->CYCCNT;
       live_scan_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
+      {
+        uint32_t histogram_bin =
+            live_scan_cycle_us / MCU_SCAN_HISTOGRAM_BIN_US;
+        if (histogram_bin >= MCU_SCAN_HISTOGRAM_BIN_COUNT) {
+          histogram_bin = MCU_SCAN_HISTOGRAM_BIN_COUNT - 1u;
+        }
+        mcu_scan_cycle_histogram[histogram_bin]++;
+        mcu_scan_cycle_sample_count++;
+      }
+      if (live_scan_cycle_us > mcu_scan_cycle_us_max) {
+        mcu_scan_cycle_us_max = live_scan_cycle_us;
+      }
+      if (live_scan_cycle_us >= KBHE_SCAN_DEADLINE_US) {
+        mcu_scan_deadline_miss_count++;
+      }
       profile_timing = should_profile_timing_scan();
       live_task_start_cycles = now;
       if (profile_timing) {
@@ -710,6 +798,8 @@ int main(void) {
         socd_task();
         task_socd_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
+        action_engine_tick(HAL_GetTick());
+
         step_start_cycles = DWT->CYCCNT;
         keyboard_hid_task();
         task_keyboard_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
@@ -728,6 +818,7 @@ int main(void) {
         calibration_guided_on_scan(HAL_GetTick());
         trigger_task();
         socd_task();
+        action_engine_tick(HAL_GetTick());
         keyboard_hid_task();
         keyboard_nkro_hid_task();
         gamepad_hid_refresh_state();
@@ -737,23 +828,69 @@ int main(void) {
 
       analog_set_scan_complete(false);
       TIM4_StartOneShot_TRGO();
+      adc_last_progress_ms = HAL_GetTick();
+
+      /* One CRC/program budget unit per completed scan. In particular, do not
+       * run persistence repeatedly while the next DMA scan is in flight. */
+      flash_storage_metrics_t persistence_before = {0};
+      flash_storage_metrics_t persistence_after_profile = {0};
+      flash_storage_get_metrics(&persistence_before);
+      profile_document_store_async_task(32u, 1u);
+      action_store_async_task();
+      flash_storage_get_metrics(&persistence_after_profile);
+      settings_task_budgeted(
+          adc_last_progress_ms,
+          persistence_after_profile.async_steps ==
+                  persistence_before.async_steps
+              ? 1u
+              : 0u);
+    }
+
+    /* Input has strict priority over best-effort USB/control work. Check the
+     * DMA completion flag between bounded services so a host command burst can
+     * never build an unbounded queue in front of a completed scan. */
+    if (!analog_is_scan_complete()) {
+      tud_task(); // TinyUSB device task
+    }
+    if (!analog_is_scan_complete()) {
+      raw_hid_task();
+    }
+    if (!analog_is_scan_complete()) {
+      consumer_hid_task();
+    }
+    if (!analog_is_scan_complete()) {
+      mouse_hid_task();
+    }
+    if (!analog_is_scan_complete()) {
+      updater_app_task();
     }
 
     // LED/UI timing should not depend on ADC scan state. The scan completes so
     // quickly on the 82-key board that gating animation updates behind the
     // "no scan complete" branch effectively starves LED effects.
     uint32_t now_ms = HAL_GetTick();
-    mcu_sample_internal_sensors(now_ms);
+    if (!analog_is_scan_complete()) {
+      mcu_sample_internal_sensors(now_ms);
+    }
     uint32_t led_start_cycles = 0u;
     if (profile_timing) {
       led_start_cycles = DWT->CYCCNT;
     }
-    calibration_guided_tick(now_ms);
-    rotary_encoder_task(now_ms);
-    led_matrix_effect_tick(now_ms);
-    led_indicator_tick(now_ms);
-    settings_task(now_ms);
-    mcu_apply_led_thermal_protection();
+    if (!analog_is_scan_complete()) {
+      calibration_guided_tick(now_ms);
+    }
+    if (!analog_is_scan_complete()) {
+      rotary_encoder_task(now_ms);
+    }
+    if (!analog_is_scan_complete()) {
+      led_matrix_effect_tick(now_ms);
+    }
+    if (!analog_is_scan_complete()) {
+      led_indicator_tick(now_ms);
+    }
+    if (!analog_is_scan_complete()) {
+      mcu_apply_led_thermal_protection();
+    }
     if (profile_timing) {
       task_led_us = cycles_to_us(DWT->CYCCNT - led_start_cycles);
     }
@@ -1092,7 +1229,7 @@ static void MX_USB_OTG_HS_PCD_Init(void) {
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   // 3. Configurer les interruptions
-  HAL_NVIC_SetPriority(OTG_HS_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(OTG_HS_IRQn, KBHE_NVIC_PRIORITY_USB, 0);
   HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
 
   // TinyUSB fera le reste via tusb_init() et dwc2_phy_init()
@@ -1127,10 +1264,10 @@ static void MX_DMA_Init(void) {
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, KBHE_NVIC_PRIORITY_LED_DMA, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, KBHE_NVIC_PRIORITY_INPUT, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 }
 

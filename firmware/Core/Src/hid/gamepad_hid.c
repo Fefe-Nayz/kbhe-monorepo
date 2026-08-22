@@ -511,6 +511,16 @@ void gamepad_hid_refresh_state(void) {
       uint8_t key = cached_layer_axis_keys[active_layer][index];
       const settings_gamepad_mapping_t *mapping = &cached_mappings[key];
       uint16_t distance_01mm = trigger_get_distance_01mm(key);
+      if (settings_is_key_curve_enabled(key)) {
+        uint8_t normalized = (uint8_t)(
+            ((uint32_t)distance_01mm * 255u +
+             (GAMEPAD_CURVE_MAX_DISTANCE_01MM / 2u)) /
+            GAMEPAD_CURVE_MAX_DISTANCE_01MM);
+        uint8_t curved = settings_apply_curve(key, normalized);
+        distance_01mm = (uint16_t)(
+            ((uint32_t)curved * GAMEPAD_CURVE_MAX_DISTANCE_01MM + 127u) /
+            255u);
+      }
       uint8_t analog_value = gamepad_apply_curve_cached(distance_01mm);
 
       if (mapping->direction == (uint8_t)GAMEPAD_DIR_NEGATIVE) {

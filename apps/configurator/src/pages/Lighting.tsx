@@ -1,14 +1,16 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
 import { usePageVisible } from "@/hooks/use-page-visible";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useDeviceSession } from "@/lib/kbhe/session";
-import { kbheDevice } from "@/lib/kbhe/device";
+import { kbheDevice, type LedIdleOptions } from "@/lib/kbhe/device";
+import { requireDeviceSuccess } from "@/lib/kbhe/mutation-result";
 import {
   patchActiveAppProfileLedEffectParams,
   patchActiveAppProfileLedIdleOptions,
-  patchActiveAppProfileLedPixel,
+  patchActiveAppProfileLedPixelBatch,
   patchActiveAppProfileLedPixels,
   patchActiveAppProfileLedSnapshot,
 } from "@/lib/kbhe/profile-snapshot-store";
@@ -19,6 +21,12 @@ import {
 } from "@/lib/kbhe/protocol";
 import { EFFECT_PARAM_ENUM_OPTIONS, EFFECT_PARAM_NAMES } from "@/lib/kbhe/effectParamNames";
 import BaseKeyboard from "@/components/baseKeyboard";
+import { LibhmkLighting } from "@/components/LibhmkLighting";
+import {
+  libhmkRgbBridge,
+  rgbBridgeSerialNumber,
+  selectRgbBridgeDevice,
+} from "@/lib/kbhe/rgb-bridge";
 
 import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
@@ -362,7 +370,7 @@ const LIVE_MATRIX_POLL_MS = 60;
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function Lighting() {
+function NativeLighting() {
   const { status } = useDeviceSession();
   const connected = status === "connected";
   const pageVisible = usePageVisible();
@@ -600,7 +608,8 @@ export default function Lighting() {
     mutationFn: async (v: boolean) => {
       markSaving();
       const ok = await kbheDevice.ledSetEnabled(v);
-      if (ok) patchActiveAppProfileLedSnapshot({ enabled: v });
+      requireDeviceSuccess(ok, "LED setting");
+      patchActiveAppProfileLedSnapshot({ enabled: v });
     },
     onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.enabled() }); },
     onError: markError,
@@ -611,7 +620,8 @@ export default function Lighting() {
     mutationFn: async (v) => {
       markSaving();
       const ok = await kbheDevice.ledSetBrightness(v);
-      if (ok) patchActiveAppProfileLedSnapshot({ brightness: v });
+      requireDeviceSuccess(ok, "LED brightness");
+      patchActiveAppProfileLedSnapshot({ brightness: v });
     },
     optimisticUpdate: (_cur, v) => v,
     onSuccess: markSaved,
@@ -622,7 +632,8 @@ export default function Lighting() {
     mutationFn: async (v: number) => {
       markSaving();
       const ok = await kbheDevice.setLedEffect(v);
-      if (ok) patchActiveAppProfileLedSnapshot({ effectMode: v });
+      requireDeviceSuccess(ok, "LED effect");
+      patchActiveAppProfileLedSnapshot({ effectMode: v });
     },
     onSuccess: () => { markSaved(); void qc.invalidateQueries({ queryKey: queryKeys.led.effect() }); },
     onError: markError,
@@ -633,127 +644,103 @@ export default function Lighting() {
     mutationFn: async (v) => {
       markSaving();
       const ok = await kbheDevice.setLedFpsLimit(v);
-      if (ok) patchActiveAppProfileLedSnapshot({ fpsLimit: v });
+      requireDeviceSuccess(ok, "LED FPS limit");
+      patchActiveAppProfileLedSnapshot({ fpsLimit: v });
     },
     optimisticUpdate: (_cur, v) => v,
     onSuccess: markSaved,
     onError: markError,
   });
 
+  const paramsDesiredRef = useRef<{ effectMode: number; params: number[] } | null>(null);
   const paramsMut = useOptimisticMutation<number[], number[], void>({
     queryKey: queryKeys.led.effectParams(currentEffect),
     mutationFn: async (params) => {
       markSaving();
       const ok = await kbheDevice.setLedEffectParams(currentEffect, params);
-      if (ok) patchActiveAppProfileLedEffectParams(currentEffect, params);
+      requireDeviceSuccess(ok, "LED effect parameters");
+      patchActiveAppProfileLedEffectParams(currentEffect, params);
     },
     optimisticUpdate: (_cur, params) => params,
     onSuccess: markSaved,
-    onError: markError,
+    onError: () => {
+      paramsDesiredRef.current = null;
+      markError();
+    },
   });
 
-  const idleTimeoutMut = useMutation({
-    mutationFn: async (timeoutSeconds: number) => {
+  const commitEffectParamUpdates = useCallback((updates: Readonly<Record<number, number>>) => {
+    const desired = paramsDesiredRef.current;
+    const base = desired?.effectMode === currentEffect ? desired.params : paramsQ.data;
+    if (!base) return;
+    const next = [...base];
+    for (const [rawIndex, value] of Object.entries(updates)) {
+      const index = Number(rawIndex);
+      if (Number.isInteger(index) && index >= 0 && index < LED_EFFECT_PARAM_COUNT) {
+        next[index] = value & 0xff;
+      }
+    }
+    paramsDesiredRef.current = { effectMode: currentEffect, params: next };
+    paramsMut.mutate(next);
+  }, [currentEffect, paramsMut, paramsQ.data]);
+
+  const commitEffectParams = useCallback((params: number[]) => {
+    const next = [...params];
+    paramsDesiredRef.current = { effectMode: currentEffect, params: next };
+    paramsMut.mutate(next);
+  }, [currentEffect, paramsMut]);
+
+  useEffect(() => {
+    if (!paramsMut.isPending) {
+      paramsDesiredRef.current = paramsQ.data
+        ? { effectMode: currentEffect, params: [...paramsQ.data] }
+        : null;
+    }
+  }, [currentEffect, paramsMut.isPending, paramsQ.data]);
+
+  const idleDesiredRef = useRef<LedIdleOptions | null>(null);
+  const idleOptionsMut = useOptimisticMutation<
+    LedIdleOptions | null,
+    LedIdleOptions,
+    void
+  >({
+    queryKey: queryKeys.led.idleOptions(),
+    mutationFn: async (next) => {
       markSaving();
-      const current = idleOptionsQ.data ?? {
-        idle_timeout_seconds: 0,
-        allow_system_when_disabled: false,
-        third_party_stream_counts_as_activity: false,
-        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
-      };
-      const next = { ...current, idle_timeout_seconds: timeoutSeconds };
       const ok = await kbheDevice.setLedIdleOptions(
         next.idle_timeout_seconds,
         next.allow_system_when_disabled,
         next.third_party_stream_counts_as_activity,
         next.usb_suspend_rgb_off,
       );
-      if (ok) patchActiveAppProfileLedIdleOptions(next);
+      requireDeviceSuccess(ok, "LED idle options");
+      patchActiveAppProfileLedIdleOptions(next);
     },
-    onSuccess: () => {
-      markSaved();
-      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
+    optimisticUpdate: (_current, next) => next,
+    onSuccess: markSaved,
+    onError: () => {
+      idleDesiredRef.current = null;
+      markError();
     },
-    onError: markError,
   });
 
-  const allowSystemIndicatorsMut = useMutation({
-    mutationFn: async (allowSystemWhenDisabled: boolean) => {
-      markSaving();
-      const current = idleOptionsQ.data ?? {
-        idle_timeout_seconds: 0,
-        allow_system_when_disabled: false,
-        third_party_stream_counts_as_activity: false,
-        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
-      };
-      const next = { ...current, allow_system_when_disabled: allowSystemWhenDisabled };
-      const ok = await kbheDevice.setLedIdleOptions(
-        next.idle_timeout_seconds,
-        next.allow_system_when_disabled,
-        next.third_party_stream_counts_as_activity,
-        next.usb_suspend_rgb_off,
-      );
-      if (ok) patchActiveAppProfileLedIdleOptions(next);
-    },
-    onSuccess: () => {
-      markSaved();
-      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
-    },
-    onError: markError,
-  });
+  const commitIdleOptions = useCallback((patch: Partial<LedIdleOptions>) => {
+    const base = idleDesiredRef.current ?? idleOptionsQ.data ?? {
+      idle_timeout_seconds: 0,
+      allow_system_when_disabled: false,
+      third_party_stream_counts_as_activity: false,
+      usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
+    };
+    const next = { ...base, ...patch };
+    idleDesiredRef.current = next;
+    idleOptionsMut.mutate(next);
+  }, [idleOptionsMut, idleOptionsQ.data]);
 
-  const thirdPartyIdleActivityMut = useMutation({
-    mutationFn: async (thirdPartyStreamCountsAsActivity: boolean) => {
-      markSaving();
-      const current = idleOptionsQ.data ?? {
-        idle_timeout_seconds: 0,
-        allow_system_when_disabled: false,
-        third_party_stream_counts_as_activity: false,
-        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
-      };
-      const next = {
-        ...current,
-        third_party_stream_counts_as_activity: thirdPartyStreamCountsAsActivity,
-      };
-      const ok = await kbheDevice.setLedIdleOptions(
-        next.idle_timeout_seconds,
-        next.allow_system_when_disabled,
-        next.third_party_stream_counts_as_activity,
-        next.usb_suspend_rgb_off,
-      );
-      if (ok) patchActiveAppProfileLedIdleOptions(next);
-    },
-    onSuccess: () => {
-      markSaved();
-      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
-    },
-    onError: markError,
-  });
-
-  const usbSuspendRgbOffMut = useMutation({
-    mutationFn: async (usbSuspendRgbOff: boolean) => {
-      markSaving();
-      const current = idleOptionsQ.data ?? {
-        idle_timeout_seconds: 0,
-        allow_system_when_disabled: false,
-        third_party_stream_counts_as_activity: false,
-        usb_suspend_rgb_off: LED_USB_SUSPEND_RGB_OFF_DEFAULT,
-      };
-      const next = { ...current, usb_suspend_rgb_off: usbSuspendRgbOff };
-      const ok = await kbheDevice.setLedIdleOptions(
-        next.idle_timeout_seconds,
-        next.allow_system_when_disabled,
-        next.third_party_stream_counts_as_activity,
-        next.usb_suspend_rgb_off,
-      );
-      if (ok) patchActiveAppProfileLedIdleOptions(next);
-    },
-    onSuccess: () => {
-      markSaved();
-      void qc.invalidateQueries({ queryKey: queryKeys.led.idleOptions() });
-    },
-    onError: markError,
-  });
+  useEffect(() => {
+    if (!idleOptionsMut.isPending) {
+      idleDesiredRef.current = idleOptionsQ.data ?? null;
+    }
+  }, [idleOptionsMut.isPending, idleOptionsQ.data]);
 
   const canResetEffectParams =
     connected && !!schemaQ.data && !!paramsQ.data && !paramsMut.isPending;
@@ -787,15 +774,16 @@ export default function Lighting() {
     }
 
     setLiveParamValues({});
-    paramsMut.mutate(next);
-  }, [paramsQ.data, schemaQ.data, paramsMut]);
+    commitEffectParams(next);
+  }, [commitEffectParams, paramsQ.data, schemaQ.data]);
 
   const fillMut = useMutation({
     mutationFn: async (c: RGBColor) => {
       markSaving();
-      return kbheDevice.ledFill(c.r, c.g, c.b);
+      const ok = await kbheDevice.ledFill(c.r, c.g, c.b);
+      requireDeviceSuccess(ok, "LED fill");
     },
-    onSuccess: (ok, c) => {
+    onSuccess: (_result, c) => {
       const filled = new Array(KEY_COUNT * 3).fill(0);
       for (let i = 0; i < KEY_COUNT; i++) {
         const offset = i * 3;
@@ -804,7 +792,7 @@ export default function Lighting() {
         filled[offset + 2] = c.b & 0xff;
       }
       updateMatrixPixelsLocal(filled);
-      if (ok) patchActiveAppProfileLedPixels(filled);
+      patchActiveAppProfileLedPixels(filled);
       markSaved();
       void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
     },
@@ -814,12 +802,13 @@ export default function Lighting() {
   const clearMut = useMutation({
     mutationFn: async () => {
       markSaving();
-      return kbheDevice.ledClear();
+      const ok = await kbheDevice.ledClear();
+      requireDeviceSuccess(ok, "LED clear");
     },
-    onSuccess: (ok) => {
+    onSuccess: () => {
       const cleared = new Array(KEY_COUNT * 3).fill(0);
       updateMatrixPixelsLocal(cleared);
-      if (ok) patchActiveAppProfileLedPixels(cleared);
+      patchActiveAppProfileLedPixels(cleared);
       markSaved();
       void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
     },
@@ -829,11 +818,12 @@ export default function Lighting() {
   const uploadMut = useMutation({
     mutationFn: async (pixels: number[]) => {
       markSaving();
-      return kbheDevice.ledUploadAll(pixels);
+      const ok = await kbheDevice.ledUploadAll(pixels);
+      requireDeviceSuccess(ok, "LED matrix upload");
     },
-    onSuccess: (ok, pixels) => {
+    onSuccess: (_result, pixels) => {
       updateMatrixPixelsLocal(pixels);
-      if (ok) patchActiveAppProfileLedPixels(pixels);
+      patchActiveAppProfileLedPixels(pixels);
       markSaved();
       void qc.invalidateQueries({ queryKey: queryKeys.led.allPixels() });
     },
@@ -869,8 +859,23 @@ export default function Lighting() {
     if (ok) patchActiveAppProfileLedEffectParams(currentEffect, params);
   });
 
+  const liveEffectParamUpdates = useCallback((updates: Readonly<Record<number, number>>) => {
+    const desired = paramsDesiredRef.current;
+    const base = desired?.effectMode === currentEffect ? desired.params : paramsQ.data;
+    if (!base) return;
+    const next = [...base];
+    for (const [rawIndex, value] of Object.entries(updates)) {
+      const index = Number(rawIndex);
+      if (Number.isInteger(index) && index >= 0 && index < LED_EFFECT_PARAM_COUNT) {
+        next[index] = value & 0xff;
+      }
+    }
+    liveParams(next);
+  }, [currentEffect, liveParams, paramsQ.data]);
+
   const matrixSetPixelPendingRef = useRef<Map<number, RGBColor>>(new Map());
   const matrixSetPixelInFlightRef = useRef(false);
+  const matrixFlushRequestedRef = useRef(false);
 
   const flushMatrixSetPixelQueue = useCallback(async () => {
     if (matrixSetPixelInFlightRef.current) {
@@ -878,25 +883,49 @@ export default function Lighting() {
     }
 
     matrixSetPixelInFlightRef.current = true;
+    let transportFailed = false;
     try {
       while (matrixSetPixelPendingRef.current.size > 0) {
         const batch = Array.from(matrixSetPixelPendingRef.current.entries());
         matrixSetPixelPendingRef.current.clear();
+        const appliedBatch: Array<readonly [number, RGBColor]> = [];
 
-        for (const [index, color] of batch) {
-          const ok = await kbheDevice.ledSetPixel(index, color.r, color.g, color.b);
-          if (ok) patchActiveAppProfileLedPixel(index, color);
+        for (let batchIndex = 0; batchIndex < batch.length; batchIndex += 1) {
+          const [index, color] = batch[batchIndex];
+          let ok = false;
+          let transportError: unknown;
+          try {
+            ok = await kbheDevice.ledSetPixel(index, color.r, color.g, color.b);
+          } catch (error) {
+            transportError = error;
+          }
+          if (!ok) {
+            for (const [retryIndex, retryColor] of batch.slice(batchIndex)) {
+              if (!matrixSetPixelPendingRef.current.has(retryIndex)) {
+                matrixSetPixelPendingRef.current.set(retryIndex, retryColor);
+              }
+            }
+            transportFailed = true;
+            markError(transportError ?? new Error(`Unable to paint LED ${index + 1}`));
+            break;
+          }
+          appliedBatch.push([index, color]);
         }
+        patchActiveAppProfileLedPixelBatch(appliedBatch);
+        if (transportFailed) break;
       }
-    } catch {
-      // Ignore transient paint transport errors to keep interaction responsive.
+    } catch (error) {
+      transportFailed = true;
+      markError(error);
     } finally {
       matrixSetPixelInFlightRef.current = false;
-      if (matrixSetPixelPendingRef.current.size > 0) {
+      const requestedWhileBusy = matrixFlushRequestedRef.current;
+      matrixFlushRequestedRef.current = false;
+      if (matrixSetPixelPendingRef.current.size > 0 && (!transportFailed || requestedWhileBusy)) {
         void flushMatrixSetPixelQueue();
       }
     }
-  }, []);
+  }, [markError]);
 
   const paintMatrixKey = useCallback((index: number) => {
     if (!connected || !isMatrixMode || index < 0 || index >= KEY_COUNT) {
@@ -920,10 +949,16 @@ export default function Lighting() {
     });
 
     enqueueMatrixPreview(next);
+    if (matrixSetPixelInFlightRef.current) {
+      matrixFlushRequestedRef.current = true;
+    }
     void flushMatrixSetPixelQueue();
   }, [allPixelsQ.data, connected, enqueueMatrixPreview, flushMatrixSetPixelQueue, isMatrixMode, paintColor.b, paintColor.g, paintColor.r]);
 
   const handleMatrixStrokeEnd = useCallback(() => {
+    if (matrixSetPixelInFlightRef.current) {
+      matrixFlushRequestedRef.current = true;
+    }
     void flushMatrixSetPixelQueue();
   }, [flushMatrixSetPixelQueue]);
 
@@ -1012,18 +1047,20 @@ export default function Lighting() {
               <ColorPicker
                 color={color}
                 onLiveChange={(c) => {
-                  const next = [...params];
-                  next[rDesc.id] = c.r;
-                  next[gDesc.id] = c.g;
-                  next[bDesc.id] = c.b;
-                  liveParams(next);
+                  liveEffectParamUpdates({
+                    [rDesc.id]: c.r,
+                    [gDesc.id]: c.g,
+                    [bDesc.id]: c.b,
+                  });
                 }}
                 onChange={(c) => {
-                  const next = [...params];
-                  next[rDesc.id] = c.r;
-                  next[gDesc.id] = c.g;
-                  next[bDesc.id] = c.b;
-                  paramsMut.mutate(next);
+                  void liveParams.cancelAndWait().then(() => {
+                    commitEffectParamUpdates({
+                      [rDesc.id]: c.r,
+                      [gDesc.id]: c.g,
+                      [bDesc.id]: c.b,
+                    });
+                  });
                 }}
               />
             </div>,
@@ -1042,9 +1079,7 @@ export default function Lighting() {
               checked={checked}
               disabled={!connected || !paramsLoaded}
               onCheckedChange={(v) => {
-                const next = [...params];
-                next[desc.id] = v ? 1 : 0;
-                paramsMut.mutate(next);
+                commitEffectParamUpdates({ [desc.id]: v ? 1 : 0 });
               }}
             />
           </div>,
@@ -1085,9 +1120,7 @@ export default function Lighting() {
                   if (!Number.isFinite(parsed)) {
                     return;
                   }
-                  const next = [...params];
-                  next[desc.id] = parsed & 0xff;
-                  paramsMut.mutate(next);
+                  commitEffectParamUpdates({ [desc.id]: parsed });
                 }}
               >
                 <SelectTrigger className="h-8 w-56 text-sm">
@@ -1134,22 +1167,20 @@ export default function Lighting() {
                 }
                 return { ...prev, [desc.id]: v };
               });
-              const next = [...params];
-              next[desc.id] = v;
-              liveParams(next);
+              liveEffectParamUpdates({ [desc.id]: v });
             }}
             onCommit={(v) => {
-              setLiveParamValues((prev) => {
-                if (!(desc.id in prev)) {
-                  return prev;
-                }
-                const next = { ...prev };
-                delete next[desc.id];
-                return next;
+              void liveParams.cancelAndWait().then(() => {
+                setLiveParamValues((prev) => {
+                  if (!(desc.id in prev)) {
+                    return prev;
+                  }
+                  const next = { ...prev };
+                  delete next[desc.id];
+                  return next;
+                });
+                commitEffectParamUpdates({ [desc.id]: v });
               });
-              const next = [...params];
-              next[desc.id] = v;
-              paramsMut.mutate(next);
             }}
             disabled={!connected || !paramsLoaded}
           />
@@ -1253,7 +1284,7 @@ export default function Lighting() {
                     step={1}
                     value={ledIdleTimeoutSeconds}
                     onLiveChange={() => { }}
-                    onCommit={(v) => idleTimeoutMut.mutate(v)}
+                    onCommit={(v) => commitIdleOptions({ idle_timeout_seconds: v })}
                     disabled={!connected || idleOptionsQ.data == null}
                     className="flex-1"
                   />
@@ -1266,7 +1297,7 @@ export default function Lighting() {
                 <Switch
                   checked={allowSystemWhenDisabled}
                   disabled={!connected || idleOptionsQ.data == null}
-                  onCheckedChange={(v) => allowSystemIndicatorsMut.mutate(v)}
+                  onCheckedChange={(v) => commitIdleOptions({ allow_system_when_disabled: v })}
                 />
               </FormRow>
               <FormRow
@@ -1276,7 +1307,7 @@ export default function Lighting() {
                 <Switch
                   checked={thirdPartyStreamCountsAsActivity}
                   disabled={!connected || idleOptionsQ.data == null}
-                  onCheckedChange={(v) => thirdPartyIdleActivityMut.mutate(v)}
+                  onCheckedChange={(v) => commitIdleOptions({ third_party_stream_counts_as_activity: v })}
                 />
               </FormRow>
               <FormRow
@@ -1286,7 +1317,7 @@ export default function Lighting() {
                 <Switch
                   checked={usbSuspendRgbOff}
                   disabled={!connected || idleOptionsQ.data == null}
-                  onCheckedChange={(v) => usbSuspendRgbOffMut.mutate(v)}
+                  onCheckedChange={(v) => commitIdleOptions({ usb_suspend_rgb_off: v })}
                 />
               </FormRow>
               <FormRow label="Global Brightness">
@@ -1295,7 +1326,9 @@ export default function Lighting() {
                     min={0} max={255} step={1}
                     value={brightnessQ.data ?? 128}
                     onLiveChange={(v) => liveBrightness(v)}
-                    onCommit={(v) => brightnessMut.mutate(v)}
+                    onCommit={(v) => {
+                      void liveBrightness.cancelAndWait().then(() => brightnessMut.mutate(v));
+                    }}
                     disabled={!connected || brightnessQ.data == null}
                     className="flex-1"
                   />
@@ -1307,7 +1340,9 @@ export default function Lighting() {
                     min={0} max={120} step={1}
                     value={fpsQ.data ?? 0}
                     onLiveChange={(v) => liveFps(v)}
-                    onCommit={(v) => fpsMut.mutate(v)}
+                    onCommit={(v) => {
+                      void liveFps.cancelAndWait().then(() => fpsMut.mutate(v));
+                    }}
                     disabled={!connected || fpsQ.data == null}
                     className="flex-1"
                   />
@@ -1424,4 +1459,93 @@ export default function Lighting() {
       </div>
     </KeyboardEditor>
   );
+}
+
+export default function Lighting() {
+  const status = useDeviceSession((state) => state.status);
+  const [selectedBridgeSerialNumber, setSelectedBridgeSerialNumber] = useState<string | null>(null);
+  const bridgeDevicesQ = useQuery({
+    queryKey: ["libhmk-rgb-bridge", "devices"],
+    queryFn: () => libhmkRgbBridge.listDevices(),
+    enabled: isTauri() && status !== "connected" && status !== "updater",
+    retry: 1,
+    staleTime: 1_000,
+    refetchInterval: 3_000,
+  });
+  const bridgeDevices = bridgeDevicesQ.data ?? [];
+  const bridgeSelection = useMemo(() => {
+    try {
+      return {
+        device: selectRgbBridgeDevice(bridgeDevices, selectedBridgeSerialNumber),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        device: null,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }, [bridgeDevices, selectedBridgeSerialNumber]);
+
+  /* Once an unambiguous device has been observed, pin its serial so a later
+   * path change or replacement device can never silently switch the target. */
+  useEffect(() => {
+    if (selectedBridgeSerialNumber || bridgeDevices.length !== 1) return;
+    try {
+      setSelectedBridgeSerialNumber(rgbBridgeSerialNumber(bridgeDevices[0]!));
+    } catch {
+      // The validation error is rendered below.
+    }
+  }, [bridgeDevices, selectedBridgeSerialNumber]);
+
+  if (bridgeDevices.length > 0) {
+    if (bridgeSelection.error) {
+      return (
+        <div className="flex flex-1 items-center justify-center p-6">
+          <SectionCard title="libhmk RGB target rejected" description={bridgeSelection.error}>
+            <p className="text-sm text-muted-foreground">
+              Reconnect the intended keyboard and make sure every attached libhmk device exposes a unique USB serial number.
+            </p>
+          </SectionCard>
+        </div>
+      );
+    }
+
+    if (!bridgeSelection.device) {
+      return (
+        <div className="flex flex-1 items-center justify-center p-6">
+          <SectionCard
+            title="Select a libhmk keyboard"
+            description="Multiple RGB bridges are attached. Choose the physical keyboard by its stable USB serial before any command is sent."
+          >
+            <Select value={selectedBridgeSerialNumber ?? undefined} onValueChange={setSelectedBridgeSerialNumber}>
+              <SelectTrigger className="w-full min-w-72">
+                <SelectValue placeholder="Choose a keyboard…" />
+              </SelectTrigger>
+              <SelectContent>
+                {bridgeDevices.map((device) => {
+                  const serialNumber = rgbBridgeSerialNumber(device);
+                  return (
+                    <SelectItem key={serialNumber} value={serialNumber}>
+                      {device.product?.trim() || "KBHE 75HE (libhmk)"} · {serialNumber}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </SectionCard>
+        </div>
+      );
+    }
+
+    const bridgeDevice = bridgeSelection.device;
+    return (
+      <LibhmkLighting
+        key={`${rgbBridgeSerialNumber(bridgeDevice)}:${bridgeDevice.path}`}
+        device={bridgeDevice}
+      />
+    );
+  }
+
+  return <NativeLighting />;
 }

@@ -8,7 +8,7 @@
 **
 **                Application-only layout:
 **                - Firmware starts at 0x08000000
-**                - Last 128KB flash sector stays reserved for settings
+**                - Sectors 6-7 (0x08040000+) stay reserved for A/B storage
 **
 ******************************************************************************
 */
@@ -21,7 +21,7 @@ MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 0x3FF00
 BOOTRAM (rw)   : ORIGIN = 0x2003FF00, LENGTH = 0x100
-FLASH (rx)     : ORIGIN = 0x08000000, LENGTH = 0x5FF00
+FLASH (rx)     : ORIGIN = 0x08000000, LENGTH = 0x3FF00
 }
 
 /* Highest address of the user mode stack */

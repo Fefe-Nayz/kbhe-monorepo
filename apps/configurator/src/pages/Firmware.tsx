@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { PageContent } from "@/components/shared/PageLayout";
 
 type FlashState = "idle" | "flashing" | "success" | "error";
+type FlashResult = { ok: true } | { ok: false; error: string };
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -73,8 +74,10 @@ export default function Firmware() {
   const updateModeDetected = status === "updater" || bootloaderDetected;
 
   const [firmwareBytes, setFirmwareBytes] = useState<Uint8Array | null>(null);
+  const [firmwareSignature, setFirmwareSignature] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
+  const [signaturePath, setSignaturePath] = useState<string | null>(null);
   const [fileVersion, setFileVersion] = useState<FirmwareResolveResult | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [flashState, setFlashState] = useState<FlashState>("idle");
@@ -89,12 +92,19 @@ export default function Firmware() {
   const dragDepthRef = useRef(0);
   const dropZoneRef = useRef<HTMLElement | null>(null);
   const logEndRef = useRef<HTMLSpanElement | null>(null);
+  const flashInFlightRef = useRef(false);
 
   const appendLog = useCallback((msg: string) => {
     setFlashLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   }, []);
 
-  const processSelectedFirmware = useCallback((bytes: Uint8Array, name: string, path?: string | null) => {
+  const processSelectedFirmware = useCallback((
+    bytes: Uint8Array,
+    signature: Uint8Array | null,
+    name: string,
+    path?: string | null,
+    detachedSignaturePath?: string | null,
+  ) => {
     setFileError(null);
     setFileVersion(null);
     setFlashState("idle");
@@ -102,8 +112,10 @@ export default function Firmware() {
     setFlashProgress(0);
 
     setFirmwareBytes(bytes);
+    setFirmwareSignature(signature);
     setFileName(name);
     setFilePath(path ?? null);
+    setSignaturePath(detachedSignaturePath ?? null);
 
     try {
       const versionInfo = resolveFirmwareVersion(bytes);
@@ -111,6 +123,9 @@ export default function Firmware() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setFileError(msg);
+    }
+    if (!signature || signature.length !== 64) {
+      setFileError("A matching 64-byte Ed25519 .sig file is required before flashing.");
     }
   }, []);
 
@@ -153,6 +168,26 @@ export default function Firmware() {
     return normalizedLine;
   }, []);
 
+  const readDetachedSignature = useCallback(async (
+    firmwarePath: string,
+    explicitSignaturePath?: string,
+  ): Promise<{ bytes: Uint8Array; path: string } | null> => {
+    const candidates = explicitSignaturePath
+      ? [explicitSignaturePath]
+      : [`${firmwarePath}.sig`];
+    for (const candidate of candidates) {
+      try {
+        const bytes = new Uint8Array(await readFile(candidate));
+        if (bytes.length === 64) {
+          return { bytes, path: candidate };
+        }
+      } catch {
+        // Try the next deterministic sibling candidate.
+      }
+    }
+    return null;
+  }, []);
+
   const extractDroppedPath = useCallback((event: React.DragEvent<HTMLDivElement>): string | null => {
     const uriList = event.dataTransfer.getData("text/uri-list");
     const parsedUriList = parseDroppedPathText(uriList);
@@ -175,12 +210,19 @@ export default function Firmware() {
 
     try {
       const bytes = await readFile(droppedPath);
-      processSelectedFirmware(new Uint8Array(bytes), name, droppedPath);
+      const signature = await readDetachedSignature(droppedPath);
+      processSelectedFirmware(
+        new Uint8Array(bytes),
+        signature?.bytes ?? null,
+        name,
+        droppedPath,
+        signature?.path,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setFileError(msg);
     }
-  }, [hasBinExtension, parseDroppedPathText, processSelectedFirmware]);
+  }, [hasBinExtension, parseDroppedPathText, processSelectedFirmware, readDetachedSignature]);
 
   const processDroppedPaths = useCallback(async (paths: string[]) => {
     if (paths.length === 0) {
@@ -219,21 +261,36 @@ export default function Firmware() {
   const handleFilePick = useCallback(async () => {
     try {
       const selected = await tauriOpen({
-        multiple: false,
-        filters: [{ name: "Firmware", extensions: ["bin"] }],
+        multiple: true,
+        filters: [{ name: "Signed firmware", extensions: ["bin", "sig"] }],
       });
       if (!selected) return;
 
-      const filePath = typeof selected === "string" ? selected : selected;
+      const paths = typeof selected === "string" ? [selected] : selected;
+      const filePath = paths.find((candidate) => candidate.toLowerCase().endsWith(".bin"));
+      if (!filePath) {
+        setFileError("Select a .bin firmware file and its matching .bin.sig file.");
+        return;
+      }
+      const selectedSignaturePath = paths.find(
+        (candidate) => candidate === `${filePath}.sig`,
+      );
 
       const bytes = await readFile(filePath);
+      const signature = await readDetachedSignature(filePath, selectedSignaturePath);
       const name = filePath.split(/[\\/]/).pop() ?? filePath;
-      processSelectedFirmware(new Uint8Array(bytes), name, filePath);
+      processSelectedFirmware(
+        new Uint8Array(bytes),
+        signature?.bytes ?? null,
+        name,
+        filePath,
+        signature?.path,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setFileError(msg);
     }
-  }, [processSelectedFirmware]);
+  }, [processSelectedFirmware, readDetachedSignature]);
 
   const isFileDrag = useCallback((event: React.DragEvent<HTMLDivElement>): boolean => {
     const types = Array.from(event.dataTransfer?.types ?? []);
@@ -341,6 +398,8 @@ export default function Firmware() {
       const dropped = files.find((file) => hasBinExtension(file.name)) ?? files[0];
       const droppedPath = (dropped as File & { path?: string }).path;
       const droppedName = dropped.name || (droppedPath?.split(/[\\/]/).pop() ?? "");
+      const detached = files.find((file) => file.name === `${droppedName}.sig`);
+      const detachedPath = (detached as (File & { path?: string }) | undefined)?.path;
 
       if (!hasBinExtension(droppedName)) {
         setFileError("Please drop a .bin firmware file.");
@@ -350,12 +409,20 @@ export default function Firmware() {
       try {
         if (droppedPath) {
           const bytes = await readFile(droppedPath);
-          processSelectedFirmware(new Uint8Array(bytes), droppedName, droppedPath);
+          const signature = await readDetachedSignature(droppedPath, detachedPath);
+          processSelectedFirmware(
+            new Uint8Array(bytes),
+            signature?.bytes ?? null,
+            droppedName,
+            droppedPath,
+            signature?.path,
+          );
           return;
         }
 
         const bytes = new Uint8Array(await dropped.arrayBuffer());
-        processSelectedFirmware(bytes, droppedName, null);
+        const signature = detached ? new Uint8Array(await detached.arrayBuffer()) : null;
+        processSelectedFirmware(bytes, signature, droppedName, null, null);
         return;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -371,7 +438,7 @@ export default function Firmware() {
     }
 
     await processDroppedPath(droppedPath);
-  }, [extractDroppedPath, hasBinExtension, isFileDrag, isPointInDropZone, processDroppedPath, processSelectedFirmware]);
+  }, [extractDroppedPath, hasBinExtension, isFileDrag, isPointInDropZone, processDroppedPath, processSelectedFirmware, readDetachedSignature]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: "end" });
@@ -381,8 +448,14 @@ export default function Firmware() {
     bytes: Uint8Array,
     path: string | null,
     versionInfo: FirmwareResolveResult | null,
+    signature: Uint8Array | null,
+    detachedSignaturePath: string | null,
     resetLog = true,
-  ) => {
+  ): Promise<FlashResult> => {
+    if (flashInFlightRef.current) {
+      return { ok: false, error: "A firmware update is already in progress" };
+    }
+    flashInFlightRef.current = true;
     setConfirmOpen(false);
     setFlashState("flashing");
     setFlashProgress(0);
@@ -390,11 +463,16 @@ export default function Firmware() {
       setFlashLog([]);
     }
 
+    let flashTargetSerialNumber: string | undefined;
     const reconnectSession = async () => {
       appendLog("Reconnecting device session...");
       await delay(1200);
       try {
-        await DeviceSessionManager.connect();
+        await DeviceSessionManager.connect(flashTargetSerialNumber);
+        const sessionStatus = useDeviceSession.getState().status;
+        if (sessionStatus !== "connected" && sessionStatus !== "updater") {
+          throw new Error("The keyboard has not reappeared yet");
+        }
         appendLog("Reconnected successfully.");
       } catch (reconnectError) {
         const reconnectMsg = reconnectError instanceof Error ? reconnectError.message : String(reconnectError);
@@ -404,13 +482,18 @@ export default function Firmware() {
 
     try {
       await delay(0);
+      const expectedSerialNumber = useDeviceSession.getState().deviceInfo?.serialNumber?.trim();
+      if (!expectedSerialNumber) {
+        throw new Error("The connected keyboard does not expose a stable USB serial number; refusing an ambiguous flash target.");
+      }
+      flashTargetSerialNumber = expectedSerialNumber;
       appendLog("Preparing flash session...");
       await DeviceSessionManager.disconnect();
       await delay(250);
 
       let finalVersion: FirmwareVersion;
 
-      if (path && isTauri()) {
+      if (path && detachedSignaturePath && isTauri()) {
         // Native fast path: entire flash loop runs in Rust (no IPC per packet)
         const { version: resolvedVersion } = resolveFirmwareVersion(bytes, versionInfo?.version);
 
@@ -418,6 +501,7 @@ export default function Firmware() {
           connecting: "Entering bootloader mode…",
           hello: "Handshaking with bootloader…",
           begin: "Starting firmware transfer…",
+          authenticating: "Authenticating firmware signature…",
           finish: "Verifying firmware…",
           boot: "Rebooting device…",
         };
@@ -448,7 +532,11 @@ export default function Firmware() {
         try {
           await invoke("kbhe_flash_firmware", {
             firmwarePath: path,
+            firmwareSignaturePath: detachedSignaturePath,
             firmwareVersion: resolvedVersion,
+            expectedSerialNumber,
+            timeoutMs: timeoutSec * 1000,
+            retries,
           });
         } finally {
           unlisten();
@@ -458,6 +546,8 @@ export default function Firmware() {
       } else {
         // Fallback: TypeScript-based flash (browser or no file path)
         finalVersion = await kbheFirmware.flashFirmware(bytes, {
+          signature: signature ?? undefined,
+          expectedSerialNumber,
           timeoutMs: timeoutSec * 1000,
           retries,
           onLog: appendLog,
@@ -467,19 +557,28 @@ export default function Firmware() {
 
       appendLog(`Flash complete! Version: ${formatFirmwareVersion(finalVersion)}`);
       setFlashState("success");
+      return { ok: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       appendLog(`Error: ${msg}`);
       setFlashState("error");
+      return { ok: false, error: msg };
     } finally {
-      void reconnectSession();
+      await reconnectSession();
+      flashInFlightRef.current = false;
     }
   }, [timeoutSec, retries, appendLog]);
 
   const handleFlash = useCallback(async () => {
     if (!firmwareBytes) return;
-    await runFlash(firmwareBytes, filePath, fileVersion);
-  }, [firmwareBytes, filePath, fileVersion, runFlash]);
+    await runFlash(
+      firmwareBytes,
+      filePath,
+      fileVersion,
+      firmwareSignature,
+      signaturePath,
+    );
+  }, [firmwareBytes, filePath, fileVersion, firmwareSignature, signaturePath, runFlash]);
 
   const handleFlashLatestFirmware = useCallback(async () => {
     const tag = firmwareUpdateQ.data?.tag;
@@ -494,12 +593,29 @@ export default function Firmware() {
       appendLog(`Downloading firmware release ${tag}...`);
       const downloaded = await downloadFirmwareRelease(tag);
       const bytes = new Uint8Array(await readFile(downloaded.path));
+      const signature = new Uint8Array(await readFile(downloaded.signaturePath));
       const versionInfo = resolveFirmwareVersion(bytes);
 
-      processSelectedFirmware(bytes, downloaded.fileName, downloaded.path);
+      processSelectedFirmware(
+        bytes,
+        signature,
+        downloaded.fileName,
+        downloaded.path,
+        downloaded.signaturePath,
+      );
       appendLog(`Downloaded ${downloaded.fileName}.`);
       setFirmwareUpdateState("flashing");
-      await runFlash(bytes, downloaded.path, versionInfo, false);
+      const flashResult = await runFlash(
+        bytes,
+        downloaded.path,
+        versionInfo,
+        signature,
+        downloaded.signaturePath,
+        false,
+      );
+      if (!flashResult.ok) {
+        throw new Error(flashResult.error);
+      }
       setFirmwareUpdateState("idle");
       await firmwareUpdateQ.refetch();
     } catch (err) {
@@ -512,7 +628,13 @@ export default function Firmware() {
   }, [appendLog, firmwareUpdateQ, processSelectedFirmware, runFlash]);
 
   const fileSizeKb = firmwareBytes ? (firmwareBytes.length / 1024).toFixed(1) : null;
-  const canFlash = connected && !!firmwareBytes && flashState !== "flashing" && firmwareUpdateState !== "flashing";
+  const canFlash = connected
+    && !!firmwareBytes
+    && fileVersion !== null
+    && fileError === null
+    && firmwareSignature?.length === 64
+    && flashState !== "flashing"
+    && firmwareUpdateState !== "flashing";
   const latestFirmware = firmwareUpdateQ.data;
   const firmwareReleaseBusy = firmwareUpdateState === "downloading" || firmwareUpdateState === "flashing";
 
@@ -638,12 +760,12 @@ export default function Firmware() {
                 >
                   <IconFileUpload className="size-8" />
                   <div className="text-center">
-                    <p className="text-sm font-medium">Select firmware binary</p>
-                    <p className="text-xs mt-0.5">Choose a .bin file to flash</p>
+                    <p className="text-sm font-medium">Select signed firmware</p>
+                    <p className="text-xs mt-0.5">Choose the .bin and matching .bin.sig files</p>
                   </div>
                 </button>
                 <p className="text-center text-xs text-muted-foreground">
-                  Or drag and drop a .bin file here
+                  Or drag and drop both signed release files here
                 </p>
               </>
             ) : (
@@ -664,6 +786,11 @@ export default function Firmware() {
                       {fileVersion?.source && (
                         <span className="text-muted-foreground/60">{fileVersion.source}</span>
                       )}
+                      {firmwareSignature?.length === 64 && (
+                        <Badge variant="outline" className="text-[10px] text-green-600 dark:text-green-400">
+                          Signed
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
@@ -681,8 +808,10 @@ export default function Firmware() {
                       className="size-8"
                       onClick={() => {
                         setFirmwareBytes(null);
+                        setFirmwareSignature(null);
                         setFileName(null);
                         setFilePath(null);
+                        setSignaturePath(null);
                         setFileVersion(null);
                         setFileError(null);
                         setFlashState("idle");
@@ -719,7 +848,7 @@ export default function Firmware() {
                     isDragOver && "border-primary bg-primary/5 text-foreground ring-2 ring-primary/30 ring-inset",
                   )}
                 >
-                  Drag and drop another .bin file here to replace it
+                  Drag and drop another .bin + .bin.sig pair here to replace it
                 </div>
               </div>
             )}

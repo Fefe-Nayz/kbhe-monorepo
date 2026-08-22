@@ -1,4 +1,5 @@
 #include "hid/consumer_hid.h"
+#include "action_engine.h"
 #include "hid/gamepad_hid.h"
 #include "hid/keyboard_hid.h"
 #include "hid/keyboard_nkro_hid.h"
@@ -35,9 +36,35 @@ static const uint8_t LED_SPEED_STEP = 8u;
 static uint8_t layer_hold_counts[SETTINGS_LAYER_COUNT] = {0};
 static uint8_t layer_toggle_mask = 0u;
 static uint16_t pressed_keycodes[NUM_KEYS] = {0};
-static bool pressed_host_output[NUM_KEYS] = {0};
 static bool keyboard_route_initialized = false;
 static bool keyboard_route_use_nkro = false;
+
+#define LAYOUT_ACTION_BINDINGS_PER_SOURCE 8u
+#define LAYOUT_GLOBAL_ACTION_SOURCE NUM_KEYS
+#define LAYOUT_OWNED_ACTION_SOURCE_BASE (NUM_KEYS + 1u)
+#define LAYOUT_ACTION_SOURCE_COUNT                                              \
+  (LAYOUT_OWNED_ACTION_SOURCE_BASE + LAYOUT_ACTION_OWNER_COUNT)
+
+typedef enum {
+  LAYOUT_OUTPUT_NONE = 0,
+  LAYOUT_OUTPUT_INTERNAL,
+  LAYOUT_OUTPUT_KEYBOARD_6KRO,
+  LAYOUT_OUTPUT_KEYBOARD_NKRO,
+  LAYOUT_OUTPUT_CONSUMER,
+  LAYOUT_OUTPUT_MOUSE_BUTTON,
+  LAYOUT_OUTPUT_MOUSE_PULSE,
+  LAYOUT_OUTPUT_GAMEPAD,
+} layout_output_route_t;
+
+typedef struct {
+  uint16_t keycode;
+  uint8_t route;
+  uint8_t references;
+} layout_action_binding_t;
+
+static layout_action_binding_t
+    action_bindings[LAYOUT_ACTION_SOURCE_COUNT]
+                   [LAYOUT_ACTION_BINDINGS_PER_SOURCE];
 
 static uint16_t layout_default_overlay_keycode(uint8_t layer, uint8_t key) {
   if (key >= NUM_KEYS) {
@@ -134,19 +161,42 @@ static void layout_sync_keyboard_route(void) {
     return;
   }
 
-  for (uint8_t key = 0u; key < NUM_KEYS; key++) {
-    if (pressed_keycodes[key] != KC_NO) {
-      return;
-    }
-  }
-
-  // On route transition, clear both interfaces so one logical keyboard path
-  // remains active and no stale pressed key stays latched.
+  /* Reconcile the complete desired keyboard state across the two interfaces.
+   * This is required when NKRO stalls while keys are held: merely changing a
+   * route flag would send later releases to the wrong interface. */
   (void)keyboard_hid_release_all();
   keyboard_hid_reset_state();
   keyboard_nkro_hid_release_all();
   keyboard_route_use_nkro = use_nkro;
+
+  for (uint8_t source = 0u; source < LAYOUT_ACTION_SOURCE_COUNT; source++) {
+    for (uint8_t i = 0u; i < LAYOUT_ACTION_BINDINGS_PER_SOURCE; i++) {
+      layout_action_binding_t *binding = &action_bindings[source][i];
+      if (binding->references == 0u ||
+          (binding->route != (uint8_t)LAYOUT_OUTPUT_KEYBOARD_6KRO &&
+           binding->route != (uint8_t)LAYOUT_OUTPUT_KEYBOARD_NKRO)) {
+        continue;
+      }
+
+      binding->route =
+          (uint8_t)((use_nkro &&
+                     (layout_is_modifier_keycode(binding->keycode) ||
+                      binding->keycode < 128u))
+                        ? LAYOUT_OUTPUT_KEYBOARD_NKRO
+                        : LAYOUT_OUTPUT_KEYBOARD_6KRO);
+      for (uint8_t reference = 0u; reference < binding->references;
+           reference++) {
+        if (binding->route == (uint8_t)LAYOUT_OUTPUT_KEYBOARD_NKRO) {
+          keyboard_nkro_hid_key_press((uint8_t)binding->keycode);
+        } else {
+          keyboard_hid_key_press((uint8_t)binding->keycode);
+        }
+      }
+    }
+  }
 }
+
+void layout_refresh_output_routes(void) { layout_sync_keyboard_route(); }
 
 static bool layout_should_use_nkro_keycode(uint16_t keycode) {
   layout_sync_keyboard_route();
@@ -363,15 +413,17 @@ static bool layout_should_emit_keyboard_for_key(uint8_t key) {
   }
 }
 
-static void layout_dispatch_press(uint16_t keycode) {
+static void layout_dispatch_press(uint16_t keycode,
+                                  layout_output_route_t route) {
   uint16_t consumer_usage = 0u;
   uint8_t mouse_button_mask = 0u;
   uint8_t gamepad_button = 0u;
   uint8_t gamepad_axis = 0u;
   uint8_t gamepad_direction = 0u;
 
-  if (layout_is_keyboard_page_keycode(keycode)) {
-    if (layout_should_use_nkro_keycode(keycode)) {
+  if (route == LAYOUT_OUTPUT_KEYBOARD_6KRO ||
+      route == LAYOUT_OUTPUT_KEYBOARD_NKRO) {
+    if (route == LAYOUT_OUTPUT_KEYBOARD_NKRO) {
       keyboard_nkro_hid_key_press((uint8_t)keycode);
     } else {
       keyboard_hid_key_press((uint8_t)keycode);
@@ -380,26 +432,32 @@ static void layout_dispatch_press(uint16_t keycode) {
   }
 
   consumer_usage = layout_consumer_usage_from_keycode(keycode);
-  if (consumer_usage != 0u) {
+  if (route == LAYOUT_OUTPUT_CONSUMER && consumer_usage != 0u) {
     (void)consumer_hid_send_usage(consumer_usage);
     return;
   }
 
   mouse_button_mask = layout_mouse_button_mask_from_keycode(keycode);
-  if (mouse_button_mask != 0u) {
+  if (route == LAYOUT_OUTPUT_MOUSE_BUTTON && mouse_button_mask != 0u) {
     mouse_hid_button_press(mouse_button_mask);
     return;
   }
 
   gamepad_button = layout_gamepad_button_from_keycode(keycode);
-  if (gamepad_button != (uint8_t)GAMEPAD_BUTTON_NONE) {
+  if (route == LAYOUT_OUTPUT_GAMEPAD &&
+      gamepad_button != (uint8_t)GAMEPAD_BUTTON_NONE) {
     gamepad_hid_custom_button_press(gamepad_button);
     return;
   }
 
-  if (layout_gamepad_axis_from_keycode(keycode, &gamepad_axis,
+  if (route == LAYOUT_OUTPUT_GAMEPAD &&
+      layout_gamepad_axis_from_keycode(keycode, &gamepad_axis,
                                        &gamepad_direction)) {
     gamepad_hid_custom_axis_press(gamepad_axis, gamepad_direction);
+    return;
+  }
+
+  if (route != LAYOUT_OUTPUT_MOUSE_PULSE) {
     return;
   }
 
@@ -421,14 +479,16 @@ static void layout_dispatch_press(uint16_t keycode) {
   }
 }
 
-static void layout_dispatch_release(uint16_t keycode) {
+static void layout_dispatch_release(uint16_t keycode,
+                                    layout_output_route_t route) {
   uint8_t mouse_button_mask = 0u;
   uint8_t gamepad_button = 0u;
   uint8_t gamepad_axis = 0u;
   uint8_t gamepad_direction = 0u;
 
-  if (layout_is_keyboard_page_keycode(keycode)) {
-    if (layout_should_use_nkro_keycode(keycode)) {
+  if (route == LAYOUT_OUTPUT_KEYBOARD_6KRO ||
+      route == LAYOUT_OUTPUT_KEYBOARD_NKRO) {
+    if (route == LAYOUT_OUTPUT_KEYBOARD_NKRO) {
       keyboard_nkro_hid_key_release((uint8_t)keycode);
     } else {
       keyboard_hid_key_release((uint8_t)keycode);
@@ -437,18 +497,20 @@ static void layout_dispatch_release(uint16_t keycode) {
   }
 
   mouse_button_mask = layout_mouse_button_mask_from_keycode(keycode);
-  if (mouse_button_mask != 0u) {
+  if (route == LAYOUT_OUTPUT_MOUSE_BUTTON && mouse_button_mask != 0u) {
     mouse_hid_button_release(mouse_button_mask);
     return;
   }
 
   gamepad_button = layout_gamepad_button_from_keycode(keycode);
-  if (gamepad_button != (uint8_t)GAMEPAD_BUTTON_NONE) {
+  if (route == LAYOUT_OUTPUT_GAMEPAD &&
+      gamepad_button != (uint8_t)GAMEPAD_BUTTON_NONE) {
     gamepad_hid_custom_button_release(gamepad_button);
     return;
   }
 
-  if (layout_gamepad_axis_from_keycode(keycode, &gamepad_axis,
+  if (route == LAYOUT_OUTPUT_GAMEPAD &&
+      layout_gamepad_axis_from_keycode(keycode, &gamepad_axis,
                                        &gamepad_direction)) {
     gamepad_hid_custom_axis_release(gamepad_axis, gamepad_direction);
   }
@@ -490,6 +552,10 @@ static bool layout_is_profile_control_keycode(uint16_t keycode) {
   return keycode == CUSTOM_PROFILE_PREV || keycode == CUSTOM_PROFILE_NEXT ||
          keycode == CUSTOM_PROFILE_SET_1 || keycode == CUSTOM_PROFILE_SET_2 ||
          keycode == CUSTOM_PROFILE_SET_3 || keycode == CUSTOM_PROFILE_SET_4;
+}
+
+static bool layout_is_macro_keycode(uint16_t keycode) {
+  return keycode >= CUSTOM_MACRO_1 && keycode <= CUSTOM_MACRO_16;
 }
 
 static uint8_t layout_profile_slot_from_keycode(uint16_t keycode) {
@@ -549,7 +615,8 @@ static bool layout_is_internal_keycode(uint16_t keycode) {
          layout_is_set_layer_keycode(keycode) ||
          keycode == CUSTOM_LAYER_CLEAR || layout_is_led_control_keycode(keycode) ||
          layout_is_gamepad_control_keycode(keycode) ||
-         layout_is_profile_control_keycode(keycode);
+         layout_is_profile_control_keycode(keycode) ||
+         layout_is_macro_keycode(keycode);
 }
 
 static uint8_t layout_layer_from_keycode(uint16_t keycode) {
@@ -652,6 +719,12 @@ static void layout_handle_internal_press(uint16_t keycode) {
   uint8_t layer = layout_layer_from_keycode(keycode);
   uint8_t value = 0u;
 
+  if (layout_is_macro_keycode(keycode)) {
+    (void)action_engine_trigger_program(
+        (uint8_t)(keycode - CUSTOM_MACRO_1));
+    return;
+  }
+
   if (layout_is_momentary_layer_keycode(keycode)) {
     if (layer < SETTINGS_LAYER_COUNT && layer_hold_counts[layer] < 0xFFu) {
       layer_hold_counts[layer]++;
@@ -741,6 +814,12 @@ static void layout_handle_internal_press(uint16_t keycode) {
 static void layout_handle_internal_release(uint16_t keycode) {
   uint8_t layer = layout_layer_from_keycode(keycode);
 
+  if (layout_is_macro_keycode(keycode)) {
+    action_engine_release_program_trigger(
+        (uint8_t)(keycode - CUSTOM_MACRO_1));
+    return;
+  }
+
   if (!layout_is_momentary_layer_keycode(keycode)) {
     return;
   }
@@ -811,9 +890,93 @@ uint8_t layout_get_active_modifier_mask(void) {
                    keyboard_nkro_hid_get_modifier_state());
 }
 
+static uint8_t layout_normalize_action_source(uint8_t source_key) {
+  return source_key < NUM_KEYS ? source_key : LAYOUT_GLOBAL_ACTION_SOURCE;
+}
+
+static uint8_t layout_owned_action_source(uint8_t owner) {
+  return (uint8_t)(LAYOUT_OWNED_ACTION_SOURCE_BASE + owner);
+}
+
+static bool layout_should_emit_for_source(uint8_t source_key) {
+  if (source_key < NUM_KEYS) {
+    return layout_should_emit_keyboard_for_key(source_key);
+  }
+  return settings_is_keyboard_enabled();
+}
+
+static layout_output_route_t layout_resolve_output_route(uint8_t source_key,
+                                                         uint16_t keycode) {
+  if (layout_is_internal_keycode(keycode)) {
+    return LAYOUT_OUTPUT_INTERNAL;
+  }
+  if (layout_is_gamepad_action_keycode(keycode)) {
+    return LAYOUT_OUTPUT_GAMEPAD;
+  }
+  if (!layout_should_emit_for_source(source_key)) {
+    return LAYOUT_OUTPUT_NONE;
+  }
+  if (layout_is_keyboard_page_keycode(keycode)) {
+    return layout_should_use_nkro_keycode(keycode)
+               ? LAYOUT_OUTPUT_KEYBOARD_NKRO
+               : LAYOUT_OUTPUT_KEYBOARD_6KRO;
+  }
+  if (layout_consumer_usage_from_keycode(keycode) != 0u) {
+    return LAYOUT_OUTPUT_CONSUMER;
+  }
+  if (layout_mouse_button_mask_from_keycode(keycode) != 0u) {
+    return LAYOUT_OUTPUT_MOUSE_BUTTON;
+  }
+  if (keycode == CUSTOM_MOUSE_WHEEL_UP ||
+      keycode == CUSTOM_MOUSE_WHEEL_DOWN ||
+      keycode == CUSTOM_MOUSE_WHEEL_LEFT ||
+      keycode == CUSTOM_MOUSE_WHEEL_RIGHT) {
+    return LAYOUT_OUTPUT_MOUSE_PULSE;
+  }
+  return LAYOUT_OUTPUT_NONE;
+}
+
+static layout_action_binding_t *
+layout_find_action_binding(uint8_t source, uint16_t keycode) {
+  for (uint8_t i = 0u; i < LAYOUT_ACTION_BINDINGS_PER_SOURCE; i++) {
+    layout_action_binding_t *binding = &action_bindings[source][i];
+    if (binding->references != 0u && binding->keycode == keycode) {
+      return binding;
+    }
+  }
+  return NULL;
+}
+
+static layout_action_binding_t *layout_allocate_action_binding(uint8_t source) {
+  for (uint8_t i = 0u; i < LAYOUT_ACTION_BINDINGS_PER_SOURCE; i++) {
+    if (action_bindings[source][i].references == 0u) {
+      return &action_bindings[source][i];
+    }
+  }
+  return NULL;
+}
+
+static void layout_dispatch_binding_press(const layout_action_binding_t *binding) {
+  if (binding->route == (uint8_t)LAYOUT_OUTPUT_INTERNAL) {
+    layout_handle_internal_press(binding->keycode);
+  } else {
+    layout_dispatch_press(binding->keycode,
+                          (layout_output_route_t)binding->route);
+  }
+}
+
+static void
+layout_dispatch_binding_release(const layout_action_binding_t *binding) {
+  if (binding->route == (uint8_t)LAYOUT_OUTPUT_INTERNAL) {
+    layout_handle_internal_release(binding->keycode);
+  } else {
+    layout_dispatch_release(binding->keycode,
+                            (layout_output_route_t)binding->route);
+  }
+}
+
 void layout_press(uint8_t key) {
   uint16_t keycode = KC_NO;
-  bool emit_host = false;
 
   if (key >= NUM_KEYS) {
     return;
@@ -821,114 +984,98 @@ void layout_press(uint8_t key) {
 
   keycode = layout_get_active_keycode(key);
   pressed_keycodes[key] = keycode;
-  pressed_host_output[key] = false;
-
-  if (layout_is_internal_keycode(keycode)) {
-    layout_handle_internal_press(keycode);
-    return;
-  }
-
-  if (layout_is_gamepad_action_keycode(keycode)) {
-    pressed_host_output[key] = true;
-    layout_dispatch_press(keycode);
-    return;
-  }
-
-  emit_host = layout_should_emit_keyboard_for_key(key);
-  pressed_host_output[key] = emit_host;
-  if (emit_host) {
-    layout_dispatch_press(keycode);
-  }
+  layout_press_action_for_key(key, keycode);
 }
 
 void layout_release(uint8_t key) {
   uint16_t keycode = KC_NO;
-  bool emit_host = false;
 
   if (key >= NUM_KEYS) {
     return;
   }
 
   keycode = pressed_keycodes[key];
-  emit_host = pressed_host_output[key];
   pressed_keycodes[key] = KC_NO;
-  pressed_host_output[key] = false;
+  layout_release_action_for_key(key, keycode);
+}
 
-  if (layout_is_internal_keycode(keycode)) {
-    layout_handle_internal_release(keycode);
+static void layout_press_action_for_source(uint8_t source,
+                                           uint8_t route_source_key,
+                                           uint16_t keycode) {
+  layout_action_binding_t *binding = NULL;
+
+  if (keycode == KC_NO || keycode == KC_TRANSPARENT) {
     return;
   }
 
-  if (layout_is_gamepad_action_keycode(keycode)) {
-    layout_dispatch_release(keycode);
+  binding = layout_find_action_binding(source, keycode);
+  if (binding != NULL) {
+    if (binding->references == 0xFFu) {
+      return;
+    }
+    binding->references++;
+    layout_dispatch_binding_press(binding);
     return;
   }
 
-  if (emit_host) {
-    layout_dispatch_release(keycode);
+  binding = layout_allocate_action_binding(source);
+  if (binding == NULL) {
+    return;
+  }
+  binding->keycode = keycode;
+  binding->route =
+      (uint8_t)layout_resolve_output_route(route_source_key, keycode);
+  binding->references = 1u;
+  layout_dispatch_binding_press(binding);
+}
+
+static void layout_release_action_for_source(uint8_t source,
+                                             uint16_t keycode) {
+  layout_action_binding_t *binding =
+      layout_find_action_binding(source, keycode);
+
+  if (binding == NULL) {
+    return;
+  }
+
+  layout_dispatch_binding_release(binding);
+  binding->references--;
+  if (binding->references == 0u) {
+    memset(binding, 0, sizeof(*binding));
   }
 }
 
 void layout_press_action_for_key(uint8_t source_key, uint16_t keycode) {
-  if (layout_is_internal_keycode(keycode)) {
-    layout_handle_internal_press(keycode);
-    return;
-  }
-
-  if (layout_is_gamepad_action_keycode(keycode)) {
-    layout_dispatch_press(keycode);
-    return;
-  }
-
-  if (layout_should_emit_keyboard_for_key(source_key)) {
-    layout_dispatch_press(keycode);
-  }
+  layout_press_action_for_source(layout_normalize_action_source(source_key),
+                                 source_key, keycode);
 }
 
 void layout_release_action_for_key(uint8_t source_key, uint16_t keycode) {
-  if (layout_is_internal_keycode(keycode)) {
-    layout_handle_internal_release(keycode);
-    return;
-  }
-
-  if (layout_is_gamepad_action_keycode(keycode)) {
-    layout_dispatch_release(keycode);
-    return;
-  }
-
-  if (layout_should_emit_keyboard_for_key(source_key)) {
-    layout_dispatch_release(keycode);
-  }
+  layout_release_action_for_source(layout_normalize_action_source(source_key),
+                                   keycode);
 }
 
 void layout_press_action(uint16_t keycode) {
-  if (layout_is_internal_keycode(keycode)) {
-    layout_handle_internal_press(keycode);
-    return;
-  }
-
-  if ((layout_is_keyboard_page_keycode(keycode) ||
-       layout_consumer_usage_from_keycode(keycode) != 0u) &&
-      !settings_is_keyboard_enabled()) {
-    return;
-  }
-
-  layout_dispatch_press(keycode);
+  layout_press_action_for_key(LAYOUT_GLOBAL_ACTION_SOURCE, keycode);
 }
 
 void layout_release_action(uint16_t keycode) {
-  if (layout_is_internal_keycode(keycode)) {
-    layout_handle_internal_release(keycode);
+  layout_release_action_for_key(LAYOUT_GLOBAL_ACTION_SOURCE, keycode);
+}
+
+void layout_press_action_owned(uint8_t owner, uint16_t keycode) {
+  if (owner >= LAYOUT_ACTION_OWNER_COUNT) {
     return;
   }
+  layout_press_action_for_source(layout_owned_action_source(owner),
+                                 LAYOUT_GLOBAL_ACTION_SOURCE, keycode);
+}
 
-  if ((layout_is_keyboard_page_keycode(keycode) ||
-       layout_consumer_usage_from_keycode(keycode) != 0u) &&
-      !settings_is_keyboard_enabled()) {
+void layout_release_action_owned(uint8_t owner, uint16_t keycode) {
+  if (owner >= LAYOUT_ACTION_OWNER_COUNT) {
     return;
   }
-
-  layout_dispatch_release(keycode);
+  layout_release_action_for_source(layout_owned_action_source(owner), keycode);
 }
 
 void layout_tap_action(uint16_t keycode) {
@@ -945,8 +1092,9 @@ void layout_reset_state(void) {
 
   for (uint8_t key = 0u; key < NUM_KEYS; key++) {
     pressed_keycodes[key] = KC_NO;
-    pressed_host_output[key] = false;
   }
+
+  memset(action_bindings, 0, sizeof(action_bindings));
 
   keyboard_route_initialized = false;
   keyboard_route_use_nkro = false;

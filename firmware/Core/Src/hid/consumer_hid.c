@@ -3,7 +3,9 @@
 #include "tusb.h"
 #include "usb_descriptors.h"
 
-#define CONSUMER_HID_QUEUE_CAPACITY 128u
+/* One slot is reserved to distinguish full from empty. 129 entries therefore
+ * hold 64 complete usage/neutral pairs even while the endpoint is busy. */
+#define CONSUMER_HID_QUEUE_CAPACITY 129u
 
 static uint16_t report_queue[CONSUMER_HID_QUEUE_CAPACITY];
 static uint8_t queue_head = 0u;
@@ -129,4 +131,12 @@ void consumer_hid_task(void) {
 void consumer_hid_on_report_complete(void) {
   report_in_flight = false;
   consumer_hid_pump_queue();
+}
+
+void consumer_hid_on_umount(void) {
+  /* An aborted transfer has no completion callback. Drop stale one-shot
+   * usages and unlock the endpoint state for the next enumeration. */
+  queue_head = 0u;
+  queue_tail = 0u;
+  report_in_flight = false;
 }

@@ -25,6 +25,15 @@ set(KBHE_BOOTLOADER_TARGET kbhe_bootloader)
 option(KBHE_ENABLE_CUSTOM_BOOTLOADER
        "Build the main firmware for the resident custom bootloader layout"
        ON)
+option(KBHE_TINYUSB_DEBUG
+       "Enable TinyUSB printf tracing (large; intended for local diagnostics only)"
+       OFF)
+
+if(KBHE_TINYUSB_DEBUG)
+    set(KBHE_TINYUSB_DEBUG_VALUE 1)
+else()
+    set(KBHE_TINYUSB_DEBUG_VALUE 0)
+endif()
 
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -60,6 +69,7 @@ endif()
 # TinyUSB Configuration
 #--------------------------------------------------------------------+
 set(TINYUSB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/tinyusb)
+set(MONOCYPHER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/monocypher)
 
 # TinyUSB source files
 set(TINYUSB_SRC
@@ -146,10 +156,17 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/layout/layout.c
     # Settings and flash storage
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/flash_storage.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/flash_storage_codec.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/settings.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/diagnostics.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/rgb_frame_staging.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid_protocol.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/action_engine.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/action_protocol.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/action_store.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/profile_document_store.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_shared.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_validation.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_app.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/analog.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/calibration.c
@@ -163,6 +180,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/led_indicator.c
     # Rotary encoder support
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/rotary_encoder.c
+    ${MONOCYPHER_DIR}/src/monocypher.c
+    ${MONOCYPHER_DIR}/src/optional/monocypher-ed25519.c
 )
 
 # Add include paths
@@ -173,10 +192,13 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
     # WS2812 driver includes
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/WS2812/Inc
+    ${MONOCYPHER_DIR}/src
+    ${MONOCYPHER_DIR}/src/optional
 )
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     KBHE_CUSTOM_BOOTLOADER_ENABLED=${KBHE_CUSTOM_BOOTLOADER_ENABLED_VALUE}
+    CFG_TUSB_DEBUG=${KBHE_TINYUSB_DEBUG_VALUE}
 )
 
 # Remove wrong libob.a library dependency when using cpp files
@@ -194,6 +216,21 @@ set_source_files_properties(
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/filter.c
     PROPERTIES
     COMPILE_DEFINITIONS "compute_next_filtered_value=filter_compute_next_filtered_value"
+)
+
+# Persistence, configuration-protocol and updater metadata handlers are cold
+# control-plane paths.
+# Optimizing them for size preserves the small application slot without
+# changing hot-path ADC, trigger, RGB rendering or USB transport optimization.
+set_source_files_properties(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/flash_storage.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/flash_storage_codec.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/profile_document_store.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/settings.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid_protocol.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/action_protocol.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_shared.c
+    PROPERTIES COMPILE_OPTIONS "$<$<CONFIG:Release>:-Os>"
 )
 
 # Newlib syscall stubs must stay as real object code even in Release+LTO,
@@ -219,11 +256,15 @@ target_sources(${KBHE_BOOTLOADER_TARGET} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/syscalls.c
     ${TINYUSB_SRC}
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_shared.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_validation.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/bootloader_usb.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/updater_bootloader.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/updater_version_floor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/usb_descriptors.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/stm32f7xx_it.c
+    ${MONOCYPHER_DIR}/src/monocypher.c
+    ${MONOCYPHER_DIR}/src/optional/monocypher-ed25519.c
 )
 
 target_include_directories(${KBHE_BOOTLOADER_TARGET} BEFORE PRIVATE
@@ -233,6 +274,12 @@ target_include_directories(${KBHE_BOOTLOADER_TARGET} BEFORE PRIVATE
 target_include_directories(${KBHE_BOOTLOADER_TARGET} PRIVATE
     ${TINYUSB_INC}
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
+    ${MONOCYPHER_DIR}/src
+    ${MONOCYPHER_DIR}/src/optional
+)
+
+target_compile_definitions(${KBHE_BOOTLOADER_TARGET} PRIVATE
+    CFG_TUSB_DEBUG=${KBHE_TINYUSB_DEBUG_VALUE}
 )
 
 target_link_libraries(${KBHE_BOOTLOADER_TARGET}

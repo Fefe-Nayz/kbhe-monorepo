@@ -17,6 +17,7 @@ import {
   captureFirmwareProfileSnapshot,
   isFirmwareProfileSnapshot,
 } from "@/lib/kbhe/profile-sync";
+import { acquireProfileInteractionLease } from "@/lib/kbhe/profile-operation-lock";
 import { SETTINGS_PROFILE_COUNT } from "@/lib/kbhe/protocol";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ import { toast } from "sonner";
 import { PageContent } from "@/components/shared/PageLayout";
 
 type ProfileTargetType = "device" | "app";
+const MAX_PROFILE_IMPORT_BYTES = 2 * 1024 * 1024;
 
 type UnifiedProfile =
   | {
@@ -141,6 +143,7 @@ export default function Profiles() {
   const runtimeSource = useProfileStore((s) => s.runtimeSource);
   const activeAppProfileName = useProfileStore((s) => s.activeAppProfileName);
   const ramOnlyFromStore = useProfileStore((s) => s.ramOnlyActive);
+  const persistenceError = useProfileStore((s) => s.persistenceError);
 
   const upsertAppProfileData = useProfileStore((s) => s.upsertAppProfileData);
   const getAppProfileByName = useProfileStore((s) => s.getAppProfileByName);
@@ -163,6 +166,14 @@ export default function Profiles() {
 
   const [actionPending, setActionPending] = useState(false);
 
+  useEffect(() => {
+    if (persistenceError) {
+      toast.error("Profile storage failed; recent changes may not survive an app restart", {
+        id: "profile-persistence-error",
+      });
+    }
+  }, [persistenceError]);
+
   const [deleteTarget, setDeleteTarget] = useState<UnifiedProfile | null>(null);
   const [renameTarget, setRenameTarget] = useState<UnifiedProfile | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -177,6 +188,7 @@ export default function Profiles() {
 
   const importRef = useRef<HTMLInputElement>(null);
   const importTargetRef = useRef<string | null>(null);
+  const actionPendingRef = useRef(false);
 
   const syncRuntimeState = useCallback(async () => {
     await DeviceSessionManager.refreshRuntimeProfileState();
@@ -187,15 +199,21 @@ export default function Profiles() {
   }, [queryClient]);
 
   const runAction = useCallback(async (task: () => Promise<void>) => {
-    if (actionPending) return;
+    // State alone does not close the same-tick double-click window: React has
+    // not re-rendered yet when a second handler invocation observes it.
+    if (actionPendingRef.current) return;
 
+    actionPendingRef.current = true;
     setActionPending(true);
+    const releaseInteraction = acquireProfileInteractionLease();
     try {
       await task();
     } finally {
+      releaseInteraction();
+      actionPendingRef.current = false;
       setActionPending(false);
     }
-  }, [actionPending]);
+  }, []);
 
   const upsertLocalAppProfile = useCallback(async (
     profileName: string,
@@ -395,6 +413,11 @@ export default function Profiles() {
     const file = e.target.files?.[0];
     const target = importTargetRef.current;
     if (!file || !target) return;
+    if (file.size > MAX_PROFILE_IMPORT_BYTES) {
+      toast.error("Profile file is too large (2 MB maximum)");
+      e.target.value = "";
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -408,7 +431,7 @@ export default function Profiles() {
         upsertAppProfileData(target, payload as Record<string, unknown>, { activate: false });
         toast.success(`Imported into "${target}"`);
       } catch {
-        toast.error("Invalid JSON file");
+        toast.error("Invalid or incompatible profile file");
       }
     };
     reader.readAsText(file);
@@ -649,7 +672,7 @@ export default function Profiles() {
       <PageContent>
         <SectionCard
           title="Profiles"
-          description="Device and app profiles are managed together. Device profiles occupy keyboard slots; app profiles are unlimited and can be applied in temporary RAM-only mode."
+          description="Device and app profiles are managed together. Device profiles occupy keyboard slots; app profiles are stored durably in the app data directory and can be applied in temporary RAM-only mode."
         >
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Device Slots: {usedDeviceSlots}/{SETTINGS_PROFILE_COUNT}</Badge>

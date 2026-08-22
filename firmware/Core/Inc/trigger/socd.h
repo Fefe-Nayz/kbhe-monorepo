@@ -1,3 +1,6 @@
+#ifndef TRIGGER_SOCD_H_
+#define TRIGGER_SOCD_H_
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -22,3 +25,5 @@ void socd_load_settings(void);
 void socd_on_press(uint8_t key);
 
 void socd_on_release(uint8_t key);
+
+#endif /* TRIGGER_SOCD_H_ */

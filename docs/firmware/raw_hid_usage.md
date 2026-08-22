@@ -13,7 +13,7 @@ entry point that runs the tools.
 
 See the complete protocol reference for application RAW HID and updater RAW HID:
 
-- `docs/RAW_HID_PROTOCOL.MD`
+- [`RAW_HID_PROTOCOL.MD`](RAW_HID_PROTOCOL.MD)
 
 New identity commands:
 
@@ -21,27 +21,39 @@ New identity commands:
 - `GET_KEYBOARD_NAME (0x2C)` / `SET_KEYBOARD_NAME (0x2D)` read/write custom keyboard name (32 chars)
 
 ### Firmware Update
-Flash the application image with the integrated updater command:
+Use a matching signed pair downloaded from one firmware release:
 
 ```powershell
-python host/raw_hid.py --flash build/Release/kbhe.bin
+python tools/host/firmware_updater.py kbhe-app.bin `
+  --signature kbhe-app.bin.sig --fw-version 0x020006
 ```
 
-Optional arguments:
+Timeout/retry controls are optional:
 
 ```powershell
-python host/raw_hid.py --flash build/Release/kbhe.bin --fw-version 0x0102 --timeout 5 --retries 5
+python tools/host/firmware_updater.py kbhe-app.bin `
+  --signature kbhe-app.bin.sig --fw-version 0x020006 `
+  --timeout 5 --retries 5
 ```
+
+The `.sig` argument is optional only syntactically: when omitted the tool reads
+`<firmware>.sig`. Flashing always requires a valid detached Ed25519 signature,
+and the host verifies it before asking the bootloader to erase flash.
+Local CMake builds intentionally do not produce a release signature. A local
+development image must be signed with an explicitly managed development key
+whose public key is compiled into that development bootloader; never copy the
+production private key into the repository or build directory.
 
 ### GUI
 Launch the keyboard configurator GUI:
 
 ```powershell
-python host/raw_hid.py --gui
+python tools/host/raw_hid.py --gui
 ```
 
 The GUI now includes a dedicated `Firmware` page with:
-- file picker for the `.bin`
+
+- file picker for the `.bin` (with a matching sibling `.bin.sig`)
 - optional firmware version override
 - timeout/retry controls
 - updater log window

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import {
@@ -17,13 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IconLayoutGrid } from "@tabler/icons-react";
+import { toast } from "sonner";
 
 export function ProfileSelect() {
   const appProfiles = useProfileStore((s) => s.appProfiles);
   const runtimeSource = useProfileStore((s) => s.runtimeSource);
   const activeAppProfileName = useProfileStore((s) => s.activeAppProfileName);
   const activeDeviceSlot = useProfileStore((s) => s.activeDeviceSlot);
-  const setRuntimeSource = useProfileStore((s) => s.setRuntimeSource);
   const init = useProfileStore((s) => s.init);
   const status = useDeviceSession((s) => s.status);
   const activeProfileIndex = useDeviceSession((s) => s.activeProfileIndex);
@@ -31,6 +31,8 @@ export function ProfileSelect() {
   const profileUsedMask = useDeviceSession((s) => s.profileUsedMask);
 
   const connected = status === "connected";
+  const [switching, setSwitching] = useState(false);
+  const switchingRef = useRef(false);
 
   useEffect(() => {
     init();
@@ -73,26 +75,38 @@ export function ProfileSelect() {
     ? selectedCandidate
     : undefined;
 
-  const handleValueChange = (value: string | null) => {
+  const handleValueChange = async (value: string | null) => {
     if (typeof value !== "string" || value.length === 0) {
       return;
     }
+    if (switchingRef.current) return;
 
-    if (value.startsWith("device:")) {
-      const slot = Number.parseInt(value.replace("device:", ""), 10);
-      if (!Number.isFinite(slot)) return;
+    switchingRef.current = true;
+    setSwitching(true);
 
-      setRuntimeSource("device");
-      if (!connected) return;
+    try {
+      if (value.startsWith("device:")) {
+        const slot = Number.parseInt(value.replace("device:", ""), 10);
+        if (!Number.isFinite(slot) || !connected) return;
 
-      void activateDeviceRuntimeProfile(slot);
-      return;
-    }
+        if (!await activateDeviceRuntimeProfile(slot)) {
+          throw new Error("The device profile could not be activated");
+        }
+        return;
+      }
 
-    if (value.startsWith("app:")) {
-      const profileName = value.replace("app:", "");
-      if (!profileName) return;
-      void activateTemporaryAppProfile(profileName);
+      if (value.startsWith("app:")) {
+        const profileName = value.replace("app:", "");
+        if (!profileName) return;
+        if (!await activateTemporaryAppProfile(profileName)) {
+          throw new Error("The app profile could not be applied");
+        }
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      switchingRef.current = false;
+      setSwitching(false);
     }
   };
 
@@ -100,7 +114,8 @@ export function ProfileSelect() {
     <Select
       value={selectedValue}
       items={items}
-      onValueChange={handleValueChange}
+      onValueChange={(value) => void handleValueChange(value)}
+      disabled={switching}
     >
       <SelectTrigger className="gap-1.5 text-xs font-medium">
         <IconLayoutGrid className="size-3.5 text-muted-foreground" />

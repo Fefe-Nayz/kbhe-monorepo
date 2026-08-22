@@ -191,9 +191,7 @@ mod platform {
     const WAVE_FORMAT_IEEE_FLOAT: u16 = 3;
     const WAVE_FORMAT_EXTENSIBLE: u16 = 0xFFFE;
 
-    unsafe fn loopback_capture(
-        sample_rate_out: &mut u32,
-    ) -> windows::core::Result<Vec<f32>> {
+    unsafe fn loopback_capture(sample_rate_out: &mut u32) -> windows::core::Result<Vec<f32>> {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
         let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?;
@@ -244,10 +242,8 @@ mod platform {
             capture_client.GetBuffer(&mut data_ptr, &mut frames, &mut flags, None, None)?;
 
             if frames > 0 && !data_ptr.is_null() && is_float {
-                let floats = std::slice::from_raw_parts(
-                    data_ptr as *const f32,
-                    frames as usize * channels,
-                );
+                let floats =
+                    std::slice::from_raw_parts(data_ptr as *const f32, frames as usize * channels);
                 for frame in floats.chunks_exact(channels) {
                     let m: f32 = frame.iter().sum::<f32>() / channels as f32;
                     mono.push(m);

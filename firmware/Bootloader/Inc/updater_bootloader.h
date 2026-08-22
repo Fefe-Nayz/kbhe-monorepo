@@ -10,6 +10,7 @@ extern "C" {
 
 void updater_bootloader_init(void);
 bool updater_bootloader_process_packet(const uint8_t *request,
+                                       uint16_t request_len,
                                        uint8_t *response);
 void updater_bootloader_notify_response_sent(void);
 bool updater_bootloader_should_jump_to_app(void);

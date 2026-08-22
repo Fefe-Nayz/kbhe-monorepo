@@ -42,6 +42,11 @@ extern "C" {
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
 
+/* Keep the 8 kHz input pipeline ahead of best-effort LED and USB work. */
+#define KBHE_NVIC_PRIORITY_INPUT 0U
+#define KBHE_NVIC_PRIORITY_LED_DMA 1U
+#define KBHE_NVIC_PRIORITY_USB 2U
+
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -94,6 +99,9 @@ extern uint32_t task_gamepad_us;
 extern uint32_t task_led_us;
 extern uint32_t task_total_us;
 extern uint32_t mcu_scan_cycle_us_live;
+extern uint32_t mcu_scan_cycle_us_max;
+extern uint32_t mcu_scan_deadline_miss_count;
+uint16_t mcu_scan_cycle_p99_us(void);
 extern uint32_t mcu_work_us_live;
 extern uint16_t mcu_load_permille_live;
 extern int16_t mcu_temperature_c_live;

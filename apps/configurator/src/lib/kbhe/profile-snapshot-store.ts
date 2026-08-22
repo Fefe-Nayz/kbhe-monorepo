@@ -14,6 +14,7 @@ import type {
   RotaryEncoderSettings,
   TriggerChatterGuard,
 } from "./device"
+import type { ActionOverlayBinding, ActionProgram } from "./action-program"
 
 function cloneSnapshot(snapshot: FirmwareProfileSnapshot): FirmwareProfileSnapshot {
   return structuredClone(snapshot)
@@ -52,6 +53,9 @@ export function patchActiveAppProfileSnapshot(
   const nextSnapshot = cloneSnapshot(snapshot)
   updater(nextSnapshot)
   nextSnapshot.capturedAt = Date.now()
+  if (nextSnapshot.schemaVersion === 2) {
+    nextSnapshot.revision = (nextSnapshot.revision ?? 0) + 1
+  }
 
   profileStore.upsertAppProfileData(profileName, profile.data, {
     firmwareSnapshot: nextSnapshot,
@@ -145,10 +149,11 @@ export function patchActiveAppProfileNkroEnabled(enabled: boolean): void {
 }
 
 export function patchActiveAppProfileOptions(
-  options: NonNullable<FirmwareProfileSnapshot["options"]>,
+  options: Partial<NonNullable<FirmwareProfileSnapshot["options"]>>,
 ): void {
   patchActiveAppProfileSnapshot((snapshot) => {
-    snapshot.options = { ...options }
+    if (!snapshot.options) return
+    snapshot.options = { ...snapshot.options, ...options }
   })
 }
 
@@ -203,16 +208,25 @@ export function patchActiveAppProfileLedPixel(
   index: number,
   color: { r: number; g: number; b: number },
 ): void {
+  patchActiveAppProfileLedPixelBatch([[index, color]])
+}
+
+export function patchActiveAppProfileLedPixelBatch(
+  updates: ReadonlyArray<readonly [number, { r: number; g: number; b: number }]>,
+): void {
+  if (updates.length === 0) return
   patchActiveAppProfileSnapshot((snapshot) => {
     const led = ensureLedSnapshot(snapshot)
     const pixels = led.pixels ? [...led.pixels] : []
-    const offset = index * 3
-    while (pixels.length <= offset + 2) {
-      pixels.push(0)
+    for (const [index, color] of updates) {
+      const offset = index * 3
+      while (pixels.length <= offset + 2) {
+        pixels.push(0)
+      }
+      pixels[offset] = color.r & 0xff
+      pixels[offset + 1] = color.g & 0xff
+      pixels[offset + 2] = color.b & 0xff
     }
-    pixels[offset] = color.r & 0xff
-    pixels[offset + 1] = color.g & 0xff
-    pixels[offset + 2] = color.b & 0xff
     led.pixels = pixels
   })
 }
@@ -226,5 +240,28 @@ export function patchActiveAppProfileTriggerChatterGuard(
 ): void {
   patchActiveAppProfileLedSnapshot({
     triggerChatterGuard: { ...triggerChatterGuard },
+  })
+}
+
+export function patchActiveAppProfileActionProgram(index: number, program: ActionProgram): void {
+  patchActiveAppProfileSnapshot((snapshot) => {
+    if (!snapshot.actionPrograms || index < 0 || index >= snapshot.actionPrograms.length) return
+    snapshot.actionPrograms[index] = structuredClone(program)
+  })
+}
+
+export function patchActiveAppProfileActionOverlay(index: number, overlay: ActionOverlayBinding): void {
+  patchActiveAppProfileSnapshot((snapshot) => {
+    if (!snapshot.actionOverlays || index < 0 || index >= snapshot.actionOverlays.length) return
+    snapshot.actionOverlays[index] = structuredClone(overlay)
+  })
+}
+
+export function patchActiveAppProfileActionState(index: number, value: boolean): void {
+  patchActiveAppProfileSnapshot((snapshot) => {
+    const mask = 1 << index
+    snapshot.actionStateBits = value
+      ? (snapshot.actionStateBits ?? 0) | mask
+      : (snapshot.actionStateBits ?? 0) & ~mask
   })
 }

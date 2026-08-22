@@ -327,6 +327,7 @@ export default function Rotary() {
 
   type RotaryPatch = Parameters<typeof kbheDevice.setRotaryEncoderSettings>[0];
 
+  const rotaryDesiredRef = useRef<RotaryEncoderSettings | null>(null);
   const mutation = useOptimisticMutation<RotaryEncoderSettings | null, RotaryPatch, boolean>({
     queryKey: queryKeys.rotary.settings(),
     mutationFn: async (full) => {
@@ -342,13 +343,11 @@ export default function Rotary() {
       markSaved();
       void DeviceSessionManager.syncVolumeService();
     },
-    onError: markError,
+    onError: () => {
+      rotaryDesiredRef.current = null;
+      markError();
+    },
   });
-
-  const write = (patch: Partial<RotaryPatch>) => {
-    if (!rotaryQ.data) return;
-    mutation.mutate({ ...rotaryQ.data, ...patch });
-  };
 
   const liveRotary = useThrottledCall(async (patch: Partial<RotaryPatch>) => {
     if (!rotaryQ.data) return;
@@ -358,6 +357,20 @@ export default function Rotary() {
       patchActiveAppProfileRotarySettings(next as RotaryEncoderSettings);
     }
   });
+
+  const write = (patch: Partial<RotaryPatch>) => {
+    const base = rotaryDesiredRef.current ?? rotaryQ.data;
+    if (!base) return;
+    const next = { ...base, ...patch };
+    rotaryDesiredRef.current = next;
+    void liveRotary.cancelAndWait().then(() => mutation.mutate(next));
+  };
+
+  useEffect(() => {
+    if (!mutation.isPending) {
+      rotaryDesiredRef.current = rotaryQ.data ?? null;
+    }
+  }, [mutation.isPending, rotaryQ.data]);
 
   const livePreviewQ = useQuery({
     queryKey: [
@@ -394,7 +407,7 @@ export default function Rotary() {
   const settingsSignature = useMemo(() => {
     if (!rotaryQ.data) return "";
     const s = rotaryQ.data;
-    return `${s.rotation_action}:${s.button_action}:${s.rgb_behavior}:${s.progress_style}:${s.progress_effect_mode}`;
+    return `${s.rotation_action}:${s.button_action}:${s.rgb_behavior}:${s.progress_style}:${s.progress_effect_mode}:${s.progress_filled_only ? 1 : 0}`;
   }, [rotaryQ.data]);
 
   const previousSettingsSignatureRef = useRef("");
@@ -454,24 +467,65 @@ export default function Rotary() {
                   {s.rotation_action === 0 && (
                     <FormRow
                       label="Volume Overlay"
-                      description="Forwards system volume to the keyboard LED bar in real time"
+                      description="Choose whether unfilled keys dim or keep the underlying RGB effect untouched"
                     >
-                      <Badge variant={isVolumeServiceRunning() ? "default" : "secondary"}>
-                        {isVolumeServiceRunning() ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={s.progress_filled_only ? "filled" : "classic"}
+                          disabled={!connected}
+                          items={[
+                            { value: "filled", label: "Filled only" },
+                            { value: "classic", label: "Dim background" },
+                          ]}
+                          onValueChange={(value) => write({ progress_filled_only: value === "filled" })}
+                        >
+                          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="filled">Filled only (transparent)</SelectItem>
+                            <SelectItem value="classic">Dim unfilled keys (classic)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Badge variant={isVolumeServiceRunning() ? "default" : "secondary"}>
+                          {isVolumeServiceRunning() ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
                     </FormRow>
                   )}
                   <FormRow label="Sensitivity">
                     <div className="w-44">
-                      <CommitSlider min={1} max={10} step={1} value={s.sensitivity}
+                      <CommitSlider min={1} max={16} step={1} value={s.sensitivity}
                         onLiveChange={(v) => liveRotary({ sensitivity: v })}
                         onCommit={(v) => write({ sensitivity: v })}
                         disabled={!connected} className="flex-1" />
                     </div>
                   </FormRow>
+                  <FormRow
+                    label="Acceleration"
+                    description="Multiplies fast detents while preserving precise slow adjustments"
+                  >
+                    <Select
+                      value={String(s.acceleration ?? 0)}
+                      disabled={!connected}
+                      items={[
+                        { value: "0", label: "Off" },
+                        { value: "1", label: "Gentle" },
+                        { value: "2", label: "Medium" },
+                        { value: "3", label: "Strong" },
+                      ]}
+                      onValueChange={(value) => write({ acceleration: Number(value) })}
+                    >
+                      <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Off</SelectItem>
+                        <SelectItem value="1">Gentle</SelectItem>
+                        <SelectItem value="2">Medium</SelectItem>
+                        <SelectItem value="3">Strong</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormRow>
                   <FormRow label="Step Size">
                     <div className="w-44">
-                      <CommitSlider min={1} max={20} step={1} value={s.step_size}
+                      <CommitSlider min={1} max={64} step={1} value={s.step_size}
                         onLiveChange={(v) => liveRotary({ step_size: v })}
                         onCommit={(v) => write({ step_size: v })}
                         disabled={!connected} className="flex-1" />

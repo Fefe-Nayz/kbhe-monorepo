@@ -29,6 +29,10 @@ typedef struct {
     bool current_key_pressed;
     uint16_t current_peak_raw;
     uint32_t zero_accumulator[NUM_KEYS];
+    /* Guided calibration is one transaction.  Zero/max values stay private
+     * until every key has completed, so aborts and mid-session validation
+     * failures cannot leave a partially calibrated keyboard in RAM/flash. */
+    settings_calibration_t pending_calibration;
 } guided_calibration_state_t;
 
 static guided_calibration_state_t guided_state;
@@ -203,6 +207,7 @@ bool calibration_guided_start(void) {
     }
 
     memset(&guided_state, 0, sizeof(guided_state));
+    guided_state.pending_calibration = *settings_get_calibration();
     guided_state.active = true;
     guided_state.phase = CALIBRATION_GUIDED_ZERO_AVERAGE;
     calibration_take_led_control();
@@ -239,16 +244,33 @@ void calibration_guided_tick(uint32_t now_ms) {
         calibration_render_all(pulse, 0u, 0u);
         if ((now_ms - guided_state.phase_start_ms) >= CALIBRATION_GUIDED_ZERO_DURATION_MS &&
             guided_state.sample_count > 0u) {
-            settings_calibration_t calibration = *settings_get_calibration();
+            settings_calibration_t *calibration =
+                &guided_state.pending_calibration;
             for (uint8_t key = 0; key < NUM_KEYS; key++) {
-                calibration.key_zero_values[key] =
-                    (int16_t)(guided_state.zero_accumulator[key] / guided_state.sample_count);
-                if (calibration.key_max_values[key] <= calibration.key_zero_values[key]) {
-                    calibration.key_max_values[key] = (int16_t)calibration_default_max_raw();
+                uint32_t zero =
+                    guided_state.zero_accumulator[key] / guided_state.sample_count;
+                uint32_t maximum =
+                    (uint16_t)calibration->key_max_values[key];
+
+                /* The settings boundary rejects impossible or near-zero
+                 * spans. Prepare a valid provisional maximum before the
+                 * guided maximum-press phase instead of ignoring a failed
+                 * all-key update. */
+                if (zero > SETTINGS_ADC_MAX_VALUE -
+                               SETTINGS_CALIBRATION_MIN_SPAN_ADC) {
+                    calibration_finish_session(false);
+                    return;
                 }
+                if (maximum < zero + SETTINGS_CALIBRATION_MIN_SPAN_ADC ||
+                    maximum > SETTINGS_ADC_MAX_VALUE) {
+                    maximum = calibration_default_max_raw();
+                }
+                if (maximum < zero + SETTINGS_CALIBRATION_MIN_SPAN_ADC) {
+                    maximum = zero + SETTINGS_CALIBRATION_MIN_SPAN_ADC;
+                }
+                calibration->key_zero_values[key] = (int16_t)zero;
+                calibration->key_max_values[key] = (int16_t)maximum;
             }
-            settings_set_calibration(&calibration);
-            calibration_load_settings();
 
             guided_state.phase = CALIBRATION_GUIDED_WAIT_MAX_PRESS;
             guided_state.phase_start_ms = now_ms;
@@ -311,7 +333,7 @@ void calibration_guided_on_scan(uint32_t now_ms) {
         return;
     }
 
-    settings_calibration_t calibration = *settings_get_calibration();
+    settings_calibration_t *calibration = &guided_state.pending_calibration;
     uint8_t key = guided_state.current_key;
     if (key >= NUM_KEYS) {
         calibration_finish_session(false);
@@ -319,7 +341,7 @@ void calibration_guided_on_scan(uint32_t now_ms) {
     }
 
     uint16_t raw_value = analog_read_raw_value(key);
-    uint16_t zero_value = (uint16_t)calibration.key_zero_values[key];
+    uint16_t zero_value = (uint16_t)calibration->key_zero_values[key];
 
     if (guided_state.phase == CALIBRATION_GUIDED_WAIT_MAX_PRESS) {
         if (raw_value > (uint16_t)(zero_value + CALIBRATION_GUIDED_PRESS_THRESHOLD_ADC)) {
@@ -340,12 +362,7 @@ void calibration_guided_on_scan(uint32_t now_ms) {
         if (captured_max <= zero_value) {
             captured_max = (uint16_t)(zero_value + CALIBRATION_GUIDED_PRESS_THRESHOLD_ADC);
         }
-        calibration.key_max_values[key] = (int16_t)captured_max;
-        if (!settings_set_calibration(&calibration)) {
-            calibration_finish_session(false);
-            return;
-        }
-        calibration_load_settings();
+        calibration->key_max_values[key] = (int16_t)captured_max;
 
         guided_state.current_key++;
         guided_state.current_key_pressed = false;
@@ -353,8 +370,21 @@ void calibration_guided_on_scan(uint32_t now_ms) {
         guided_state.phase_start_ms = now_ms;
 
         if (guided_state.current_key >= NUM_KEYS) {
-            bool saved = settings_save();
-            calibration_finish_session(saved);
+            settings_calibration_t original = *settings_get_calibration();
+            bool published = settings_set_calibration(calibration);
+            bool committed = published;
+
+            if (committed) {
+                committed = settings_request_save();
+            }
+            if (!committed && published) {
+                /* Restore the exact pre-session calibration if publication or
+                 * persistence failed. The rollback itself remains dirty so a
+                 * later healthy autosave can repair flash after an I/O error. */
+                (void)settings_set_calibration(&original);
+            }
+
+            calibration_finish_session(committed);
             guided_state.phase_start_ms = now_ms;
         } else {
             guided_state.phase = CALIBRATION_GUIDED_WAIT_MAX_PRESS;

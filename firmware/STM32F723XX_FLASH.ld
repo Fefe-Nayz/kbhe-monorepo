@@ -57,8 +57,15 @@ MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 0x3FF00
 BOOTRAM (rw)   : ORIGIN = 0x2003FF00, LENGTH = 0x100
-FLASH (rx)     : ORIGIN = 0x08010000, LENGTH = 0x4FF00
+/* Sectors 4-5 only; 0x0803FF00..0x0803FFFF is the signed image trailer. */
+FLASH (rx)     : ORIGIN = 0x08010000, LENGTH = 0x2FF00
 }
+
+/* Keep a release-engineering safety margin inside the 192 KiB application
+ * slot. A build that leaves less than 8 KiB must fail instead of producing an
+ * image that barely links and cannot absorb security or recovery fixes. */
+ASSERT(__data_source_end <= ORIGIN(FLASH) + LENGTH(FLASH) - 8192,
+       "kbhe firmware exceeds FLASH budget (8 KiB headroom required)")
 
 /* Highest address of the user mode stack */
 _estack = ORIGIN(RAM) + LENGTH(RAM);    /* end of RAM */

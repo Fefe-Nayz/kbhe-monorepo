@@ -74,19 +74,10 @@ export function CommitSlider({
     onLiveChange?.(n);
   }, [onLiveChange]);
 
-  const handlePointerDown = useCallback(() => {
-    setDraft(value);
-    commitRef.current = value;
-    waitingForRef.current = null;
-    if (clearTimerRef.current) {
-      clearTimeout(clearTimerRef.current);
-      clearTimerRef.current = null;
-    }
-  }, [value]);
-
-  const handlePointerUp = useCallback(() => {
-    if (draft === null) return;
-    const finalValue = commitRef.current;
+  const handleValueCommitted = useCallback((next: number | readonly number[]) => {
+    const finalValue = typeof next === "number" ? next : next[0];
+    if (finalValue === undefined) return;
+    commitRef.current = finalValue;
     waitingForRef.current = finalValue;
 
     if (clearTimerRef.current) {
@@ -99,16 +90,10 @@ export function CommitSlider({
     }, 1500);
 
     onCommit(finalValue);
-  }, [draft, onCommit]);
+  }, [onCommit]);
 
   return (
-    <div
-      className={cn("w-full", className)}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onLostPointerCapture={handlePointerUp}
-    >
+    <div className={cn("w-full", className)}>
       {!hideValue && (
         <div className="mb-1 flex justify-end">
           <span className="text-xs font-mono tabular-nums text-muted-foreground">
@@ -122,6 +107,7 @@ export function CommitSlider({
         step={step}
         value={[displayValue]}
         onValueChange={handleValueChange}
+        onValueCommitted={handleValueCommitted}
         disabled={disabled}
       />
     </div>

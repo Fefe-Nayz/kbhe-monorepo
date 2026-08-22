@@ -1,11 +1,28 @@
 import { buildCommandReport, Command, PACKET_SIZE } from "./protocol";
 import { kbheTransport, type KbheTransport } from "./transport";
 
+export function isRetrySafeCommand(command: Command | number): boolean {
+  const name = Command[command as Command];
+  return name?.startsWith("GET_") === true
+    || command === Command.ECHO
+    || command === Command.GUIDED_CALIBRATION_STATUS;
+}
+
+export function isAtomicCommandUnavailableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /kbhe_send_command/i.test(message)
+    && /(not found|unknown|does not exist|not registered)/i.test(message);
+}
+
 export class KbheCommander {
   private queue: Promise<unknown> = Promise.resolve();
   private atomicCommandAvailable: boolean | null = null;
 
   constructor(private readonly transport: KbheTransport = kbheTransport) {}
+
+  resetTransportCapabilities(): void {
+    this.atomicCommandAvailable = null;
+  }
 
   enqueue<T>(task: () => Promise<T>): Promise<T> {
     const next = this.queue.then(task, task);
@@ -14,6 +31,20 @@ export class KbheCommander {
       () => undefined,
     );
     return next;
+  }
+
+  /**
+   * Drain the transport queue, including follow-up commands enqueued by the
+   * completion continuation of an earlier command. Profile switches and USB
+   * teardown use this as a strict ordering barrier.
+   */
+  async waitForIdle(): Promise<void> {
+    for (;;) {
+      const observedTail = this.queue;
+      await observedTail;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (observedTail === this.queue) return;
+    }
   }
 
   private async sendCommandLegacy(
@@ -48,8 +79,12 @@ export class KbheCommander {
         const response = await this.transport.sendCommand(command, data, timeoutMs);
         this.atomicCommandAvailable = true;
         return response;
-      } catch {
-        // Older backend or missing invoke handler: use legacy path.
+      } catch (error) {
+        if (!isAtomicCommandUnavailableError(error)) {
+          throw error;
+        }
+
+        // Older backend with no atomic invoke handler: use legacy path.
         this.atomicCommandAvailable = false;
       }
     }
@@ -62,8 +97,13 @@ export class KbheCommander {
     data: ArrayLike<number> = [],
     timeoutMs = 100,
   ): Promise<Uint8Array | null> {
+    if (data.length > PACKET_SIZE - 1) {
+      throw new RangeError(
+        `RAW HID command payload has ${data.length} bytes; maximum is ${PACKET_SIZE - 1}`,
+      );
+    }
     return this.enqueue(async () => {
-      const maxAttempts = 2;
+      const maxAttempts = isRetrySafeCommand(command) ? 2 : 1;
 
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         const response = await this.sendCommandAtomicOrLegacy(command, data, timeoutMs);
@@ -72,7 +112,7 @@ export class KbheCommander {
         }
 
         if (attempt + 1 < maxAttempts) {
-          await new Promise((resolve) => window.setTimeout(resolve, 4));
+          await new Promise((resolve) => setTimeout(resolve, 4));
         }
       }
 

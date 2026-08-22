@@ -12,12 +12,14 @@ import { kbheTransport, type KbheTransport, type KbheTransportDeviceInfo } from 
 
 const UPDATER_TRAILER_MAGIC = 0x55445452;
 const KBHE_FW_VERSION_RECORD_MAGIC = 0x4b465756;
-const UPDATER_APP_SLOT_SIZE = 0x00050000;
+const UPDATER_APP_SLOT_SIZE = 0x00030000;
+const UPDATER_APP_BASE = 0x08010000;
 const UPDATER_TRAILER_RESERVED_SIZE = 0x00000100;
 const UPDATER_APP_MAX_IMAGE_SIZE = UPDATER_APP_SLOT_SIZE - UPDATER_TRAILER_RESERVED_SIZE;
-const PROTOCOL_VERSION = 0x0002;
+const PROTOCOL_VERSION = 0x0003;
 const FLASH_WRITE_ALIGN = 4;
 const DATA_CHUNK_SIZE = 56;
+const BEGIN_MIN_TIMEOUT_MS = 6000;
 const APP_CMD_ENTER_BOOTLOADER = Command.ENTER_BOOTLOADER;
 
 const UPDATER_CMD_HELLO = 0x01;
@@ -26,7 +28,10 @@ const UPDATER_CMD_DATA = 0x03;
 const UPDATER_CMD_FINISH = 0x04;
 const UPDATER_CMD_ABORT = 0x05;
 const UPDATER_CMD_BOOT = 0x06;
+const UPDATER_CMD_AUTH = 0x07;
 const UPDATER_STATUS_OK = 0x00;
+const UPDATER_FLAG_SIGNATURE_REQUIRED = 1 << 2;
+const FIRMWARE_SIGNATURE_SIZE = 64;
 
 const STATUS_NAMES: Record<number, string> = {
   0x00: "OK",
@@ -36,6 +41,10 @@ const STATUS_NAMES: Record<number, string> = {
   0x04: "INVALID_STATE",
   0x05: "VERIFY_FAILED",
   0x06: "INVALID_IMAGE",
+  0x07: "AUTH_REQUIRED",
+  0x08: "AUTH_FAILED",
+  0x09: "ROLLBACK_REJECTED",
+  0x0a: "STORAGE_ERROR",
 };
 
 export interface FirmwareResolveResult {
@@ -45,6 +54,8 @@ export interface FirmwareResolveResult {
 
 export interface FirmwareFlashOptions {
   firmwareVersion?: FirmwareVersion;
+  signature?: ArrayBuffer | Uint8Array;
+  expectedSerialNumber: string;
   timeoutMs?: number;
   retries?: number;
   onLog?: (message: string) => void;
@@ -94,13 +105,19 @@ function buildUpdaterPacket(
   return packet;
 }
 
-function parseUpdaterResponse(response: Uint8Array, expectedCommand?: number): UpdaterResponse {
-  if (!response || response.length < 8) {
-    throw new Error("short or empty response from updater");
+export function parseUpdaterResponse(response: Uint8Array, expectedCommand?: number): UpdaterResponse {
+  if (response.length !== PACKET_SIZE && response.length !== PACKET_SIZE + 1) {
+    throw new Error(
+      `invalid updater report size ${response.length}; expected ${PACKET_SIZE} or ${PACKET_SIZE + 1}`,
+    );
   }
 
   const candidates: UpdaterResponse[] = [];
-  for (const baseOffset of [0, 1]) {
+  const baseOffsets = response.length === PACKET_SIZE + 1 ? [1] : [0];
+  if (baseOffsets[0] === 1 && response[0] !== REPORT_ID) {
+    throw new Error("invalid updater report ID");
+  }
+  for (const baseOffset of baseOffsets) {
     if (response.length < baseOffset + 8) {
       continue;
     }
@@ -186,8 +203,64 @@ function crc32(bytes: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+export function selectFirmwareTargetDevice(
+  devices: KbheTransportDeviceInfo[],
+  kind: KbheTransportDeviceInfo["kind"],
+  expectedSerialNumber: string,
+): KbheTransportDeviceInfo | null {
+  const expected = expectedSerialNumber.trim();
+  if (!expected) {
+    throw new Error("firmware flashing requires the serial number of the connected keyboard");
+  }
+
+  const matches = devices.filter(
+    (device) => device.kind === kind && device.serialNumber?.trim() === expected,
+  );
+  if (matches.length > 1) {
+    throw new Error(
+      `refusing ambiguous firmware target: found ${matches.length} ${kind} devices with serial ${expected}`,
+    );
+  }
+  return matches[0] ?? null;
+}
+
+export function resolveFirmwareTargetSnapshot(
+  devices: KbheTransportDeviceInfo[],
+  expectedSerialNumber: string,
+): { runtime: KbheTransportDeviceInfo | null; updater: KbheTransportDeviceInfo | null } {
+  const runtime = selectFirmwareTargetDevice(devices, "runtime", expectedSerialNumber);
+  const updater = selectFirmwareTargetDevice(devices, "updater", expectedSerialNumber);
+  if (runtime && updater) {
+    throw new Error(
+      `refusing ambiguous firmware target: serial ${expectedSerialNumber.trim()} is present in both runtime and updater mode`,
+    );
+  }
+  return { runtime, updater };
+}
+
+export async function buildFirmwareSignatureManifest(
+  bytes: Uint8Array,
+  version: FirmwareVersion,
+  imageCrc32: number,
+): Promise<Uint8Array> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-512", bytes.slice().buffer),
+  );
+  const manifest = new Uint8Array(84);
+  manifest.set(new TextEncoder().encode("KBHEFW3\0"), 0);
+  const view = new DataView(manifest.buffer);
+  view.setUint32(8, bytes.length, true);
+  view.setUint32(12, imageCrc32, true);
+  manifest[16] = version.major & 0xff;
+  manifest[17] = version.minor & 0xff;
+  manifest[18] = version.patch & 0xff;
+  manifest[19] = 0;
+  manifest.set(digest, 20);
+  return manifest;
+}
+
 function tryReadVersionFromImageTrailer(bytes: Uint8Array): FirmwareResolveResult | null {
-  const trailerSize = 20;
+  const trailerSize = 84;
   let bestOffset = -1;
   let bestVersion: FirmwareVersion | null = null;
 
@@ -203,7 +276,7 @@ function tryReadVersionFromImageTrailer(bytes: Uint8Array): FirmwareResolveResul
       minor: bytes[offset + 13] ?? 0,
       patch: bytes[offset + 14] ?? 0,
     };
-    const trailerCrc32 = bytesToUint32(bytes, offset + 16);
+    const trailerCrc32 = bytesToUint32(bytes, offset + 80);
 
     if (imageSize === 0 || imageSize > offset) {
       continue;
@@ -300,10 +373,11 @@ export class KBHEFirmware {
 
   private async requestBootloaderTransition(
     runtimePath: string,
+    expectedSerialNumber: string,
     timeoutMs: number,
     log: (message: string) => void,
   ): Promise<void> {
-    await this.transport.connect(runtimePath);
+    await this.transport.connect(runtimePath, expectedSerialNumber);
     try {
       // Some boards disconnect before replying to ENTER_BOOTLOADER.
       await this.commander.sendCommand(APP_CMD_ENTER_BOOTLOADER, [], timeoutMs);
@@ -319,14 +393,60 @@ export class KBHEFirmware {
     }
   }
 
-  private async findRuntimeDevice(): Promise<KbheTransportDeviceInfo | null> {
-    const devices = await this.transport.listDevices();
-    return devices.find((device) => device.kind === "runtime") ?? null;
+  private async findRuntimeDevice(expectedSerialNumber: string): Promise<KbheTransportDeviceInfo | null> {
+    return selectFirmwareTargetDevice(
+      await this.transport.listDevices(),
+      "runtime",
+      expectedSerialNumber,
+    );
   }
 
-  private async findUpdaterDevice(): Promise<KbheTransportDeviceInfo | null> {
-    const devices = await this.transport.listDevices();
-    return devices.find((device) => device.kind === "updater") ?? null;
+  private async findUpdaterDevice(expectedSerialNumber: string): Promise<KbheTransportDeviceInfo | null> {
+    return selectFirmwareTargetDevice(
+      await this.transport.listDevices(),
+      "updater",
+      expectedSerialNumber,
+    );
+  }
+
+  private async waitForDevice(
+    kind: KbheTransportDeviceInfo["kind"],
+    expectedSerialNumber: string,
+    timeoutMs: number,
+  ): Promise<KbheTransportDeviceInfo | null> {
+    const deadline = Date.now() + timeoutMs;
+    do {
+      const device = selectFirmwareTargetDevice(
+        await this.transport.listDevices(),
+        kind,
+        expectedSerialNumber,
+      );
+      if (device) {
+        return device;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } while (Date.now() < deadline);
+    return null;
+  }
+
+  private async waitForDeviceAbsent(
+    kind: KbheTransportDeviceInfo["kind"],
+    expectedSerialNumber: string,
+    timeoutMs: number,
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    do {
+      const device = selectFirmwareTargetDevice(
+        await this.transport.listDevices(),
+        kind,
+        expectedSerialNumber,
+      );
+      if (!device) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } while (Date.now() < deadline);
+    return false;
   }
 
   private async transactWithRetry(
@@ -386,18 +506,32 @@ export class KBHEFirmware {
         );
       }
 
-      log(`Retry ${attempt}/${retries} after timeout...`);
+      if (attempt < retries) {
+        log(`Retry ${attempt}/${retries} after timeout...`);
+      }
     }
     throw lastError ?? new Error("device did not respond after retries");
   }
 
   async flashFirmware(
     firmware: ArrayBuffer | Uint8Array,
-    options: FirmwareFlashOptions = {},
+    options: FirmwareFlashOptions,
   ): Promise<FirmwareVersion> {
     const bytes = firmware instanceof Uint8Array ? firmware : new Uint8Array(firmware);
     if (bytes.length === 0) {
       throw new Error("firmware file is empty");
+    }
+    const signature = options.signature instanceof Uint8Array
+      ? options.signature
+      : options.signature
+        ? new Uint8Array(options.signature)
+        : null;
+    if (!signature || signature.length !== FIRMWARE_SIGNATURE_SIZE) {
+      throw new Error(`a ${FIRMWARE_SIGNATURE_SIZE}-byte Ed25519 firmware signature is required`);
+    }
+    const expectedSerialNumber = options.expectedSerialNumber.trim();
+    if (!expectedSerialNumber) {
+      throw new Error("firmware flashing requires the serial number of the connected keyboard");
     }
 
     const { version: firmwareVersion, source } = resolveFirmwareVersion(bytes, options.firmwareVersion);
@@ -415,25 +549,55 @@ export class KBHEFirmware {
     const padded = new Uint8Array(paddedSize).fill(0xff);
     padded.set(bytes);
     const imageCrc32 = crc32(bytes);
+    const signedManifest = await buildFirmwareSignatureManifest(
+      bytes,
+      firmwareVersion,
+      imageCrc32,
+    );
+    const authorization = new Uint8Array(signedManifest.length + signature.length);
+    authorization.set(signedManifest, 0);
+    authorization.set(signature, signedManifest.length);
 
-    const runtime = await this.findRuntimeDevice();
-    const updater = await this.findUpdaterDevice();
+    const initialDevices = await this.transport.listDevices();
+    const { runtime, updater } = resolveFirmwareTargetSnapshot(
+      initialDevices,
+      expectedSerialNumber,
+    );
+    if (!runtime && !updater) {
+      throw new Error(
+        `keyboard serial ${expectedSerialNumber} was not found in runtime or updater mode`,
+      );
+    }
     if (!updater && runtime) {
-      await this.requestBootloaderTransition(runtime.path, Math.min(transitionTimeoutMs, 1200), log);
+      await this.requestBootloaderTransition(
+        runtime.path,
+        expectedSerialNumber,
+        Math.min(transitionTimeoutMs, 1200),
+        log,
+      );
       await new Promise((resolve) => setTimeout(resolve, 250));
 
-      let runtimeDisconnected = await this.transport.waitForDisconnect("runtime", transitionTimeoutMs);
+      let runtimeDisconnected = await this.waitForDeviceAbsent(
+        "runtime",
+        expectedSerialNumber,
+        transitionTimeoutMs,
+      );
       if (!runtimeDisconnected) {
         log("Runtime device still present; retrying ENTER_BOOTLOADER once...");
-        const retryRuntime = await this.findRuntimeDevice();
+        const retryRuntime = await this.findRuntimeDevice(expectedSerialNumber);
         if (retryRuntime) {
           await this.requestBootloaderTransition(
             retryRuntime.path,
+            expectedSerialNumber,
             Math.min(transitionTimeoutMs, 1200),
             log,
           );
           await new Promise((resolve) => setTimeout(resolve, 250));
-          runtimeDisconnected = await this.transport.waitForDisconnect("runtime", transitionTimeoutMs);
+          runtimeDisconnected = await this.waitForDeviceAbsent(
+            "runtime",
+            expectedSerialNumber,
+            transitionTimeoutMs,
+          );
         }
       }
 
@@ -443,13 +607,13 @@ export class KBHEFirmware {
     }
 
     const updaterDevice =
-      (await this.transport.waitForDevice("updater", transitionTimeoutMs))
-      ?? (await this.findUpdaterDevice());
+      (await this.waitForDevice("updater", expectedSerialNumber, transitionTimeoutMs))
+      ?? (await this.findUpdaterDevice(expectedSerialNumber));
     if (!updaterDevice) {
       throw new Error(`updater device not found after ${transitionTimeoutMs}ms`);
     }
 
-    await this.transport.connect(updaterDevice.path);
+    await this.transport.connect(updaterDevice.path, expectedSerialNumber);
     log(`Connected to updater: ${updaterDevice.path}`);
 
     let sequence = 1;
@@ -470,6 +634,19 @@ export class KBHEFirmware {
           `unsupported updater protocol 0x${helloPayload.protocolVersion.toString(16)}, expected 0x${PROTOCOL_VERSION.toString(16)}`,
         );
       }
+      if ((helloPayload.flags & UPDATER_FLAG_SIGNATURE_REQUIRED) === 0) {
+        throw new Error("updater does not enforce signed firmware");
+      }
+      if (helloPayload.appBase !== UPDATER_APP_BASE) {
+        throw new Error(
+          `unexpected updater app base 0x${helloPayload.appBase.toString(16)}, expected 0x${UPDATER_APP_BASE.toString(16)}`,
+        );
+      }
+      if (helloPayload.appMaxSize !== UPDATER_APP_MAX_IMAGE_SIZE) {
+        throw new Error(
+          `unexpected updater app max ${helloPayload.appMaxSize}, expected ${UPDATER_APP_MAX_IMAGE_SIZE}`,
+        );
+      }
       if (helloPayload.writeAlign !== FLASH_WRITE_ALIGN) {
         throw new Error(
           `unexpected flash write alignment ${helloPayload.writeAlign}, expected ${FLASH_WRITE_ALIGN}`,
@@ -485,6 +662,22 @@ export class KBHEFirmware {
         `Updater ready: app_base=0x${helloPayload.appBase.toString(16)}, max_size=${helloPayload.appMaxSize}, installed=${helloPayload.installedFwVersion ? formatFirmwareVersion(helloPayload.installedFwVersion) : "unknown"}`,
       );
 
+      let authOffset = 0;
+      log("Authenticating signed manifest before flash erase...");
+      while (authOffset < authorization.length) {
+        sequence = (sequence + 1) & 0xff;
+        const chunk = authorization.slice(authOffset, authOffset + DATA_CHUNK_SIZE);
+        const auth = await this.transactWithRetry(
+          buildUpdaterPacket(UPDATER_CMD_AUTH, sequence, authOffset, chunk),
+          timeoutMs,
+          retries,
+          log,
+          UPDATER_CMD_AUTH,
+          sequence,
+        );
+        requireUpdaterOk(auth, UPDATER_CMD_AUTH);
+        authOffset += chunk.length;
+      }
       sequence = (sequence + 1) & 0xff;
       const beginPayload = new Uint8Array(12);
       beginPayload[0] = bytes.length & 0xff;
@@ -500,7 +693,7 @@ export class KBHEFirmware {
       beginPayload[10] = firmwareVersion.patch & 0xff;
       const begin = await this.transactWithRetry(
         buildUpdaterPacket(UPDATER_CMD_BEGIN, sequence, 0, beginPayload),
-        timeoutMs,
+        Math.max(timeoutMs, BEGIN_MIN_TIMEOUT_MS),
         retries,
         log,
         UPDATER_CMD_BEGIN,
@@ -539,7 +732,7 @@ export class KBHEFirmware {
       sequence = (sequence + 1) & 0xff;
       const finish = await this.transactWithRetry(
         buildUpdaterPacket(UPDATER_CMD_FINISH, sequence),
-        timeoutMs,
+        Math.max(timeoutMs, 5000),
         retries,
         log,
         UPDATER_CMD_FINISH,
@@ -548,32 +741,67 @@ export class KBHEFirmware {
       requireUpdaterOk(finish, UPDATER_CMD_FINISH);
 
       sequence = (sequence + 1) & 0xff;
-      const boot = await this.transactWithRetry(
-        buildUpdaterPacket(UPDATER_CMD_BOOT, sequence),
-        timeoutMs,
-        retries,
-        log,
-        UPDATER_CMD_BOOT,
-        sequence,
-      );
-      requireUpdaterOk(boot, UPDATER_CMD_BOOT);
+      try {
+        const boot = await this.transactWithRetry(
+          buildUpdaterPacket(UPDATER_CMD_BOOT, sequence),
+          Math.min(timeoutMs, 2000),
+          Math.min(retries, 3),
+          log,
+          UPDATER_CMD_BOOT,
+          sequence,
+        );
+        requireUpdaterOk(boot, UPDATER_CMD_BOOT);
+      } catch {
+        // A successful BOOT normally resets USB before the acknowledgement can
+        // be read. Runtime re-enumeration below is the authoritative result.
+        log("BOOT acknowledgement unavailable; waiting for runtime USB re-enumeration...");
+      }
     } catch (error) {
       try {
         sequence = (sequence + 1) & 0xff;
-        await this.transport.writeReport(buildUpdaterPacket(UPDATER_CMD_ABORT, sequence));
+        await this.transactWithRetry(
+          buildUpdaterPacket(UPDATER_CMD_ABORT, sequence),
+          timeoutMs,
+          Math.min(retries, 2),
+          log,
+          UPDATER_CMD_ABORT,
+          sequence,
+        );
       } catch {
         // ignore abort failures
+      }
+      try {
+        sequence = (sequence + 1) & 0xff;
+        await this.transactWithRetry(
+          buildUpdaterPacket(UPDATER_CMD_BOOT, sequence),
+          timeoutMs,
+          Math.min(retries, 2),
+          log,
+          UPDATER_CMD_BOOT,
+          sequence,
+        );
+      } catch {
+        // BOOT safely fails if BEGIN already erased the previous application.
       }
       throw error;
     } finally {
       await this.transport.disconnect();
     }
 
-    await this.transport.waitForDisconnect("updater", Math.max(timeoutMs, 5000));
-    const appDevice = await this.transport.waitForDevice("runtime", Math.max(timeoutMs, 15000));
-    if (appDevice) {
-      await this.transport.connect(appDevice.path);
+    await this.waitForDeviceAbsent(
+      "updater",
+      expectedSerialNumber,
+      Math.max(timeoutMs, 5000),
+    );
+    const appDevice = await this.waitForDevice(
+      "runtime",
+      expectedSerialNumber,
+      Math.max(timeoutMs, 15000),
+    );
+    if (!appDevice) {
+      throw new Error("application did not return after the updater finished");
     }
+    await this.transport.connect(appDevice.path, expectedSerialNumber);
     log("Update complete, application is back online.");
     return firmwareVersion;
   }

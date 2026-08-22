@@ -9,6 +9,7 @@ on:
     paths:
       - "firmware/**"
       - "tools/host/**"
+      - "tools/release/**"
       - "CMakeLists.txt"
       - "CMakePresets.json"
       - ".github/workflows/firmware.yml"
@@ -16,13 +17,14 @@ on:
     paths:
       - "firmware/**"
       - "tools/host/**"
+      - "tools/release/**"
       - "CMakeLists.txt"
       - "CMakePresets.json"
       - ".github/workflows/firmware.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -31,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           submodules: recursive
 
@@ -50,6 +52,18 @@ jobs:
           cmake --version
           ninja --version
           arm-none-eabi-gcc --version
+
+      - name: Configure first-party host tests
+        run: cmake -S firmware/tests -B firmware/build-host-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build first-party host tests
+        run: cmake --build firmware/build-host-tests
+
+      - name: Run first-party host tests
+        run: |
+          ctest --test-dir firmware/build-host-tests --output-on-failure
+          python tools/release/test_release_signing.py
+          python tools/host/test_firmware_updater_selection.py
 
       - name: Configure Release
         run: cmake --preset Release
@@ -87,15 +101,151 @@ jobs:
           EOF
 
       - name: Upload firmware artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kbhe-firmware-${{ github.sha }}
           path: dist/*
           if-no-files-found: error
 
-      - name: Create GitHub release
-        if: startsWith(github.ref, 'refs/tags/firmware-v')
-        uses: softprops/action-gh-release@v3
+  release:
+    name: Sign and publish firmware release
+    if: startsWith(github.ref, 'refs/tags/firmware-v')
+    needs: build
+    concurrency:
+      group: firmware-release-${{ github.ref }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout signing tooling and public key
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Require tag commit on main
+        run: |
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: Download verified build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: kbhe-firmware-${{ github.sha }}
+          path: dist
+
+      - name: Sign firmware and factory-programming artifacts
+        env:
+          SIGNING_KEY_B64: ${{ secrets.KBHE_RELEASE_SIGNING_KEY_B64 }}
+        run: |
+          if [ -z "$SIGNING_KEY_B64" ]; then
+            echo "Missing required KBHE_RELEASE_SIGNING_KEY_B64 repository secret" >&2
+            exit 1
+          fi
+          umask 077
+          key_path="$RUNNER_TEMP/kbhe-ed25519-private.pem"
+          trap 'rm -f "$key_path"' EXIT
+          printf '%s' "$SIGNING_KEY_B64" | base64 --decode > "$key_path"
+          unset SIGNING_KEY_B64
+          version="${GITHUB_REF_NAME#firmware-v}"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Firmware tag must be canonical firmware-vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+          IFS=. read -r major minor patch <<<"$version"
+          if [ "$major" -gt 255 ] || [ "$minor" -gt 255 ] || [ "$patch" -gt 255 ]; then
+            echo "Firmware version components must fit one byte" >&2
+            exit 1
+          fi
+
+          python tools/release/sign_release_asset.py firmware \
+            --key "$key_path" \
+            --input dist/kbhe-app.bin \
+            --output dist/kbhe-app.bin.sig \
+            --version "$version" \
+            --verify-public firmware/keys/firmware-ed25519-public.pem
+
+          python tools/release/build_factory_image.py \
+            --bootloader dist/kbhe-bootloader.bin \
+            --app dist/kbhe-app.bin \
+            --signature dist/kbhe-app.bin.sig \
+            --version "$version" \
+            --verify-public firmware/keys/firmware-ed25519-public.pem \
+            --output dist/kbhe-factory.bin \
+            --manifest dist/firmware-manifest.json
+
+          while IFS= read -r -d '' asset; do
+            name="$(basename "$asset")"
+            python tools/release/sign_release_asset.py artifact \
+              --key "$key_path" \
+              --input "$asset" \
+              --output "$asset.sig" \
+              --version "$version" \
+              --target kbhe-75he-stm32f723vet6 \
+              --role "$name" \
+              --verify-public firmware/keys/firmware-ed25519-public.pem
+          done < <(find dist -maxdepth 1 -type f ! -name '*.sig' ! -name 'kbhe-app.bin' -print0)
+
+      - name: Create authenticated draft release
+        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
         with:
           files: dist/*
           generate_release_notes: true
+          draft: true
+
+      - name: Verify and publish authenticated release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_json="$(gh release view "$GITHUB_REF_NAME" --json isDraft,assets)"
+          if [ "$(jq -r '.isDraft' <<<"$release_json")" != "true" ]; then
+            echo "Refusing to verify an already-published release" >&2
+            exit 1
+          fi
+          verify_dir="$(mktemp -d "$RUNNER_TEMP/kbhe-release-verify.XXXXXX")"
+          case "$verify_dir" in
+            "$RUNNER_TEMP"/kbhe-release-verify.*) ;;
+            *)
+              echo "Release verification directory escaped RUNNER_TEMP" >&2
+              exit 1
+              ;;
+          esac
+          cleanup_verify_dir() {
+            find "$verify_dir" -mindepth 1 -maxdepth 1 -type f -delete
+            rmdir "$verify_dir"
+          }
+          trap cleanup_verify_dir EXIT
+
+          local_count="$(find dist -maxdepth 1 -type f | wc -l)"
+          remote_count="$(jq '.assets | length' <<<"$release_json")"
+          if [ "$local_count" -ne "$remote_count" ]; then
+            echo "Draft asset count mismatch: local=$local_count remote=$remote_count" >&2
+            exit 1
+          fi
+          while IFS= read -r -d '' asset; do
+            name="$(basename "$asset")"
+            size="$(stat -c '%s' "$asset")"
+            matches="$(jq --arg name "$name" '[.assets[] | select(.name == $name)] | length' <<<"$release_json")"
+            remote_size="$(jq -r --arg name "$name" '.assets[] | select(.name == $name) | .size' <<<"$release_json")"
+            if [ "$matches" -ne 1 ] || [ "$remote_size" -ne "$size" ]; then
+              echo "Draft asset mismatch for $name: matches=$matches local=$size remote=$remote_size" >&2
+              exit 1
+            fi
+            gh release download "$GITHUB_REF_NAME" \
+              --dir "$verify_dir" \
+              --pattern "$name"
+            downloaded="$verify_dir/$name"
+            if [ ! -f "$downloaded" ]; then
+              echo "Draft asset download is missing for $name" >&2
+              exit 1
+            fi
+            local_sha256="$(sha256sum "$asset" | cut -d ' ' -f 1)"
+            remote_sha256="$(sha256sum "$downloaded" | cut -d ' ' -f 1)"
+            if [ "$local_sha256" != "$remote_sha256" ]; then
+              echo "Downloaded draft asset digest mismatch for $name" >&2
+              exit 1
+            fi
+          done < <(find dist -maxdepth 1 -type f -print0)
+          gh release edit "$GITHUB_REF_NAME" --draft=false

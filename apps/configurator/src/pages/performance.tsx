@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
@@ -19,6 +19,7 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice, type KeySettings } from "@/lib/kbhe/device";
+import { requireDeviceSuccess } from "@/lib/kbhe/mutation-result";
 import {
   patchActiveAppProfileAdvancedTickRate,
   patchActiveAppProfileFilterEnabled,
@@ -26,7 +27,11 @@ import {
   patchActiveAppProfileKeySettings,
   patchActiveAppProfileTriggerChatterGuard,
 } from "@/lib/kbhe/profile-snapshot-store";
-import { KEY_COUNT, TRIGGER_CHATTER_GUARD_MAX_MS } from "@/lib/kbhe/protocol";
+import {
+  KEY_COUNT,
+  TRIGGER_CHATTER_GUARD_MAX_MS,
+  TRIGGER_CHATTER_GUARD_RECOMMENDED_MS,
+} from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import {
   IconAlertTriangle,
@@ -284,10 +289,14 @@ export default function Performance() {
       markSaving();
       await Promise.all(
         keyIndexes.map(async (targetKeyIndex) => {
-          const base =
-            targetKeyIndex === keyIndex && settings
-              ? settings
-              : await kbheDevice.getKeySettings(targetKeyIndex, profileContext, currentLayer);
+          // Read after earlier scoped mutations have settled. Reusing the
+          // render-time `settings` object here can overwrite a just-committed
+          // field when two controls are changed before React re-renders.
+          const base = await kbheDevice.getKeySettings(
+            targetKeyIndex,
+            profileContext,
+            currentLayer,
+          );
 
           if (!base) {
             throw new Error(`Unable to load key settings for key ${targetKeyIndex}`);
@@ -352,37 +361,61 @@ export default function Performance() {
   const filterMutation = useOptimisticMutation<boolean, boolean, boolean>({
     queryKey: queryKeys.device.filterEnabled(),
     mutationFn: async (v) => {
+      markSaving();
       const ok = await kbheDevice.setFilterEnabled(v);
-      if (ok) {
-        patchActiveAppProfileFilterEnabled(v);
-      }
+      requireDeviceSuccess(ok, "input filter setting");
+      patchActiveAppProfileFilterEnabled(v);
       return ok;
     },
     optimisticUpdate: (_cur, v) => v,
+    onSuccess: () => markSaved(),
+    onError: () => markError(),
   });
 
+  const filterParamsDesiredRef = useRef<FilterParams | null>(null);
   const filterParamsMutation = useOptimisticMutation<FilterParams, FilterParams, boolean>({
-    queryKey: ["device", "filterParams"],
+    queryKey: queryKeys.device.filterParams(),
     mutationFn: async (p) => {
+      markSaving();
       const ok = await kbheDevice.setFilterParams(p.noise_band, p.alpha_min_denom, p.alpha_max_denom);
-      if (ok) {
-        patchActiveAppProfileFilterParams(p);
-      }
+      requireDeviceSuccess(ok, "input filter parameters");
+      patchActiveAppProfileFilterParams(p);
       return ok;
     },
     optimisticUpdate: (_cur, p) => p,
+    onSuccess: () => markSaved(),
+    onError: () => {
+      filterParamsDesiredRef.current = null;
+      markError();
+    },
   });
+
+  const commitFilterParams = useCallback((patch: Partial<FilterParams>) => {
+    const base = filterParamsDesiredRef.current ?? filterParamsQ.data;
+    if (!base) return;
+    const next = { ...base, ...patch };
+    filterParamsDesiredRef.current = next;
+    filterParamsMutation.mutate(next);
+  }, [filterParamsMutation, filterParamsQ.data]);
+
+  useEffect(() => {
+    if (!filterParamsMutation.isPending) {
+      filterParamsDesiredRef.current = filterParamsQ.data ?? null;
+    }
+  }, [filterParamsMutation.isPending, filterParamsQ.data]);
 
   const tickMutation = useOptimisticMutation<number, number, boolean>({
     queryKey: queryKeys.device.advancedTickRate(),
     mutationFn: async (v) => {
+      markSaving();
       const ok = await kbheDevice.setAdvancedTickRate(v);
-      if (ok) {
-        patchActiveAppProfileAdvancedTickRate(v);
-      }
+      requireDeviceSuccess(ok, "advanced tick rate");
+      patchActiveAppProfileAdvancedTickRate(v);
       return ok;
     },
     optimisticUpdate: (_cur, v) => v,
+    onSuccess: () => markSaved(),
+    onError: () => markError(),
   });
 
   const triggerChatterGuardMutation = useOptimisticMutation<
@@ -393,29 +426,38 @@ export default function Performance() {
     queryKey: queryKeys.device.triggerChatterGuard(),
     mutationFn: async (next) => {
       markSaving();
-      return kbheDevice.setTriggerChatterGuard(next.enabled, next.duration_ms);
+      const ok = await kbheDevice.setTriggerChatterGuard(next.enabled, next.duration_ms);
+      requireDeviceSuccess(ok, "trigger chatter guard");
+      return ok;
     },
     optimisticUpdate: (_cur, next) => next,
-    onSuccess: (ok, next) => {
-      if (ok) {
-        patchActiveAppProfileTriggerChatterGuard(next);
-      }
+    onSuccess: (_ok, next) => {
+      patchActiveAppProfileTriggerChatterGuard(next);
       markSaved();
     },
     onError: () => markError(),
   });
 
-  const chatterGuardValue = triggerChatterGuardQ.data ?? { enabled: false, duration_ms: 0 };
+  const chatterGuardValue = useMemo(
+    () => triggerChatterGuardQ.data ?? { enabled: false, duration_ms: 0 },
+    [triggerChatterGuardQ.data],
+  );
+  const chatterGuardDesiredRef = useRef(chatterGuardValue);
 
   const commitChatterGuard = useCallback(
     (patch: Partial<{ enabled: boolean; duration_ms: number }>) => {
-      triggerChatterGuardMutation.mutate({
-        enabled: patch.enabled ?? chatterGuardValue.enabled,
-        duration_ms: patch.duration_ms ?? chatterGuardValue.duration_ms,
-      });
+      const next = { ...chatterGuardDesiredRef.current, ...patch };
+      chatterGuardDesiredRef.current = next;
+      triggerChatterGuardMutation.mutate(next);
     },
-    [chatterGuardValue.duration_ms, chatterGuardValue.enabled, triggerChatterGuardMutation],
+    [triggerChatterGuardMutation],
   );
+
+  useEffect(() => {
+    if (!triggerChatterGuardMutation.isPending) {
+      chatterGuardDesiredRef.current = chatterGuardValue;
+    }
+  }, [chatterGuardValue, triggerChatterGuardMutation.isPending]);
 
   // Merge a partial patch with the current full settings and commit.
   function commitKey(
@@ -428,11 +470,12 @@ export default function Performance() {
       options?.enforceLinkedRapidSensitivity
       ?? (!useSeparateReleaseSensitivity && isRapidTriggerPatch(patch));
 
-    keyMutation.mutate({
+    const variables = {
       patch,
-      keyIndexes: selectedKeyIndexes,
+      keyIndexes: [...selectedKeyIndexes],
       enforceLinkedRapidSensitivity,
-    });
+    };
+    void liveKeyUpdate.cancelAndWait().then(() => keyMutation.mutate(variables));
   }
 
   const resetSelectedPerformance = useCallback(async () => {
@@ -714,7 +757,11 @@ export default function Performance() {
                         min={1} max={255} step={1}
                         value={filterParamsQ.data.noise_band}
                         onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, noise_band: v })}
-                        onCommit={v => filterParamsMutation.mutate({ ...filterParamsQ.data!, noise_band: v })}
+                        onCommit={v => {
+                          void liveFilterParams.cancelAndWait().then(() => {
+                            commitFilterParams({ noise_band: v });
+                          });
+                        }}
                         disabled={!connected}
                       />
                     </div>
@@ -724,7 +771,11 @@ export default function Performance() {
                         min={1} max={255} step={1}
                         value={filterParamsQ.data.alpha_min_denom}
                         onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_min_denom: v })}
-                        onCommit={v => filterParamsMutation.mutate({ ...filterParamsQ.data!, alpha_min_denom: v })}
+                        onCommit={v => {
+                          void liveFilterParams.cancelAndWait().then(() => {
+                            commitFilterParams({ alpha_min_denom: v });
+                          });
+                        }}
                         disabled={!connected}
                       />
                     </div>
@@ -734,7 +785,11 @@ export default function Performance() {
                         min={1} max={255} step={1}
                         value={filterParamsQ.data.alpha_max_denom}
                         onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_max_denom: v })}
-                        onCommit={v => filterParamsMutation.mutate({ ...filterParamsQ.data!, alpha_max_denom: v })}
+                        onCommit={v => {
+                          void liveFilterParams.cancelAndWait().then(() => {
+                            commitFilterParams({ alpha_max_denom: v });
+                          });
+                        }}
                         disabled={!connected}
                       />
                     </div>
@@ -748,30 +803,37 @@ export default function Performance() {
                     min={1} max={100} step={1}
                     value={tickRateQ.data ?? 1}
                     onLiveChange={v => liveTickRate(v)}
-                    onCommit={v => tickMutation.mutate(v)}
+                    onCommit={v => {
+                      void liveTickRate.cancelAndWait().then(() => tickMutation.mutate(v));
+                    }}
                     disabled={!connected}
                   />
                 </div>
                 <FormRow
                   label="Chatter Guard"
-                  description="Anti-chatter gate to block rapid bounce after trigger"
+                  description="Debounce: accepts a press or release only after the candidate state remains continuously stable"
                 >
                   <Switch
                     checked={chatterGuardValue.enabled}
                     disabled={!connected || triggerChatterGuardQ.data == null}
-                    onCheckedChange={(enabled) => commitChatterGuard({ enabled })}
+                    onCheckedChange={(enabled) => commitChatterGuard({
+                      enabled,
+                      duration_ms: enabled && chatterGuardValue.duration_ms === 0
+                        ? TRIGGER_CHATTER_GUARD_RECOMMENDED_MS
+                        : chatterGuardValue.duration_ms,
+                    })}
                   />
                 </FormRow>
                 <div className="grid gap-2">
                   <span className="text-sm font-medium">Chatter Guard Duration (ms)</span>
                   <CommitSlider
-                    min={0}
+                    min={chatterGuardValue.enabled ? 1 : 0}
                     max={TRIGGER_CHATTER_GUARD_MAX_MS}
                     step={1}
                     value={chatterGuardValue.duration_ms}
                     onLiveChange={() => {}}
                     onCommit={(duration) => commitChatterGuard({ duration_ms: duration })}
-                    disabled={!connected || triggerChatterGuardQ.data == null}
+                    disabled={!connected || triggerChatterGuardQ.data == null || !chatterGuardValue.enabled}
                   />
                 </div>
               </div>

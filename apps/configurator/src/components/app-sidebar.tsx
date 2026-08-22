@@ -42,6 +42,7 @@ import {
   IconPlugConnectedX,
   IconDeviceDesktop,
   IconHome,
+  IconBraces,
 } from "@tabler/icons-react";
 import type { Icon } from "@tabler/icons-react";
 
@@ -68,6 +69,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { title: "Keymap", path: "/keymap", icon: IconKeyboard },
       { title: "Performance", path: "/performance", icon: IconBrandSpeedtest },
       { title: "Advanced Keys", path: "/advanced-keys", icon: IconArrowBigUpLines },
+      { title: "Macros", path: "/macros", icon: IconBraces },
       { title: "Gamepad", path: "/gamepad", icon: IconDeviceGamepad2 },
       { title: "Calibration", path: "/calibration", icon: IconCrosshair },
       { title: "Rotary", path: "/rotary", icon: IconRotateClockwise },

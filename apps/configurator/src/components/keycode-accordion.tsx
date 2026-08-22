@@ -124,6 +124,8 @@ function categorize(resolveLegend: (hidKeycode: number, fallbackName: string) =>
   const mouse: KeycodeCategory["keys"] = [];
   const numpad: KeycodeCategory["keys"] = [];
   const layers: KeycodeCategory["keys"] = [];
+  const profiles: KeycodeCategory["keys"] = [];
+  const macros: KeycodeCategory["keys"] = [];
   const led: KeycodeCategory["keys"] = [];
   const gamepad: KeycodeCategory["keys"] = [];
   const system: KeycodeCategory["keys"] = [];
@@ -149,6 +151,8 @@ function categorize(resolveLegend: (hidKeycode: number, fallbackName: string) =>
     else if (/^(UP|DOWN|LEFT|RIGHT|HOME|END|PAGEUP|PAGEDOWN|INSERT|DELETE)$/.test(name) && code < 0x100) navigation.push(entry);
     else if (/MOUSE/.test(name)) mouse.push(entry);
     else if (/Layer|FN|MO|TG|Clear Layer/.test(name)) layers.push(entry);
+    else if (/^Profile /.test(name)) profiles.push(entry);
+    else if (/^Macro \d+$/.test(name)) macros.push(entry);
     else if (/LED/.test(name)) led.push(entry);
     else if (/GP |Gamepad/.test(name)) gamepad.push(entry);
     else if (code === 0 || code === 1) special.push(entry);
@@ -166,6 +170,8 @@ function categorize(resolveLegend: (hidKeycode: number, fallbackName: string) =>
     { label: "Media", keys: media },
     { label: "Mouse", keys: mouse },
     { label: "Layers", keys: layers },
+    { label: "Profiles", keys: profiles },
+    { label: "Macros", keys: macros },
     { label: "LED Control", keys: led },
     { label: "Gamepad", keys: gamepad },
     { label: "System", keys: system },

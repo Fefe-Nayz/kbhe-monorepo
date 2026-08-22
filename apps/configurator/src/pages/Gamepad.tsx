@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useThrottledCall } from "@/hooks/use-throttled-call";
+import { useOptimisticMutation } from "@/hooks/use-optimistic-mutation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
@@ -12,8 +13,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { LayerSelect } from "@/components/layer-select";
-import { useDeviceSession } from "@/lib/kbhe/session";
-import { kbheDevice, type GamepadSettings, type GamepadCurvePoint } from "@/lib/kbhe/device";
+import { DeviceSessionManager, useDeviceSession } from "@/lib/kbhe/session";
+import {
+  kbheDevice,
+  type GamepadSettings,
+  type GamepadCurvePoint,
+  type KeyGamepadMap,
+} from "@/lib/kbhe/device";
+import { requireDeviceSuccess } from "@/lib/kbhe/mutation-result";
 import {
   patchActiveAppProfileGamepadSettings,
   patchActiveAppProfileKeyGamepadMap,
@@ -117,69 +124,105 @@ export default function Gamepad() {
 
   // ── Mutations ──
 
-  const gamepadMutation = useMutation({
-    mutationFn: async (patch: Partial<GamepadSettings>) => {
+  const gamepadDesiredRef = useRef<GamepadSettings | null>(null);
+  const appliedApiModeRef = useRef<number | null>(null);
+  const gamepadMutation = useOptimisticMutation<
+    GamepadSettings | null,
+    GamepadSettings,
+    void
+  >({
+    queryKey: queryKeys.gamepad.settings(),
+    mutationFn: async (next) => {
       markSaving();
-      const base = gamepadQ.data;
-      if (!base) {
-        return;
-      }
-      const next: GamepadSettings = { ...base, ...patch };
+      const previousApiMode = appliedApiModeRef.current
+        ?? gamepadQ.data?.api_mode
+        ?? next.api_mode;
       const ok = await kbheDevice.setGamepadSettings(next);
-      if (ok) {
-        patchActiveAppProfileGamepadSettings(next);
-      }
-    },
-    onSuccess: () => {
-      markSaved();
-      void qc.invalidateQueries({ queryKey: queryKeys.gamepad.settings() });
-    },
-    onError: markError,
-  });
+      requireDeviceSuccess(ok, "gamepad settings");
+      appliedApiModeRef.current = next.api_mode;
+      patchActiveAppProfileGamepadSettings(next);
 
-  const keyMapMutation = useMutation({
-    mutationFn: async ({
-      axis,
-      direction,
-      button,
-      layerMask,
-    }: {
-      axis: number;
-      direction: number;
-      button: number;
-      layerMask: number;
-    }) => {
-      if (keyIndex == null) return;
-      markSaving();
-      const ok = await kbheDevice.setKeyGamepadMap(keyIndex, axis, direction, button, layerMask);
-      if (ok) {
-        const next = await kbheDevice.getKeyGamepadMap(keyIndex);
-        if (next) {
-          patchActiveAppProfileKeyGamepadMap(next);
+      if (next.api_mode !== previousApiMode) {
+        const reconnected = await DeviceSessionManager.reenumerate();
+        if (!reconnected) {
+          throw new Error("The keyboard did not reconnect after changing the gamepad API");
         }
       }
     },
     onSuccess: () => {
       markSaved();
-      void qc.invalidateQueries({ queryKey: ["gamepad", "keyMap"] });
-      void qc.invalidateQueries({ queryKey: queryKeys.gamepad.allKeyMaps(currentLayer) });
     },
-    onError: markError,
+    onError: () => {
+      gamepadDesiredRef.current = null;
+      markError();
+    },
+    optimisticUpdate: (_current, next) => next,
   });
+
+  const commitGamepadSettings = useCallback((patch: Partial<GamepadSettings>) => {
+    const base = gamepadDesiredRef.current ?? gamepadQ.data;
+    if (!base) return;
+    const next = { ...base, ...patch };
+    gamepadDesiredRef.current = next;
+    gamepadMutation.mutate(next);
+  }, [gamepadMutation, gamepadQ.data]);
+
+  useEffect(() => {
+    if (!gamepadMutation.isPending) {
+      gamepadDesiredRef.current = gamepadQ.data ?? null;
+      appliedApiModeRef.current = gamepadQ.data?.api_mode ?? null;
+    }
+  }, [gamepadMutation.isPending, gamepadQ.data]);
+
+  const keyMapDesiredRef = useRef<KeyGamepadMap | null>(null);
+  const keyMapMutation = useOptimisticMutation<
+    KeyGamepadMap | null,
+    KeyGamepadMap,
+    void
+  >({
+    queryKey: queryKeys.gamepad.keyMap(keyIndex ?? -1, currentLayer),
+    mutationFn: async (mapping) => {
+      markSaving();
+      const ok = await kbheDevice.setKeyGamepadMap(
+        mapping.key_index,
+        mapping.axis,
+        mapping.direction,
+        mapping.button,
+        mapping.layer_mask,
+      );
+      requireDeviceSuccess(ok, "gamepad key mapping");
+      const applied = await kbheDevice.getKeyGamepadMap(mapping.key_index);
+      patchActiveAppProfileKeyGamepadMap(applied ?? mapping);
+    },
+    onSuccess: () => {
+      markSaved();
+      void qc.invalidateQueries({ queryKey: ["gamepad"] });
+    },
+    onError: () => {
+      keyMapDesiredRef.current = null;
+      markError();
+    },
+    optimisticUpdate: (_current, mapping) => mapping,
+  });
+
+  useEffect(() => {
+    if (!keyMapMutation.isPending) {
+      keyMapDesiredRef.current = keyMapQ.data ?? null;
+    }
+  }, [keyIndex, keyMapMutation.isPending, keyMapQ.data]);
 
   const gamepadEnabledMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const ok = await kbheDevice.setGamepadEnabled(enabled);
-      if (ok && optionsQ.data) {
-        patchActiveAppProfileOptions({
-          ...optionsQ.data,
-          gamepad_enabled: enabled,
-        });
+      requireDeviceSuccess(ok, "gamepad output setting");
+      if (optionsQ.data) {
+        patchActiveAppProfileOptions({ gamepad_enabled: enabled });
       }
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.device.options() });
     },
+    onError: markError,
   });
 
   const gs = gamepadQ.data;
@@ -200,10 +243,14 @@ export default function Gamepad() {
         return;
       }
 
-      let nextAxis = next.axis ?? effectiveAxis;
-      let nextDirection = next.direction ?? effectiveDirection;
-      let nextButton = next.button ?? effectiveButton;
-      let nextLayerMask = km.layer_mask & layerMaskAll;
+      const base = keyMapDesiredRef.current?.key_index === keyIndex
+        ? keyMapDesiredRef.current
+        : km;
+      const baseActiveOnLayer = (base.layer_mask & currentLayerBit) !== 0;
+      let nextAxis = next.axis ?? (baseActiveOnLayer ? base.axis : 0);
+      let nextDirection = next.direction ?? (baseActiveOnLayer ? base.direction : 0);
+      let nextButton = next.button ?? (baseActiveOnLayer ? base.button : 0);
+      let nextLayerMask = base.layer_mask & layerMaskAll;
       const hasLayerMapping = nextAxis !== 0 || nextButton !== 0;
 
       if (hasLayerMapping) {
@@ -217,19 +264,19 @@ export default function Gamepad() {
         }
       }
 
-      keyMapMutation.mutate({
+      const mapping = {
+        key_index: keyIndex,
         axis: nextAxis,
         direction: nextDirection,
         button: nextButton,
-        layerMask: nextLayerMask === 0 ? layerMaskAll : nextLayerMask,
-      });
+        layer_mask: nextLayerMask === 0 ? layerMaskAll : nextLayerMask,
+      };
+      keyMapDesiredRef.current = mapping;
+      keyMapMutation.mutate(mapping);
     },
     [
       keyIndex,
       km,
-      effectiveAxis,
-      effectiveDirection,
-      effectiveButton,
       currentLayerBit,
       keyMapMutation,
       layerMaskAll,
@@ -288,9 +335,11 @@ export default function Gamepad() {
     (pts: CurvePoint[]) => {
       if (!gs) return;
       const devicePts = editorCurveToDevice(pts);
-      gamepadMutation.mutate({ ...gs, curve_points: devicePts });
+      void liveCurveUpdate.cancelAndWait().then(() => {
+        commitGamepadSettings({ curve_points: devicePts });
+      });
     },
-    [gs, gamepadMutation],
+    [gs, commitGamepadSettings, liveCurveUpdate],
   );
 
   // ── XInput / HID toggle ──
@@ -308,8 +357,7 @@ export default function Gamepad() {
             disabled={!connected || gamepadQ.isLoading}
             onCheckedChange={(v) => {
               if (!gs) return;
-              gamepadMutation.mutate({
-                ...gs,
+              commitGamepadSettings({
                 api_mode: v
                   ? GAMEPAD_API_MODES["XInput (Xbox Compatible)"]
                   : GAMEPAD_API_MODES["HID (DirectInput)"],
@@ -499,10 +547,7 @@ export default function Gamepad() {
                         items={selectItems(GAMEPAD_KEYBOARD_ROUTING)}
                         onValueChange={(v) => {
                           if (!gs || !keyboardEnabled) return;
-                          gamepadMutation.mutate({
-                            ...gs,
-                            keyboard_routing: Number(v),
-                          });
+                          commitGamepadSettings({ keyboard_routing: Number(v) });
                         }}
                       >
                         <SelectTrigger className="w-44 h-8">
@@ -565,7 +610,7 @@ export default function Gamepad() {
                       disabled={!connected || gamepadQ.isLoading}
                       onCheckedChange={(v) => {
                         if (!gs) return;
-                        gamepadMutation.mutate({ ...gs, square_mode: v });
+                        commitGamepadSettings({ square_mode: v });
                       }}
                     />
                   </FormRow>
@@ -578,7 +623,7 @@ export default function Gamepad() {
                       disabled={!connected || gamepadQ.isLoading}
                       onCheckedChange={(v) => {
                         if (!gs) return;
-                        gamepadMutation.mutate({ ...gs, reactive_stick: v });
+                        commitGamepadSettings({ reactive_stick: v });
                       }}
                     />
                   </FormRow>

@@ -384,6 +384,14 @@ void led_matrix_set_effect(led_effect_mode_t mode);
 led_effect_mode_t led_matrix_get_effect(void);
 
 /**
+ * @brief Monotonic token changed whenever the active effect changes.
+ *
+ * Live-frame transports use this to invalidate an incomplete frame if the
+ * user leaves and later re-enters third-party mode between HID chunks.
+ */
+uint32_t led_matrix_get_effect_generation(void);
+
+/**
  * @brief Compatibility setter for the active effect color.
  *
  * The RGB value maps to the active effect parameter block
@@ -476,6 +484,52 @@ void led_matrix_set_volume_overlay(uint8_t level);
  * @brief Backward-compatible wrapper to clear the host volume overlay.
  */
 void led_matrix_clear_volume_overlay(void);
+
+// Runtime state overlays are composited over the active LED effect.  They are
+// intentionally device-side so fades remain smooth even when the configurator
+// is disconnected or the RAW HID channel is busy.
+#define LED_STATE_OVERLAY_COUNT 8u
+#define LED_STATE_OVERLAY_MASK_BYTES ((NUM_KEYS + 7u) / 8u)
+
+typedef enum {
+  LED_OVERLAY_BLEND_ALPHA = 0,
+  LED_OVERLAY_BLEND_ADD = 1,
+  LED_OVERLAY_BLEND_REPLACE = 2,
+  LED_OVERLAY_BLEND_MAX
+} led_overlay_blend_mode_t;
+
+#define LED_OVERLAY_FLAG_ALL_KEYS 0x01u
+
+typedef struct __attribute__((packed)) {
+  uint8_t enabled;
+  uint8_t priority;
+  uint8_t blend_mode;
+  uint8_t opacity;
+  uint8_t color_r;
+  uint8_t color_g;
+  uint8_t color_b;
+  uint8_t flags;
+  uint16_t fade_in_ms;
+  uint16_t fade_out_ms;
+  uint8_t key_mask[LED_STATE_OVERLAY_MASK_BYTES];
+} led_state_overlay_config_t;
+
+/** Configure one reusable state overlay. Configuration does not activate it. */
+bool led_matrix_configure_state_overlay(
+    uint8_t overlay_id, const led_state_overlay_config_t *config);
+
+/** Read one state overlay configuration. */
+bool led_matrix_get_state_overlay_config(
+    uint8_t overlay_id, led_state_overlay_config_t *config_out);
+
+/** Fade a persistent state overlay in or out. */
+bool led_matrix_set_state_overlay_active(uint8_t overlay_id, bool active);
+
+/** Activate an overlay for a bounded duration before fading it out. */
+bool led_matrix_pulse_state_overlay(uint8_t overlay_id, uint16_t duration_ms);
+
+/** Fade every state overlay out (used on profile changes and abort paths). */
+void led_matrix_clear_state_overlays(void);
 
 /**
  * @brief Cache the last host-reported PC volume level.

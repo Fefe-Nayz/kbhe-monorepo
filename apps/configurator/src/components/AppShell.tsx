@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -10,6 +10,10 @@ import { UpdateBanner } from "@/components/UpdateBanner";
 import { ThemeButton } from "@/components/nav-components/themeButton";
 import { ProfileSelect } from "@/components/profile-select";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
+import {
+  getProfileOperationPending,
+  subscribeProfileOperationPending,
+} from "@/lib/kbhe/profile-operation-lock";
 import { useAudioSpectrumService } from "@/lib/kbhe/useAudioSpectrumService";
 import { useAlphaMaskService } from "@/lib/kbhe/useAlphaMaskService";
 import { useDashboardMcuTrendsService } from "@/lib/kbhe/useDashboardMcuTrendsService";
@@ -18,6 +22,7 @@ import Profiles from "@/pages/Profiles";
 import Keymap from "@/pages/Keymap";
 import Performance from "@/pages/performance";
 import AdvancedKeys from "@/pages/AdvancedKeys";
+import Macros from "@/pages/Macros";
 import Gamepad from "@/pages/Gamepad";
 import Calibration from "@/pages/calibration";
 import Lighting from "@/pages/Lighting";
@@ -37,6 +42,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/keymap": "Keymap",
   "/performance": "Performance",
   "/advanced-keys": "Advanced Keys",
+  "/macros": "Macros",
   "/gamepad": "Gamepad",
   "/calibration": "Calibration",
   "/lighting": "Lighting",
@@ -83,6 +89,11 @@ export function AppShell() {
     () => window.innerWidth < MIN_WIDTH || window.innerHeight < MIN_HEIGHT,
   );
   const developerMode = useDeviceSession((s) => s.developerMode);
+  const profileOperationPending = useSyncExternalStore(
+    subscribeProfileOperationPending,
+    getProfileOperationPending,
+    getProfileOperationPending,
+  );
   const pageTitle = getPageTitle(location.pathname);
   useAudioSpectrumService();
   useAlphaMaskService();
@@ -104,7 +115,19 @@ export function AppShell() {
 
   return (
     <TooltipProvider>
+      {profileOperationPending && (
+        <div
+          className="fixed inset-0 z-[100] flex cursor-wait items-start justify-center bg-background/10 pt-16"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
+            Synchronizing profile…
+          </div>
+        </div>
+      )}
       <SidebarProvider
+        inert={profileOperationPending ? true : undefined}
         style={
           {
             "--sidebar-width": "calc(var(--spacing) * 72)",
@@ -124,6 +147,7 @@ export function AppShell() {
               <Route path="/keymap"        element={<Keymap />} />
               <Route path="/performance"   element={<Performance />} />
               <Route path="/advanced-keys" element={<AdvancedKeys />} />
+              <Route path="/macros"        element={<Macros />} />
               <Route path="/gamepad"       element={<Gamepad />} />
               <Route path="/calibration"   element={<Calibration />} />
               <Route path="/lighting"      element={<Lighting />} />

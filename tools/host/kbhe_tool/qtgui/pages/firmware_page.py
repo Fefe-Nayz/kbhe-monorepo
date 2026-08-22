@@ -281,7 +281,7 @@ class FirmwarePage(QWidget):
                 manual_version = int(manual_text, 0)
                 version_note = (
                     f"\nFirmware version: {format_firmware_version(manual_version)} "
-                    f"(0x{manual_version:04X}) · source manual override"
+                    f"(0x{manual_version:06X}) · source manual override"
                 )
             except ValueError:
                 version_note = "\nFirmware version: invalid manual value"
@@ -290,7 +290,7 @@ class FirmwarePage(QWidget):
                 auto_version, source = resolve_firmware_version(path)
                 version_note = (
                     f"\nFirmware version: {format_firmware_version(auto_version)} "
-                    f"(0x{auto_version:04X}) · source {source}"
+                    f"(0x{auto_version:06X}) · source {source}"
                 )
             except Exception as exc:
                 version_note = f"\nFirmware version: auto-detect failed ({exc})"
@@ -429,7 +429,7 @@ class FirmwarePage(QWidget):
             self._update_status(f"Firmware version auto-detect failed: {exc}", "error")
             return
 
-        label = f"{format_firmware_version(firmware_version)} (0x{firmware_version:04X})"
+        label = f"{format_firmware_version(firmware_version)} (0x{firmware_version:06X})"
         confirm = QMessageBox.question(
             self,
             "Confirm firmware flash",

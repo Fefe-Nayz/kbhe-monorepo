@@ -4,13 +4,17 @@
  */
 
 #include "hid_protocol.h"
+#include "action_engine.h"
+#include "action_protocol.h"
 #include "adc_capture.h"
 #include "analog/analog.h"
 #include "diagnostics.h"
+#include "flash_storage.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "layout/keycodes.h"
 #include "main.h"
+#include "rgb_frame_staging.h"
 #include "rotary_encoder.h"
 #include "settings.h"
 #include "trigger/trigger.h"
@@ -161,8 +165,11 @@ static inline void hid_fill_key_settings_packet(hid_packet_key_settings_t *resp,
 _Static_assert((sizeof(HID_DEVICE_SERIAL_PREFIX) - 1u + HID_DEVICE_UID_B62_CHARS +
                 1u) <= HID_DEVICE_SERIAL_MAX_LEN,
                "HID_DEVICE_SERIAL_MAX_LEN too small for configured prefix");
+_Static_assert(sizeof(hid_resp_mcu_metrics_t) == 64u,
+               "MCU metrics response must remain one RAW HID packet");
 
 static char s_device_serial_cache[HID_DEVICE_SERIAL_MAX_LEN];
+static rgb_frame_staging_t s_third_party_frame_staging;
 
 static void hid_encode_uid_base62_12(const uint8_t *uid_bytes, char *out_b62) {
   static const char base62_table[] =
@@ -267,8 +274,8 @@ static void cmd_enter_bootloader(const uint8_t *in, uint8_t *out) {
   (void)in;
   resp->command_id = CMD_ENTER_BOOTLOADER;
 
-  if (!settings_is_ram_only_mode() &&
-      settings_has_unsaved_changes() && !settings_save()) {
+  if (!settings_is_ram_only_mode() && settings_has_unsaved_changes() &&
+      !settings_request_save()) {
     resp->status_or_len = HID_RESP_ERROR;
     return;
   }
@@ -356,9 +363,26 @@ static void cmd_set_gamepad_enabled(const uint8_t *in, uint8_t *out) {
 
 static void cmd_save_settings(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
+  settings_save_status_t save_status;
   (void)in;
   resp->command_id = CMD_SAVE_SETTINGS;
   resp->status_or_len = settings_request_save() ? HID_RESP_OK : HID_RESP_ERROR;
+  settings_get_save_status(&save_status);
+  out[2] = (uint8_t)save_status.state;
+  out[3] = 1u; /* save-status response extension version */
+}
+
+static void cmd_get_settings_save_status(const uint8_t *in, uint8_t *out) {
+  settings_save_status_t save_status;
+  (void)in;
+  out[0] = CMD_GET_SETTINGS_SAVE_STATUS;
+  out[1] = HID_RESP_OK;
+  settings_get_save_status(&save_status);
+  out[2] = (uint8_t)save_status.state;
+  out[3] = 1u;
+  out[4] = save_status.dirty ? 1u : 0u;
+  out[5] = save_status.requested ? 1u : 0u;
+  out[6] = save_status.in_progress ? 1u : 0u;
 }
 
 static void cmd_get_nkro_enabled(const uint8_t *in, uint8_t *out) {
@@ -569,19 +593,51 @@ static void cmd_get_ram_only_mode(const uint8_t *in, uint8_t *out) {
   resp->payload[0]     = settings_is_ram_only_mode() ? 1u : 0u;
 }
 
+static bool hid_schedule_settings_reload_reboot(void) {
+  settings_save_status_t status = {0};
+
+  /* Never reset across an owned journal transaction or a terminal
+   * ProfileDocument result waiting to be consumed. Once persistence is idle,
+   * RAM-only makes updater_app_task intentionally discard all volatile
+   * settings/actions instead of autosaving them before the controlled reset. */
+  settings_get_save_status(&status);
+  if (status.in_progress ||
+      !updater_app_schedule_action(UPDATER_APP_ACTION_REBOOT)) {
+    return false;
+  }
+  return settings_enter_ram_only_mode();
+}
+
 static void cmd_set_ram_only_mode(const uint8_t *in, uint8_t *out) {
   const hid_packet_t *req  = (const hid_packet_t *)in;
   hid_packet_t       *resp = (hid_packet_t *)out;
   resp->command_id = CMD_SET_RAM_ONLY_MODE;
 
-  if (req->payload[0]) {
-    settings_enter_ram_only_mode();
-    resp->status_or_len = HID_RESP_OK;
-  } else {
-    /* enable=0 exits RAM-only mode and reloads the last-saved flash state,
-     * identical to CMD_RELOAD_SETTINGS_FROM_FLASH. */
-    bool ok = settings_exit_ram_only_mode();
-    resp->status_or_len = ok ? HID_RESP_OK : HID_RESP_ERROR;
+  switch (hid_ram_only_request_classify(
+      req->status_or_len, req->payload[0], req->payload[1])) {
+  case HID_RAM_ONLY_REQUEST_ENTER:
+    resp->status_or_len = settings_enter_ram_only_mode()
+                              ? HID_RESP_OK
+                              : HID_RESP_ERROR;
+    break;
+  case HID_RAM_ONLY_REQUEST_LEAVE_V1:
+    /* Extension v1: leave after a durable explicit ProfileDocument commit.
+     * The committed live state is retained without decoding Flash in the HID
+     * path. Legacy disable requests retain discard-and-reload semantics. */
+    resp->status_or_len = settings_leave_ram_only_mode()
+                              ? HID_RESP_OK
+                              : HID_RESP_ERROR;
+    break;
+  case HID_RAM_ONLY_REQUEST_RELOAD_REBOOT:
+    resp->status_or_len = hid_schedule_settings_reload_reboot()
+                              ? HID_RESP_OK
+                              : HID_RESP_ERROR;
+    break;
+  case HID_RAM_ONLY_REQUEST_INVALID:
+  default:
+    /* Unknown extensions must not accidentally trigger a reboot. */
+    resp->status_or_len = HID_RESP_INVALID_PARAM;
+    break;
   }
 
   resp->payload[0] = settings_is_ram_only_mode() ? 1u : 0u;
@@ -592,7 +648,7 @@ static void cmd_reload_settings_from_flash(const uint8_t *in, uint8_t *out) {
   hid_packet_t *resp = (hid_packet_t *)out;
   resp->command_id    = CMD_RELOAD_SETTINGS_FROM_FLASH;
 
-  bool ok = settings_exit_ram_only_mode();
+  bool ok = hid_schedule_settings_reload_reboot();
   resp->status_or_len = ok ? HID_RESP_OK : HID_RESP_ERROR;
   resp->payload[0]    = settings_is_ram_only_mode() ? 1u : 0u;
 }
@@ -884,7 +940,7 @@ static void cmd_get_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   resp->status = HID_RESP_OK;
   resp->rotation_action = rotary.rotation_action;
   resp->button_action = rotary.button_action;
-  resp->sensitivity = rotary.sensitivity;
+  resp->sensitivity = settings_rotary_get_sensitivity(&rotary);
   resp->step_size = rotary.step_size;
   resp->invert_direction = rotary.invert_direction;
   resp->rgb_behavior = rotary.rgb_behavior;
@@ -914,6 +970,9 @@ static void cmd_get_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
       rotary.click_binding.fallback_no_mod_keycode;
   resp->click_layer_mode = rotary.click_binding.layer_mode;
   resp->click_layer_index = rotary.click_binding.layer_index;
+  resp->acceleration = settings_rotary_get_acceleration(&rotary);
+  resp->progress_filled_only =
+      settings_rotary_is_progress_filled_only(&rotary) ? 1u : 0u;
 }
 
 static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
@@ -926,6 +985,8 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
       req->rotation_action >= ROTARY_ACTION_MAX ||
       req->button_action >= ROTARY_BUTTON_ACTION_MAX ||
       req->sensitivity == 0u || req->sensitivity > 16u ||
+      req->acceleration > SETTINGS_ROTARY_ACCELERATION_MAX ||
+      req->progress_filled_only > 1u ||
       req->step_size == 0u || req->step_size > 64u ||
       req->rgb_behavior >= ROTARY_RGB_BEHAVIOR_MAX ||
       req->rgb_effect_mode >= LED_EFFECT_MAX ||
@@ -951,7 +1012,9 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
 
   rotary.rotation_action = req->rotation_action;
   rotary.button_action = req->button_action;
-  rotary.sensitivity = req->sensitivity;
+  settings_rotary_set_motion(&rotary, req->sensitivity, req->acceleration);
+  settings_rotary_set_progress_filled_only(
+      &rotary, req->progress_filled_only != 0u);
   rotary.step_size = req->step_size;
   rotary.invert_direction = req->invert_direction ? 1u : 0u;
   rotary.rgb_behavior = req->rgb_behavior;
@@ -990,7 +1053,7 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
   resp->status = HID_RESP_OK;
   resp->rotation_action = rotary.rotation_action;
   resp->button_action = rotary.button_action;
-  resp->sensitivity = rotary.sensitivity;
+  resp->sensitivity = settings_rotary_get_sensitivity(&rotary);
   resp->step_size = rotary.step_size;
   resp->invert_direction = rotary.invert_direction;
   resp->rgb_behavior = rotary.rgb_behavior;
@@ -1020,6 +1083,9 @@ static void cmd_set_rotary_encoder_settings(const uint8_t *in, uint8_t *out) {
       rotary.click_binding.fallback_no_mod_keycode;
   resp->click_layer_mode = rotary.click_binding.layer_mode;
   resp->click_layer_index = rotary.click_binding.layer_index;
+  resp->acceleration = settings_rotary_get_acceleration(&rotary);
+  resp->progress_filled_only =
+      settings_rotary_is_progress_filled_only(&rotary) ? 1u : 0u;
 }
 
 static void cmd_get_rotary_state(const uint8_t *in, uint8_t *out) {
@@ -1328,7 +1394,9 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
   }
 
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
-    if (!is_valid_adc_calibration_value(cal.key_zero_values[i])) {
+    if (!is_valid_adc_calibration_value(cal.key_zero_values[i]) ||
+        (int32_t)cal.key_max_values[i] - cal.key_zero_values[i] <
+            (int32_t)SETTINGS_CALIBRATION_MIN_SPAN_ADC) {
       resp->status = HID_RESP_INVALID_PARAM;
       return;
     }
@@ -1341,7 +1409,7 @@ static void cmd_set_calibration(const uint8_t *in, uint8_t *out) {
     refresh_runtime_calibration();
   }
 
-  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->status = success ? HID_RESP_OK : HID_RESP_INVALID_PARAM;
   resp->start_index = req->start_index;
   resp->value_count = req->value_count;
   resp->lut_zero_value = cal.lut_zero_value;
@@ -1401,7 +1469,9 @@ static void cmd_set_calibration_max(const uint8_t *in, uint8_t *out) {
   }
 
   for (uint8_t i = 0; i < NUM_KEYS; i++) {
-    if (!is_valid_adc_calibration_value(cal.key_max_values[i])) {
+    if (!is_valid_adc_calibration_value(cal.key_max_values[i]) ||
+        (int32_t)cal.key_max_values[i] - cal.key_zero_values[i] <
+            (int32_t)SETTINGS_CALIBRATION_MIN_SPAN_ADC) {
       resp->status = HID_RESP_INVALID_PARAM;
       return;
     }
@@ -1412,7 +1482,7 @@ static void cmd_set_calibration_max(const uint8_t *in, uint8_t *out) {
     refresh_runtime_calibration();
   }
 
-  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  resp->status = success ? HID_RESP_OK : HID_RESP_INVALID_PARAM;
   resp->start_index = req->start_index;
   resp->value_count = req->value_count;
   resp->lut_zero_value = cal.lut_zero_value;
@@ -1429,26 +1499,26 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_AUTO_CALIBRATE;
 
   uint8_t key_index = req->key_index;
-
-  bool success = true;
+  settings_calibration_t calibration = *settings_get_calibration();
+  bool success = false;
 
   if (key_index == 0xFF) {
-    // Auto-calibrate all keys
-    for (int i = 0; i < NUM_KEYS; i++) {
-      if (!settings_set_key_calibration(i, (int16_t)analog_read_raw_value(i))) {
-        success = false;
-      }
+    for (uint8_t i = 0u; i < NUM_KEYS; i++) {
+      calibration.key_zero_values[i] =
+          (int16_t)analog_read_raw_value(i);
     }
   } else if (key_index < NUM_KEYS) {
-    // Auto-calibrate single key
-    success = settings_set_key_calibration(
-        key_index, (int16_t)analog_read_raw_value(key_index));
+    calibration.key_zero_values[key_index] =
+        (int16_t)analog_read_raw_value(key_index);
   } else {
     resp->status = HID_RESP_INVALID_PARAM;
     return;
   }
 
-  resp->status = success ? HID_RESP_OK : HID_RESP_ERROR;
+  /* Validate and publish the complete calibration once.  A bad sensor value
+   * can no longer leave a partially updated 82-key table behind. */
+  success = settings_set_calibration(&calibration);
+  resp->status = success ? HID_RESP_OK : HID_RESP_INVALID_PARAM;
   if (!success) {
     return;
   }
@@ -1717,9 +1787,15 @@ static void cmd_set_led_pixel(const uint8_t *in, uint8_t *out) {
   }
 
   if (third_party_mode) {
+    /* Immediate editing commands are transaction boundaries. Remaining bulk
+     * chunks from an older PC frame must not overwrite this pixel later. */
+    rgb_frame_staging_reset(&s_third_party_frame_staging);
     led_matrix_set_pixel_idx(req->index, req->r, req->g, req->b);
   } else {
-  settings_set_led_pixel(req->index, req->r, req->g, req->b);
+    if (!settings_set_led_pixel(req->index, req->r, req->g, req->b)) {
+      resp->status = HID_RESP_ERROR;
+      return;
+    }
   }
 
   resp->status = HID_RESP_OK;
@@ -1763,12 +1839,13 @@ static void cmd_set_led_row(const uint8_t *in, uint8_t *out) {
 
   if (third_party_mode) {
     // Third-party streaming must stay runtime-only and avoid dirty autosaves.
+    rgb_frame_staging_reset(&s_third_party_frame_staging);
     led_matrix_begin_pixel_batch();
-  for (int x = 0; x < LED_MATRIX_WIDTH; x++) {
-    uint8_t idx = req->row * LED_MATRIX_WIDTH + x;
+    for (int x = 0; x < LED_MATRIX_WIDTH; x++) {
+      uint8_t idx = req->row * LED_MATRIX_WIDTH + x;
       led_matrix_set_pixel_idx(idx, req->pixels[x * 3], req->pixels[x * 3 + 1],
-                           req->pixels[x * 3 + 2]);
-  }
+                               req->pixels[x * 3 + 2]);
+    }
     led_matrix_end_pixel_batch();
   } else {
     uint8_t pixels[LED_MATRIX_DATA_BYTES];
@@ -1837,17 +1914,31 @@ static void cmd_set_led_all_chunk(const uint8_t *in, uint8_t *out) {
   }
 
   if (third_party_mode) {
-    // Third-party live chunks should not mutate persisted matrix storage.
-    led_matrix_begin_pixel_batch();
-  for (uint16_t i = 0; i + 2 < req->chunk_size; i += 3) {
-      uint8_t idx = (offset + i) / 3u;
-    if (idx < LED_MATRIX_SIZE) {
-        led_matrix_set_pixel_idx(idx, req->data[i], req->data[i + 1],
-                             req->data[i + 2]);
+    rgb_frame_staging_result_t staging_result = rgb_frame_staging_push(
+        &s_third_party_frame_staging, req->chunk_index, req->chunk_size,
+        req->data, led_matrix_get_effect_generation());
+
+    if (staging_result == RGB_FRAME_STAGING_INVALID) {
+      resp->status = HID_RESP_INVALID_PARAM;
+      return;
     }
-  }
-    led_matrix_end_pixel_batch();
+    if (staging_result == RGB_FRAME_STAGING_COMPLETE) {
+      /* One whole-frame copy and one WS2812 publication: no partially received
+       * PC frame can become visible. */
+      led_matrix_set_live_frame(rgb_frame_staging_completed_frame(
+          &s_third_party_frame_staging));
+    }
   } else {
+    if (rgb_frame_staging_is_active(&s_third_party_frame_staging)) {
+      /* The user changed effect during an in-flight live frame. A non-zero
+       * remainder is stale and must not become a persisted matrix edit. */
+      bool starts_new_upload = req->chunk_index == 0u;
+      rgb_frame_staging_reset(&s_third_party_frame_staging);
+      if (!starts_new_upload) {
+        resp->status = HID_RESP_INVALID_PARAM;
+        return;
+      }
+    }
     uint8_t pixels[LED_MATRIX_DATA_BYTES];
 
     memcpy(pixels, settings_get_led_pixels(), LED_MATRIX_DATA_BYTES);
@@ -1871,6 +1962,7 @@ static void cmd_led_clear(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_LED_CLEAR;
 
   if (third_party_mode) {
+    rgb_frame_staging_reset(&s_third_party_frame_staging);
     led_matrix_clear();
   } else {
     uint8_t pixels[LED_MATRIX_DATA_BYTES] = {0};
@@ -1892,9 +1984,8 @@ static void cmd_led_fill(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_LED_FILL;
 
   if (third_party_mode) {
-    led_matrix_begin_pixel_batch();
+    rgb_frame_staging_reset(&s_third_party_frame_staging);
     led_matrix_fill(req->r, req->g, req->b);
-    led_matrix_end_pixel_batch();
   } else {
     uint8_t pixels[LED_MATRIX_DATA_BYTES];
 
@@ -1921,6 +2012,7 @@ static void cmd_led_test_rainbow(const uint8_t *in, uint8_t *out) {
   resp->command_id = CMD_LED_TEST_RAINBOW;
 
   // Show rainbow test pattern
+  rgb_frame_staging_reset(&s_third_party_frame_staging);
   led_matrix_test_rainbow(0);
 
   resp->status_or_len = HID_RESP_OK;
@@ -1940,8 +2032,10 @@ static void cmd_set_led_effect(const uint8_t *in, uint8_t *out) {
 
   uint8_t mode = req->payload[0];
   if (mode < LED_EFFECT_MAX) {
+    rgb_frame_staging_reset(&s_third_party_frame_staging);
     settings_set_led_effect_mode(mode);
     resp->status_or_len = HID_RESP_OK;
+    resp->payload[0] = settings_get_led_effect_mode();
   } else {
     resp->status_or_len = HID_RESP_INVALID_PARAM;
   }
@@ -2237,6 +2331,26 @@ static void cmd_set_led_usb_suspend_rgb_off(const uint8_t *in, uint8_t *out) {
   resp->value = settings_is_led_usb_suspend_rgb_off_enabled() ? 1u : 0u;
 }
 
+static void cmd_get_rgb_capabilities(const uint8_t *in, uint8_t *out) {
+  hid_packet_rgb_capabilities_t *resp =
+      (hid_packet_rgb_capabilities_t *)out;
+  (void)in;
+
+  resp->command_id = CMD_GET_RGB_CAPABILITIES;
+  resp->status = HID_RESP_OK;
+  resp->protocol_major = HID_RGB_BRIDGE_PROTOCOL_MAJOR;
+  resp->protocol_minor = HID_RGB_BRIDGE_PROTOCOL_MINOR;
+  resp->led_count = LED_MATRIX_SIZE;
+  resp->bytes_per_pixel = 3u;
+  resp->chunk_bytes = HID_LED_BYTES_PER_CHUNK;
+  resp->live_effect_id = (uint8_t)LED_EFFECT_THIRD_PARTY;
+  resp->capabilities =
+      HID_RGB_CAP_ENABLED | HID_RGB_CAP_BRIGHTNESS | HID_RGB_CAP_PIXEL |
+      HID_RGB_CAP_FRAME_CHUNKS | HID_RGB_CAP_FILL | HID_RGB_CAP_LIVE_MODE |
+      HID_RGB_CAP_RESTORE_MODE;
+  resp->color_order = 0u;
+}
+
 //--------------------------------------------------------------------+
 // Internal Functions - Filter Commands
 //--------------------------------------------------------------------+
@@ -2452,6 +2566,7 @@ static void cmd_get_key_states(const uint8_t *in, uint8_t *out) {
 
 static void cmd_get_mcu_metrics(const uint8_t *in, uint8_t *out) {
   hid_resp_mcu_metrics_t *resp = (hid_resp_mcu_metrics_t *)out;
+  flash_storage_metrics_t flash_metrics = {0};
   (void)in;
   diagnostics_live_ping();
 
@@ -2467,6 +2582,29 @@ static void cmd_get_mcu_metrics(const uint8_t *in, uint8_t *out) {
   resp->work_us = (uint16_t)mcu_work_us_live;
   resp->load_permille = mcu_load_permille_live;
   resp->temp_valid = mcu_temperature_valid_live ? 1u : 0u;
+  flash_storage_get_metrics(&flash_metrics);
+  resp->max_scan_cycle_us =
+      mcu_scan_cycle_us_max > UINT16_MAX ? UINT16_MAX
+                                         : (uint16_t)mcu_scan_cycle_us_max;
+  resp->scan_deadline_miss_count = mcu_scan_deadline_miss_count;
+  resp->flash_programmed_words = flash_metrics.programmed_words;
+  resp->flash_async_steps = flash_metrics.async_steps;
+  resp->flash_gc_count = flash_metrics.async_gc_count;
+  resp->flash_boot_erase_count = flash_metrics.boot_erase_count;
+  resp->flash_runtime_erase_count = flash_metrics.runtime_erase_count;
+  resp->flash_deferred_no_space_count =
+      flash_metrics.deferred_no_space_count;
+  resp->flash_max_words_per_step = flash_metrics.max_words_in_one_step;
+  resp->flash_async_busy = flash_metrics.async_busy;
+  resp->flash_spare_bank_ready = flash_metrics.spare_bank_ready;
+  resp->flash_word_program_datasheet_max_us =
+      FLASH_STORAGE_WORD_PROGRAM_DATASHEET_MAX_US;
+  /* The STM32F723 maximum word-program time leaves too little of a 125 us
+   * scan deadline for a silicon-level guarantee. Runtime counters above are
+   * deliberately exposed so HIL can enforce the operational acceptance bar. */
+  resp->flash_hard_8khz_guarantee = 0u;
+  resp->p99_scan_cycle_us = mcu_scan_cycle_p99_us();
+  resp->flash_last_status = (uint8_t)flash_storage_get_last_status();
   memset(resp->reserved, 0, sizeof(resp->reserved));
 }
 
@@ -2581,6 +2719,7 @@ static void cmd_unknown(const uint8_t *in, uint8_t *out) {
 //--------------------------------------------------------------------+
 
 void hid_protocol_init(void) {
+  rgb_frame_staging_reset(&s_third_party_frame_staging);
   hid_prepare_device_serial_cache();
   adc_capture_init();
 }
@@ -2590,6 +2729,22 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
   memset(out_packet, 0, HID_PROTOCOL_PACKET_SIZE);
 
   uint8_t cmd_id = in_packet[0];
+
+  /* ENTER_RAM_ONLY may need to finish one journal transaction that already
+   * owns Flash. A client that ignores the v1 status polling requirement must
+   * not be able to mutate live sources until that transaction is gone, or its
+   * RAM-only bytes could leak into the committed snapshot. */
+  if (settings_ram_only_transition_pending() &&
+      cmd_id != CMD_GET_SETTINGS_SAVE_STATUS &&
+      cmd_id != CMD_GET_RAM_ONLY_MODE && cmd_id != CMD_SET_RAM_ONLY_MODE) {
+    out_packet[0] = cmd_id;
+    out_packet[1] = HID_RESP_ERROR;
+    return true;
+  }
+
+  if (action_protocol_handle(cmd_id, in_packet, out_packet)) {
+    return !action_protocol_response_is_deferred();
+  }
 
   switch (cmd_id) {
   // System commands
@@ -2640,6 +2795,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_SAVE_SETTINGS:
     cmd_save_settings(in_packet, out_packet);
+    break;
+
+  case CMD_GET_SETTINGS_SAVE_STATUS:
+    cmd_get_settings_save_status(in_packet, out_packet);
     break;
 
   case CMD_GET_NKRO_ENABLED:
@@ -2948,6 +3107,10 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
     cmd_set_led_usb_suspend_rgb_off(in_packet, out_packet);
     break;
 
+  case CMD_GET_RGB_CAPABILITIES:
+    cmd_get_rgb_capabilities(in_packet, out_packet);
+    break;
+
   // Filter commands
   case CMD_GET_FILTER_ENABLED:
     cmd_get_filter_enabled(in_packet, out_packet);
@@ -3017,4 +3180,12 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
   }
 
   return true; // Always send a response
+}
+
+bool hid_protocol_response_is_deferred(void) {
+  return action_protocol_response_is_deferred();
+}
+
+bool hid_protocol_poll_deferred_response(uint8_t *out_packet) {
+  return action_protocol_poll_deferred_response(out_packet);
 }

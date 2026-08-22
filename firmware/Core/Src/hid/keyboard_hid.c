@@ -23,9 +23,14 @@
 // Rapport clavier courant
 static hid_keyboard_report_t keyboard_report = {0};
 
-// Buffer des touches actuellement pressées (max 6 comme HID standard)
-static uint8_t pressed_keys[6] = {0};
+/* Keep the complete desired set, not only the six boot-report slots.  This
+ * allows a seventh held key to be promoted as soon as one of the first six is
+ * released. */
+#define KEYBOARD_HID_MAX_HELD_KEYS 128u
+static uint8_t pressed_keys[KEYBOARD_HID_MAX_HELD_KEYS] = {0};
 static uint8_t num_pressed_keys = 0;
+/* Multiple physical keys/macros may own the same HID usage. */
+static uint8_t key_reference_counts[256] = {0};
 
 // Flag pour indiquer qu'un rapport a changé et doit être envoyé
 static volatile bool report_changed = false;
@@ -78,20 +83,48 @@ bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode) {
 }
 
 bool keyboard_hid_release_all(void) {
-  return keyboard_hid_send_report(0, NULL);
+  bool sent = false;
+
+  /* Clear desired ownership first, then retain a pending neutral report if
+   * the endpoint is momentarily busy. Discarding the state after a failed
+   * immediate send can otherwise leave the host's last 6KRO report stuck. */
+  memset(&keyboard_report, 0, sizeof(keyboard_report));
+  memset(pressed_keys, 0, sizeof(pressed_keys));
+  memset(key_reference_counts, 0, sizeof(key_reference_counts));
+  num_pressed_keys = 0u;
+  report_changed = true;
+
+  if (tud_mounted() && tud_hid_n_ready(HID_ITF_KEYBOARD)) {
+    sent = keyboard_hid_send_report(0u, NULL);
+    if (sent) {
+      report_changed = false;
+    }
+  }
+  return sent;
 }
 
 void keyboard_hid_reset_state(void) {
   memset(&keyboard_report, 0, sizeof(keyboard_report));
   memset(pressed_keys, 0, sizeof(pressed_keys));
+  memset(key_reference_counts, 0, sizeof(key_reference_counts));
   num_pressed_keys = 0;
-  report_changed = false;
+  /* Reset is also a logical release. Keep it pending until the USB endpoint
+   * accepts the neutral report. */
+  report_changed = true;
   report_pending = false;
 }
 
 void keyboard_hid_key_press(uint8_t keycode) {
   if (keycode == 0)
     return;
+
+  if (key_reference_counts[keycode] == 0xFFu) {
+    return;
+  }
+  key_reference_counts[keycode]++;
+  if (key_reference_counts[keycode] > 1u) {
+    return;
+  }
 
   if (keyboard_hid_is_modifier(keycode)) {
     uint8_t modifier_mask = (uint8_t)(1u << (keycode - HID_KEY_CONTROL_LEFT));
@@ -102,23 +135,26 @@ void keyboard_hid_key_press(uint8_t keycode) {
     return;
   }
 
-  // Check if key is already pressed
-  for (uint8_t i = 0; i < num_pressed_keys; i++) {
-    if (pressed_keys[i] == keycode) {
-      return; // Already pressed
-    }
-  }
-
-  // Add key if space available
-  if (num_pressed_keys < 6) {
+  // Track all logical keys; report generation selects the first six.
+  if (num_pressed_keys < KEYBOARD_HID_MAX_HELD_KEYS) {
     pressed_keys[num_pressed_keys++] = keycode;
     report_changed = true;
+  } else {
+    key_reference_counts[keycode] = 0u;
   }
 }
 
 void keyboard_hid_key_release(uint8_t keycode) {
   if (keycode == 0)
     return;
+
+  if (key_reference_counts[keycode] == 0u) {
+    return;
+  }
+  key_reference_counts[keycode]--;
+  if (key_reference_counts[keycode] > 0u) {
+    return;
+  }
 
   if (keyboard_hid_is_modifier(keycode)) {
     uint8_t modifier_mask = (uint8_t)(1u << (keycode - HID_KEY_CONTROL_LEFT));
@@ -175,6 +211,13 @@ void keyboard_hid_task(void) {
   keyboard_hid_send_report_if_changed();
 }
 
+void keyboard_hid_on_umount(void) {
+  /* Endpoint transfers can be aborted without report-complete. Keep logical
+   * ownership and republish it when the host enumerates again. */
+  report_pending = false;
+  report_changed = true;
+}
+
 //--------------------------------------------------------------------+
 // TinyUSB HID Callbacks (requis par TinyUSB)
 //--------------------------------------------------------------------+
@@ -183,7 +226,12 @@ void keyboard_hid_task(void) {
 void tud_mount_cb(void) { led_matrix_set_usb_suspend_state(false); }
 
 // Invoked when device is unmounted.
-void tud_umount_cb(void) { led_matrix_set_usb_suspend_state(false); }
+void tud_umount_cb(void) {
+  keyboard_hid_on_umount();
+  consumer_hid_on_umount();
+  mouse_hid_on_umount();
+  led_matrix_set_usb_suspend_state(false);
+}
 
 // Invoked when USB bus enters suspend.
 void tud_suspend_cb(bool remote_wakeup_en) {
@@ -205,13 +253,18 @@ void tud_resume_cb(void) { led_matrix_set_usb_suspend_state(false); }
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
                                hid_report_type_t report_type, uint8_t *buffer,
                                uint16_t reqlen) {
+  uint16_t response_len = 0u;
   (void)report_id;
-  (void)reqlen;
 
-  if ((instance == HID_ITF_KEYBOARD) && (report_type == HID_REPORT_TYPE_INPUT)) {
+  if ((instance == HID_ITF_KEYBOARD) &&
+      (report_type == HID_REPORT_TYPE_INPUT) && buffer != NULL &&
+      reqlen > 0u) {
     // Retourner le rapport clavier courant
-    memcpy(buffer, &keyboard_report, sizeof(keyboard_report));
-    return sizeof(keyboard_report);
+    response_len = reqlen < sizeof(keyboard_report)
+                       ? reqlen
+                       : (uint16_t)sizeof(keyboard_report);
+    memcpy(buffer, &keyboard_report, response_len);
+    return response_len;
   }
 
   return 0;
@@ -231,7 +284,8 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
 
   switch (instance) {
   case HID_ITF_KEYBOARD: // Keyboard
-    if (report_type == HID_REPORT_TYPE_OUTPUT && bufsize >= 1) {
+    if (report_type == HID_REPORT_TYPE_OUTPUT && buffer != NULL &&
+        bufsize >= 1u) {
       uint8_t led_state = buffer[0];
       // Update lock-state tracking and refresh the matrix so the Caps Lock key
       // LED can be overridden immediately.
