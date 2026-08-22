@@ -261,10 +261,25 @@ jobs:
       - name: Create disposable executable
         shell: pwsh
         run: |
-          $source = 'public static class Program { public static void Main() { } }'
-          Add-Type -TypeDefinition $source `
-            -OutputAssembly $env:KBHE_PREFLIGHT_EXECUTABLE_PATH `
-            -OutputType ConsoleApplication
+          $sourceExecutable = Join-Path $env:SystemRoot "System32\where.exe"
+          Copy-Item -LiteralPath $sourceExecutable `
+            -Destination $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          $signtool = @(
+            Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -File |
+              Sort-Object FullName -Descending
+          ) | Select-Object -First 1
+          if ($null -eq $signtool) {
+            throw "Windows SDK signtool.exe was not found"
+          }
+          & $signtool.FullName remove /s $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to remove the source executable signature"
+          }
+          $unsigned = Get-AuthenticodeSignature `
+            -FilePath $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+          if ($unsigned.Status -ne [System.Management.Automation.SignatureStatus]::NotSigned) {
+            throw "Disposable executable must be unsigned before the round trip"
+          }
 
       - name: Sign disposable executable
         shell: pwsh
