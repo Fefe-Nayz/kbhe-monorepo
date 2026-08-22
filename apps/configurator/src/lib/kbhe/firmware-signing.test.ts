@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { buildFirmwareSignatureManifest } from "./firmware";
 
 interface SigningVectors {
-  publicKeyHex: string;
+  firmwarePublicKeyHex: string;
   firmware: {
     dataHex: string;
     version: string;
@@ -45,7 +45,7 @@ describe("firmware release signing contract", () => {
       crc,
     );
     expect(encodeHex(manifest)).toBe(vectors.firmware.manifestHex);
-    expect(vectors.publicKeyHex).toHaveLength(64);
+    expect(vectors.firmwarePublicKeyHex).toHaveLength(64);
     expect(vectors.firmware.signatureHex).toHaveLength(128);
   });
 });

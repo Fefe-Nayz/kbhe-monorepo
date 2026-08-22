@@ -59,7 +59,7 @@ int main(void) {
                  "signature manifest must remain canonical");
   const char *firmware_section = strstr(json, "\"firmware\"");
   assert(firmware_section != NULL);
-  (void)decode_named_hex(json, "\"publicKeyHex\"", public_key,
+  (void)decode_named_hex(json, "\"firmwarePublicKeyHex\"", public_key,
                          sizeof(public_key));
   (void)decode_named_hex(firmware_section, "\"manifestHex\"", manifest,
                          sizeof(manifest));

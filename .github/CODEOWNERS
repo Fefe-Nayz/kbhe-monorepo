@@ -1,0 +1,10 @@
+# Release trust boundary. Enforcement requires the main-branch ruleset to
+# require Code Owner approval.
+/.github/workflows/ @Fefedu973 @nayzflux
+/tools/release/ @Fefedu973 @nayzflux
+/docs/releases.md @Fefedu973 @nayzflux
+/firmware/keys/ @Fefedu973 @nayzflux
+/firmware/Core/Inc/firmware_public_key.h @Fefedu973 @nayzflux
+/apps/configurator/keys/ @Fefedu973 @nayzflux
+/apps/configurator/src-tauri/src/signing.rs @Fefedu973 @nayzflux
+/firmware/tests/release_signing_vectors.json @Fefedu973 @nayzflux

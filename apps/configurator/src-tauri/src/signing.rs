@@ -4,9 +4,13 @@ use sha2::{Digest, Sha512};
 const FIRMWARE_CONTEXT: &[u8; 8] = b"KBHEFW3\0";
 const APP_CONTEXT: &[u8; 8] = b"KBHEAPP2";
 const SIGNATURE_SIZE: usize = 64;
-const RELEASE_PUBLIC_KEY: [u8; 32] = [
-    0x52, 0xF4, 0x0D, 0x13, 0xB9, 0xEF, 0x87, 0x39, 0xE1, 0xB9, 0x90, 0x1F, 0x72, 0x2B, 0x4E, 0x2A,
-    0xFF, 0x58, 0x5F, 0xE6, 0xF6, 0x7C, 0xF1, 0xB6, 0x2A, 0x8D, 0xC3, 0xAE, 0x5B, 0xE7, 0x53, 0xAD,
+const FIRMWARE_RELEASE_PUBLIC_KEY: [u8; 32] = [
+    0x05, 0xEC, 0x98, 0x7D, 0xA8, 0x9D, 0x96, 0x86, 0xE4, 0xB2, 0xE4, 0x87, 0xDD, 0x46, 0xE0, 0xCE,
+    0x49, 0x9D, 0xC8, 0xDC, 0x84, 0xD8, 0x69, 0x83, 0xF5, 0xF4, 0x9A, 0x7B, 0xB3, 0x41, 0x76, 0xC5,
+];
+const APP_RELEASE_PUBLIC_KEY: [u8; 32] = [
+    0x33, 0xE4, 0x14, 0x2E, 0x35, 0xCB, 0xE4, 0xBB, 0x61, 0x9A, 0xC8, 0x3D, 0x2B, 0x63, 0x65, 0xC7,
+    0x02, 0x55, 0x89, 0xEF, 0x0A, 0x89, 0xB3, 0x9C, 0xCD, 0x05, 0xFE, 0xC1, 0xA0, 0x08, 0xF3, 0xDC,
 ];
 
 fn crc32(data: &[u8]) -> u32 {
@@ -68,7 +72,11 @@ fn app_manifest(
     Ok(manifest)
 }
 
-fn verify_manifest(manifest: &[u8], signature_bytes: &[u8]) -> Result<(), String> {
+fn verify_manifest(
+    public_key_bytes: &[u8; 32],
+    manifest: &[u8],
+    signature_bytes: &[u8],
+) -> Result<(), String> {
     if signature_bytes.len() != SIGNATURE_SIZE {
         return Err(format!(
             "release signature has {} bytes; expected {SIGNATURE_SIZE}",
@@ -77,7 +85,7 @@ fn verify_manifest(manifest: &[u8], signature_bytes: &[u8]) -> Result<(), String
     }
     let signature = Signature::from_slice(signature_bytes)
         .map_err(|error| format!("invalid Ed25519 signature: {error}"))?;
-    let public_key = VerifyingKey::from_bytes(&RELEASE_PUBLIC_KEY)
+    let public_key = VerifyingKey::from_bytes(public_key_bytes)
         .map_err(|error| format!("invalid embedded release key: {error}"))?;
     public_key
         .verify_strict(manifest, &signature)
@@ -89,7 +97,11 @@ pub fn verify_firmware_asset(
     version: [u8; 3],
     signature: &[u8],
 ) -> Result<(), String> {
-    verify_manifest(&firmware_manifest(data, version)?, signature)
+    verify_manifest(
+        &FIRMWARE_RELEASE_PUBLIC_KEY,
+        &firmware_manifest(data, version)?,
+        signature,
+    )
 }
 
 pub fn verify_app_asset(
@@ -101,6 +113,7 @@ pub fn verify_app_asset(
     signature: &[u8],
 ) -> Result<(), String> {
     verify_manifest(
+        &APP_RELEASE_PUBLIC_KEY,
         &app_manifest(data, version, platform, arch, role)?,
         signature,
     )
@@ -128,8 +141,12 @@ mod tests {
     fn python_generated_golden_vectors_match_and_verify() {
         let vectors: serde_json::Value = serde_json::from_str(VECTORS).unwrap();
         assert_eq!(
-            decode_hex(vectors["publicKeyHex"].as_str().unwrap()),
-            RELEASE_PUBLIC_KEY
+            decode_hex(vectors["firmwarePublicKeyHex"].as_str().unwrap()),
+            FIRMWARE_RELEASE_PUBLIC_KEY
+        );
+        assert_eq!(
+            decode_hex(vectors["appPublicKeyHex"].as_str().unwrap()),
+            APP_RELEASE_PUBLIC_KEY
         );
 
         let firmware = &vectors["firmware"];

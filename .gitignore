@@ -63,6 +63,12 @@ Desktop.ini
 *.bak
 *.old
 
+# Release private material (public PEM files remain tracked explicitly)
+*.pfx
+*.p12
+*-private.pem
+.release-secrets/
+
 # KiCad local/generated outputs
 **/*-backups/
 **/.history/

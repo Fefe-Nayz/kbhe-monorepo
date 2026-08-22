@@ -115,7 +115,7 @@ jobs:
       group: firmware-release-${{ github.ref }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    environment: release
+    environment: firmware-release
     permissions:
       contents: write
 
@@ -138,10 +138,10 @@ jobs:
 
       - name: Sign firmware and factory-programming artifacts
         env:
-          SIGNING_KEY_B64: ${{ secrets.KBHE_RELEASE_SIGNING_KEY_B64 }}
+          SIGNING_KEY_B64: ${{ secrets.KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64 }}
         run: |
           if [ -z "$SIGNING_KEY_B64" ]; then
-            echo "Missing required KBHE_RELEASE_SIGNING_KEY_B64 repository secret" >&2
+            echo "Missing required KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64 environment secret" >&2
             exit 1
           fi
           umask 077

@@ -1,0 +1,261 @@
+name: Release Signing Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Release trust boundary to validate
+        required: true
+        default: both
+        type: choice
+        options:
+          - app
+          - firmware
+          - both
+
+permissions:
+  contents: read
+
+jobs:
+  firmware_key:
+    name: Validate firmware Ed25519 key
+    if: inputs.target == 'firmware' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    environment: firmware-release
+
+    steps:
+      - name: Checkout only signing tooling and public key
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          sparse-checkout: |
+            tools/release
+            firmware/keys
+          sparse-checkout-cone-mode: false
+
+      - name: Validate firmware key pair and round trip
+        env:
+          SIGNING_KEY_B64: ${{ secrets.KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64 }}
+        run: |
+          if [ -z "$SIGNING_KEY_B64" ]; then
+            echo "firmware-release is missing KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64" >&2
+            exit 1
+          fi
+          umask 077
+          key_path="$RUNNER_TEMP/kbhe-firmware-ed25519-private.pem"
+          derived_path="$RUNNER_TEMP/kbhe-firmware-ed25519-public.der"
+          committed_path="$RUNNER_TEMP/kbhe-firmware-ed25519-committed.der"
+          fixture_path="$RUNNER_TEMP/kbhe-firmware-signing-preflight.bin"
+          signature_path="$fixture_path.sig"
+          cleanup() {
+            rm -f "$key_path" "$derived_path" "$committed_path" \
+              "$fixture_path" "$signature_path"
+          }
+          trap cleanup EXIT
+          printf '%s' "$SIGNING_KEY_B64" | base64 --decode > "$key_path"
+          unset SIGNING_KEY_B64
+          openssl pkey -in "$key_path" -check -noout
+          openssl pkey -in "$key_path" -pubout -outform DER -out "$derived_path"
+          openssl pkey -pubin \
+            -in firmware/keys/firmware-ed25519-public.pem \
+            -outform DER -out "$committed_path"
+          cmp "$derived_path" "$committed_path"
+          printf 'KBHE firmware release signing preflight\n' > "$fixture_path"
+          python tools/release/sign_release_asset.py artifact \
+            --key "$key_path" \
+            --input "$fixture_path" \
+            --output "$signature_path" \
+            --version 0.0.1 \
+            --target kbhe-signing-preflight \
+            --role kbhe-firmware-signing-preflight.bin \
+            --verify-public firmware/keys/firmware-ed25519-public.pem
+          test "$(stat -c '%s' "$signature_path")" -eq 64
+
+  app_key:
+    name: Validate app Ed25519 key
+    if: inputs.target == 'app' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    environment: app-publish
+
+    steps:
+      - name: Checkout only signing tooling and public key
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          sparse-checkout: |
+            tools/release
+            apps/configurator/keys
+          sparse-checkout-cone-mode: false
+
+      - name: Validate app key pair and round trip
+        env:
+          SIGNING_KEY_B64: ${{ secrets.KBHE_APP_RELEASE_SIGNING_KEY_B64 }}
+        run: |
+          if [ -z "$SIGNING_KEY_B64" ]; then
+            echo "app-publish is missing KBHE_APP_RELEASE_SIGNING_KEY_B64" >&2
+            exit 1
+          fi
+          umask 077
+          key_path="$RUNNER_TEMP/kbhe-app-ed25519-private.pem"
+          derived_path="$RUNNER_TEMP/kbhe-app-ed25519-public.der"
+          committed_path="$RUNNER_TEMP/kbhe-app-ed25519-committed.der"
+          fixture_path="$RUNNER_TEMP/kbhe-app-signing-preflight.exe"
+          signature_path="$fixture_path.sig"
+          cleanup() {
+            rm -f "$key_path" "$derived_path" "$committed_path" \
+              "$fixture_path" "$signature_path"
+          }
+          trap cleanup EXIT
+          printf '%s' "$SIGNING_KEY_B64" | base64 --decode > "$key_path"
+          unset SIGNING_KEY_B64
+          openssl pkey -in "$key_path" -check -noout
+          openssl pkey -in "$key_path" -pubout -outform DER -out "$derived_path"
+          openssl pkey -pubin \
+            -in apps/configurator/keys/app-ed25519-public.pem \
+            -outform DER -out "$committed_path"
+          cmp "$derived_path" "$committed_path"
+          printf 'KBHE app release signing preflight\n' > "$fixture_path"
+          python tools/release/sign_release_asset.py app \
+            --key "$key_path" \
+            --input "$fixture_path" \
+            --output "$signature_path" \
+            --version 0.0.1 \
+            --platform windows \
+            --arch x86_64 \
+            --role kbhe-app-signing-preflight.exe \
+            --verify-public apps/configurator/keys/app-ed25519-public.pem
+          test "$(stat -c '%s' "$signature_path")" -eq 64
+
+  app_codesign:
+    name: Validate Windows Authenticode key
+    if: inputs.target == 'app' || inputs.target == 'both'
+    runs-on: windows-latest
+    environment: app-codesign
+
+    steps:
+      - name: Checkout committed Authenticode public certificate
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          sparse-checkout: |
+            apps/configurator/keys/kbhe-community-authenticode.pem
+          sparse-checkout-cone-mode: false
+
+      - name: Import, sign, timestamp, and verify a disposable executable
+        shell: pwsh
+        env:
+          CODESIGN_PFX_B64: ${{ secrets.KBHE_WINDOWS_CODESIGN_PFX_B64 }}
+          CODESIGN_PASSWORD: ${{ secrets.KBHE_WINDOWS_CODESIGN_PASSWORD }}
+          CODESIGN_MODE: ${{ vars.KBHE_WINDOWS_CODESIGN_MODE }}
+          EXPECTED_CODESIGN_THUMBPRINT: ${{ vars.KBHE_WINDOWS_CODESIGN_CERT_THUMBPRINT }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "kbhe-codesign-preflight.pfx"
+          $cerPath = Join-Path $env:RUNNER_TEMP "kbhe-codesign-preflight.cer"
+          $executablePath = Join-Path $env:RUNNER_TEMP "kbhe-codesign-preflight.exe"
+          $committedCertificatePath = "apps/configurator/keys/kbhe-community-authenticode.pem"
+          $actual = $null
+          $expected = ($env:EXPECTED_CODESIGN_THUMBPRINT -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
+          $securePassword = $null
+          try {
+            if ([string]::IsNullOrWhiteSpace($env:CODESIGN_PFX_B64) -or
+                [string]::IsNullOrWhiteSpace($env:CODESIGN_PASSWORD)) {
+              throw "app-codesign is missing the required Authenticode PFX secrets"
+            }
+            if ($env:CODESIGN_MODE -notin @("public-ca", "self-signed-bootstrap")) {
+              throw "KBHE_WINDOWS_CODESIGN_MODE must be public-ca or self-signed-bootstrap"
+            }
+            if ($expected -notmatch '^[0-9A-F]{40}$') {
+              throw "KBHE_WINDOWS_CODESIGN_CERT_THUMBPRINT must contain exactly 40 hexadecimal digits"
+            }
+
+            [IO.File]::WriteAllBytes(
+              $pfxPath,
+              [Convert]::FromBase64String($env:CODESIGN_PFX_B64)
+            )
+            $securePassword = ConvertTo-SecureString $env:CODESIGN_PASSWORD -AsPlainText -Force
+            $imported = @(
+              Import-PfxCertificate -FilePath $pfxPath `
+                -CertStoreLocation Cert:\CurrentUser\My `
+                -Password $securePassword
+            )
+            $candidates = @(
+              $imported | Where-Object {
+                $_.HasPrivateKey -and
+                @($_.EnhancedKeyUsageList | Where-Object {
+                  $_.ObjectId.Value -eq "1.3.6.1.5.5.7.3.3"
+                }).Count -gt 0
+              }
+            )
+            if ($candidates.Count -ne 1) {
+              throw "PFX must contain exactly one private-key code-signing certificate"
+            }
+            $certificate = $candidates[0]
+            $actual = ($certificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+            if ($actual -ne $expected) {
+              throw "PFX certificate thumbprint does not match the protected environment variable"
+            }
+            $committedCertificate = `
+              [Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPemFile(
+                $committedCertificatePath
+              )
+            if ((($committedCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()) -ne $expected -or
+                [Convert]::ToBase64String($committedCertificate.RawData) -ne
+                  [Convert]::ToBase64String($certificate.RawData)) {
+              throw "PFX certificate does not match the committed Authenticode certificate"
+            }
+            if ($certificate.NotBefore -gt (Get-Date) -or $certificate.NotAfter -le (Get-Date)) {
+              throw "Authenticode certificate is not currently valid"
+            }
+            $basicConstraints = $certificate.Extensions |
+              Where-Object { $_.Oid.Value -eq "2.5.29.19" } |
+              Select-Object -First 1
+            if ($null -ne $basicConstraints -and $basicConstraints.CertificateAuthority) {
+              throw "The Authenticode leaf certificate must not be a CA"
+            }
+
+            Export-Certificate -Cert $certificate -FilePath $cerPath -Type CERT | Out-Null
+            if ($env:CODESIGN_MODE -eq "self-signed-bootstrap") {
+              if ($certificate.Subject -ne $certificate.Issuer) {
+                throw "self-signed-bootstrap mode requires a self-issued certificate"
+              }
+              Import-Certificate -FilePath $cerPath `
+                -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+              Write-Output "::warning::Self-signed bootstrap Authenticode does not establish a publicly trusted Windows publisher."
+            } elseif ($certificate.Subject -eq $certificate.Issuer) {
+              throw "public-ca mode refuses a self-issued Authenticode certificate"
+            }
+
+            $source = 'public static class Program { public static void Main() { } }'
+            Add-Type -TypeDefinition $source `
+              -OutputAssembly $executablePath -OutputType ConsoleApplication
+
+            $signtool = @(
+              Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -File |
+                Sort-Object FullName -Descending
+            ) | Select-Object -First 1
+            if ($null -eq $signtool) {
+              throw "Windows SDK signtool.exe was not found"
+            }
+            & $signtool.FullName sign /sha1 $expected /fd SHA256 `
+              /tr https://timestamp.digicert.com /td SHA256 /v $executablePath
+            if ($LASTEXITCODE -ne 0) {
+              throw "Disposable Authenticode signing failed"
+            }
+            & $signtool.FullName verify /pa /tw /v $executablePath
+            if ($LASTEXITCODE -ne 0) {
+              throw "Disposable Authenticode verification failed"
+            }
+            $signature = Get-AuthenticodeSignature -FilePath $executablePath
+            $signer = ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
+            if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+                $signer -ne $expected -or $null -eq $signature.TimeStamperCertificate) {
+              throw "Disposable signer, trust, or RFC3161 timestamp validation failed"
+            }
+          } finally {
+            Remove-Item Env:CODESIGN_PFX_B64 -ErrorAction SilentlyContinue
+            Remove-Item Env:CODESIGN_PASSWORD -ErrorAction SilentlyContinue
+            if ($actual -match '^[0-9A-F]{40}$') {
+              Remove-Item "Cert:\CurrentUser\My\$actual" -Force -ErrorAction SilentlyContinue
+              Remove-Item "Cert:\CurrentUser\Root\$actual" -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item -LiteralPath $pfxPath, $cerPath, $executablePath `
+              -Force -ErrorAction SilentlyContinue
+            $securePassword = $null
+          }

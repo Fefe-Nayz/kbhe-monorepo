@@ -1472,7 +1472,7 @@ export default function Lighting() {
     staleTime: 1_000,
     refetchInterval: 3_000,
   });
-  const bridgeDevices = bridgeDevicesQ.data ?? [];
+  const bridgeDevices = useMemo(() => bridgeDevicesQ.data ?? [], [bridgeDevicesQ.data]);
   const bridgeSelection = useMemo(() => {
     try {
       return {

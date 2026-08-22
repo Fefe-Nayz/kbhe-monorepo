@@ -36,7 +36,12 @@ from sign_release_asset import (
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 VECTORS_PATH = ROOT / "firmware" / "tests" / "release_signing_vectors.json"
-PUBLIC_KEY_PATH = ROOT / "firmware" / "keys" / "firmware-ed25519-public.pem"
+FIRMWARE_PUBLIC_KEY_PATH = (
+    ROOT / "firmware" / "keys" / "firmware-ed25519-public.pem"
+)
+APP_PUBLIC_KEY_PATH = (
+    ROOT / "apps" / "configurator" / "keys" / "app-ed25519-public.pem"
+)
 
 
 class ReleaseSigningVectorsTest(unittest.TestCase):
@@ -44,23 +49,30 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.vectors = json.loads(VECTORS_PATH.read_text(encoding="utf-8"))
 
-    def test_public_key_matches_pem(self) -> None:
-        result = subprocess.run(
-            [
-                "openssl",
-                "pkey",
-                "-pubin",
-                "-in",
-                str(PUBLIC_KEY_PATH),
-                "-outform",
-                "DER",
-            ],
-            capture_output=True,
-            check=True,
-        )
-        # Ed25519 SubjectPublicKeyInfo ends with the exact 32-byte raw key.
-        self.assertGreaterEqual(len(result.stdout), 32)
-        self.assertEqual(result.stdout[-32:].hex(), self.vectors["publicKeyHex"])
+    def test_public_keys_match_pems(self) -> None:
+        for public_key_path, vector_name in (
+            (FIRMWARE_PUBLIC_KEY_PATH, "firmwarePublicKeyHex"),
+            (APP_PUBLIC_KEY_PATH, "appPublicKeyHex"),
+        ):
+            with self.subTest(public_key_path=public_key_path):
+                result = subprocess.run(
+                    [
+                        "openssl",
+                        "pkey",
+                        "-pubin",
+                        "-in",
+                        str(public_key_path),
+                        "-outform",
+                        "DER",
+                    ],
+                    capture_output=True,
+                    check=True,
+                )
+                # Ed25519 SPKI ends with the exact 32-byte raw key.
+                self.assertGreaterEqual(len(result.stdout), 32)
+                self.assertEqual(
+                    result.stdout[-32:].hex(), self.vectors[vector_name]
+                )
 
     def test_python_manifests_and_signatures_match_golden(self) -> None:
         firmware = self.vectors["firmware"]
@@ -79,10 +91,12 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
             directory = pathlib.Path(raw_dir)
             firmware_signature = directory / "firmware.sig"
             firmware_signature.write_bytes(bytes.fromhex(firmware["signatureHex"]))
-            openssl_verify(PUBLIC_KEY_PATH, firmware_bytes, firmware_signature)
+            openssl_verify(
+                FIRMWARE_PUBLIC_KEY_PATH, firmware_bytes, firmware_signature
+            )
             app_signature = directory / "app.sig"
             app_signature.write_bytes(bytes.fromhex(app["signatureHex"]))
-            openssl_verify(PUBLIC_KEY_PATH, app_bytes, app_signature)
+            openssl_verify(APP_PUBLIC_KEY_PATH, app_bytes, app_signature)
 
             artifact = self.vectors["artifact"]
             artifact_data = bytes.fromhex(artifact["dataHex"])
@@ -95,7 +109,9 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
             self.assertEqual(artifact_bytes.hex(), artifact["manifestHex"])
             artifact_signature = directory / "artifact.sig"
             artifact_signature.write_bytes(bytes.fromhex(artifact["signatureHex"]))
-            openssl_verify(PUBLIC_KEY_PATH, artifact_bytes, artifact_signature)
+            openssl_verify(
+                FIRMWARE_PUBLIC_KEY_PATH, artifact_bytes, artifact_signature
+            )
             self.assertNotEqual(
                 artifact_bytes,
                 artifact_manifest(

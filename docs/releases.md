@@ -14,51 +14,131 @@ bootable.
 
 ## One-time release signing setup
 
-Both tag workflows require a repository Actions secret named
-`KBHE_RELEASE_SIGNING_KEY_B64`. Its value is the base64 encoding of the Ed25519
-private PEM matching [`firmware/keys/firmware-ed25519-public.pem`](../firmware/keys/firmware-ed25519-public.pem).
-The private key must stay outside the repository and must never be committed.
+App and firmware releases deliberately use different Ed25519 keys. A compromise
+of the JavaScript/Windows build boundary must not grant the ability to sign a
+firmware image accepted by the bootloader.
 
-For example, an administrator can encode an existing private PEM locally with:
+- `KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64` matches
+  [`firmware/keys/firmware-ed25519-public.pem`](../firmware/keys/firmware-ed25519-public.pem).
+- `KBHE_APP_RELEASE_SIGNING_KEY_B64` matches
+  [`apps/configurator/keys/app-ed25519-public.pem`](../apps/configurator/keys/app-ed25519-public.pem).
+
+Generate the two private keys independently on a trusted machine. Keep at least
+two encrypted offline backups of the firmware key: the bootloader trust root
+cannot be replaced by a normal USB application update.
+
+```powershell
+openssl genpkey -algorithm ED25519 -out C:\secure\firmware-ed25519-private.pem
+openssl pkey -in C:\secure\firmware-ed25519-private.pem `
+  -pubout -out firmware\keys\firmware-ed25519-public.pem
+openssl genpkey -algorithm ED25519 -out C:\secure\app-ed25519-private.pem
+openssl pkey -in C:\secure\app-ed25519-private.pem `
+  -pubout -out apps\configurator\keys\app-ed25519-public.pem
+```
+
+The private PEM files are ignored by the repository and must never be copied
+under a different unignored name. Encode and upload them through stdin so their
+contents do not appear in a command line or terminal history:
 
 ```powershell
 [Convert]::ToBase64String(
-  [System.IO.File]::ReadAllBytes("C:\secure\firmware-ed25519.pem")
-)
+  [IO.File]::ReadAllBytes("C:\secure\firmware-ed25519-private.pem")
+) | gh secret set KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64 `
+  --env firmware-release --repo Fefe-Nayz/kbhe-monorepo
+
+[Convert]::ToBase64String(
+  [IO.File]::ReadAllBytes("C:\secure\app-ed25519-private.pem")
+) | gh secret set KBHE_APP_RELEASE_SIGNING_KEY_B64 `
+  --env app-publish --repo Fefe-Nayz/kbhe-monorepo
 ```
 
-Store the resulting single line as the repository secret. Tag release jobs
-fail closed when the secret is absent, malformed, or does not match the
-committed public key. Normal pull-request and `main` builds do not receive or
-require the secret.
+### Protected GitHub environments
 
-Windows app releases additionally require
-`KBHE_WINDOWS_CODESIGN_PFX_B64` and `KBHE_WINDOWS_CODESIGN_PASSWORD` in the
-protected `release` environment. The workflow Authenticode-signs and RFC3161
-timestamps every EXE/MSI, verifies it with Windows policy, replaces the draft
-asset, and only then creates the detached Ed25519 signature. Authenticode is
-the OS/SmartScreen trust layer; the Ed25519 manifest independently binds the
-GitHub release version, platform, architecture, filename and bytes.
+The release boundary is split across three GitHub Actions environments:
 
-Create a GitHub Actions environment named `release`, move the secret to that
-environment, and configure required reviewers plus protected `app-v*` and
-`firmware-v*` tag rules. Both release jobs target this environment and reject
-tags whose commit is not reachable from `main`. The decoded key is removed from
-the step environment immediately after the temporary PEM is created. For
-production-scale signing, replace the long-lived PEM secret with a KMS/HSM
-operation reached through short-lived OIDC credentials; workflow protections
-reduce exposure but do not turn a repository secret into hardware-backed key
-custody.
+| Environment | Allowed tag | Secrets | Environment variables |
+|---|---|---|---|
+| `firmware-release` | `firmware-v*` | `KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64` | none |
+| `app-codesign` | `app-v*` | `KBHE_WINDOWS_CODESIGN_PFX_B64`, `KBHE_WINDOWS_CODESIGN_PASSWORD` | `KBHE_WINDOWS_CODESIGN_MODE`, `KBHE_WINDOWS_CODESIGN_CERT_THUMBPRINT` |
+| `app-publish` | `app-v*` | `KBHE_APP_RELEASE_SIGNING_KEY_B64` | the same mode and thumbprint values |
+
+Configure required reviewers, prevent self-review, restrict each environment to
+the listed tag pattern, and disable administrator bypass. A protected job does
+not receive its environment secrets before another reviewer approves it.
+Normal pull-request and `main` jobs never receive release secrets.
+
+The app workflow intentionally runs on two different Windows runners. The
+`app-codesign` runner is the only runner that receives the PFX; it builds and
+Authenticode-signs Tauri, verifies every executable and uploads a one-day
+private Actions artifact. A fresh `app-publish` runner does **not** run Bun,
+npm, frontend code, or the Tauri build. It re-verifies the transferred hashes,
+certificate, signer and timestamp, then receives the app Ed25519 key, creates a
+draft GitHub Release, re-downloads every asset, verifies it again, and only then
+makes the draft public. The firmware key is never available to either app job.
+
+### Windows Authenticode bootstrap
+
+`app-codesign` also requires a code-signing PFX. The public half is committed as
+[`kbhe-community-authenticode.pem`](../apps/configurator/keys/kbhe-community-authenticode.pem).
+The workflow requires the PFX certificate, the committed PEM and the protected
+thumbprint variable to be byte-for-byte/thumbprint consistent. It also requires
+the code-signing EKU, current validity, SHA-256 signing, an RFC3161 timestamp,
+Windows Authenticode validation, and the exact expected signer.
+
+The current `self-signed-bootstrap` mode is free and keeps the pipeline fail
+closed, but it is **not a publicly trusted publisher identity**. Microsoft
+documents that a self-signed certificate has the same SmartScreen warning
+behavior as an unsigned download. Users can therefore still see “Unknown
+publisher”; the detached KBHE Ed25519 signature is the actual application
+update trust layer. Never describe the bootstrap certificate as eliminating
+SmartScreen warnings. Switch `KBHE_WINDOWS_CODESIGN_MODE` to `public-ca` only
+after replacing the PFX, committed certificate and thumbprint with a real
+publicly trusted signing identity. See [Microsoft's SmartScreen guidance](https://learn.microsoft.com/windows/apps/package-and-deploy/smartscreen-reputation).
+
+### Mandatory signing preflight
+
+Before any tag is created, dispatch **Release Signing Preflight** with target
+`app`, `firmware`, or `both`. It derives each Ed25519 public key from its
+protected private key and compares it with the committed PEM, performs a real
+sign/verify round trip, and signs/timestamps/verifies a disposable Windows
+executable with the protected PFX. The workflow writes no release and has only
+`contents: read` permission.
 
 ## CI vs CD Behavior
 
-Both workflows split validation from publication:
+The workflows split validation, code signing and publication:
 
 - **Push to `main` / pull request**: CI runs (frontend tests/lint/build, `cargo check --locked` and `cargo test --locked` for the configurator; all native tests plus both ARM builds for firmware). **No release is created.**
-- **Push of a `app-v*` or `firmware-v*` tag**: CI runs **and** the release job builds the artifacts and publishes them to GitHub Releases.
+- **Protected signing preflight**: validates all selected key pairs and the
+  Authenticode timestamp path without publishing anything.
+- **Push of an `app-v*` or `firmware-v*` tag**: CI runs **and** the protected
+  release jobs build, authenticate and publish the artifacts.
 
 This means a green CI run on `main` does **not** mean a release exists — the
 release only appears after the matching tag is pushed.
+
+## Canonical release automation
+
+Run the release helper from a clean, up-to-date `main`. Preparation and
+publication are separate on purpose:
+
+```powershell
+# Bump, refresh locks, run every documented test/build, whitelist-stage,
+# commit and push main, then wait for the matching main CI run.
+.\tools\release\run-release.ps1 -Phase prepare -Target both -BumpPart patch
+
+# Re-check exact origin/main, wait for main CI, dispatch/wait for protected
+# signing preflight, then atomically push the annotated app+firmware tags.
+.\tools\release\run-release.ps1 -Phase publish -Target both -BumpPart patch
+```
+
+`-Phase all` performs both phases in one invocation but still stops for the CI
+and environment approval gates. `-Yes` skips local confirmations; it cannot and
+must not bypass GitHub environment reviewers. The helper refuses a dirty tree,
+a branch other than `main`, a local/remote mismatch, unexpected generated
+changes, an existing tag/release, red CI, or a failed signing preflight. It
+stages only the documented version and lock files and uses an atomic multi-tag
+push for a combined release.
 
 ## Publishing the Configurator (app)
 
@@ -98,6 +178,7 @@ Run from the repo root.
 
    ```powershell
    cd apps/configurator
+   bun test
    bun run lint
    bun run build
    cd src-tauri
@@ -105,14 +186,14 @@ Run from the repo root.
    cargo test --locked
    ```
 
-   All commands must succeed. The two locked Cargo commands are the exact
-   backend validation performed by CI with Rust 1.88.0.
+   All commands must succeed. These are the exact frontend/backend validations
+   performed by CI with Bun 1.4.0 and Rust 1.88.0.
 
 5. **Stage and commit every changed file**:
 
    ```powershell
    git add apps/configurator/package.json `
-           apps/configurator/bun.lockb `
+           apps/configurator/bun.lock `
            apps/configurator/src-tauri/Cargo.toml `
            apps/configurator/src-tauri/Cargo.lock `
            apps/configurator/src-tauri/tauri.conf.json
@@ -123,21 +204,26 @@ Run from the repo root.
 6. **Wait for the `Configurator CI` workflow on `main` to go green** before
    tagging. If main is red, the tag run will publish a broken installer.
 
-7. **Tag and push** (this is what triggers the release build):
+7. **Run the protected `Release Signing Preflight` workflow** for target
+   `app` and wait for the `app-codesign` and `app-publish` reviewers/jobs. Do
+   not create a tag if either key pair, certificate, timestamp or verification
+   check fails.
+
+8. **Tag and push** (this is what triggers the release build):
 
    ```powershell
    git tag app-vX.Y.Z
    git push origin app-vX.Y.Z
    ```
 
-8. **Watch the tag run** in GitHub Actions. It publishes each installer and a
-   matching `.sig`. The configurator ignores unsigned releases and verifies the
-   signature again immediately before launching the installer. Publication is
-   atomic from the user's perspective: Tauri first uploads to a draft release,
-   signatures are generated and uploaded, then CI downloads the exact remote
-   assets, compares their SHA-256 digests and re-verifies Ed25519 over the
-   downloaded installers. Any missing, duplicate or unexpected draft asset
-   blocks publication.
+9. **Watch both protected tag jobs** in GitHub Actions. The first runner builds,
+   signs and timestamps Tauri with only the Authenticode PFX, then transfers a
+   hash manifest, the public certificate and installers as a short-lived private
+   Actions artifact. A fresh runner re-verifies Authenticode and exact hashes,
+   then obtains only the app Ed25519 key. It creates detached `.sig` siblings in
+   a draft release, downloads the exact remote assets, compares SHA-256 digests,
+   re-verifies Authenticode and Ed25519, and finally publishes. Any missing,
+   duplicate, untrusted, untimestamped or unexpected asset blocks publication.
 
 Installer signatures use the `KBHEAPP2` domain and bind the normalized app
 version, OS, CPU architecture, exact asset filename, byte length and SHA-512
@@ -147,9 +233,9 @@ rollback through a relabelled GitHub release.
 
 ### Re-running the installer build
 
-The publish step is gated on `if: startsWith(github.ref, 'refs/tags/app-v')`,
-and `tauri-action` rejects publishing if a release for the same tag already
-exists. To rebuild after a failure, **bump the patch version and tag again**
+The publish jobs are gated on `if: startsWith(github.ref, 'refs/tags/app-v')`
+and refuse to replace a release for the same tag. To rebuild after a failure,
+**bump the patch version and tag again**
 (`0.1.1` → `0.1.2`) — this is the normal release flow and avoids dangling
 releases.
 
@@ -208,7 +294,11 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
 3. **Wait for the `Firmware CI` workflow on `main` to go green** before
    tagging.
 
-4. **Tag and push** (use semver `X.Y.Z` matching the source constants from
+4. **Run the protected `Release Signing Preflight` workflow** for target
+   `firmware`, approve the `firmware-release` environment job, and require a
+   successful private/public key derivation plus signing round trip.
+
+5. **Tag and push** (use semver `X.Y.Z` matching the source constants from
    step 1):
 
    ```powershell
@@ -216,7 +306,7 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
    git push origin firmware-vX.Y.Z
    ```
 
-5. The release appears at
+6. The release appears at
    `https://github.com/<owner>/<repo>/releases/tag/firmware-vX.Y.Z` with
    `kbhe-app.bin` plus `kbhe-app.bin.sig`. The signature binds the exact image
    length, CRC32, SHA-512 digest and firmware version from the tag. Every other
@@ -289,8 +379,10 @@ installer built without them will check the default repository.
 |---|---|---|
 | `cargo check --locked` fails on CI with "lock file needs to be updated" | `Cargo.toml` was modified without regenerating `Cargo.lock` | Run `cargo check` in `apps/configurator/src-tauri/`, commit the updated `Cargo.lock` |
 | Tag pushed but the release job didn't run | The tag does not match the exact `app-v*` / `firmware-v*` prefix or the workflow is disabled | Check the tag spelling and the Actions run list; `workflow_dispatch` can be used for diagnostics but does not bypass release guards |
-| In-app "Application is up to date" despite a new release | `KBHE_RELEASE_OWNER`/`KBHE_RELEASE_REPO` defaults point at the wrong repo, or the asset extension is not `.exe`/`.msi` on Windows | Check the compiled-in defaults in `releases.rs`, and confirm `tauri-action` published the expected installer |
+| In-app "Application is up to date" despite a new release | `KBHE_RELEASE_OWNER`/`KBHE_RELEASE_REPO` defaults point at the wrong repo, or the asset extension is not `.exe`/`.msi` on Windows | Check the compiled-in defaults in `releases.rs`, and confirm the authenticated publish job uploaded the expected installer |
 | In-app firmware update always shown as available | The keyboard reports a version that doesn't match the published tag (e.g. flashed firmware was built before the constants were bumped) | Re-flash the keyboard with a build whose `FIRMWARE_VERSION_*` constants match the tag you published, or bump source + tag together |
 | Updater protocol mismatch error after flashing | The bootloader on the keyboard is older than the configurator's `UPDATER_PROTOCOL_VERSION` | Verify and flash the matching `kbhe-factory.bin` at `0x08000000` with ST-Link/STM32CubeProgrammer; this updates bootloader, app and signed trailer together |
-| Tag release fails at the signing step | `KBHE_RELEASE_SIGNING_KEY_B64` is absent, malformed, or belongs to another public key | Configure the repository secret from the release private PEM; do not weaken or remove the signature checks |
+| Firmware signing fails | `KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64` is absent, malformed, or does not match the committed firmware public key | Correct the `firmware-release` environment secret and rerun signing preflight; never weaken the verifier |
+| App detached signing fails | `KBHE_APP_RELEASE_SIGNING_KEY_B64` is absent, malformed, or does not match the committed app public key | Correct the `app-publish` environment secret and rerun signing preflight |
+| Authenticode signing or verification fails | PFX/password, mode, expected thumbprint and committed public certificate disagree; the certificate lacks code-signing EKU/validity; or RFC3161 timestamping failed | Correct `app-codesign` and mirror its mode/thumbprint variables in `app-publish`, then require a green signing preflight before creating another version tag |
 | A release is not offered by the configurator | The expected binary/installer has no exact sibling `<asset>.sig` or the signature metadata is not 64 bytes | Re-run a correctly configured tag release and confirm that both assets were uploaded |
