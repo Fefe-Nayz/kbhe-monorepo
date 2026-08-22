@@ -326,11 +326,12 @@ jobs:
               throw "Authenticode verification failed for $($signedFile.FullName)"
             }
             $signature = Get-AuthenticodeSignature -FilePath $signedFile.FullName
-            $actual = if ($null -eq $signature.SignerCertificate) {
-              ""
-            } else {
-              ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-            }
+            $embeddedSigner = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+              [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile(
+                $signedFile.FullName
+              )
+            )
+            $actual = ($embeddedSigner.Thumbprint -replace '\s', '').ToUpperInvariant()
             $invalidPowerShellStatus = if ($env:KBHE_CODESIGN_MODE -eq "public-ca") {
               $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid
             } else {
@@ -551,11 +552,12 @@ jobs:
               throw "Authenticode verification failed for $($asset.Name)"
             }
             $signature = Get-AuthenticodeSignature -FilePath $asset.FullName
-            $actual = if ($null -eq $signature.SignerCertificate) {
-              ""
-            } else {
-              ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-            }
+            $embeddedSigner = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+              [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile(
+                $asset.FullName
+              )
+            )
+            $actual = ($embeddedSigner.Thumbprint -replace '\s', '').ToUpperInvariant()
             $invalidPowerShellStatus = if ($manifest.codesignMode -eq "public-ca") {
               $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid
             } else {
@@ -709,11 +711,12 @@ jobs:
                 throw "Downloaded Authenticode verification failed for $($record.name)"
               }
               $authenticode = Get-AuthenticodeSignature -FilePath $downloadedInstaller
-              $actual = if ($null -eq $authenticode.SignerCertificate) {
-                ""
-              } else {
-                ($authenticode.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-              }
+              $embeddedSigner = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile(
+                  $downloadedInstaller
+                )
+              )
+              $actual = ($embeddedSigner.Thumbprint -replace '\s', '').ToUpperInvariant()
               $invalidPowerShellStatus = if ($manifest.codesignMode -eq "public-ca") {
                 $authenticode.Status -ne [System.Management.Automation.SignatureStatus]::Valid
               } else {

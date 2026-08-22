@@ -310,11 +310,12 @@ jobs:
           }
           $signature = Get-AuthenticodeSignature `
             -FilePath $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
-          $signer = if ($null -eq $signature.SignerCertificate) {
-            ""
-          } else {
-            ($signature.SignerCertificate.Thumbprint -replace '\s', '').ToUpperInvariant()
-          }
+          $embeddedSigner = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile(
+              $env:KBHE_PREFLIGHT_EXECUTABLE_PATH
+            )
+          )
+          $signer = ($embeddedSigner.Thumbprint -replace '\s', '').ToUpperInvariant()
           $invalidPowerShellStatus = if ($env:KBHE_PREFLIGHT_MODE -eq "public-ca") {
             $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid
           } else {
