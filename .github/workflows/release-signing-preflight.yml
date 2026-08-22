@@ -127,7 +127,7 @@ jobs:
   app_codesign:
     name: Validate Windows Authenticode key
     if: inputs.target == 'app' || inputs.target == 'both'
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 15
     environment: app-codesign
 

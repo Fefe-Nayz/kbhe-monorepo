@@ -39,7 +39,7 @@ permissions:
 jobs:
   build:
     name: Build configurator
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     env:
       KBHE_RELEASE_OWNER: ${{ github.repository_owner }}
@@ -90,7 +90,7 @@ jobs:
     concurrency:
       group: configurator-codesign-${{ github.ref }}
       cancel-in-progress: false
-    runs-on: windows-latest
+    runs-on: windows-2022
     environment: app-codesign
     permissions:
       contents: read
@@ -395,7 +395,7 @@ jobs:
     concurrency:
       group: configurator-publish-${{ github.ref }}
       cancel-in-progress: false
-    runs-on: windows-latest
+    runs-on: windows-2022
     environment: app-publish
     permissions:
       contents: write
