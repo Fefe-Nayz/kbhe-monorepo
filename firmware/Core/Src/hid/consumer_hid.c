@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include "hid/consumer_hid.h"
 
 #include "tusb.h"
