@@ -460,22 +460,32 @@ static void test_macro_call_graph_enforces_runtime_instance_depth(void) {
 
   assert(action_engine_reset_profile(0u));
   assert(action_engine_get_profile(0u, &profile));
-  for (uint8_t program = 0u; program < ACTION_PROGRAM_COUNT - 1u;
+  for (uint8_t program = 0u; program < ACTION_ENGINE_MAX_INSTANCES - 1u;
        program++) {
     profile.programs[program] = macro_call_program((uint8_t)(program + 1u));
   }
-  /* An acyclic graph of 16 slots can require at most 16 simultaneous
-   * instances. The pool deliberately matches that exact upper bound. */
+  /* Four nested calls exactly fill the runtime pool. */
   assert(action_engine_validate_profile(&profile) == ACTION_VALIDATE_OK);
 
   assert(action_engine_reset_profile(0u));
-  for (uint8_t program = 0u; program < ACTION_PROGRAM_COUNT - 1u;
+  for (uint8_t program = 0u; program < ACTION_ENGINE_MAX_INSTANCES - 1u;
        program++) {
     assert(action_engine_set_program(0u, program, &profile.programs[program],
                                      false));
   }
 
-  /* Fan-out does not consume extra nesting depth when each branch is short. */
+  /* A fifth synchronous nesting level cannot be deferred without changing
+   * parent/child lifetime semantics, so both whole-profile and incremental
+   * validation reject it. */
+  profile.programs[ACTION_ENGINE_MAX_INSTANCES - 1u] =
+      macro_call_program(ACTION_ENGINE_MAX_INSTANCES);
+  assert(action_engine_validate_profile(&profile) ==
+         ACTION_VALIDATE_MACRO_DEPTH);
+  assert(!action_engine_set_program(
+      0u, ACTION_ENGINE_MAX_INSTANCES - 1u,
+      &profile.programs[ACTION_ENGINE_MAX_INSTANCES - 1u], false));
+
+  /* Shared fan-out is acyclic and consumes only the longest branch depth. */
   assert(action_engine_reset_profile(0u));
   assert(action_engine_get_profile(0u, &profile));
   profile.programs[0].step_count = 3u;
@@ -489,43 +499,94 @@ static void test_macro_call_graph_enforces_runtime_instance_depth(void) {
   assert(action_engine_validate_profile(&profile) == ACTION_VALIDATE_OK);
 }
 
-static void test_all_program_slots_can_run_concurrently(void) {
+static action_program_t delayed_key_program(uint16_t keycode) {
+  action_program_t program = empty_program();
+  program.step_count = 3u;
+  program.steps[0].opcode = ACTION_OP_KEY_DOWN;
+  program.steps[0].arg16 = keycode;
+  program.steps[1].opcode = ACTION_OP_DELAY_MS;
+  program.steps[1].arg16 = 500u;
+  program.steps[2].opcode = ACTION_OP_END;
+  return program;
+}
+
+static void test_fifth_trigger_waits_and_runs_in_fifo_order(void) {
   uint16_t owner_mask = 0u;
 
   assert(action_engine_reset_profile(0u));
-  for (uint8_t program_index = 0u; program_index < ACTION_PROGRAM_COUNT;
-       program_index++) {
-    action_program_t program = empty_program();
-    program.flags = ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE;
-    program.step_count = 3u;
-    program.steps[0].opcode = ACTION_OP_KEY_DOWN;
-    program.steps[0].arg16 = (uint16_t)(0x20u + program_index);
-    program.steps[1].opcode = ACTION_OP_DELAY_MS;
-    program.steps[1].arg16 = 500u;
-    program.steps[2].opcode = ACTION_OP_END;
+  for (uint8_t program_index = 0u;
+       program_index <= ACTION_ENGINE_MAX_INSTANCES; program_index++) {
+    action_program_t program = delayed_key_program(
+        (uint16_t)(0x20u + program_index));
+    if (program_index == 0u) {
+      program.step_count = 1u;
+      program.steps[0].opcode = ACTION_OP_END;
+    }
     assert(action_engine_set_program(0u, program_index, &program, false));
   }
 
   action_engine_cancel_all();
   reset_events();
-  for (uint8_t program_index = 0u; program_index < ACTION_PROGRAM_COUNT;
-       program_index++) {
+  for (uint8_t program_index = 0u;
+       program_index <= ACTION_ENGINE_MAX_INSTANCES; program_index++) {
     assert(action_engine_trigger_program(program_index));
   }
+  assert(action_engine_pending_trigger_count() == 1u);
+
+  /* Program 0 frees one owner and the accepted fifth trigger is transferred
+   * from the FIFO at the end of the same scan. It executes on the next scan. */
   action_engine_tick(6400u);
-  assert(pressed_count == ACTION_PROGRAM_COUNT);
+  assert(action_engine_pending_trigger_count() == 0u);
+  assert(pressed_count == ACTION_ENGINE_MAX_INSTANCES - 1u);
+  action_engine_tick(6401u);
+  assert(pressed_count == ACTION_ENGINE_MAX_INSTANCES);
+  assert(pressed[pressed_count - 1u] ==
+         (uint16_t)(0x20u + ACTION_ENGINE_MAX_INSTANCES));
+
   for (uint8_t event = 0u; event < pressed_count; event++) {
-    assert(pressed_owner[event] < ACTION_PROGRAM_COUNT);
+    assert(pressed_owner[event] < ACTION_ENGINE_MAX_INSTANCES);
     owner_mask |= (uint16_t)(1u << pressed_owner[event]);
   }
-  assert(owner_mask == UINT16_MAX);
+  assert(owner_mask ==
+         (uint16_t)((1u << ACTION_ENGINE_MAX_INSTANCES) - 1u));
+  action_engine_cancel_all();
+  assert(action_engine_pending_trigger_count() == 0u);
+}
 
+static void test_trigger_fifo_reports_real_saturation(void) {
+  uint32_t drops_before = 0u;
+
+  assert(action_engine_reset_profile(0u));
   for (uint8_t program_index = 0u; program_index < ACTION_PROGRAM_COUNT;
        program_index++) {
-    action_engine_release_program_trigger(program_index);
+    action_program_t program = empty_program();
+    program.step_count = 2u;
+    program.steps[0].opcode = ACTION_OP_DELAY_MS;
+    program.steps[0].arg16 = 500u;
+    program.steps[1].opcode = ACTION_OP_END;
+    assert(action_engine_set_program(0u, program_index, &program, false));
   }
-  action_engine_tick(6401u);
-  assert(released_count == ACTION_PROGRAM_COUNT);
+
+  action_engine_cancel_all();
+  for (uint8_t program_index = 0u;
+       program_index < ACTION_ENGINE_MAX_INSTANCES; program_index++) {
+    assert(action_engine_trigger_program(program_index));
+  }
+  drops_before = action_engine_dropped_trigger_count();
+  for (uint8_t queued = 0u;
+       queued < ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY; queued++) {
+    uint8_t program_index = (uint8_t)(
+        ACTION_ENGINE_MAX_INSTANCES +
+        (queued % (ACTION_PROGRAM_COUNT - ACTION_ENGINE_MAX_INSTANCES)));
+    assert(action_engine_trigger_program(program_index));
+  }
+  assert(action_engine_pending_trigger_count() ==
+         ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY);
+
+  assert(!action_engine_trigger_program(ACTION_ENGINE_MAX_INSTANCES));
+  assert(action_engine_dropped_trigger_count() == drops_before + 1u);
+  action_engine_cancel_all();
+  assert(action_engine_pending_trigger_count() == 0u);
 }
 
 static void test_tick_has_one_global_step_budget_and_rotates_fairly(void) {
@@ -556,8 +617,8 @@ static void test_tick_has_one_global_step_budget_and_rotates_fairly(void) {
   action_engine_tick(6451u);
   assert(overlay_set_calls == 2u * ACTION_ENGINE_GLOBAL_STEPS_PER_TICK);
 
-  /* Four instances consume 8 steps per visit, so a cursor that advances past
-   * the last serviced instance reaches every slot within four scans. */
+  /* Four active instances consume 8 steps per visit; the global budget stays
+   * fixed even while the remaining accepted triggers wait in the FIFO. */
   action_engine_tick(6452u);
   action_engine_tick(6453u);
   assert(overlay_set_calls == 4u * ACTION_ENGINE_GLOBAL_STEPS_PER_TICK);
@@ -684,7 +745,8 @@ int main(void) {
   test_validation_rejects_unsafe_programs();
   test_macro_call_graph_rejects_direct_and_mutual_cycles();
   test_macro_call_graph_enforces_runtime_instance_depth();
-  test_all_program_slots_can_run_concurrently();
+  test_fifth_trigger_waits_and_runs_in_fifo_order();
+  test_trigger_fifo_reports_real_saturation();
   test_tick_has_one_global_step_budget_and_rotates_fairly();
   test_trusted_publication_is_targeted();
   test_live_profile_revision_tracks_every_publication();

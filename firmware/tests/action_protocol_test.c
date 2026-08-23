@@ -375,7 +375,7 @@ static void test_meta_reports_absent_and_committed_generation(void) {
   assert(read_u32_le(&response[4]) == 7u);
 }
 
-static void test_capabilities_report_one_instance_per_macro_slot(void) {
+static void test_capabilities_report_bounded_runtime_instance_pool(void) {
   uint8_t request[HID_PROTOCOL_PACKET_SIZE] = {0};
   uint8_t response[HID_PROTOCOL_PACKET_SIZE] = {0};
 
@@ -384,7 +384,7 @@ static void test_capabilities_report_one_instance_per_macro_slot(void) {
   assert(response[1] == HID_RESP_OK);
   assert(response[4] == ACTION_PROGRAM_COUNT);
   assert(response[9] == ACTION_ENGINE_MAX_INSTANCES);
-  assert(ACTION_ENGINE_MAX_INSTANCES == ACTION_PROGRAM_COUNT);
+  assert(ACTION_ENGINE_MAX_INSTANCES < ACTION_PROGRAM_COUNT);
 }
 
 static void test_commit_retry_is_idempotent(void) {
@@ -432,7 +432,7 @@ static void test_rejects_declared_payload_beyond_report(void) {
 }
 
 int main(void) {
-  test_capabilities_report_one_instance_per_macro_slot();
+  test_capabilities_report_bounded_runtime_instance_pool();
   test_meta_reports_absent_and_committed_generation();
   test_commit_retry_is_idempotent();
   test_deferred_program_apply_preserves_concurrent_mode_state();

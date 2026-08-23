@@ -154,7 +154,7 @@ describe("action program wire format", () => {
     expect(validateActionProgramGraph(programs)).toBe(ActionValidationResult.Ok);
   });
 
-  test("accepts a chain using all sixteen runtime instances", () => {
+  test("accepts depth four and rejects depth five by default", () => {
     const programs = Array.from({ length: ACTION_PROGRAM_COUNT }, () => defaultActionProgram());
     const call = (target: number) => ({
       version: 1 as const,
@@ -170,6 +170,10 @@ describe("action program wire format", () => {
     }
     expect(findActionProgramDepthOverflow(programs)).toBeNull();
     expect(validateActionProgramGraph(programs)).toBe(ActionValidationResult.Ok);
+
+    programs[ACTION_ENGINE_MAX_INSTANCES - 1] = call(ACTION_ENGINE_MAX_INSTANCES);
+    expect(findActionProgramDepthOverflow(programs)).toEqual([0, 1, 2, 3, 4]);
+    expect(validateActionProgramGraph(programs)).toBe(ActionValidationResult.MacroDepth);
   });
 
   test("accepts fan-out branches within the nesting limit", () => {

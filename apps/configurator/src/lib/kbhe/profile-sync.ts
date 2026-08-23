@@ -24,6 +24,7 @@ import {
   defaultActionProgram,
   findActionProgramCycle,
   findActionProgramDepthOverflow,
+  type ActionCapabilities,
   type ActionOverlayBinding,
   type ActionProgram,
 } from "./action-program"
@@ -584,6 +585,16 @@ async function applyLedSnapshot(led: FirmwareLedSnapshot): Promise<boolean> {
   return true
 }
 
+function actionProgramsFitDevice(
+  programs: readonly ActionProgram[],
+  capabilities: ActionCapabilities | null,
+): boolean {
+  return capabilities != null
+    && capabilities.programCount >= programs.length
+    && capabilities.maxInstances >= 1
+    && findActionProgramDepthOverflow(programs, capabilities.maxInstances) == null
+}
+
 export async function applyFirmwareProfileSnapshot(
   snapshot: FirmwareProfileSnapshot,
   targetProfileIndex: number,
@@ -604,15 +615,7 @@ export async function applyFirmwareProfileSnapshot(
 
   if (snapshot.actionPrograms) {
     const actionCapabilities = await kbheDevice.getActionCapabilities()
-    if (
-      !actionCapabilities
-      || actionCapabilities.programCount < snapshot.actionPrograms.length
-      || actionCapabilities.maxInstances < 1
-      || findActionProgramDepthOverflow(
-        snapshot.actionPrograms,
-        actionCapabilities.maxInstances,
-      )
-    ) {
+    if (!actionProgramsFitDevice(snapshot.actionPrograms, actionCapabilities)) {
       return false
     }
   }

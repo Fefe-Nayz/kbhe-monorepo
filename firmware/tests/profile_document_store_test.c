@@ -380,7 +380,7 @@ static void test_async_live_source_restart_is_bounded(void) {
   profile_document_store_async_consume();
 }
 
-static void test_async_accepts_full_macro_depth_and_shared_fanout(void) {
+static void test_async_validates_macro_depth_fanout_and_cycle(void) {
   static settings_profile_t settings;
   static action_profile_t actions;
 
@@ -407,6 +407,31 @@ static void test_async_accepts_full_macro_depth_and_shared_fanout(void) {
          PROFILE_DOCUMENT_ASYNC_DONE);
   profile_document_store_async_consume();
 
+  /* The same chain with a fifth nesting level must fail before compression or
+   * Flash ownership is attempted. */
+  reset_fake_store();
+  valid_actions(&actions);
+  for (uint8_t program = 0u; program < ACTION_ENGINE_MAX_INSTANCES;
+       program++) {
+    actions.programs[program].step_count = 2u;
+    actions.programs[program].steps[0].opcode = ACTION_OP_KEY_TAP;
+    actions.programs[program].steps[0].arg16 =
+        (uint16_t)(0xF400u + program + 1u);
+    actions.programs[program].steps[1].opcode = ACTION_OP_END;
+  }
+  assert(profile_document_store_save_async_begin(0u, &settings, &actions,
+                                                 0u));
+  for (uint32_t i = 0u;
+       i < 20000u && profile_document_store_async_result(NULL) ==
+                           PROFILE_DOCUMENT_ASYNC_IN_PROGRESS;
+       i++) {
+    profile_document_store_async_task(128u, 1u);
+  }
+  assert(profile_document_store_async_result(NULL) ==
+         PROFILE_DOCUMENT_ASYNC_ERROR);
+  assert(fake_async_begin_calls == 0u);
+  profile_document_store_async_consume();
+
   reset_fake_store();
   valid_actions(&actions);
   actions.programs[0].step_count = 3u;
@@ -431,6 +456,29 @@ static void test_async_accepts_full_macro_depth_and_shared_fanout(void) {
   }
   assert(profile_document_store_async_result(NULL) ==
          PROFILE_DOCUMENT_ASYNC_DONE);
+  profile_document_store_async_consume();
+
+  reset_fake_store();
+  valid_actions(&actions);
+  actions.programs[0].step_count = 2u;
+  actions.programs[0].steps[0].opcode = ACTION_OP_KEY_TAP;
+  actions.programs[0].steps[0].arg16 = 0xF401u;
+  actions.programs[0].steps[1].opcode = ACTION_OP_END;
+  actions.programs[1].step_count = 2u;
+  actions.programs[1].steps[0].opcode = ACTION_OP_KEY_TAP;
+  actions.programs[1].steps[0].arg16 = 0xF400u;
+  actions.programs[1].steps[1].opcode = ACTION_OP_END;
+  assert(profile_document_store_save_async_begin(0u, &settings, &actions,
+                                                 0u));
+  for (uint32_t i = 0u;
+       i < 20000u && profile_document_store_async_result(NULL) ==
+                           PROFILE_DOCUMENT_ASYNC_IN_PROGRESS;
+       i++) {
+    profile_document_store_async_task(128u, 1u);
+  }
+  assert(profile_document_store_async_result(NULL) ==
+         PROFILE_DOCUMENT_ASYNC_ERROR);
+  assert(fake_async_begin_calls == 0u);
   profile_document_store_async_consume();
 }
 
@@ -520,7 +568,7 @@ int main(void) {
   test_malformed_document_or_actions_are_rejected();
   test_async_live_source_mutation_restarts_without_torn_snapshot();
   test_async_live_source_restart_is_bounded();
-  test_async_accepts_full_macro_depth_and_shared_fanout();
+  test_async_validates_macro_depth_fanout_and_cycle();
   test_async_profile_waits_for_settings_writer_and_owns_its_step();
   test_async_retry_match_is_incremental_and_avoids_flash();
   puts("profile_document_store_test: ok");

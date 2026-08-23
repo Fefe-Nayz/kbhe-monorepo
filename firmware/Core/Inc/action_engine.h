@@ -14,7 +14,11 @@ extern "C" {
 #define ACTION_PROGRAM_COUNT 16u
 #define ACTION_PROGRAM_MAX_STEPS 32u
 #define ACTION_STATE_COUNT 16u
-#define ACTION_ENGINE_MAX_INSTANCES ACTION_PROGRAM_COUNT
+#define ACTION_ENGINE_MAX_INSTANCES 4u
+/* A short fixed FIFO absorbs simultaneous physical/fan-out triggers when all
+ * runtime instances are busy. It is deliberately allocation-free and large
+ * enough to retain one full burst across every macro slot. */
+#define ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY ACTION_PROGRAM_COUNT
 /* Shared by all running instances so concurrent macros cannot multiply the
  * amount of action/overlay work performed in one input scan. */
 #define ACTION_ENGINE_GLOBAL_STEPS_PER_TICK 32u
@@ -96,6 +100,10 @@ uint8_t action_engine_active_profile(void);
 
 bool action_engine_trigger_program(uint8_t program_index);
 void action_engine_release_program_trigger(uint8_t program_index);
+/** Number of accepted triggers currently waiting for a runtime instance. */
+uint8_t action_engine_pending_trigger_count(void);
+/** Monotonic, saturating count of triggers rejected because the FIFO was full. */
+uint32_t action_engine_dropped_trigger_count(void);
 
 action_validation_result_t
 action_engine_validate_program(const action_program_t *program);

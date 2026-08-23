@@ -1,9 +1,9 @@
 #include <stdint.h>
 
-/* Action programs run independently from physical keys. One owner per macro
- * slot lets all 16 programs overlap while releasing exactly the keys acquired
- * by each instance. action_engine.c statically checks this stays in sync. */
-#define LAYOUT_ACTION_OWNER_COUNT 16u
+/* Action programs run independently from physical keys. One owner per runtime
+ * instance releases exactly the outputs acquired by that instance; additional
+ * triggers wait in action_engine.c's fixed FIFO. Keep both limits in sync. */
+#define LAYOUT_ACTION_OWNER_COUNT 4u
 
 uint16_t layout_get_default_keycode(uint8_t key);
 

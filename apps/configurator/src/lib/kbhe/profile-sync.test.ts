@@ -6,6 +6,7 @@ import {
   firmwareProfileSnapshotSchema,
 } from "./profile-sync";
 import {
+  ACTION_ENGINE_MAX_INSTANCES,
   ACTION_MACRO_KEYCODE_BASE,
   ACTION_PROGRAM_COUNT,
   ActionOpcode,
@@ -56,7 +57,7 @@ function validSnapshot() {
   };
 }
 
-function actionCapabilities(maxInstances = ACTION_PROGRAM_COUNT) {
+function actionCapabilities(maxInstances = ACTION_ENGINE_MAX_INSTANCES) {
   return {
     programVersion: 1,
     profileCount: 4,
@@ -165,12 +166,12 @@ describe("ProfileDocument v2 validation", () => {
     }
   });
 
-  test("accepts a snapshot using all sixteen macro runtime instances", () => {
+  test("defers depth-five import validation to live device capabilities", () => {
     const actionPrograms = Array.from(
       { length: ACTION_PROGRAM_COUNT },
       () => defaultActionProgram(),
     );
-    for (let program = 0; program < ACTION_PROGRAM_COUNT - 1; program += 1) {
+    for (let program = 0; program < ACTION_ENGINE_MAX_INSTANCES; program += 1) {
       actionPrograms[program] = {
         version: 1,
         flags: 0,
@@ -188,7 +189,7 @@ describe("ProfileDocument v2 validation", () => {
     expect(parsed.success).toBeTrue();
   });
 
-  test("validates macro depth against maxInstances reported by the firmware", async () => {
+  test("validates depth four/five against maxInstances reported by the firmware", async () => {
     const actionPrograms = Array.from(
       { length: ACTION_PROGRAM_COUNT },
       () => defaultActionProgram(),
@@ -203,14 +204,27 @@ describe("ProfileDocument v2 validation", () => {
       flags: 0,
       steps: [{ opcode: ActionOpcode.KeyTap, arg8: 0, arg16: ACTION_MACRO_KEYCODE_BASE + 2 }],
     };
+    actionPrograms[2] = {
+      version: 1,
+      flags: 0,
+      steps: [{ opcode: ActionOpcode.KeyTap, arg8: 0, arg16: ACTION_MACRO_KEYCODE_BASE + 3 }],
+    };
+    actionPrograms[3] = {
+      version: 1,
+      flags: 0,
+      steps: [{ opcode: ActionOpcode.KeyTap, arg8: 0, arg16: ACTION_MACRO_KEYCODE_BASE + 4 }],
+    };
 
     const originalGetActionCapabilities = kbheDevice.getActionCapabilities;
+    const originalGetActiveProfile = kbheDevice.getActiveProfile;
     const originalSetKeySettings = kbheDevice.setKeySettingsExtended;
     let keyWrites = 0;
-    kbheDevice.getActionCapabilities = async () => actionCapabilities(2);
+    let reportedMaxInstances = ACTION_ENGINE_MAX_INSTANCES;
+    kbheDevice.getActionCapabilities = async () => actionCapabilities(reportedMaxInstances);
+    kbheDevice.getActiveProfile = async () => ({ profile_index: 0, profile_used_mask: 1 });
     kbheDevice.setKeySettingsExtended = async () => {
       keyWrites += 1;
-      return true;
+      return false;
     };
 
     try {
@@ -219,8 +233,19 @@ describe("ProfileDocument v2 validation", () => {
         actionPrograms,
       }, 0, { persistToFlash: false })).toBeFalse();
       expect(keyWrites).toBe(0);
+
+      /* A future device advertising five instances must pass the same import
+       * graph. The forced first key-write failure proves validation advanced
+       * past the capability gate without mutating a complete profile. */
+      reportedMaxInstances = ACTION_ENGINE_MAX_INSTANCES + 1;
+      expect(await applyFirmwareProfileSnapshot({
+        ...validSnapshot(),
+        actionPrograms,
+      }, 0, { persistToFlash: false })).toBeFalse();
+      expect(keyWrites).toBe(1);
     } finally {
       kbheDevice.getActionCapabilities = originalGetActionCapabilities;
+      kbheDevice.getActiveProfile = originalGetActiveProfile;
       kbheDevice.setKeySettingsExtended = originalSetKeySettings;
     }
   });

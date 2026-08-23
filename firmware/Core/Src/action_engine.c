@@ -28,6 +28,13 @@ static volatile uint32_t
     action_profile_revision_counters[ACTION_PROFILE_COUNT];
 static action_profile_t profile_update_scratch;
 static action_instance_t action_instances[ACTION_ENGINE_MAX_INSTANCES];
+static uint8_t
+    pending_trigger_programs[ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY];
+static uint8_t pending_trigger_head = 0u;
+static uint8_t pending_trigger_tail = 0u;
+static uint8_t pending_trigger_count = 0u;
+static uint8_t active_instance_count = 0u;
+static uint32_t dropped_trigger_count = 0u;
 /* Physical keys and nested programs can acquire the same program slot. Keep
  * trigger ownership independently from execution lifetime: a program may
  * finish before its trigger is released, or fail to allocate an instance. */
@@ -37,8 +44,13 @@ static uint8_t active_profile_index = 0u;
 static uint8_t action_tick_cursor = 0u;
 static uint16_t runtime_state_bits = 0u;
 
-_Static_assert(ACTION_ENGINE_MAX_INSTANCES == ACTION_PROGRAM_COUNT,
-               "every macro slot must have runtime instance capacity");
+_Static_assert(ACTION_ENGINE_MAX_INSTANCES > 0u,
+               "the action engine requires at least one runtime instance");
+_Static_assert(ACTION_ENGINE_MAX_INSTANCES <= ACTION_PROGRAM_COUNT,
+               "runtime instances cannot exceed the macro slot count");
+_Static_assert(ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY > 0u &&
+                   ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY <= UINT8_MAX,
+               "the trigger FIFO counters must fit in one byte");
 _Static_assert(ACTION_ENGINE_MAX_INSTANCES == LAYOUT_ACTION_OWNER_COUNT,
                "layout must provide one output owner per action instance");
 
@@ -124,12 +136,62 @@ static int8_t action_instance_find_for_program(uint8_t program_index) {
 }
 
 static int8_t action_instance_allocate(void) {
+  if (active_instance_count >= ACTION_ENGINE_MAX_INSTANCES) {
+    return -1;
+  }
   for (uint8_t i = 0u; i < ACTION_ENGINE_MAX_INSTANCES; i++) {
     if (!action_instances[i].active) {
       return (int8_t)i;
     }
   }
   return -1;
+}
+
+static void action_trigger_queue_clear(void) {
+  pending_trigger_head = 0u;
+  pending_trigger_tail = 0u;
+  pending_trigger_count = 0u;
+}
+
+static bool action_trigger_queue_push(uint8_t program_index) {
+  if (pending_trigger_count >= ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY) {
+    if (dropped_trigger_count != UINT32_MAX) {
+      dropped_trigger_count++;
+    }
+    return false;
+  }
+  pending_trigger_programs[pending_trigger_tail] = program_index;
+  pending_trigger_tail++;
+  if (pending_trigger_tail >= ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY) {
+    pending_trigger_tail = 0u;
+  }
+  pending_trigger_count++;
+  return true;
+}
+
+static bool action_trigger_queue_pop(uint8_t *program_index_out) {
+  if (program_index_out == NULL || pending_trigger_count == 0u) {
+    return false;
+  }
+  *program_index_out = pending_trigger_programs[pending_trigger_head];
+  pending_trigger_head++;
+  if (pending_trigger_head >= ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY) {
+    pending_trigger_head = 0u;
+  }
+  pending_trigger_count--;
+  return true;
+}
+
+static void action_instance_start(uint8_t slot, uint8_t program_index) {
+  action_instance_t *instance = &action_instances[slot];
+  memset(instance, 0, sizeof(*instance));
+  instance->active = true;
+  instance->program_index = program_index;
+  instance->execution_generation = next_execution_generation++;
+  active_instance_count++;
+  if (next_execution_generation == 0u) {
+    next_execution_generation = 1u;
+  }
 }
 
 static int8_t action_instance_held_index(const action_instance_t *instance,
@@ -195,12 +257,68 @@ static void action_instance_release_pending_tap(action_instance_t *instance) {
 }
 
 static void action_instance_finish(action_instance_t *instance) {
+  if (!instance->active) {
+    return;
+  }
   action_instance_release_pending_tap(instance);
   while (instance->held_count > 0u) {
     action_instance_release(instance,
                             instance->held_keycodes[instance->held_count - 1u]);
   }
+  active_instance_count--;
   memset(instance, 0, sizeof(*instance));
+}
+
+/* Drain at most one fixed pool's worth of entries per scan. This keeps the
+ * overloaded 8 kHz path bounded even if cancelled/stale FIFO entries must be
+ * skipped; valid entries retain strict FIFO order across scans. */
+static void action_trigger_queue_drain(void) {
+  uint8_t attempts = ACTION_ENGINE_MAX_INSTANCES;
+
+  while (attempts-- > 0u && pending_trigger_count > 0u &&
+         active_instance_count < ACTION_ENGINE_MAX_INSTANCES) {
+    const action_program_t *program = NULL;
+    uint8_t program_index = 0u;
+    int8_t existing = -1;
+    int8_t slot = -1;
+
+    if (!action_trigger_queue_pop(&program_index)) {
+      return;
+    }
+    program = &action_profiles[active_profile_index].programs[program_index];
+    if (!action_program_runtime_shape_is_sane(program)) {
+      continue;
+    }
+
+    existing = action_instance_find_for_program(program_index);
+    if (existing >= 0) {
+      if ((program->flags & ACTION_PROGRAM_FLAG_RESTART_ON_TRIGGER) == 0u) {
+        continue;
+      }
+      action_instance_finish(&action_instances[(uint8_t)existing]);
+      slot = existing;
+    } else {
+      /* A released momentary macro must not begin later merely because it was
+       * waiting for capacity. Non-cancelling macros remain trigger events and
+       * are intentionally executed even if their source was already released. */
+      if ((program->flags & ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE) != 0u &&
+          program_trigger_references[program_index] == 0u) {
+        continue;
+      }
+      slot = action_instance_allocate();
+      if (slot < 0) {
+        /* The active-count guard above makes this unreachable without state
+         * corruption. Preserve the event instead of silently losing it. */
+        pending_trigger_head = pending_trigger_head == 0u
+                                   ? ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY - 1u
+                                   : (uint8_t)(pending_trigger_head - 1u);
+        pending_trigger_programs[pending_trigger_head] = program_index;
+        pending_trigger_count++;
+        return;
+      }
+    }
+    action_instance_start((uint8_t)slot, program_index);
+  }
 }
 
 static bool action_program_condition_is_true(const action_step_t *step) {
@@ -307,8 +425,11 @@ static bool action_instance_execute_step(action_instance_t *instance,
 
 void action_engine_init(void) {
   memset(action_instances, 0, sizeof(action_instances));
+  action_trigger_queue_clear();
   memset(program_trigger_references, 0,
          sizeof(program_trigger_references));
+  active_instance_count = 0u;
+  dropped_trigger_count = 0u;
   next_execution_generation = 1u;
   action_tick_cursor = 0u;
   for (uint8_t profile = 0u; profile < ACTION_PROFILE_COUNT; profile++) {
@@ -370,6 +491,7 @@ void action_engine_tick(uint32_t now_ms) {
     }
   }
   action_tick_cursor = next_cursor;
+  action_trigger_queue_drain();
 }
 
 void action_engine_cancel_all(void) {
@@ -380,6 +502,7 @@ void action_engine_cancel_all(void) {
   }
   memset(program_trigger_references, 0,
          sizeof(program_trigger_references));
+  action_trigger_queue_clear();
   action_tick_cursor = 0u;
 }
 
@@ -395,6 +518,7 @@ bool action_engine_activate_profile(uint8_t profile_index) {
       action_instance_finish(&action_instances[i]);
     }
   }
+  action_trigger_queue_clear();
   led_matrix_clear_state_overlays();
   active_profile_index = profile_index;
   action_tick_cursor = 0u;
@@ -436,22 +560,17 @@ bool action_engine_trigger_program(uint8_t program_index) {
     action_instance_finish(&action_instances[(uint8_t)existing]);
   }
 
+  /* Do not let a new physical edge overtake triggers that were already
+   * accepted while the pool was full. */
+  if (pending_trigger_count > 0u) {
+    return action_trigger_queue_push(program_index);
+  }
+
   slot = action_instance_allocate();
   if (slot < 0) {
-    /* Unreachable for a validated profile: there is at most one live instance
-     * per macro slot and the pool has one entry for every slot. Keep the guard
-     * fail-closed for corrupted state. */
-    return false;
+    return action_trigger_queue_push(program_index);
   }
-  memset(&action_instances[(uint8_t)slot], 0,
-         sizeof(action_instances[(uint8_t)slot]));
-  action_instances[(uint8_t)slot].active = true;
-  action_instances[(uint8_t)slot].program_index = program_index;
-  action_instances[(uint8_t)slot].execution_generation =
-      next_execution_generation++;
-  if (next_execution_generation == 0u) {
-    next_execution_generation = 1u;
-  }
+  action_instance_start((uint8_t)slot, program_index);
   return true;
 }
 
@@ -475,6 +594,14 @@ void action_engine_release_program_trigger(uint8_t program_index) {
   if ((program->flags & ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE) != 0u) {
     action_instances[(uint8_t)instance_index].cancel_requested = true;
   }
+}
+
+uint8_t action_engine_pending_trigger_count(void) {
+  return pending_trigger_count;
+}
+
+uint32_t action_engine_dropped_trigger_count(void) {
+  return dropped_trigger_count;
 }
 
 action_validation_result_t
@@ -902,6 +1029,7 @@ bool action_engine_set_profile(uint8_t profile_index,
         action_instance_finish(&action_instances[i]);
       }
     }
+    action_trigger_queue_clear();
     led_matrix_clear_state_overlays();
   }
   memcpy(&action_profiles[profile_index], sanitized, sizeof(*sanitized));
