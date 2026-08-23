@@ -959,7 +959,11 @@ void trigger_reload_key_settings(uint8_t key) {
             !settings_get_key_for_layer(key, layer, &settings)) {
             return;
         }
-        trigger_active_layer_cache = layer;
+        /* Deliberately not touching trigger_active_layer_cache: only one key
+         * was refreshed. Marking the whole layer as loaded made
+         * trigger_refresh_layer_runtime_settings() skip the full reload, so
+         * the other NUM_KEYS-1 keys kept the previous layer's actuation,
+         * release and rapid-trigger parameters. */
         trigger_apply_key_settings(key, &settings);
     }
 
@@ -981,6 +985,13 @@ uint16_t trigger_get_distance_01mm(uint8_t key) {
     int16_t um = analog_read_travel_distance_value(key);
     if (um < 0) {
         um = 0;
+    }
+    /* The trigger consumes the extrapolated value, but this accessor feeds the
+     * host readout, whose contract is 0.00..4.00 mm. Clamp here so reporting
+     * stays unchanged while the trigger keeps its resolution past the
+     * calibrated peak. */
+    if (um > (int16_t)SETTINGS_LOGICAL_TRAVEL_UM) {
+        um = (int16_t)SETTINGS_LOGICAL_TRAVEL_UM;
     }
 
     return (uint16_t)((um + 5) / 10);

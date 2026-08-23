@@ -31,6 +31,11 @@ static volatile uint8_t current_mux_channel = 0;
 static volatile bool is_scan_complete = false;
 static volatile bool scan_fault_pending = false;
 
+/* Upper bound for the extrapolated logical travel. Four times the
+ * configurable travel leaves headroom no physical switch can reach while
+ * keeping the value inside int16_t. */
+#define ANALOG_TRAVEL_EXTRAPOLATION_MAX_UM (4u * SETTINGS_LOGICAL_TRAVEL_UM)
+
 static analog_task_monitor_t analog_task_monitor;
 static uint8_t analog_profile_counter = 0u;
 
@@ -294,6 +299,7 @@ int16_t analog_read_distance_value(uint8_t key) {
 int16_t analog_read_travel_distance_value(uint8_t key) {
     uint32_t distance = 0u;
     uint32_t calibrated_max = 0u;
+    uint32_t scaled = 0u;
 
     if (key >= NUM_KEYS) {
         return 0;
@@ -304,13 +310,28 @@ int16_t analog_read_travel_distance_value(uint8_t key) {
     if (distance == 0u || calibrated_max == 0u) {
         return 0;
     }
-    if (distance >= calibrated_max) {
-        return (int16_t)SETTINGS_LOGICAL_TRAVEL_UM;
+
+    /* Extrapolate past the calibrated reference instead of saturating on it.
+     * calibration_get_max_distance_um() is the peak captured during guided
+     * calibration, not the mechanical end of travel, so saturating there made
+     * every position deeper than that peak report the exact same value.
+     * Rapid trigger is purely differential (current - min_top,
+     * max_bottom - current), so inside that flat zone no press and no release
+     * could ever be detected: bottoming out hard swallowed the keystroke.
+     * The relation stays linear and identical below the calibrated peak; only
+     * the previously flat region changes. */
+    scaled = ((distance * (uint32_t)SETTINGS_LOGICAL_TRAVEL_UM) +
+              (calibrated_max / 2u)) /
+             calibrated_max;
+
+    /* Overflow guard only. A calibrated peak degenerate enough to reach this
+     * bound is already broken calibration; real values stay far below it
+     * because the sensor LUT itself tops out around 3.5 mm. */
+    if (scaled > (uint32_t)ANALOG_TRAVEL_EXTRAPOLATION_MAX_UM) {
+        scaled = (uint32_t)ANALOG_TRAVEL_EXTRAPOLATION_MAX_UM;
     }
 
-    return (int16_t)(((distance * (uint32_t)SETTINGS_LOGICAL_TRAVEL_UM) +
-                      (calibrated_max / 2u)) /
-                     calibrated_max);
+    return (int16_t)scaled;
 }
 
 uint8_t analog_read_normalized_value(uint8_t key) {

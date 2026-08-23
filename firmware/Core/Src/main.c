@@ -76,6 +76,10 @@
 #define MCU_LED_THERMAL_HYSTERESIS_C 3
 #define MCU_LED_THERMAL_BRIGHTNESS_MAX 96u
 #define ADC_SCAN_WATCHDOG_MS 100u
+/* Upper bound on how long one granted persistence budget unit may stay
+ * parked when the loop never observes slack. Bounds the worst case for a
+ * started Flash transaction without putting it back in the scan window. */
+#define KBHE_PERSISTENCE_DEFER_LIMIT_MS 250u
 
 /* USER CODE END PD */
 
@@ -722,6 +726,8 @@ int main(void) {
   TIM4_StartOneShot_TRGO();
   uint32_t adc_last_progress_ms = HAL_GetTick();
   bool adc_recovery_pending = false;
+  bool persistence_step_pending = false;
+  uint32_t persistence_pending_since_ms = adc_last_progress_ms;
 
   /* USER CODE END 2 */
 
@@ -754,6 +760,17 @@ int main(void) {
         TIM4_StartOneShot_TRGO();
       }
     }
+
+    /* TinyUSB is part of the input path, not best-effort work.  The HID
+     * interfaces publish state rather than queued events, and
+     * tud_hid_n_ready() only clears the endpoint busy flag once tud_task()
+     * drains the transfer-complete event.  Skipping it for a single cycle
+     * makes keyboard_hid_task() fail to arm its report, which silently
+     * collapses a press/release pair into no host report at all on the
+     * 8 kHz interrupt endpoint.  Run it before the scan block so the
+     * endpoint is already free when the HID tasks build this scan's
+     * report. */
+    tud_task();
 
     // If a full ADC scan is complete, process keys and restart
     if (analog_is_scan_complete()) {
@@ -830,39 +847,56 @@ int main(void) {
       TIM4_StartOneShot_TRGO();
       adc_last_progress_ms = HAL_GetTick();
 
-      /* One CRC/program budget unit per completed scan. In particular, do not
-       * run persistence repeatedly while the next DMA scan is in flight. */
+      /* Grant one CRC/program budget unit per completed scan, but spend it
+       * in the best-effort section below.  A single Flash word program can
+       * stall the core for FLASH_STORAGE_WORD_PROGRAM_DATASHEET_MAX_US
+       * (100 us), i.e. most of a 125 us scan period, and on this single-bank
+       * STM32F723 that stall also blocks instruction fetch for the ISRs.
+       * Running it here pushed every later service past the next completed
+       * scan for the whole duration of a save. */
+      if (!persistence_step_pending) {
+        persistence_step_pending = true;
+        persistence_pending_since_ms = adc_last_progress_ms;
+      }
+    }
+
+    /* Input has strict priority over the remaining best-effort control
+     * work. Check the DMA completion flag between bounded services so a
+     * host command burst can never build an unbounded queue in front of a
+     * completed scan.  tud_task() is deliberately absent here: it is
+     * serviced unconditionally above. */
+    if (!analog_is_scan_complete()) {
+      raw_hid_task();
+    }
+    /* Consumer and mouse reports are published as state, exactly like the
+     * keyboard report, so a skipped service collapses a press/release pair
+     * for every key mapped to a media or mouse action. Both are bounded
+     * and no-op when nothing changed. */
+    consumer_hid_task();
+    mouse_hid_task();
+    if (!analog_is_scan_complete()) {
+      updater_app_task();
+    }
+
+    /* Spend the persistence budget granted by the last completed scan, but
+     * only where a Flash stall costs slack instead of input latency. */
+    if (persistence_step_pending &&
+        (!analog_is_scan_complete() ||
+         (uint32_t)(HAL_GetTick() - persistence_pending_since_ms) >=
+             KBHE_PERSISTENCE_DEFER_LIMIT_MS)) {
       flash_storage_metrics_t persistence_before = {0};
       flash_storage_metrics_t persistence_after_profile = {0};
+
+      persistence_step_pending = false;
       flash_storage_get_metrics(&persistence_before);
       profile_document_store_async_task(32u, 1u);
       action_store_async_task();
       flash_storage_get_metrics(&persistence_after_profile);
-      settings_task_budgeted(
-          adc_last_progress_ms,
-          persistence_after_profile.async_steps ==
-                  persistence_before.async_steps
-              ? 1u
-              : 0u);
-    }
-
-    /* Input has strict priority over best-effort USB/control work. Check the
-     * DMA completion flag between bounded services so a host command burst can
-     * never build an unbounded queue in front of a completed scan. */
-    if (!analog_is_scan_complete()) {
-      tud_task(); // TinyUSB device task
-    }
-    if (!analog_is_scan_complete()) {
-      raw_hid_task();
-    }
-    if (!analog_is_scan_complete()) {
-      consumer_hid_task();
-    }
-    if (!analog_is_scan_complete()) {
-      mouse_hid_task();
-    }
-    if (!analog_is_scan_complete()) {
-      updater_app_task();
+      settings_task_budgeted(HAL_GetTick(),
+                             persistence_after_profile.async_steps ==
+                                     persistence_before.async_steps
+                                 ? 1u
+                                 : 0u);
     }
 
     // LED/UI timing should not depend on ADC scan state. The scan completes so
@@ -879,9 +913,10 @@ int main(void) {
     if (!analog_is_scan_complete()) {
       calibration_guided_tick(now_ms);
     }
-    if (!analog_is_scan_complete()) {
-      rotary_encoder_task(now_ms);
-    }
+    /* Polled quadrature decoder: a skipped poll can turn a valid Gray-code
+     * edge into a two-bit jump, which discards the accumulated detent. It
+     * early-exits when neither the A/B lines nor the button changed. */
+    rotary_encoder_task(now_ms);
     if (!analog_is_scan_complete()) {
       led_matrix_effect_tick(now_ms);
     }
