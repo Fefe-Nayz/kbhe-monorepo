@@ -482,9 +482,9 @@ function Wait-GitHubWorkflowForCommit {
         $run = $runs |
             Where-Object {
                 $_.headSha -eq $Commit -and
-                [DateTimeOffset]::Parse($_.createdAt) -ge $NotBefore
+                ([DateTimeOffset]$_.createdAt) -ge $NotBefore
             } |
-            Sort-Object { [DateTimeOffset]::Parse($_.createdAt) } -Descending |
+            Sort-Object { [DateTimeOffset]$_.createdAt } -Descending |
             Select-Object -First 1
         if ($null -eq $run) {
             Start-Sleep -Seconds 5
