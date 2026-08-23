@@ -4,10 +4,9 @@ import { buildKeycodeLegendSlots } from "@/lib/kbhe/keycode-icons";
 import { useOSKeycapLegend, type KeycapLegend } from "@/hooks/use-os-layout";
 import { KeycapButton } from "@/components/keycap-button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
-import { IconSearch } from "@tabler/icons-react";
+import { IconSearch, IconX, IconMoodEmpty } from "@tabler/icons-react";
 
 const KEYCODE_TILE_UNIT = 50;
 
@@ -192,13 +191,30 @@ interface KeycodeAccordionProps {
   selectedCodes?: number[];
   className?: string;
   resolveLegend?: (hidKeycode: number, fallbackName: string) => KeycapLegend;
+  /** Message shown above the picker when nothing on the keyboard is selected. */
+  hint?: string;
 }
 
-export function KeycodeAccordion({ onSelect, selectedCode, selectedCodes, className, resolveLegend }: KeycodeAccordionProps) {
+const ALL_CATEGORIES = "__all__";
+
+/**
+ * Keycode picker. Every category is visible at once under sticky headers —
+ * the previous accordion hid 14 of 15 groups behind a click, which made
+ * assigning anything but a letter a scavenger hunt.
+ */
+export function KeycodeAccordion({
+  onSelect,
+  selectedCode,
+  selectedCodes,
+  className,
+  resolveLegend,
+  hint,
+}: KeycodeAccordionProps) {
   const [search, setSearch] = useState("");
-  const [hasSearched, setHasSearched] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORIES);
   const hookResolveKeycapLegend = useOSKeycapLegend();
   const resolveKeycapLegend = resolveLegend ?? hookResolveKeycapLegend;
+
   const selectedCodesSet = useMemo(() => {
     const merged = new Set<number>();
     if (typeof selectedCode === "number") {
@@ -213,83 +229,161 @@ export function KeycodeAccordion({ onSelect, selectedCode, selectedCodes, classN
   const categories = useMemo(() => categorize(resolveKeycapLegend), [resolveKeycapLegend]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return categories;
-    const q = search.toLowerCase();
-    return categories.map((cat) => ({
-      ...cat,
-      keys: cat.keys.filter((k) =>
-        k.legend.searchText.includes(q) || k.name.toLowerCase().includes(q),
-      ),
-    })).filter((cat) => cat.keys.length > 0);
-  }, [search, categories]);
+    const q = search.trim().toLowerCase();
+    return categories
+      .filter((cat) => activeCategory === ALL_CATEGORIES || cat.label === activeCategory)
+      .map((cat) =>
+        q
+          ? {
+              ...cat,
+              keys: cat.keys.filter(
+                (k) => k.legend.searchText.includes(q) || k.name.toLowerCase().includes(q),
+              ),
+            }
+          : cat,
+      )
+      .filter((cat) => cat.keys.length > 0);
+  }, [search, categories, activeCategory]);
 
-  const defaultOpen = search.trim()
-    ? filtered.map((c) => c.label)
-    : hasSearched
-      ? []
-      : ["Letters"];
-  const accordionKey = search.trim()
-    ? `search:${filtered.map((c) => c.label).join("|")}`
-    : hasSearched
-      ? "cleared"
-      : "default";
+  const totalMatches = filtered.reduce((sum, cat) => sum + cat.keys.length, 0);
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <div className="relative">
-        <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search keycodes..."
-          value={search}
-          onChange={(e) => {
-            const nextValue = e.target.value;
-            if (nextValue.trim().length > 0) {
-              setHasSearched(true);
-            }
-            setSearch(nextValue);
-          }}
-          className="pl-9 h-8 text-sm"
-        />
+    <div className={cn("flex flex-col", className)}>
+      {hint && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/8 px-3 py-2 text-xs text-primary">
+          <IconSearch className="size-3.5 shrink-0" />
+          <span>{hint}</span>
+        </div>
+      )}
+
+      <div className="sticky top-0 z-20 -mx-5 -mt-5 flex flex-col gap-2.5 border-b bg-background/95 px-5 pb-3 pt-5 backdrop-blur-sm">
+        <div className="relative">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search keycodes…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 pl-9 pr-9 text-sm"
+          />
+          {search && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <IconX className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="-mx-1 flex flex-wrap gap-1.5 px-1">
+          <CategoryChip
+            label="All"
+            count={categories.reduce((sum, cat) => sum + cat.keys.length, 0)}
+            active={activeCategory === ALL_CATEGORIES}
+            onClick={() => setActiveCategory(ALL_CATEGORIES)}
+          />
+          {categories.map((cat) => (
+            <CategoryChip
+              key={cat.label}
+              label={cat.label}
+              count={cat.keys.length}
+              active={activeCategory === cat.label}
+              onClick={() =>
+                setActiveCategory((current) =>
+                  current === cat.label ? ALL_CATEGORIES : cat.label,
+                )
+              }
+            />
+          ))}
+        </div>
       </div>
-      <ScrollArea className="flex-1">
-        <Accordion key={accordionKey} multiple defaultValue={defaultOpen} className="w-full">
-          {filtered.map((cat) => (
-            <AccordionItem key={cat.label} value={cat.label}>
-              <AccordionTrigger className="items-center py-2 text-sm font-medium">
-                <div className="flex min-w-0 flex-1 items-center pr-8">
-                  <span className="truncate">{cat.label}</span>
+
+      <div className="mt-4">
+        {totalMatches === 0 ? (
+          <EmptyState
+            icon={<IconMoodEmpty />}
+            title="No matching keycodes"
+            description={`Nothing matches “${search}”. Try a shorter query or pick another category.`}
+            size="sm"
+          />
+        ) : (
+          <div className="flex flex-col gap-4 pb-2">
+            {filtered.map((cat) => (
+              <section key={cat.label}>
+                <div className="sticky top-[6.25rem] z-10 -mx-1 mb-2 flex items-center gap-2 bg-background/95 px-1 py-1.5 backdrop-blur-sm">
+                  <h4 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {cat.label}
+                  </h4>
+                  <span className="rounded-full bg-muted px-1.5 py-px text-[0.65rem] font-medium tabular-nums text-muted-foreground">
+                    {cat.keys.length}
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
                 </div>
-                <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-xs tabular-nums text-muted-foreground">
-                  {cat.keys.length}
-                </span>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="flex flex-wrap gap-1.5 pb-2">
+                <div className="flex flex-wrap gap-1.5">
                   {cat.keys.map((k) => {
                     const isSelected = selectedCodesSet.has(k.code);
                     return (
-                    <KeycapButton
-                      key={k.code}
-                      keyId={`keycode-${k.code}`}
-                      legendSlots={buildKeycodeLegendSlots(k.code, k.legend.slots, "size-3.5")}
-                      labelText={k.legend.text}
-                      unit={KEYCODE_TILE_UNIT}
-                      selected={isSelected}
-                      className={cn("rounded-md", isSelected && "ring-2 ring-primary/20")}
-                      onClick={() => onSelect(k.code, k.legend.text)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        onSelect(0, "NO");
-                      }}
-                    />
+                      <KeycapButton
+                        key={k.code}
+                        keyId={`keycode-${k.code}`}
+                        legendSlots={buildKeycodeLegendSlots(k.code, k.legend.slots, "size-3.5")}
+                        labelText={k.legend.text}
+                        unit={KEYCODE_TILE_UNIT}
+                        selected={isSelected}
+                        className={cn("rounded-md", isSelected && "ring-2 ring-primary/40")}
+                        onClick={() => onSelect(k.code, k.legend.text)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          onSelect(0, "NO");
+                        }}
+                      />
                     );
                   })}
                 </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </ScrollArea>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+function CategoryChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex h-6.5 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+        active
+          ? "border-primary/40 bg-primary/12 text-primary"
+          : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      {label}
+      <span
+        className={cn(
+          "tabular-nums",
+          active ? "text-primary/70" : "text-muted-foreground/60",
+        )}
+      >
+        {count}
+      </span>
+    </button>
   );
 }

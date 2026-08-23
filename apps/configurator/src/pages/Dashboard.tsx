@@ -1,16 +1,18 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { kbheDevice } from "@/lib/kbhe/device";
-import { useDeviceSession } from "@/lib/kbhe/session";
+import { DeviceSessionManager, useDeviceSession } from "@/lib/kbhe/session";
 import { queryKeys } from "@/lib/query/keys";
 import { useDashboardMcuTrendStore } from "@/stores/dashboard-mcu-trends-store";
 import { SectionCard } from "@/components/shared/SectionCard";
-import { PageContent } from "@/components/shared/PageLayout";
+import { PageContent, PageSection } from "@/components/shared/PageLayout";
+import { StatTile } from "@/components/shared/StatTile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkline } from "@/components/ui/sparkline";
 import { LED_EFFECT_NAMES } from "@/lib/kbhe/protocol";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
   IconKeyboard,
@@ -21,6 +23,13 @@ import {
   IconBrandSpeedtest,
   IconUpload,
   IconSettings,
+  IconChevronRight,
+  IconPlugConnectedX,
+  IconRefresh,
+  IconTemperature,
+  IconBolt,
+  IconWaveSine,
+  IconGauge,
 } from "@tabler/icons-react";
 
 const POLL_INTERVAL = 5000;
@@ -33,20 +42,20 @@ interface QuickLinkItem {
 }
 
 const BASE_QUICK_LINKS: QuickLinkItem[] = [
-  { icon: IconKeyboard, title: "Keymap", path: "/keymap", description: "Remap keys" },
-  { icon: IconBrandSpeedtest, title: "Performance", path: "/performance", description: "Actuation & RT" },
-  { icon: IconBulb, title: "Lighting", path: "/lighting", description: "Effects & Matrix" },
-  { icon: IconDeviceGamepad2, title: "Gamepad", path: "/gamepad", description: "Controller setup" },
-  { icon: IconUpload, title: "Firmware", path: "/firmware", description: "Update firmware" },
-  { icon: IconSettings, title: "Device", path: "/device", description: "Settings" },
-  { icon: IconCpu, title: "Calibration", path: "/calibration", description: "Sensor tuning" },
+  { icon: IconKeyboard, title: "Keymap", path: "/keymap", description: "Remap keys per layer" },
+  { icon: IconBrandSpeedtest, title: "Performance", path: "/performance", description: "Actuation & rapid trigger" },
+  { icon: IconBulb, title: "Lighting", path: "/lighting", description: "Effects & per-key matrix" },
+  { icon: IconDeviceGamepad2, title: "Gamepad", path: "/gamepad", description: "Controller output" },
+  { icon: IconUpload, title: "Firmware", path: "/firmware", description: "Flash a new build" },
+  { icon: IconSettings, title: "Device", path: "/device", description: "Identity & input modes" },
+  { icon: IconCpu, title: "Calibration", path: "/calibration", description: "Sensor range tuning" },
 ];
 
 const DIAGNOSTICS_LINK: QuickLinkItem = {
   icon: IconActivity,
   title: "Diagnostics",
   path: "/diagnostics",
-  description: "Debug tools",
+  description: "Protocol debug tools",
 };
 
 function useDeviceOverview() {
@@ -87,75 +96,134 @@ function useDeviceOverview() {
   return { gamepad: gamepadQ.data, nkro: nkroQ.data, ledEffect: ledEffectQ.data, mcu: mcuQ.data, connected };
 }
 
-function OverviewPill({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: ReactNode;
-  icon: typeof IconKeyboard;
-}) {
-  return (
-    <div className="rounded-lg border bg-background/60 px-3 py-2">
-      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
-        <Icon className="size-3.5" />
-        <span className="text-xs">{label}</span>
-      </div>
-      <div className="text-sm font-medium truncate">{value}</div>
-    </div>
-  );
-}
-
 function MetricTrendCard({
   label,
   value,
   values,
+  icon,
   accentClassName,
 }: {
   label: string;
   value: string;
   values: number[];
-  accentClassName?: string;
+  icon: ReactNode;
+  accentClassName: string;
 }) {
   return (
-    <div className="rounded-lg border bg-background/60 px-3 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="font-mono text-sm font-medium truncate">{value}</p>
-        </div>
-        <Sparkline
-          values={values}
-          className="h-8 w-28"
-          colorClassName={accentClassName ?? "text-primary/70"}
-        />
+    <div className="rounded-xl border bg-card px-3.5 py-3">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <span className={cn("[&_svg]:size-3.5", accentClassName)}>{icon}</span>
+        <span className="truncate text-[0.7rem] font-medium uppercase tracking-[0.06em]">
+          {label}
+        </span>
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <p className="truncate font-mono text-lg font-semibold leading-none">{value}</p>
+        <Sparkline values={values} className="h-7 w-24" colorClassName={accentClassName} />
       </div>
     </div>
   );
 }
 
-function QuickLink({ icon: Icon, title, path, description }: {
-  icon: typeof IconKeyboard; title: string; path: string; description: string;
-}) {
+function QuickLink({ icon: Icon, title, path, description }: QuickLinkItem) {
   const navigate = useNavigate();
   return (
-    <Button
-      variant="outline"
-      className="h-auto min-h-20 p-4 flex-col items-start gap-1 border-border/70 hover:bg-muted/60"
+    <button
+      type="button"
       onClick={() => navigate(path)}
+      className="group flex items-center gap-3 rounded-xl border bg-card px-3.5 py-3 text-left transition-colors hover:border-primary/35 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
     >
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 text-muted-foreground" />
-        <span className="font-medium text-sm">{title}</span>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/12 group-hover:text-primary">
+        <Icon className="size-4.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{title}</span>
+        <span className="block truncate text-xs text-muted-foreground">{description}</span>
+      </span>
+      <IconChevronRight className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+    </button>
+  );
+}
+
+function HeroBanner({
+  connected,
+  status,
+  keyboardName,
+  firmwareVersion,
+}: {
+  connected: boolean;
+  status: string;
+  keyboardName: string;
+  firmwareVersion: string | null;
+}) {
+  const connecting = status === "connecting";
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border bg-card">
+      <div className="kbhe-grid-fade pointer-events-none absolute inset-0 opacity-60" />
+      <div
+        className={cn(
+          "pointer-events-none absolute -right-24 -top-28 size-72 rounded-full blur-3xl transition-colors",
+          connected ? "bg-primary/18" : "bg-muted-foreground/8",
+        )}
+      />
+      <div className="relative flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            className={cn(
+              "flex size-12 shrink-0 items-center justify-center rounded-xl",
+              connected
+                ? "bg-primary/12 text-primary"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            <IconKeyboard className="size-6" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="truncate text-xl font-semibold tracking-tight">{keyboardName}</h2>
+              <Badge
+                variant={connected ? "default" : "secondary"}
+                className={cn("capitalize", connected && "bg-success text-success-foreground")}
+              >
+                {status}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {connected
+                ? "Every change you make below is written straight to the keyboard."
+                : connecting
+                  ? "Looking for a KBHE keyboard on USB…"
+                  : "Connect your keyboard over USB to configure it."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {firmwareVersion && (
+            <span className="rounded-lg border bg-background/60 px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
+              fw {firmwareVersion}
+            </span>
+          )}
+          {!connected && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={connecting}
+              onClick={() => void DeviceSessionManager.reconnect()}
+            >
+              <IconRefresh className={connecting ? "animate-spin" : undefined} />
+              {connecting ? "Searching…" : "Retry connection"}
+            </Button>
+          )}
+        </div>
       </div>
-      <span className="text-xs text-muted-foreground">{description}</span>
-    </Button>
+    </div>
   );
 }
 
 export default function Dashboard() {
-  const { status, firmwareVersion } = useDeviceSession();
+  const { status, firmwareVersion, deviceInfo } = useDeviceSession();
   const developerMode = useDeviceSession((state) => state.developerMode);
   const { gamepad, nkro, ledEffect, mcu, connected } = useDeviceOverview();
   const mcuTrends = useDashboardMcuTrendStore((state) => state.trends);
@@ -163,111 +231,138 @@ export default function Dashboard() {
   const quickLinks = developerMode ? [...BASE_QUICK_LINKS, DIAGNOSTICS_LINK] : BASE_QUICK_LINKS;
   const ledEffectLabel = ledEffect != null
     ? (LED_EFFECT_NAMES[ledEffect as number] ?? `Effect ${ledEffect}`)
-    : "Unknown";
+    : "—";
+  const keyboardName = connected
+    ? (deviceInfo?.product?.trim() || "KBHE Keyboard")
+    : "No keyboard connected";
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <PageContent containerClassName="max-w-5xl">
-        <SectionCard className="border-border/70 bg-gradient-to-br from-card via-card to-muted/40">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Device Dashboard</p>
-              <h2 className="text-lg font-semibold tracking-tight">Keyboard overview and live telemetry</h2>
-              <p className="text-sm text-muted-foreground">
-                Monitor connection state, active modes, and MCU activity in real time.
-              </p>
-            </div>
-            <Badge variant={connected ? "default" : "secondary"} className="w-fit capitalize">
-              {status}
-            </Badge>
-          </div>
+    <PageContent containerClassName="max-w-6xl">
+      <HeroBanner
+        connected={connected}
+        status={status}
+        keyboardName={keyboardName}
+        firmwareVersion={firmwareVersion}
+      />
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <OverviewPill
-              label="Firmware"
-              icon={IconUpload}
-              value={firmwareVersion ? <span className="font-mono">{firmwareVersion}</span> : <Skeleton className="h-4 w-20" />}
-            />
-            <OverviewPill
-              label="Current LED Effect"
-              icon={IconBulb}
-              value={ledEffectLabel}
-            />
-            <OverviewPill
-              label="Input Modes"
-              icon={IconKeyboard}
-              value={
-                <span className="flex items-center gap-1.5">
-                  <Badge variant="secondary" className="text-[10px]">KB</Badge>
-                  {gamepad && <Badge variant="secondary" className="text-[10px]">GP</Badge>}
-                  {nkro && <Badge variant="secondary" className="text-[10px]">NKRO</Badge>}
+      <PageSection title="At a glance">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile
+            label="Firmware"
+            icon={<IconUpload />}
+            tone={connected ? "primary" : "default"}
+            mono
+            value={
+              firmwareVersion ?? (connected ? <Skeleton className="h-4 w-16" /> : "—")
+            }
+            hint={connected ? "Running on device" : "Unavailable offline"}
+          />
+          <StatTile
+            label="LED effect"
+            icon={<IconBulb />}
+            tone={connected ? "warning" : "default"}
+            value={ledEffectLabel}
+            hint={connected ? "Active on all keys" : "Unavailable offline"}
+          />
+          <StatTile
+            label="Input modes"
+            icon={<IconKeyboard />}
+            tone={connected ? "info" : "default"}
+            value={
+              connected ? (
+                <span className="flex items-center gap-1">
+                  <Badge variant="secondary" className="text-[0.65rem]">KB</Badge>
+                  {gamepad ? <Badge variant="secondary" className="text-[0.65rem]">GP</Badge> : null}
+                  {nkro ? <Badge variant="secondary" className="text-[0.65rem]">NKRO</Badge> : null}
                 </span>
-              }
-            />
-            <OverviewPill
-              label="Connection"
-              icon={IconActivity}
-              value={connected ? "Active" : "Waiting for device"}
-            />
-          </div>
-        </SectionCard>
+              ) : (
+                "—"
+              )
+            }
+            hint={connected ? "Reported by firmware" : "Unavailable offline"}
+          />
+          <StatTile
+            label="Connection"
+            icon={connected ? <IconActivity /> : <IconPlugConnectedX />}
+            tone={connected ? "success" : "default"}
+            value={connected ? "Active" : "Waiting for device"}
+            hint={connected ? "USB HID link established" : "Plug in over USB"}
+          />
+        </div>
+      </PageSection>
 
-        {mcu && (
-          <SectionCard title="MCU Live Metrics" description="Updated every 5 seconds.">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {connected && (
+        <PageSection
+          title="MCU telemetry"
+          description="Sampled every 5 seconds while the keyboard is attached."
+        >
+          {mcu ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricTrendCard
                 label="Temperature"
-                value={mcu.temperature_valid && mcu.temperature_c != null ? `${mcu.temperature_c.toFixed(1)} deg C` : "—"}
+                icon={<IconTemperature />}
+                value={
+                  mcu.temperature_valid && mcu.temperature_c != null
+                    ? `${mcu.temperature_c.toFixed(1)} °C`
+                    : "—"
+                }
                 values={mcuTrends.temperature}
-                accentClassName="text-orange-500/80"
+                accentClassName="text-chart-4"
               />
               <MetricTrendCard
                 label="Vref"
+                icon={<IconBolt />}
                 value={`${(mcu.vref_mv / 1000).toFixed(3)} V`}
                 values={mcuTrends.vref}
-                accentClassName="text-cyan-500/80"
+                accentClassName="text-chart-2"
               />
               <MetricTrendCard
-                label="Scan Rate"
+                label="Scan rate"
+                icon={<IconWaveSine />}
                 value={`${mcu.scan_rate_hz} Hz`}
                 values={mcuTrends.scanRate}
-                accentClassName="text-emerald-500/80"
+                accentClassName="text-chart-3"
               />
               <MetricTrendCard
-                label="CPU Load"
-                value={`${mcu.load_percent.toFixed(1)}%`}
+                label="CPU load"
+                icon={<IconGauge />}
+                value={`${mcu.load_percent.toFixed(1)} %`}
                 values={mcuTrends.load}
-                accentClassName="text-violet-500/80"
+                accentClassName="text-chart-1"
               />
             </div>
-          </SectionCard>
-        )}
-
-        {!mcu && connected && (
-          <SectionCard title="MCU Live Metrics" description="Telemetry will appear after first sample.">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Skeleton className="h-[62px]" />
-              <Skeleton className="h-[62px]" />
-              <Skeleton className="h-[62px]" />
-              <Skeleton className="h-[62px]" />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Skeleton className="h-[86px] rounded-xl" />
+              <Skeleton className="h-[86px] rounded-xl" />
+              <Skeleton className="h-[86px] rounded-xl" />
+              <Skeleton className="h-[86px] rounded-xl" />
             </div>
-          </SectionCard>
-        )}
+          )}
+        </PageSection>
+      )}
 
-        <SectionCard title="Quick Links" description="Fast access to the most-used configuration pages.">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {quickLinks.map((link) => (
-              <QuickLink
-                key={link.path}
-                icon={link.icon}
-                title={link.title}
-                path={link.path}
-                description={link.description}
-              />
-            ))}
-          </div>
+      <PageSection title="Jump to">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {quickLinks.map((link) => (
+            <QuickLink key={link.path} {...link} />
+          ))}
+        </div>
+      </PageSection>
+
+      {!connected && (
+        <SectionCard
+          tone="muted"
+          title="Working without a keyboard"
+          description="Pages that only need local data stay usable while you are disconnected."
+          icon={<IconPlugConnectedX />}
+        >
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            App profiles, appearance settings and firmware files can all be prepared offline.
+            Anything that writes to the keyboard stays disabled until a device is detected.
+          </p>
         </SectionCard>
-      </PageContent>
-    </div>
+      )}
+    </PageContent>
   );
 }

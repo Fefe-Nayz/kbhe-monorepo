@@ -14,9 +14,18 @@ import {
 } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
-import { SectionCard, FormRow } from "@/components/shared/SectionCard";
+import { SectionCard, FormRow, FormRows } from "@/components/shared/SectionCard";
+import { ConnectPrompt } from "@/components/shared/ConnectPrompt";
+import {
+  IconArrowsHorizontal,
+  IconHandClick,
+  IconKeyboard,
+  IconPalette,
+  IconProgress,
+  IconRotateClockwise,
+} from "@tabler/icons-react";
+import { SliderField } from "@/components/shared/SliderField";
 import { PageContent } from "@/components/shared/PageLayout";
-import { CommitSlider } from "@/components/ui/commit-slider";
 import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
@@ -424,23 +433,24 @@ export default function Rotary() {
   const s = rotaryQ.data;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <PageContent>
-        <div className="flex justify-end">
-          <AutosaveStatus state={saveState} />
-        </div>
+    <PageContent containerClassName="max-w-4xl">
+      <div className="flex justify-end">
+        <AutosaveStatus state={saveState} />
+      </div>
 
           {rotaryQ.isLoading ? (
             <SectionCard>
               <div className="space-y-3">{[0,1,2,3].map(i=><Skeleton key={i} className="h-9 w-full"/>)}</div>
             </SectionCard>
           ) : !s ? (
-            <SectionCard>
-              <p className="text-sm text-muted-foreground">Connect device to configure rotary encoder.</p>
-            </SectionCard>
+            <ConnectPrompt feature="configure the rotary encoder" />
           ) : (
             <>
-              <SectionCard>
+              <SectionCard
+                title="Live preview"
+                description="Mirrors what the encoder is doing right now."
+                icon={<IconRotateClockwise />}
+              >
                 <RotaryVisual
                   settings={s}
                   livePercent={livePreviewQ.data ?? null}
@@ -448,9 +458,13 @@ export default function Rotary() {
                 />
               </SectionCard>
 
-              <SectionCard title="Rotation">
-                <div className="flex flex-col divide-y">
-                  <FormRow label="Rotation Action" description="What rotating the knob controls">
+              <SectionCard
+                title="Rotation"
+                description="What turning the knob does, and how it responds."
+                icon={<IconArrowsHorizontal />}
+              >
+                <FormRows>
+                  <FormRow label="Rotation action" description="What turning the knob controls.">
                     <Select value={String(s.rotation_action)} disabled={!connected}
                       items={selectItems(ROTARY_ACTIONS)}
                       onValueChange={v => write({ rotation_action: Number(v) })}>
@@ -466,8 +480,8 @@ export default function Rotary() {
                   </FormRow>
                   {s.rotation_action === 0 && (
                     <FormRow
-                      label="Volume Overlay"
-                      description="Choose whether unfilled keys dim or keep the underlying RGB effect untouched"
+                      label="Volume overlay"
+                      description="Whether unfilled keys dim, or keep the underlying RGB effect untouched."
                     >
                       <div className="flex items-center gap-2">
                         <Select
@@ -491,13 +505,19 @@ export default function Rotary() {
                       </div>
                     </FormRow>
                   )}
-                  <FormRow label="Sensitivity">
-                    <div className="w-44">
-                      <CommitSlider min={1} max={16} step={1} value={s.sensitivity}
-                        onLiveChange={(v) => liveRotary({ sensitivity: v })}
-                        onCommit={(v) => write({ sensitivity: v })}
-                        disabled={!connected} className="flex-1" />
-                    </div>
+                  <FormRow
+                    stacked
+                    label="Sensitivity"
+                    description="How many detents the encoder must turn before one step is emitted."
+                  >
+                    <SliderField
+                      label="Detents per step"
+                      min={1} max={16} step={1}
+                      value={s.sensitivity}
+                      onLiveChange={(v) => liveRotary({ sensitivity: v })}
+                      onCommit={(v) => write({ sensitivity: v })}
+                      disabled={!connected}
+                    />
                   </FormRow>
                   <FormRow
                     label="Acceleration"
@@ -523,23 +543,36 @@ export default function Rotary() {
                       </SelectContent>
                     </Select>
                   </FormRow>
-                  <FormRow label="Step Size">
-                    <div className="w-44">
-                      <CommitSlider min={1} max={64} step={1} value={s.step_size}
-                        onLiveChange={(v) => liveRotary({ step_size: v })}
-                        onCommit={(v) => write({ step_size: v })}
-                        disabled={!connected} className="flex-1" />
-                    </div>
+                  <FormRow
+                    stacked
+                    label="Step size"
+                    description="How much each emitted step changes the target value."
+                  >
+                    <SliderField
+                      label="Units per step"
+                      min={1} max={64} step={1}
+                      value={s.step_size}
+                      onLiveChange={(v) => liveRotary({ step_size: v })}
+                      onCommit={(v) => write({ step_size: v })}
+                      disabled={!connected}
+                    />
                   </FormRow>
-                  <FormRow label="Invert Direction">
+                  <FormRow
+                    label="Invert direction"
+                    description="Swap which way counts as clockwise."
+                  >
                     <Switch checked={s.invert_direction} disabled={!connected}
                       onCheckedChange={v => write({ invert_direction: v })} />
                   </FormRow>
-                </div>
+                </FormRows>
               </SectionCard>
 
-              <SectionCard title="Button">
-                <FormRow label="Button Action" description="What pressing the knob does">
+              <SectionCard
+                title="Button"
+                description="The click action of the knob."
+                icon={<IconHandClick />}
+              >
+                <FormRow label="Button action" description="What pressing the knob does.">
                   <Select value={String(s.button_action)} disabled={!connected}
                     items={selectItems(ROTARY_BUTTON_ACTIONS)}
                     onValueChange={v => write({ button_action: Number(v) })}>
@@ -555,9 +588,13 @@ export default function Rotary() {
                 </FormRow>
               </SectionCard>
 
-              <SectionCard title="RGB Customizer" description="When rotation action is RGB Customizer">
-                <div className="flex flex-col divide-y">
-                  <FormRow label="RGB Behavior">
+              <SectionCard
+                title="RGB customizer"
+                description="Used when the rotation action above is set to RGB Customizer."
+                icon={<IconPalette />}
+              >
+                <FormRows>
+                  <FormRow label="Behaviour" description="Which RGB property the knob changes.">
                     <Select value={String(s.rgb_behavior)} disabled={!connected}
                       items={selectItems(ROTARY_RGB_BEHAVIORS)}
                       onValueChange={v => write({ rgb_behavior: Number(v) })}>
@@ -571,7 +608,7 @@ export default function Rotary() {
                       </SelectContent>
                     </Select>
                   </FormRow>
-                  <FormRow label="RGB Effect Mode">
+                  <FormRow label="Effect mode" description="Which effect the knob cycles into.">
                     <Select value={String(s.rgb_effect_mode)} disabled={!connected}
                       items={selectItemsReverse(LED_EFFECT_NAMES)}
                       onValueChange={v => write({ rgb_effect_mode: Number(v) })}>
@@ -585,13 +622,19 @@ export default function Rotary() {
                       </SelectContent>
                     </Select>
                   </FormRow>
-                </div>
+                </FormRows>
               </SectionCard>
 
-              <SectionCard title="Key Bindings" description="Custom keycode bindings for CW, CCW and click">
+              <SectionCard
+                title="Key bindings"
+                description="Send specific keycodes instead of a built-in action."
+                icon={<IconKeyboard />}
+              >
                 <div className="flex flex-col gap-4">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">CW Binding</p>
+                    <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Clockwise
+                    </p>
                     <BindingEditor
                       label="CW"
                       binding={s.cw_binding}
@@ -600,7 +643,9 @@ export default function Rotary() {
                     />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">CCW Binding</p>
+                    <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Counter-clockwise
+                    </p>
                     <BindingEditor
                       label="CCW"
                       binding={s.ccw_binding}
@@ -609,7 +654,9 @@ export default function Rotary() {
                     />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Click Binding</p>
+                    <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Click
+                    </p>
                     <BindingEditor
                       label="Click"
                       binding={s.click_binding}
@@ -620,9 +667,13 @@ export default function Rotary() {
                 </div>
               </SectionCard>
 
-              <SectionCard title="Progress Bar" description="LED progress bar display">
-                <div className="flex flex-col divide-y">
-                  <FormRow label="Style">
+              <SectionCard
+                title="Progress bar"
+                description="The LED readout that appears while you turn the knob."
+                icon={<IconProgress />}
+              >
+                <FormRows>
+                  <FormRow label="Style" description="How the filled portion is drawn.">
                     <Select value={String(s.progress_style)} disabled={!connected}
                       items={selectItems(ROTARY_PROGRESS_STYLES)}
                       onValueChange={v => write({ progress_style: Number(v) })}>
@@ -636,7 +687,7 @@ export default function Rotary() {
                       </SelectContent>
                     </Select>
                   </FormRow>
-                  <FormRow label="Effect Mode">
+                  <FormRow label="Effect mode" description="Effect rendered inside the filled portion.">
                     <Select value={String(s.progress_effect_mode)} disabled={!connected}
                       items={selectItemsReverse(LED_EFFECT_NAMES)}
                       onValueChange={v => write({ progress_effect_mode: Number(v) })}>
@@ -650,7 +701,7 @@ export default function Rotary() {
                       </SelectContent>
                     </Select>
                   </FormRow>
-                  <FormRow label="Progress Color" description="Solid color for progress bar">
+                  <FormRow label="Colour" description="Solid colour used by the progress bar.">
                     <ColorPicker
                       color={{
                         r: s.progress_color?.[0] ?? 255,
@@ -661,12 +712,10 @@ export default function Rotary() {
                       onChange={(c) => write({ progress_color: [c.r, c.g, c.b] })}
                     />
                   </FormRow>
-                </div>
+                </FormRows>
               </SectionCard>
             </>
           )}
-
-      </PageContent>
-    </div>
+    </PageContent>
   );
 }

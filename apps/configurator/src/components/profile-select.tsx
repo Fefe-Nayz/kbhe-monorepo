@@ -52,12 +52,15 @@ export function ProfileSelect() {
     slot,
     name,
     used: Boolean(profileUsedMask & (1 << slot)),
+    // An unused slot reports an empty name; showing a blank row is worse than
+    // naming the slot it would occupy.
+    label: name.trim() || `Slot ${slot + 1} — empty`,
   }));
 
   const items = [
     ...deviceProfiles.map((profile) => ({
       value: `device:${profile.slot}`,
-      label: profile.name,
+      label: profile.label,
     })),
     ...appProfiles.map((profile) => ({
       value: `app:${profile.name}`,
@@ -71,9 +74,14 @@ export function ProfileSelect() {
       ? `device:${activeDeviceSlot ?? activeProfileIndex}`
       : null;
 
-  const selectedValue = selectedCandidate && items.some((item) => item.value === selectedCandidate)
-    ? selectedCandidate
+  const selectedItem = selectedCandidate
+    ? items.find((item) => item.value === selectedCandidate)
     : undefined;
+  const selectedValue = selectedItem?.value;
+  // Render the label explicitly rather than relying on Base UI resolving it
+  // from `items`: the list is rebuilt whenever the device reports new profile
+  // names, and the trigger would fall back to its placeholder mid-refresh.
+  const selectedLabel = selectedItem?.label ?? "No profile";
 
   const handleValueChange = async (value: string | null) => {
     if (typeof value !== "string" || value.length === 0) {
@@ -117,16 +125,24 @@ export function ProfileSelect() {
       onValueChange={(value) => void handleValueChange(value)}
       disabled={switching}
     >
-      <SelectTrigger className="gap-1.5 text-xs font-medium">
-        <IconLayoutGrid className="size-3.5 text-muted-foreground" />
-        <SelectValue />
+      {/* Fixed width: without it the trigger collapses to the width of the
+          longest profile name and the header jumps on every switch. */}
+      <SelectTrigger
+        className="h-7 w-44 gap-1.5 text-xs font-medium"
+        aria-label="Active profile"
+        title="Active profile"
+      >
+        <IconLayoutGrid className="size-3.5 shrink-0 text-muted-foreground" />
+        <SelectValue className="min-w-0 overflow-hidden whitespace-nowrap">
+          {selectedLabel}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>
           <SelectLabel>Device</SelectLabel>
           {deviceProfiles.map((profile) => (
             <SelectItem key={profile.slot} value={`device:${profile.slot}`} disabled={!connected || !profile.used}>
-              {profile.name}
+              {profile.label}
             </SelectItem>
           ))}
         </SelectGroup>

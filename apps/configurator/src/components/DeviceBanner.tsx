@@ -4,7 +4,6 @@ import { useDeviceSession } from "@/lib/kbhe/session";
 import { DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheTransport } from "@/lib/kbhe/transport";
 import { libhmkRgbBridge } from "@/lib/kbhe/rgb-bridge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   IconPlugConnected,
@@ -20,32 +19,32 @@ const STATUS_CONFIG = {
   disconnected: {
     label: "No device",
     icon: IconPlugConnectedX,
-    variant: "secondary" as const,
-    className: "text-muted-foreground",
+    dotClassName: "bg-muted-foreground/50",
+    className: "border-border bg-muted/60 text-muted-foreground",
   },
   connecting: {
-    label: "Connecting…",
+    label: "Connecting",
     icon: IconLoader2,
-    variant: "secondary" as const,
-    className: "text-muted-foreground animate-spin",
+    dotClassName: "bg-warning",
+    className: "border-border bg-muted/60 text-muted-foreground",
   },
   connected: {
     label: "Connected",
     icon: IconPlugConnected,
-    variant: "default" as const,
-    className: "text-green-500",
+    dotClassName: "bg-success",
+    className: "border-success/30 bg-success/10 text-success",
   },
   updater: {
-    label: "Updater mode",
+    label: "Updater",
     icon: IconPlugConnected,
-    variant: "default" as const,
-    className: "text-yellow-500",
+    dotClassName: "bg-warning",
+    className: "border-warning/30 bg-warning/10 text-warning",
   },
   error: {
-    label: "Connection error",
+    label: "Error",
     icon: IconAlertTriangle,
-    variant: "destructive" as const,
-    className: "text-red-500",
+    dotClassName: "bg-destructive",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
   },
 } as const;
 
@@ -53,13 +52,24 @@ const STATUS_CONFIG = {
 export function DeviceStatusChip() {
   const { status } = useDeviceSession();
   const cfg = STATUS_CONFIG[status];
-  const Icon = cfg.icon;
 
   return (
-    <Badge variant={cfg.variant} className="gap-1.5 text-xs font-medium">
-      <Icon className={cn("size-3", status === "connecting" && "animate-spin")} />
+    <span
+      className={cn(
+        "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium",
+        cfg.className,
+      )}
+      title={`Device status: ${cfg.label}`}
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          cfg.dotClassName,
+          status === "connecting" && "animate-pulse",
+        )}
+      />
       {cfg.label}
-    </Badge>
+    </span>
   );
 }
 
@@ -90,11 +100,12 @@ export function DeviceBanner() {
 
   if (rgbBridgeDevice) {
     return (
-      <div className="flex min-h-11 items-center gap-2 border-b border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm">
-        <IconBulb className="size-4 shrink-0 text-blue-500" />
-        <span className="truncate">
-          {rgbBridgeDevice.product ?? "libhmk keyboard"} detected in isolated RGB bridge mode.
-          Lighting controls are available; native profiles and firmware updates stay disabled.
+      <div className="flex min-h-10 items-center gap-2.5 border-b border-info/25 bg-info/8 px-5 py-2 text-xs">
+        <IconBulb className="size-4 shrink-0 text-info" />
+        <span className="truncate text-foreground/90">
+          <span className="font-medium">{rgbBridgeDevice.product ?? "libhmk keyboard"}</span>{" "}
+          detected in isolated RGB bridge mode — lighting controls are available; native
+          profiles and firmware updates stay disabled.
         </span>
       </div>
     );
@@ -105,35 +116,41 @@ export function DeviceBanner() {
   return (
     <div
       className={cn(
-        "flex min-h-11 items-center gap-3 border-b px-4 py-2 text-sm",
+        "flex min-h-10 items-center gap-2.5 border-b px-5 py-2 text-xs",
         isError
-          ? "bg-destructive/10 border-destructive/30 text-destructive"
-          : "bg-muted/60 border-border text-muted-foreground",
+          ? "border-destructive/25 bg-destructive/8 text-destructive"
+          : "border-border bg-muted/50 text-muted-foreground",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
         {isError ? (
-          <IconAlertTriangle className="size-4 shrink-0" />
+          <IconAlertTriangle className="size-3.5 shrink-0" />
+        ) : status === "connecting" ? (
+          <IconLoader2 className="size-3.5 shrink-0 animate-spin" />
         ) : (
-          <IconPlugConnectedX className="size-4 shrink-0" />
+          <IconPlugConnectedX className="size-3.5 shrink-0" />
         )}
         <span className="truncate">
           {isError
-            ? `Device error: ${error ?? "unknown"}`
+            ? `Device error — ${error ?? "unknown"}`
             : status === "connecting"
               ? "Connecting to KBHE device…"
-              : "No KBHE device detected. Connect via USB."}
+              : "No KBHE device detected. Connect your keyboard over USB."}
         </span>
       </div>
 
-      <div className="flex w-36 shrink-0 items-center justify-end gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {firmwareVersion && (
-          <span className="truncate text-xs opacity-60">fw {firmwareVersion}</span>
+          <span className="truncate font-mono text-[0.68rem] opacity-60">fw {firmwareVersion}</span>
         )}
         <Button
           variant="ghost"
-          size="sm"
-          className={cn("h-7 gap-1.5 text-xs", status === "connecting" && "invisible pointer-events-none")}
+          size="xs"
+          className={cn(
+            "gap-1.5",
+            isError && "text-destructive hover:bg-destructive/10 hover:text-destructive",
+            status === "connecting" && "invisible pointer-events-none",
+          )}
           disabled={status === "connecting"}
           onClick={() => void DeviceSessionManager.reconnect()}
         >

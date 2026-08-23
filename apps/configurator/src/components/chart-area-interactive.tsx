@@ -141,6 +141,13 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
+/** Shared by the ToggleGroup and the Select so the trigger shows the label. */
+const TIME_RANGE_OPTIONS = [
+  { value: "90d", label: "Last 3 months" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "7d", label: "Last 7 days" },
+]
+
 export function ChartAreaInteractive() {
   const isMobile = useIsMobile()
   const [timeRange, setTimeRange] = React.useState("90d")
@@ -191,6 +198,7 @@ export function ChartAreaInteractive() {
           </ToggleGroup>
           <Select
             value={timeRange}
+            items={TIME_RANGE_OPTIONS}
             onValueChange={(value) => {
               if (value !== null) {
                 setTimeRange(value)
@@ -206,15 +214,11 @@ export function ChartAreaInteractive() {
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               <SelectGroup>
-                <SelectItem value="90d" className="rounded-lg">
-                  Last 3 months
-                </SelectItem>
-                <SelectItem value="30d" className="rounded-lg">
-                  Last 30 days
-                </SelectItem>
-                <SelectItem value="7d" className="rounded-lg">
-                  Last 7 days
-                </SelectItem>
+                {TIME_RANGE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value} className="rounded-lg">
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>

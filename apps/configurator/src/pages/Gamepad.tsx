@@ -6,7 +6,12 @@ import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { AnalogCurveEditor, type CurvePoint } from "@/components/analog-curve";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
-import { SectionCard, FormRow } from "@/components/shared/SectionCard";
+import { SectionCard, FormRow, FormRows } from "@/components/shared/SectionCard";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ConnectPrompt } from "@/components/shared/ConnectPrompt";
+import { SegmentedControl } from "@/components/shared/SegmentedControl";
+import { Toolbar, ToolbarDivider } from "@/components/shared/Toolbar";
+import { IconChartLine, IconCircleDot, IconPointer, IconRoute } from "@tabler/icons-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -347,31 +352,33 @@ export default function Gamepad() {
   const isXInput = gs?.api_mode === GAMEPAD_API_MODES["XInput (Xbox Compatible)"];
 
   const menubar = (
-    <>
-      <div className="flex items-center gap-3">
-        <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">HID</span>
-          <Switch
-            checked={isXInput}
+    <Toolbar
+      left={
+        <>
+          <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
+          <ToolbarDivider />
+          <span className="text-xs text-muted-foreground">Reports as</span>
+          <SegmentedControl
+            aria-label="Gamepad API mode"
+            value={isXInput ? "xinput" : "hid"}
             disabled={!connected || gamepadQ.isLoading}
-            onCheckedChange={(v) => {
+            onChange={(value) => {
               if (!gs) return;
               commitGamepadSettings({
-                api_mode: v
+                api_mode: value === "xinput"
                   ? GAMEPAD_API_MODES["XInput (Xbox Compatible)"]
                   : GAMEPAD_API_MODES["HID (DirectInput)"],
               });
             }}
+            options={[
+              { value: "hid", label: "HID", title: "DirectInput — broad compatibility" },
+              { value: "xinput", label: "XInput", title: "Xbox controller emulation" },
+            ]}
           />
-          <span className="text-sm text-muted-foreground">XInput</span>
-        </div>
-        <Badge variant="outline" className="text-xs">
-          {isXInput ? "XInput" : "HID"}
-        </Badge>
-      </div>
-      <AutosaveStatus state={saveState} />
-    </>
+        </>
+      }
+      right={<AutosaveStatus state={saveState} />}
+    />
   );
 
   // ── Main render ──
@@ -393,41 +400,43 @@ export default function Gamepad() {
       menubar={menubar}
     >
       <Tabs defaultValue="setup" className="flex flex-col gap-4">
-        <TabsList className="w-fit">
-          <TabsTrigger value="setup">
-            <IconDeviceGamepad className="size-4 mr-1.5" />
-            Setup
+        <TabsList className="h-8 w-fit">
+          <TabsTrigger value="setup" className="gap-1.5 text-xs">
+            <IconDeviceGamepad className="size-3.5" />
+            Button map
           </TabsTrigger>
-          <TabsTrigger value="analog">
-            <IconDeviceGamepad2 className="size-4 mr-1.5" />
-            Analog
+          <TabsTrigger value="analog" className="gap-1.5 text-xs">
+            <IconDeviceGamepad2 className="size-3.5" />
+            Analog output
           </TabsTrigger>
         </TabsList>
 
         {/* ─── Setup Tab ─── */}
-        <TabsContent value="setup" className="mt-0">
+        <TabsContent value="setup" className="mt-0 [&[data-ending-style]]:hidden">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
             {/* Left: gamepad button grid */}
             <SectionCard
-              title={
-                keyIndex != null
-                  ? `Key ${keyIndex} — Assign Gamepad Button (Layer ${currentLayer})`
-                  : "Gamepad Button Map"
-              }
+              title="Button map"
+              icon={<IconDeviceGamepad />}
               description={
                 keyIndex == null
-                  ? "Select a key above, then click a button to assign"
-                  : "Click a button to assign it for the selected layer"
+                  ? "Pick a key in the preview above, then choose the controller button it should send."
+                  : `Choose the controller button key ${keyIndex} sends on this layer.`
+              }
+              headerRight={
+                keyIndex != null ? (
+                  <Badge variant="secondary">Key {keyIndex}</Badge>
+                ) : undefined
               }
             >
               {!connected ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  Connect a device to configure gamepad mapping.
-                </p>
+                <ConnectPrompt feature="map keys to controller buttons" />
               ) : keyIndex == null ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  Select a key on the keyboard above.
-                </p>
+                <EmptyState
+                  icon={<IconPointer />}
+                  title="No key selected"
+                  description="Click a key in the keyboard above to see and change the controller button it sends."
+                />
               ) : keyMapQ.isLoading ? (
                 <div className="grid grid-cols-4 gap-2">
                   {Array.from({ length: 16 }, (_, i) => (
@@ -519,11 +528,15 @@ export default function Gamepad() {
 
             {/* Right: global switches */}
             <div className="flex flex-col gap-4">
-              <SectionCard title="Input Routing">
-                <div className="flex flex-col divide-y">
+              <SectionCard
+                title="Input routing"
+                description="How the keyboard and controller interfaces coexist."
+                icon={<IconRoute />}
+              >
+                <FormRows>
                   <FormRow
-                    label="Gamepad Enabled"
-                    description="Enable or disable gamepad output on the device"
+                    label="Gamepad output"
+                    description="Expose the controller interface to the host."
                   >
                     <Switch
                       checked={gamepadEnabled}
@@ -532,10 +545,10 @@ export default function Gamepad() {
                     />
                   </FormRow>
                   <FormRow
-                    label="Keyboard Routing"
+                    label="Keyboard routing"
                     description={keyboardEnabled
-                      ? "How keyboard output behaves alongside gamepad"
-                      : "Enable Keyboard in Device page to change this"
+                      ? "Which keys keep sending keystrokes while the gamepad is active."
+                      : "Turn on keyboard output on the Device page to change this."
                     }
                   >
                     {gamepadQ.isLoading ? (
@@ -563,7 +576,7 @@ export default function Gamepad() {
                       </Select>
                     )}
                   </FormRow>
-                </div>
+                </FormRows>
               </SectionCard>
 
               <StickPreview
@@ -575,19 +588,18 @@ export default function Gamepad() {
         </TabsContent>
 
         {/* ─── Analog Tab ─── */}
-        <TabsContent value="analog" className="mt-0">
+        <TabsContent value="analog" className="mt-0 [&[data-ending-style]]:hidden">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
             {/* Left: curve editor */}
             <SectionCard
-              title="Analog Curve"
-              description="Drag points to shape the distance-to-output mapping"
+              title="Analog curve"
+              description="Drag the points to shape how key travel maps to stick output."
+              icon={<IconChartLine />}
             >
               {!connected || gamepadQ.isLoading ? (
                 <Skeleton className="h-60 w-full" />
               ) : !gs ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  Connect device to edit analog curve.
-                </p>
+                <ConnectPrompt feature="edit the analog curve" />
               ) : (
                 <AnalogCurveEditor
                   points={curvePoints}
@@ -599,11 +611,15 @@ export default function Gamepad() {
 
             {/* Right: analog options */}
             <div className="flex flex-col gap-4">
-              <SectionCard title="Stick Options">
-                <div className="flex flex-col divide-y">
+              <SectionCard
+                title="Stick behaviour"
+                description="How key travel is shaped into stick output."
+                icon={<IconCircleDot />}
+              >
+                <FormRows>
                   <FormRow
-                    label="Square Joystick Mode"
-                    description="Snap stick output to a square boundary"
+                    label="Square gate"
+                    description="Let the stick reach its corners instead of a circular limit."
                   >
                     <Switch
                       checked={gs?.square_mode ?? false}
@@ -615,8 +631,8 @@ export default function Gamepad() {
                     />
                   </FormRow>
                   <FormRow
-                    label="Snappy Joystick"
-                    description="Enhanced stick response curve"
+                    label="Snappy response"
+                    description="Sharpen the response curve so small movements register sooner."
                   >
                     <Switch
                       checked={gs?.reactive_stick ?? false}
@@ -627,7 +643,7 @@ export default function Gamepad() {
                       }}
                     />
                   </FormRow>
-                </div>
+                </FormRows>
               </SectionCard>
 
               <StickPreview
@@ -677,9 +693,18 @@ function StickPreview({
   }
 
   return (
-    <SectionCard title="Stick Preview" description="Live analog stick position">
+    <SectionCard
+      title="Stick preview"
+      description="Live analog stick position, read from the keyboard."
+      icon={<IconCircleDot />}
+    >
       {!connected ? (
-        <p className="text-sm text-muted-foreground py-4">Connect device to see live preview.</p>
+        <EmptyState
+          size="sm"
+          icon={<IconCircleDot />}
+          title="Nothing to show"
+          description="Connect the keyboard to watch the stick move in real time."
+        />
       ) : (
         <div className="flex items-center justify-center py-2">
           <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>

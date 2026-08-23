@@ -3,6 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { SectionCard } from "@/components/shared/SectionCard";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ConnectPrompt } from "@/components/shared/ConnectPrompt";
+import { SegmentedControl } from "@/components/shared/SegmentedControl";
+import { Toolbar, ToolbarDivider, ToolbarStat } from "@/components/shared/Toolbar";
+import { IconAlertTriangle, IconCrosshair, IconWand } from "@tabler/icons-react";
 import { useAutosave } from "@/components/AutosaveStatus";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +15,6 @@ import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/components/theme-provider";
 import { previewKeys } from "@/constants/defaultLayout";
 import { useKeyboardStore } from "@/stores/keyboard-store";
@@ -696,50 +700,59 @@ export default function Calibration() {
   }, [calibrationQ.data, commitCalibrationArrays]);
 
   const menubar = (
-    <>
-      <div className="flex items-center gap-2">
-        <Badge variant={connected ? "secondary" : "outline"} className="text-xs">
-          {connected ? "Device Connected" : "Device Disconnected"}
-        </Badge>
-        <Badge variant="outline" className="text-xs">
-          Selected: {keyIndex == null ? "None" : focusedKeyLabel}
-        </Badge>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Distance (mm)</span>
-        <Switch
-          checked={previewMode === "offset"}
-          onCheckedChange={(checked) => setPreviewMode(checked ? "offset" : "distance")}
-        />
-        <span className="text-xs text-muted-foreground">Calibration (ADC)</span>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8"
-          onClick={() => void qc.invalidateQueries({ queryKey: ["calibration"] })}
-        >
-          <IconRefresh className="size-4" />
-          Reload
-        </Button>
-      </div>
-    </>
+    <Toolbar
+      left={
+        <>
+          <ToolbarStat
+            label="Selected"
+            value={keyIndex == null ? "No key" : focusedKeyLabel}
+            tone={keyIndex == null ? "default" : "active"}
+          />
+          <ToolbarDivider />
+          <span className="truncate text-xs text-muted-foreground">
+            Keys are shaded by their current reading
+          </span>
+        </>
+      }
+      right={
+        <>
+          <SegmentedControl
+            aria-label="Preview values"
+            value={previewMode}
+            onChange={(value) => setPreviewMode(value)}
+            options={[
+              { value: "distance", label: "Distance (mm)" },
+              { value: "offset", label: "Raw ADC" },
+            ]}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void qc.invalidateQueries({ queryKey: ["calibration"] })}
+          >
+            <IconRefresh className="size-4" />
+            Reload
+          </Button>
+        </>
+      }
+    />
   );
 
   return (
     <KeyboardEditor keyboard={selectionKeyboard} menubar={menubar}>
       <div className="flex flex-col gap-4">
         {keyIndex == null ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/20 border-dashed">
-            <div className="flex size-14 items-center justify-center rounded-full bg-muted/50 mb-4">
-              <IconPointer className="size-6 text-muted-foreground" />
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Sélectionnez une touche</h3>
-            <p className="text-xs text-muted-foreground max-w-[300px] mt-1.5">
-              Cliquez sur une touche du clavier interactif ci-dessus pour modifier ses paramètres de calibration individuellement.
-            </p>
-          </div>
+          <EmptyState
+            icon={<IconPointer />}
+            title="No key selected"
+            description="Click a key in the keyboard above to inspect and hand-tune its calibration. Leave everything deselected to run the guided procedure below."
+          />
         ) : (
-          <SectionCard title={`Key ${focusedKeyLabel} Calibration`}>
+          <SectionCard
+            title={`Calibration — ${focusedKeyLabel}`}
+            description="Zero is the resting sensor reading; max is the reading at full travel."
+            icon={<IconCrosshair />}
+          >
             <div className="flex flex-col gap-4">
               {calibrationQ.isLoading ? (
                 <div className="flex flex-col gap-2">
@@ -819,30 +832,35 @@ export default function Calibration() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">Connect device to edit key calibration.</p>
+                <ConnectPrompt feature="edit this key's calibration" />
               )}
             </div>
           </SectionCard>
         )}
 
         {(keyIndex == null || guidedState === "running") && (
-          <SectionCard title="Calibration Procedure">
+          <SectionCard
+            title="Guided calibration"
+            description="Recompute zero and max for every key, one key at a time."
+            icon={<IconWand />}
+          >
             <div className="flex flex-col gap-4">
-              <p className="text-sm text-muted-foreground">
-                Guided calibration removes the current calibration for all keys, then recomputes zero and max values key by key.
-                Start it only when no key is selected, and follow LED prompts until completion.
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                This clears the existing calibration for all keys, then walks the board key by
+                key. Follow the LED prompts and press each highlighted key fully. Run it with
+                no key selected.
               </p>
 
               <div className="flex flex-wrap items-center gap-2">
                 {guidedState === "running" ? (
                   <Button variant="destructive" size="sm" onClick={() => void guidedAbort()}>
                     <IconPlayerStop className="size-4" />
-                    Abort Guided Calibration
+                    Abort
                   </Button>
                 ) : (
                   <Button size="sm" disabled={!connected || keyIndex != null} onClick={() => void guidedStart()}>
                     <IconPlayerPlay className="size-4" />
-                    Start Guided Calibration
+                    Start guided calibration
                   </Button>
                 )}
 
@@ -857,7 +875,7 @@ export default function Calibration() {
                 <div className="flex flex-col gap-2">
                   <Progress value={guidedProgress} className="h-2" />
                   <span className="text-xs text-muted-foreground">
-                    {guidedState === "running" && `Calibrating... ${guidedProgress}%`}
+                    {guidedState === "running" && `Calibrating… ${guidedProgress}%`}
                     {guidedState === "success" && "Calibration complete."}
                     {guidedState === "error" && "Calibration failed."}
                   </span>
@@ -868,7 +886,12 @@ export default function Calibration() {
         )}
 
         {keyIndex == null && (
-          <SectionCard title="Restore Calibration">
+          <SectionCard
+            tone="danger"
+            title="Reset calibration"
+            description="Return every key to the keyboard-wide reference values."
+            icon={<IconAlertTriangle />}
+          >
             {calibrationQ.isLoading ? (
               <div className="flex flex-col gap-2">
                 <Skeleton className="h-8 w-full" />
@@ -876,8 +899,9 @@ export default function Calibration() {
               </div>
             ) : calibrationQ.data ? (
               <div className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
-                  This will delete all calibration parameters (zero and max) for every key and restore keyboard-wide reference values.
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Deletes the per-key zero and max values for the whole board. Keys will use
+                  the factory reference until they are calibrated again.
                 </p>
                 <Button
                   size="sm"
@@ -886,11 +910,11 @@ export default function Calibration() {
                   disabled={!connected || autoCalibrateMutation.isPending}
                   onClick={() => void restoreAllCalibration()}
                 >
-                  Restore Calibration (All Keys)
+                  Reset all keys
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Connect device to restore calibration.</p>
+              <ConnectPrompt feature="reset calibration" />
             )}
           </SectionCard>
         )}

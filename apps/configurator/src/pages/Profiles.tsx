@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SectionCard } from "@/components/shared/SectionCard";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -62,6 +62,15 @@ import {
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { PageContent } from "@/components/shared/PageLayout";
+import { StatTile } from "@/components/shared/StatTile";
+import { EmptyState } from "@/components/shared/EmptyState";
+import {
+  IconDeviceDesktop,
+  IconLayoutGrid,
+  IconPlayerPlay,
+  IconPlugConnected,
+  IconPlugConnectedX,
+} from "@tabler/icons-react";
 
 type ProfileTargetType = "device" | "app";
 const MAX_PROFILE_IMPORT_BYTES = 2 * 1024 * 1024;
@@ -667,56 +676,128 @@ export default function Profiles() {
     });
   };
 
+  const runtimeLabel =
+    runtimeSource === "app" && effectiveRamOnly
+      ? "Temporary app profile (RAM only)"
+      : runtimeSource === "device"
+        ? "Device profile"
+        : "App profile";
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <PageContent>
-        <SectionCard
-          title="Profiles"
-          description="Device and app profiles are managed together. Device profiles occupy keyboard slots; app profiles are stored durably in the app data directory and can be applied in temporary RAM-only mode."
-        >
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">Device Slots: {usedDeviceSlots}/{SETTINGS_PROFILE_COUNT}</Badge>
-            <Badge variant={effectiveRamOnly ? "default" : "outline"}>
-              Runtime: {runtimeSource === "app" && effectiveRamOnly ? "Temporary App (RAM only)" : runtimeSource === "device" ? "Device Profile" : "App Profile"}
-            </Badge>
-            {!connected && (
-              <Badge variant="outline">Keyboard disconnected</Badge>
-            )}
+    <>
+      <PageContent containerClassName="max-w-6xl">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">Profiles</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Device profiles live in the keyboard&rsquo;s own slots and survive unplugging.
+              App profiles are stored on this computer and can be applied temporarily,
+              without writing to the keyboard&rsquo;s flash.
+            </p>
           </div>
+          <Button
+            className="shrink-0"
+            onClick={() => {
+              setNewName("");
+              setCreateType("app");
+              setCreateOpen(true);
+            }}
+          >
+            <IconPlus className="size-4" />
+            New profile
+          </Button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <StatTile
+            label="Device slots"
+            icon={<IconDeviceFloppy />}
+            tone={usedDeviceSlots >= SETTINGS_PROFILE_COUNT ? "warning" : "default"}
+            value={`${usedDeviceSlots} of ${SETTINGS_PROFILE_COUNT} used`}
+            hint={
+              freeDeviceSlot == null
+                ? "No free slot on the keyboard"
+                : `Next free slot: ${freeDeviceSlot + 1}`
+            }
+          />
+          <StatTile
+            label="Running now"
+            icon={<IconPlayerPlay />}
+            tone={effectiveRamOnly ? "warning" : "success"}
+            value={runtimeLabel}
+            hint={
+              effectiveRamOnly
+                ? "Changes are lost when the keyboard restarts"
+                : "Changes persist on the keyboard"
+            }
+          />
+          <StatTile
+            label="Keyboard"
+            icon={connected ? <IconPlugConnected /> : <IconPlugConnectedX />}
+            tone={connected ? "success" : "default"}
+            value={connected ? "Connected" : "Disconnected"}
+            hint={
+              connected
+                ? "Device profiles can be switched"
+                : "App profiles remain editable offline"
+            }
+          />
+        </div>
 
           {!connected && profiles.length === 0 ? (
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-22 w-full" />
-              <Skeleton className="h-22 w-full" />
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <Skeleton className="h-28 w-full rounded-xl" />
+              <Skeleton className="h-28 w-full rounded-xl" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {profiles.map((profile) => {
                 const canDeleteDevice = profile.kind === "device" ? usedDeviceSlots > 1 || !profile.used : true;
 
                 return (
                   <div
                     key={profile.id}
-                    className="rounded-lg border bg-card p-4 shadow-sm flex flex-col gap-3 transition-colors hover:border-primary/30"
+                    className={cn(
+                      "flex flex-col gap-3 rounded-xl border bg-card p-4 transition-colors",
+                      profile.isRuntimeActive
+                        ? "border-success/40 ring-1 ring-success/20"
+                        : "hover:border-foreground/20",
+                    )}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <span className="text-sm font-medium truncate">{profile.name}</span>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge variant="outline" className="text-[10px]">
-                            {profile.kind === "device" ? `Device Slot ${profile.slot + 1}` : "App"}
-                          </Badge>
-                          {profile.isRuntimeActive && (
-                            <Badge className="gap-1 text-[10px]">
-                              <IconCheck className="size-3" /> Running
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div
+                          className={cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                            profile.isRuntimeActive
+                              ? "bg-success/12 text-success"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {profile.kind === "device" ? (
+                            <IconDeviceFloppy className="size-4.5" />
+                          ) : (
+                            <IconDeviceDesktop className="size-4.5" />
+                          )}
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <span className="truncate text-sm font-semibold">{profile.name}</span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" className="text-[0.65rem]">
+                              {profile.kind === "device" ? `Slot ${profile.slot + 1}` : "On this PC"}
                             </Badge>
-                          )}
-                          {profile.kind === "device" && profile.isDefault && (
-                            <Badge variant="secondary" className="text-[10px]">Boot Default</Badge>
-                          )}
-                          {profile.kind === "app" && profile.isRuntimeActive && effectiveRamOnly && (
-                            <Badge variant="secondary" className="text-[10px]">Temporary RAM</Badge>
-                          )}
+                            {profile.isRuntimeActive && (
+                              <Badge className="gap-1 bg-success text-[0.65rem] text-success-foreground">
+                                <IconCheck className="size-3" /> Running
+                              </Badge>
+                            )}
+                            {profile.kind === "device" && profile.isDefault && (
+                              <Badge variant="secondary" className="text-[0.65rem]">Boot default</Badge>
+                            )}
+                            {profile.kind === "app" && profile.isRuntimeActive && effectiveRamOnly && (
+                              <Badge variant="secondary" className="text-[0.65rem]">Temporary</Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -856,39 +937,56 @@ export default function Profiles() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full h-7 text-xs gap-1"
+                        className="w-full"
                         disabled={actionPending || (profile.kind === "device" && !connected)}
                         onClick={() => handleActivateProfile(profile)}
                       >
-                        <IconRefresh className="size-3" />
-                        {profile.kind === "device" ? "Use on Keyboard" : "Apply Temporary"}
+                        <IconPlayerPlay className="size-3" />
+                        {profile.kind === "device" ? "Use on keyboard" : "Apply temporarily"}
                       </Button>
                     )}
                   </div>
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setNewName("");
-                  setCreateType("app");
-                  setCreateOpen(true);
-                }}
-                className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors min-h-22 cursor-pointer"
-              >
-                <IconPlus className="size-5" />
-                <span className="text-xs font-medium">New Profile</span>
-              </button>
+              {profiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewName("");
+                    setCreateType("app");
+                    setCreateOpen(true);
+                  }}
+                  className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-4 text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/40 hover:text-foreground"
+                >
+                  <IconPlus className="size-5" />
+                  <span className="text-xs font-medium">New profile</span>
+                </button>
+              )}
             </div>
           )}
 
-          {profiles.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              No profiles yet. Create one to get started.
-            </div>
+          {profiles.length === 0 && connected && (
+            <EmptyState
+              size="lg"
+              icon={<IconLayoutGrid />}
+              title="No profiles yet"
+              description="Create a profile to keep a full set of keymaps, actuation settings and lighting together, and switch between them in one click."
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setNewName("");
+                    setCreateType("app");
+                    setCreateOpen(true);
+                  }}
+                >
+                  <IconPlus className="size-4" />
+                  Create a profile
+                </Button>
+              }
+            />
           )}
-        </SectionCard>
       </PageContent>
 
       <input
@@ -903,9 +1001,10 @@ export default function Profiles() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Profile</DialogTitle>
+            <DialogTitle>Create a profile</DialogTitle>
             <DialogDescription>
-              Choose where the profile is stored.
+              App profiles are stored on this computer; device profiles take one of the
+              keyboard&rsquo;s {SETTINGS_PROFILE_COUNT} slots.
             </DialogDescription>
           </DialogHeader>
           <Select
@@ -1066,6 +1165,6 @@ export default function Profiles() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

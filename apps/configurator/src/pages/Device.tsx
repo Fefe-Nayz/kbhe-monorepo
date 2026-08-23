@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
@@ -8,11 +9,11 @@ import {
   patchActiveAppProfileOptions,
 } from "@/lib/kbhe/profile-snapshot-store";
 import { queryKeys } from "@/lib/query/keys";
-import { SectionCard, FormRow } from "@/components/shared/SectionCard";
-import { PageContent } from "@/components/shared/PageLayout";
+import { SectionCard, FormRow, FormRows } from "@/components/shared/SectionCard";
+import { PageContent, PageSection } from "@/components/shared/PageLayout";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,9 +28,11 @@ import {
 import {
   IconRefresh,
   IconPower,
+  IconPlugConnected,
   IconDatabaseExport,
   IconAlertTriangle,
   IconRotateClockwise2,
+  IconTag,
 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -207,189 +210,260 @@ export default function Device() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <PageContent>
-
-          <SectionCard title="Connection">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">Device:</span>
-                <span className="text-sm font-medium">{deviceInfo?.product ?? "Not connected"}</span>
-              </div>
-              {deviceInfo && (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">VID:PID:</span>
-                  <Badge variant="secondary" className="font-mono text-xs">
-                    {deviceInfo.vid.toString(16).padStart(4, "0")}:{deviceInfo.pid.toString(16).padStart(4, "0")}
-                  </Badge>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">Serial:</span>
-                {serialNumber ? (
-                  <Badge variant="secondary" className="font-mono text-xs">{serialNumber}</Badge>
-                ) : connected && deviceIdentityQ.isLoading ? (
-                  <Skeleton className="h-5 w-40" />
-                ) : (
-                  <span className="text-sm text-muted-foreground">Unavailable</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">Firmware:</span>
-                {firmwareVersion ? (
-                  <Badge variant="secondary" className="font-mono">{firmwareVersion}</Badge>
-                ) : (
-                  <Skeleton className="h-5 w-16" />
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground">Status:</span>
-                <Badge variant={connected ? "default" : "secondary"}>{status}</Badge>
-              </div>
-              <div className="flex flex-col gap-2 pt-1">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-muted-foreground">Keyboard Name:</span>
-                  <span className="text-xs text-muted-foreground">
-                    {keyboardNameInput.length}/{KEYBOARD_NAME_LENGTH}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Input
-                    value={keyboardNameInput}
-                    maxLength={KEYBOARD_NAME_LENGTH}
-                    disabled={keyboardNameDisabled}
-                    placeholder="Custom keyboard name"
-                    onChange={(event) => handleKeyboardNameChange(event.target.value)}
-                    className="font-mono"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-
-                      disabled={keyboardNameDisabled || !keyboardNameDirty}
-                      onClick={() => setKeyboardNameMutation.mutate(keyboardNameInput)}
-                    >
-                      Apply Name
-                    </Button>
-                    <Button
-                      variant="ghost"
-
-                      disabled={keyboardNameDisabled || !keyboardNameDirty}
-                      onClick={() => {
-                        setKeyboardNameInput(deviceKeyboardName);
-                        setKeyboardNameDirty(false);
-                      }}
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                </div>
-                {connected && !identitySupported && !deviceIdentityQ.isLoading && (
-                  <p className="text-xs text-muted-foreground">
-                    This firmware does not expose device identity commands (0x2B/0x2C/0x2D).
-                  </p>
-                )}
-              </div>
-              <Button variant="outline" size="sm" className="w-fit gap-1.5"
-                onClick={() => void DeviceSessionManager.reconnect()}>
+    <PageContent containerClassName="max-w-5xl">
+      <PageSection title="Identity">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <SectionCard
+            title="Connection"
+            description="What the app currently sees on the USB bus."
+            icon={<IconPlugConnected />}
+            footer={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void DeviceSessionManager.reconnect()}
+              >
                 <IconRefresh className="size-4" />
                 Reconnect
               </Button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Options">
-            <div className="flex flex-col divide-y">
-              <div className="py-3 first:pt-0 last:pb-0">
-                <FormRow label="Keyboard Enabled" className="py-0">
-                  <Switch
-                    checked={keyboardEnabled}
-                    disabled={!connected}
-                    onCheckedChange={(v) => toggleMutation.mutate({ key: "keyboard", value: v })}
-                  />
-                </FormRow>
-                <div className="mt-3 ml-3 border-l pl-4">
-                  <FormRow
-                    label="NKRO Enabled"
-                    description={keyboardEnabled
-                      ? "N-Key Rollover for full anti-ghosting"
-                      : "Enable Keyboard first to modify NKRO"
-                    }
-                    className="py-1"
+            }
+          >
+            <dl className="flex flex-col">
+              <DetailRow label="Device" value={deviceInfo?.product ?? "Not connected"} />
+              <DetailRow
+                label="Status"
+                value={
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 font-medium capitalize",
+                      connected ? "text-success" : "text-muted-foreground",
+                    )}
                   >
-                    <Switch
-                      checked={nkroEnabledQ.data ?? false}
-                      disabled={!connected || !keyboardEnabled}
-                      onCheckedChange={(v) => toggleMutation.mutate({ key: "nkro", value: v })}
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        connected ? "bg-success" : "bg-muted-foreground/50",
+                      )}
                     />
-                  </FormRow>
-                </div>
-              </div>
-              <FormRow label="Gamepad Enabled">
-                <Switch checked={optionsQ.data?.gamepad_enabled ?? false} disabled={!connected}
-                  onCheckedChange={(v) => toggleMutation.mutate({ key: "gamepad", value: v })} />
-              </FormRow>
-              <FormRow label="LED Enabled">
-                <Switch checked={ledEnabledQ.data ?? false} disabled={!connected}
-                  onCheckedChange={(v) => toggleMutation.mutate({ key: "led", value: v })} />
-              </FormRow>
-              <FormRow
-                label="LED Thermal Protection"
-                description="Limit LED brightness automatically when MCU temperature is high"
-              >
-                <Switch
-                  checked={optionsQ.data?.led_thermal_protection_enabled ?? true}
-                  disabled={!connected || !optionsQ.data}
-                  onCheckedChange={(v) =>
-                    toggleMutation.mutate({ key: "led_thermal_protection", value: v })
-                  }
+                    {status}
+                  </span>
+                }
+              />
+              {deviceInfo && (
+                <DetailRow
+                  label="VID:PID"
+                  mono
+                  value={`${deviceInfo.vid.toString(16).padStart(4, "0")}:${deviceInfo.pid
+                    .toString(16)
+                    .padStart(4, "0")}`}
                 />
-              </FormRow>
-            </div>
+              )}
+              <DetailRow
+                label="Serial"
+                mono
+                value={
+                  serialNumber ??
+                  (connected && deviceIdentityQ.isLoading ? (
+                    <Skeleton className="h-4 w-36" />
+                  ) : (
+                    "Unavailable"
+                  ))
+                }
+              />
+              <DetailRow
+                label="Firmware"
+                mono
+                value={firmwareVersion ?? <Skeleton className="h-4 w-14" />}
+              />
+            </dl>
           </SectionCard>
 
-          <SectionCard title="Actions">
-            <div className="flex flex-wrap gap-3">
+          <SectionCard
+            title="Keyboard name"
+            description="Shown in the sidebar and reported to the host over USB."
+            icon={<IconTag />}
+            headerRight={
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                {keyboardNameInput.length}/{KEYBOARD_NAME_LENGTH}
+              </span>
+            }
+            footer={
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={keyboardNameDisabled || !keyboardNameDirty}
+                  onClick={() => {
+                    setKeyboardNameInput(deviceKeyboardName);
+                    setKeyboardNameDirty(false);
+                  }}
+                >
+                  Discard
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={keyboardNameDisabled || !keyboardNameDirty}
+                  onClick={() => setKeyboardNameMutation.mutate(keyboardNameInput)}
+                >
+                  Apply name
+                </Button>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-2">
+              <Input
+                value={keyboardNameInput}
+                maxLength={KEYBOARD_NAME_LENGTH}
+                disabled={keyboardNameDisabled}
+                placeholder="Custom keyboard name"
+                onChange={(event) => handleKeyboardNameChange(event.target.value)}
+                className="font-mono"
+              />
+              {connected && !identitySupported && !deviceIdentityQ.isLoading ? (
+                <p className="text-xs leading-relaxed text-warning">
+                  This firmware does not expose the device identity commands
+                  (0x2B/0x2C/0x2D), so the name cannot be changed from here.
+                </p>
+              ) : (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Up to {KEYBOARD_NAME_LENGTH} characters. Takes effect after the next
+                  USB re-enumeration.
+                </p>
+              )}
+            </div>
+          </SectionCard>
+        </div>
+      </PageSection>
+
+      <PageSection
+        title="Input modes"
+        description="Which USB interfaces the keyboard exposes to the host."
+      >
+        <SectionCard>
+          <FormRows>
+            <FormRow
+              label="Keyboard output"
+              description="Send standard HID keystrokes. Turning this off silences the board."
+            >
+              <Switch
+                checked={keyboardEnabled}
+                disabled={!connected}
+                onCheckedChange={(v) => toggleMutation.mutate({ key: "keyboard", value: v })}
+              />
+            </FormRow>
+            <FormRow
+              nested
+              label="N-key rollover"
+              description={
+                keyboardEnabled
+                  ? "Report every held key at once, instead of the standard six."
+                  : "Enable keyboard output first."
+              }
+            >
+              <Switch
+                checked={nkroEnabledQ.data ?? false}
+                disabled={!connected || !keyboardEnabled}
+                onCheckedChange={(v) => toggleMutation.mutate({ key: "nkro", value: v })}
+              />
+            </FormRow>
+            <FormRow
+              label="Gamepad output"
+              description="Expose an analog controller alongside the keyboard."
+            >
+              <Switch
+                checked={optionsQ.data?.gamepad_enabled ?? false}
+                disabled={!connected}
+                onCheckedChange={(v) => toggleMutation.mutate({ key: "gamepad", value: v })}
+              />
+            </FormRow>
+          </FormRows>
+        </SectionCard>
+      </PageSection>
+
+      <PageSection title="Lighting hardware">
+        <SectionCard>
+          <FormRows>
+            <FormRow
+              label="LEDs powered"
+              description="Master switch for the RGB matrix. Per-effect settings live on the Lighting page."
+            >
+              <Switch
+                checked={ledEnabledQ.data ?? false}
+                disabled={!connected}
+                onCheckedChange={(v) => toggleMutation.mutate({ key: "led", value: v })}
+              />
+            </FormRow>
+            <FormRow
+              label="Thermal protection"
+              description="Automatically dim the LEDs when the MCU runs hot."
+            >
+              <Switch
+                checked={optionsQ.data?.led_thermal_protection_enabled ?? true}
+                disabled={!connected || !optionsQ.data}
+                onCheckedChange={(v) =>
+                  toggleMutation.mutate({ key: "led_thermal_protection", value: v })
+                }
+              />
+            </FormRow>
+          </FormRows>
+        </SectionCard>
+      </PageSection>
+
+      <PageSection title="Maintenance">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <SectionCard
+            title="Persistence"
+            description="Settings live in RAM until they are written to flash."
+            icon={<IconDatabaseExport />}
+          >
+            <div className="flex flex-wrap gap-2">
               <Button
-                variant="default"
-                size="sm"
-                className="gap-1.5"
                 disabled={!connected || saveMutation.isPending}
                 onClick={() => saveMutation.mutate()}
               >
                 <IconDatabaseExport className="size-4" />
-                Save to Flash
+                Save to flash
               </Button>
-
               <Button
                 variant="outline"
-                size="sm"
-                className="gap-1.5"
                 disabled={!connected || rebootMutation.isPending}
                 onClick={() => rebootMutation.mutate()}
               >
                 <IconPower className="size-4" />
-                Restart Keyboard
+                Restart keyboard
               </Button>
+            </div>
+          </SectionCard>
 
+          <SectionCard
+            tone="danger"
+            title="Danger zone"
+            description="These actions cannot be undone."
+            icon={<IconAlertTriangle />}
+          >
+            <div className="flex flex-col gap-2">
               <Dialog open={bootloaderOpen} onOpenChange={setBootloaderOpen}>
                 <DialogTrigger render={
-                  <Button variant="outline" size="sm" className="gap-1.5" disabled={!connected}>
+                  <Button variant="outline" size="sm" className="justify-start" disabled={!connected}>
                     <IconRotateClockwise2 className="size-4" />
-                    Enter Bootloader
+                    Enter bootloader (DFU)
                   </Button>
                 } />
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Enter Bootloader</DialogTitle>
+                    <DialogTitle>Enter bootloader?</DialogTitle>
                     <DialogDescription>
-                      The keyboard will reboot into firmware update (DFU) mode. It will be unavailable until reflashed or rebooted.
+                      The keyboard reboots into firmware update mode and stops working as a
+                      keyboard until it is reflashed or power-cycled.
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setBootloaderOpen(false)}>Cancel</Button>
-                    <Button variant="destructive" onClick={() => { setBootloaderOpen(false); enterBootloaderMutation.mutate(); }}>
-                      Confirm
+                    <Button
+                      variant="destructive"
+                      onClick={() => { setBootloaderOpen(false); enterBootloaderMutation.mutate(); }}
+                    >
+                      Enter bootloader
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -397,32 +471,55 @@ export default function Device() {
 
               <Dialog open={resetOpen} onOpenChange={setResetOpen}>
                 <DialogTrigger render={
-                  <Button variant="destructive" size="sm" className="gap-1.5" disabled={!connected}>
+                  <Button variant="destructive" size="sm" className="justify-start" disabled={!connected}>
                     <IconAlertTriangle className="size-4" />
-                    Factory Reset
+                    Factory reset
                   </Button>
                 } />
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <IconAlertTriangle className="size-5 text-destructive" />
-                      Factory Reset
+                      Factory reset?
                     </DialogTitle>
                     <DialogDescription>
-                      This will erase ALL settings including calibration, keymaps, profiles, and gamepad configs. This action cannot be undone.
+                      This erases every setting on the keyboard — calibration, keymaps,
+                      profiles and gamepad configuration. It cannot be undone.
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
-                    <Button variant="destructive" onClick={() => { setResetOpen(false); factoryResetMutation.mutate(); }}>
-                      Reset Everything
+                    <Button
+                      variant="destructive"
+                      onClick={() => { setResetOpen(false); factoryResetMutation.mutate(); }}
+                    >
+                      Erase everything
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             </div>
           </SectionCard>
-      </PageContent>
+        </div>
+      </PageSection>
+    </PageContent>
+  );
+}
+
+/** Label/value line for the identity cards. */
+function DetailRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-border/50 py-2 last:border-b-0">
+      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn("min-w-0 truncate text-sm", mono && "font-mono text-xs")}>{value}</dd>
     </div>
   );
 }

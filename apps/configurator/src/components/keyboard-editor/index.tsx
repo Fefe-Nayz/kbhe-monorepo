@@ -26,7 +26,12 @@ interface KeyboardEditorProps {
   className?: string;
 }
 
-export function KeyboardEditor({ keyboard, menubar, children, className }: KeyboardEditorProps) {
+export function KeyboardEditor({
+  keyboard,
+  menubar,
+  children,
+  className,
+}: KeyboardEditorProps) {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: KEYBOARD_EDITOR_LAYOUT_STORAGE_ID,
     panelIds: KEYBOARD_EDITOR_PANEL_IDS,
@@ -49,8 +54,8 @@ export function KeyboardEditor({ keyboard, menubar, children, className }: Keybo
           maxSize={PREVIEW_MAX_SIZE}
           className="min-h-0 overflow-hidden"
         >
-          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden overscroll-none">
-            <div className="h-full min-h-0 w-full min-w-0 p-4 pb-2">
+          <div className="flex h-full min-h-0 w-full flex-col overflow-hidden overscroll-none bg-surface-sunken/40">
+            <div className="h-full min-h-0 w-full min-w-0 p-5 pb-3">
               {keyboard}
             </div>
             {menubar && (
@@ -72,9 +77,7 @@ export function KeyboardEditor({ keyboard, menubar, children, className }: Keybo
         >
           <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
             <ScrollArea className="h-full w-full min-h-0 min-w-0">
-              <KeyboardEditorContainer>
-                {children}
-              </KeyboardEditorContainer>
+              <KeyboardEditorContainer>{children}</KeyboardEditorContainer>
             </ScrollArea>
           </div>
         </ResizablePanel>
@@ -83,10 +86,15 @@ export function KeyboardEditor({ keyboard, menubar, children, className }: Keybo
   );
 }
 
+/**
+ * The control strip pinned under the keyboard. It reads as a toolbar — a solid
+ * band with a top and bottom edge — so it never floats ambiguously between the
+ * preview and the settings below it.
+ */
 function KeyboardEditorMenubar({ children }: { children: ReactNode }) {
   return (
-    <header className="flex h-12 w-full min-w-0 shrink-0 items-center border-b">
-      <div className="mx-auto flex w-full min-w-0 max-w-7xl items-center justify-between gap-4 px-4">
+    <header className="flex h-12 w-full min-w-0 shrink-0 items-center border-y bg-background/80 backdrop-blur-sm">
+      <div className="mx-auto flex w-full min-w-0 max-w-7xl items-center justify-between gap-4 px-5">
         {children}
       </div>
     </header>
@@ -94,11 +102,7 @@ function KeyboardEditorMenubar({ children }: { children: ReactNode }) {
 }
 
 function KeyboardEditorContainer({ children }: { children: ReactNode }) {
-  return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl p-4">
-      {children}
-    </div>
-  );
+  return <div className="mx-auto w-full min-w-0 max-w-7xl p-5">{children}</div>;
 }
 
 export { KeyboardEditorMenubar, KeyboardEditorContainer };

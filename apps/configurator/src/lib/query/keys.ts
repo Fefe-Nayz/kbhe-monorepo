@@ -106,5 +106,6 @@ export const queryKeys = {
   diagnostics: {
     adcValues: () => ["diagnostics", ...deviceScope(), "adcValues"] as const,
     keyStates: () => ["diagnostics", ...deviceScope(), "keyStates"] as const,
+    allKeySettings: () => ["diagnostics", ...profileScope(), "allKeySettings"] as const,
   },
 };

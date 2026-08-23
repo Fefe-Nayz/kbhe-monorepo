@@ -273,6 +273,10 @@ export function LibhmkLighting({ device }: LibhmkLightingProps) {
             <Select
               value={String(state.effect)}
               disabled={effectMut.isPending}
+              items={LIBHMK_EFFECT_OPTIONS.map((effect) => ({
+                value: String(effect.value),
+                label: effect.label,
+              }))}
               onValueChange={(value) => {
                 const effect = Number(value);
                 if (!isLibhmkRgbEffect(effect)) return;

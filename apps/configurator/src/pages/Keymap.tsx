@@ -22,6 +22,7 @@ import {
   KEY_COUNT,
 } from "@/lib/kbhe/protocol";
 import { queryKeys } from "@/lib/query/keys";
+import { Toolbar, ToolbarDivider, ToolbarStat } from "@/components/shared/Toolbar";
 import { IconRestore } from "@tabler/icons-react";
 
 async function fetchAllLayerKeycodes(layer: number): Promise<Record<number, number>> {
@@ -225,23 +226,37 @@ export default function Keymap() {
   })();
 
   const menubar = (
-    <>
-      <div className="flex items-center gap-2">
-        <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
-      </div>
-      <div className="flex items-center gap-2">
-        {focusedGamepadSummary && (
-          <span className="rounded-md border px-2 py-1 text-xs text-muted-foreground">
-            GP: {focusedGamepadSummary}
-          </span>
-        )}
-        <AutosaveStatus state={saveState} />
-        <Button variant="destructive" size="sm" className="h-8 gap-1.5" disabled={!connected}>
-          <IconRestore className="size-4" />
-          Reset Layer
-        </Button>
-      </div>
-    </>
+    <Toolbar
+      left={
+        <>
+          <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
+          <ToolbarDivider />
+          <ToolbarStat
+            label="Selected"
+            value={
+              selectedKeys.length === 0
+                ? "No key"
+                : selectedKeys.length === 1
+                  ? `Key ${focusedKeyIndex ?? "?"}`
+                  : `${selectedKeys.length} keys`
+            }
+            tone={selectedKeys.length > 0 ? "active" : "default"}
+          />
+          {focusedGamepadSummary && (
+            <ToolbarStat label="Gamepad" value={focusedGamepadSummary} />
+          )}
+        </>
+      }
+      right={
+        <>
+          <AutosaveStatus state={saveState} />
+          <Button variant="destructive" size="sm" disabled={!connected}>
+            <IconRestore className="size-4" />
+            Reset layer
+          </Button>
+        </>
+      }
+    />
   );
 
   return (
@@ -266,6 +281,11 @@ export default function Keymap() {
         selectedCodes={focusedGamepadSelectedCodes}
         className="h-full"
         resolveLegend={resolveKeycapLegend}
+        hint={
+          selectedKeys.length === 0
+            ? "Click a key in the keyboard above first, then pick the keycode it should send."
+            : undefined
+        }
       />
     </KeyboardEditor>
   );

@@ -60,7 +60,7 @@ export function UpdateBanner() {
       : `Firmware update ${firmwareLabel} is available.`;
 
   return (
-    <div className="flex min-h-11 items-center gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-900 dark:text-amber-200">
+    <div className="flex min-h-11 items-center gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm text-warning">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <IconDownload className="size-4 shrink-0" />
         <span className="truncate">{description}</span>
@@ -71,7 +71,7 @@ export function UpdateBanner() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 border-amber-500/35 bg-transparent text-xs text-amber-900 hover:bg-amber-500/15 dark:text-amber-200"
+            className="h-7 border-warning/40 bg-transparent text-xs text-warning hover:bg-warning/15 dark:text-warning"
             onClick={() => navigate("/settings")}
           >
             Open App Updates
@@ -82,7 +82,7 @@ export function UpdateBanner() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 border-amber-500/35 bg-transparent text-xs text-amber-900 hover:bg-amber-500/15 dark:text-amber-200"
+            className="h-7 border-warning/40 bg-transparent text-xs text-warning hover:bg-warning/15 dark:text-warning"
             onClick={() => navigate("/firmware")}
           >
             Open Firmware Updates
@@ -92,7 +92,7 @@ export function UpdateBanner() {
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1.5 px-2 text-xs text-amber-900 hover:bg-amber-500/15 dark:text-amber-200"
+          className="h-7 gap-1.5 px-2 text-xs text-warning hover:bg-warning/15 dark:text-warning"
           disabled={refreshBusy}
           onClick={() => {
             void appUpdateQ.refetch();

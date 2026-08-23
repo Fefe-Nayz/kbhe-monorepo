@@ -14,12 +14,9 @@ import {
 import { kbheTransport } from "@/lib/kbhe/transport";
 import { formatFirmwareVersion, type FirmwareVersion } from "@/lib/kbhe/protocol";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { sliderVal } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +38,9 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { PageContent } from "@/components/shared/PageLayout";
+import { SectionCard } from "@/components/shared/SectionCard";
+import { SliderField } from "@/components/shared/SliderField";
+import { IconAdjustments, IconCloudDownload } from "@tabler/icons-react";
 
 type FlashState = "idle" | "flashing" | "success" | "error";
 type FlashResult = { ok: true } | { ok: false; error: string };
@@ -639,55 +639,63 @@ export default function Firmware() {
   const firmwareReleaseBusy = firmwareUpdateState === "downloading" || firmwareUpdateState === "flashing";
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <>
       <PageContent containerClassName="max-w-3xl">
 
         {/* ── Device status strip ─────────────────────────────── */}
-        <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
+        <div className="flex items-center gap-3.5 rounded-xl border bg-card p-4">
           <div className={cn(
-            "flex size-10 items-center justify-center rounded-full",
-            connectedForStatus ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-muted text-muted-foreground",
+            "flex size-11 shrink-0 items-center justify-center rounded-xl",
+            updateModeDetected
+              ? "bg-warning/12 text-warning"
+              : connectedForStatus
+                ? "bg-success/12 text-success"
+                : "bg-muted text-muted-foreground",
           )}>
             {connectedForStatus
               ? <IconPlugConnected className="size-5" />
               : <IconPlugConnectedX className="size-5" />}
           </div>
-          <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-            <span className="text-sm font-medium">
-              {updateModeDetected ? "Device Connected (Update Mode)" : connectedForStatus ? "Device Connected" : "No Device"}
-            </span>
-            <span className="text-xs text-muted-foreground truncate">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-sm font-semibold">
               {updateModeDetected
-                ? "Keyboard detected in bootloader mode. Ready for firmware update."
-                : firmwareVersion
-                ? `Installed firmware: ${firmwareVersion}`
+                ? "Connected in update mode"
                 : connectedForStatus
-                  ? "Firmware version unknown"
-                  : "Connect your keyboard to flash firmware"}
+                  ? "Keyboard connected"
+                  : "No keyboard connected"}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+              {updateModeDetected
+                ? "The keyboard is in bootloader mode and ready to receive firmware."
+                : firmwareVersion
+                ? `Running firmware ${firmwareVersion}.`
+                : connectedForStatus
+                  ? "Firmware version could not be read."
+                  : "Plug the keyboard in over USB to flash firmware."}
             </span>
           </div>
           {firmwareVersion && (
-            <Badge variant="secondary" className="font-mono shrink-0">{firmwareVersion}</Badge>
+            <Badge variant="secondary" className="shrink-0 font-mono">{firmwareVersion}</Badge>
           )}
         </div>
 
         {/* -- Online firmware update -------------------------------- */}
         {isTauri() && (
-          <div className="rounded-lg border bg-card">
-            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-              <div>
-                <h2 className="text-sm font-medium">Online Firmware Update</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {latestFirmware?.updateAvailable
-                    ? `Release ${latestFirmware.tag ?? latestFirmware.version} is available.`
-                    : firmwareUpdateQ.isLoading
-                      ? "Checking GitHub releases..."
-                      : "Firmware is up to date."}
-                </p>
-              </div>
+          <SectionCard
+            tone={latestFirmware?.updateAvailable ? "accent" : "default"}
+            title="Online firmware update"
+            icon={<IconCloudDownload />}
+            description={
+              latestFirmware?.updateAvailable
+                ? `Release ${latestFirmware.tag ?? latestFirmware.version} is available.`
+                : firmwareUpdateQ.isLoading
+                  ? "Checking GitHub releases…"
+                  : "The installed firmware is up to date."
+            }
+            headerRight={
               <Button
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
                 disabled={firmwareUpdateQ.isFetching || firmwareReleaseBusy}
                 onClick={() => {
                   void firmwareUpdateQ.refetch();
@@ -696,10 +704,10 @@ export default function Firmware() {
               >
                 <IconRefresh className="size-4" />
               </Button>
-            </div>
-
-            {latestFirmware?.updateAvailable && (
-              <div className="flex flex-col gap-3 p-4">
+            }
+          >
+            {latestFirmware?.updateAvailable ? (
+              <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {latestFirmware.version && (
                     <Badge variant="secondary" className="font-mono">{latestFirmware.version}</Badge>
@@ -708,15 +716,16 @@ export default function Firmware() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
-                    className="gap-2"
                     disabled={!connected || firmwareReleaseBusy || flashState === "flashing"}
                     onClick={() => void handleFlashLatestFirmware()}
                   >
                     <IconDownload className="size-4" />
-                    {firmwareReleaseBusy ? "Updating..." : "Download and Flash"}
+                    {firmwareReleaseBusy ? "Updating…" : "Download and flash"}
                   </Button>
                   {!connected && (
-                    <span className="text-xs text-muted-foreground">Connect the keyboard before flashing.</span>
+                    <span className="text-xs text-muted-foreground">
+                      Connect the keyboard before flashing.
+                    </span>
                   )}
                 </div>
                 {firmwareUpdateError && (
@@ -726,18 +735,41 @@ export default function Firmware() {
                   </div>
                 )}
               </div>
+            ) : (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Updates are published as signed releases and verified before they are written
+                to the keyboard. Nothing is flashed without your confirmation.
+              </p>
             )}
-          </div>
+          </SectionCard>
+        )}
+
+        {/* Without developer mode there is nothing else on this page — say so
+            rather than leaving the rest of the screen blank. */}
+        {!developerMode && !latestFirmware?.updateAvailable && (
+          <SectionCard
+            tone="muted"
+            title="Manual flashing"
+            description="Loading a firmware file by hand is a developer-mode feature."
+            icon={<IconFileUpload />}
+          >
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Turn on Developer mode in App Settings to pick a signed <code>.bin</code> and
+              its <code>.bin.sig</code>, tune flash timeouts, and watch the flash log.
+            </p>
+          </SectionCard>
         )}
 
         {/* ── File picker area (developer mode) ───────────────── */}
         {developerMode && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-4 py-3">
-            <h2 className="text-sm font-medium">Firmware File</h2>
-          </div>
+        <SectionCard
+          title="Firmware file"
+          description="Pick or drop a signed release pair to flash by hand."
+          icon={<IconFileUpload />}
+          contentClassName="px-5 py-4"
+        >
           <div
-            className="p-4 flex flex-col gap-4"
+            className="flex flex-col gap-4"
             onDragEnter={handleDragEnter}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -787,7 +819,7 @@ export default function Firmware() {
                         <span className="text-muted-foreground/60">{fileVersion.source}</span>
                       )}
                       {firmwareSignature?.length === 64 && (
-                        <Badge variant="outline" className="text-[10px] text-green-600 dark:text-green-400">
+                        <Badge variant="outline" className="border-success/40 text-[0.65rem] text-success">
                           Signed
                         </Badge>
                       )}
@@ -853,60 +885,54 @@ export default function Firmware() {
               </div>
             )}
           </div>
-        </div>
+        </SectionCard>
         )}
 
         {/* ── Flash options (developer mode) ─────────────────── */}
         {developerMode && (
-          <div className="rounded-lg border bg-card">
-            <div className="border-b px-4 py-3">
-              <h2 className="text-sm font-medium">Flash Options</h2>
+          <SectionCard
+            title="Flash options"
+            description="How patiently the flasher waits on each bootloader operation."
+            icon={<IconAdjustments />}
+          >
+            <div className="flex flex-col gap-5">
+              <SliderField
+                label="Timeout per operation"
+                description="Give up on a single bootloader exchange after this long."
+                unit="s"
+                min={1} max={30} step={1}
+                value={timeoutSec}
+                onCommit={setTimeoutSec}
+                disabled={flashState === "flashing"}
+              />
+              <SliderField
+                label="Retry attempts"
+                description="How many times to retry a failed exchange before aborting."
+                min={1} max={20} step={1}
+                value={retries}
+                onCommit={setRetries}
+                disabled={flashState === "flashing"}
+              />
             </div>
-            <div className="p-4 flex flex-col gap-5">
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Timeout per operation</Label>
-                  <span className="text-sm tabular-nums font-mono text-muted-foreground">{timeoutSec}s</span>
-                </div>
-                <Slider
-                  min={1} max={30} step={1}
-                  value={[timeoutSec]}
-                  onValueChange={(v) => { const n = sliderVal(v); if (n !== undefined) setTimeoutSec(n); }}
-                  disabled={flashState === "flashing"}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Retry attempts</Label>
-                  <span className="text-sm tabular-nums font-mono text-muted-foreground">{retries}</span>
-                </div>
-                <Slider
-                  min={1} max={20} step={1}
-                  value={[retries]}
-                  onValueChange={(v) => { const n = sliderVal(v); if (n !== undefined) setRetries(n); }}
-                  disabled={flashState === "flashing"}
-                />
-              </div>
-            </div>
-          </div>
+          </SectionCard>
         )}
 
         {/* ── Flash action + progress ─────────────────────────── */}
         {(developerMode || flashState !== "idle" || flashLog.length > 0) && (
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-4 py-3">
-            <h2 className="text-sm font-medium">Flash</h2>
-          </div>
-          <div className="p-4 flex flex-col gap-4">
+        <SectionCard
+          title="Flash"
+          description="Write the selected firmware to the keyboard."
+          icon={<IconUpload />}
+        >
+          <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
               {developerMode && (
                 <Button
                   disabled={!canFlash}
-                  className="gap-2"
                   onClick={() => setConfirmOpen(true)}
                 >
                   <IconUpload className="size-4" />
-                  Flash Firmware
+                  Flash firmware
                 </Button>
               )}
 
@@ -914,7 +940,7 @@ export default function Firmware() {
                 <span className="text-xs text-muted-foreground animate-pulse">Flashing… {flashProgress}%</span>
               )}
               {flashState === "success" && (
-                <Badge variant="default" className="gap-1">
+                <Badge className="gap-1 bg-success text-success-foreground">
                   <IconCheck className="size-3" />
                   Complete
                 </Badge>
@@ -932,15 +958,20 @@ export default function Firmware() {
             )}
 
             {flashLog.length > 0 && (
-              <ScrollArea className="h-44 rounded-md border bg-muted/30 p-3">
-                <pre className="text-xs font-mono whitespace-pre-wrap text-muted-foreground">
-                  {flashLog.join("\n")}
-                  <span ref={logEndRef} />
-                </pre>
-              </ScrollArea>
+              <div>
+                <p className="mb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Flash log
+                </p>
+                <ScrollArea className="h-44 rounded-lg border bg-surface-sunken p-3">
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+                    {flashLog.join("\n")}
+                    <span ref={logEndRef} />
+                  </pre>
+                </ScrollArea>
+              </div>
             )}
           </div>
-        </div>
+        </SectionCard>
         )}
 
       </PageContent>
@@ -951,7 +982,7 @@ export default function Firmware() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <IconAlertTriangle className="size-5 text-destructive" />
-              Confirm Firmware Flash
+              Flash this firmware?
             </DialogTitle>
             <DialogDescription>
               {fileVersion && (
@@ -967,11 +998,11 @@ export default function Firmware() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={() => void handleFlash()}>
-              Flash Now
+              Flash now
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

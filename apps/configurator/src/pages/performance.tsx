@@ -7,13 +7,15 @@ import BaseKeyboard from "@/components/baseKeyboard";
 import { KeyboardEditor } from "@/components/keyboard-editor";
 import { DistanceSlider } from "@/components/distance-slider";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
-import { SectionCard, FormRow } from "@/components/shared/SectionCard";
+import { SectionCard, FormRow, FormRows } from "@/components/shared/SectionCard";
+import { PageSection } from "@/components/shared/PageLayout";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SliderField } from "@/components/shared/SliderField";
+import { Toolbar, ToolbarDivider, ToolbarStat } from "@/components/shared/Toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { CommitSlider } from "@/components/ui/commit-slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { useProfileStore } from "@/stores/profileStore";
@@ -35,10 +37,14 @@ import {
 import { queryKeys } from "@/lib/query/keys";
 import {
   IconAlertTriangle,
+  IconArrowBarToDown,
+  IconBolt,
+  IconClockBolt,
   IconSelectAll,
   IconDeselect,
   IconRestore,
   IconPointer,
+  IconWaveSine,
 } from "@tabler/icons-react";
 
 type FilterParams = { noise_band: number; alpha_min_denom: number; alpha_max_denom: number };
@@ -531,35 +537,57 @@ export default function Performance() {
   // ── UI ──
 
   const menubar = (
-    <>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="h-8" onClick={selectAll}>
-          <IconSelectAll className="size-4" />
-          Select All
-        </Button>
-        <Button variant="outline" size="sm" className="h-8" onClick={clearSelection}>
-          <IconDeselect className="size-4" />
-          Deselect
-        </Button>
-        <Badge variant="secondary" className="h-8 px-2 text-xs">
-          {selectedKeyIndexes.length} selected
-        </Badge>
-      </div>
-      <div className="flex items-center gap-2">
-        <AutosaveStatus state={saveState} />
-        <Button
-          variant="destructive"
-          size="sm"
-          className="h-8 gap-1.5"
-          disabled={noSelection || !connected}
-          onClick={() => void resetSelectedPerformance()}
-        >
-          <IconRestore className="size-4" />
-          Reset Selected
-        </Button>
-      </div>
-    </>
+    <Toolbar
+      left={
+        <>
+          <ToolbarStat
+            label="Selected"
+            value={`${selectedKeyIndexes.length} ${selectedKeyIndexes.length === 1 ? "key" : "keys"}`}
+            tone={selectedKeyIndexes.length > 0 ? "active" : "default"}
+          />
+          <ToolbarDivider />
+          <Button variant="ghost" size="sm" onClick={selectAll}>
+            <IconSelectAll className="size-4" />
+            Select all
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={noSelection}
+            onClick={clearSelection}
+          >
+            <IconDeselect className="size-4" />
+            Clear
+          </Button>
+        </>
+      }
+      right={
+        <>
+          <AutosaveStatus state={saveState} />
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={noSelection || !connected}
+            onClick={() => void resetSelectedPerformance()}
+          >
+            <IconRestore className="size-4" />
+            Reset selected
+          </Button>
+        </>
+      }
+    />
   );
+
+  const mixedNotice = (mixed: boolean | undefined) =>
+    isMultiSelection && mixed ? (
+      <Badge
+        variant="outline"
+        className="border-warning/40 bg-warning/10 text-warning"
+        title="The selected keys currently hold different values for this setting"
+      >
+        Mixed
+      </Badge>
+    ) : null;
 
   return (
     <KeyboardEditor
@@ -577,269 +605,300 @@ export default function Performance() {
       }
       menubar={menubar}
     >
-      <div className="flex flex-col gap-4">
-        {noSelection ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg bg-muted/20 border-dashed">
-            <div className="flex size-14 items-center justify-center rounded-full bg-muted/50 mb-4">
-              <IconPointer className="size-6 text-muted-foreground" />
+      <div className="flex flex-col gap-6">
+        <PageSection
+          title="Per-key settings"
+          description={
+            noSelection
+              ? "Pick one or more keys in the preview above to edit them."
+              : `Editing ${selectedKeyIndexes.length} ${selectedKeyIndexes.length === 1 ? "key" : "keys"}.`
+          }
+        >
+          {noSelection ? (
+            <EmptyState
+              icon={<IconPointer />}
+              title="No keys selected"
+              description="Click a key in the keyboard above — or drag across several — to change its actuation point and rapid trigger behaviour."
+              action={
+                <Button variant="outline" size="sm" onClick={selectAll}>
+                  <IconSelectAll className="size-4" />
+                  Select all keys
+                </Button>
+              }
+            />
+          ) : keySettingsQ.isLoading ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <SectionCard title="Actuation" description="Loading…">
+                <div className="flex flex-col gap-4">
+                  {[0, 1].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              </SectionCard>
+              <SectionCard title="Rapid trigger" description="Loading…">
+                <div className="flex flex-col gap-4">
+                  {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              </SectionCard>
             </div>
-            <h3 className="text-sm font-semibold text-foreground">Sélectionnez une touche</h3>
-            <p className="text-xs text-muted-foreground max-w-[300px] mt-1.5">
-              Cliquez sur une ou plusieurs touches du clavier interactif ci-dessus pour modifier leurs paramètres de performance individuellement.
-            </p>
-          </div>
-        ) : keySettingsQ.isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="shadow-none border">
-              <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-sm font-medium">Point d'activation</CardTitle>
-                <CardDescription className="text-xs mt-0.5">Reglages d'activation et de relachement</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4 flex flex-col gap-3">
-                {[0, 1].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
-              </CardContent>
-            </Card>
-            <Card className="shadow-none border">
-              <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-sm font-medium">Rapid Trigger</CardTitle>
-                <CardDescription className="text-xs mt-0.5">Reglages RT et options associees</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4 flex flex-col gap-3">
-                {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
-              </CardContent>
-            </Card>
-          </div>
-        ) : !settings ? (
-          <p className="text-sm text-muted-foreground">Could not load settings.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {isMultiSelection && hasCompleteSelectedSettings && hasMixedValues && (
-              <Card className="overflow-hidden border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
-                    <IconAlertTriangle className="size-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div className="flex flex-col gap-1 text-sm">
-                    <p className="font-semibold text-amber-800 dark:text-amber-300">
-                      Paramètres hétérogènes détectés
+          ) : !settings ? (
+            <EmptyState
+              icon={<IconAlertTriangle />}
+              title="Could not read these keys"
+              description="The keyboard did not answer the settings request. Reselect the keys or reconnect the device."
+            />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {isMultiSelection && hasCompleteSelectedSettings && hasMixedValues && (
+                <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/8 px-4 py-3">
+                  <IconAlertTriangle className="mt-px size-4 shrink-0 text-warning" />
+                  <div className="min-w-0 text-xs leading-relaxed">
+                    <p className="text-sm font-medium text-foreground">
+                      These keys do not share the same settings
                     </p>
-                    <p className="text-amber-700/80 dark:text-amber-300/80">
-                      Les {selectedKeyIndexes.length} touches sélectionnées ont des paramètres différents. La modification entraînera l'écrasement des anciens paramètres.
+                    <p className="mt-0.5 text-muted-foreground">
+                      Controls marked <span className="font-medium text-warning">Mixed</span> hold
+                      different values across the {selectedKeyIndexes.length} selected keys.
+                      Changing one overwrites all of them.
                     </p>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="shadow-none border">
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-sm font-medium">Point d'activation</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">Reglages d'activation et de relachement</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-4 flex flex-col gap-4">
-                  <DistanceSlider
-                    label="Actuation Point"
-                    value={settings.actuation_point_mm}
-                    onLiveChange={v => liveKeyUpdate({ actuation_point_mm: v })}
-                    onChange={v => commitKey({ actuation_point_mm: v })}
-                    disabled={!connected}
-                  />
-                  {isMultiSelection && mixedValues.actuation_point_mm && (
-                    <p className="-mt-2 text-xs text-muted-foreground">Les valeurs actuelles diffèrent. Bouger le slider écrasera toutes les touches sélectionnées.</p>
-                  )}
-                  <DistanceSlider
-                    label="Release Point"
-                    value={settings.release_point_mm}
-                    onLiveChange={v => liveKeyUpdate({ release_point_mm: v })}
-                    onChange={v => commitKey({ release_point_mm: v })}
-                    disabled={!connected}
-                  />
-                  {isMultiSelection && mixedValues.release_point_mm && (
-                    <p className="-mt-2 text-xs text-muted-foreground">Les valeurs actuelles diffèrent. Bouger le slider écrasera toutes les touches sélectionnées.</p>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <SectionCard
+                  title="Actuation"
+                  description="How far the key must travel before it registers."
+                  icon={<IconArrowBarToDown />}
+                >
+                  <div className="flex flex-col gap-5">
+                    <DistanceSlider
+                      label="Actuation point"
+                      value={settings.actuation_point_mm}
+                      onLiveChange={v => liveKeyUpdate({ actuation_point_mm: v })}
+                      onChange={v => commitKey({ actuation_point_mm: v })}
+                      disabled={!connected}
+                      labelRight={mixedNotice(mixedValues.actuation_point_mm)}
+                      description="Depth at which a press is reported."
+                    />
+                    <DistanceSlider
+                      label="Release point"
+                      value={settings.release_point_mm}
+                      onLiveChange={v => liveKeyUpdate({ release_point_mm: v })}
+                      onChange={v => commitKey({ release_point_mm: v })}
+                      disabled={!connected}
+                      labelRight={mixedNotice(mixedValues.release_point_mm)}
+                      description="Depth at which the key is considered released."
+                    />
+                  </div>
+                </SectionCard>
 
-              <Card className="shadow-none border">
-                <CardHeader className="pb-3 border-b">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-sm font-medium">Rapid Trigger</CardTitle>
-                      <CardDescription className="text-xs mt-0.5">Reglages RT et options associees</CardDescription>
-                    </div>
+                <SectionCard
+                  title="Rapid trigger"
+                  description="Re-arm the key from wherever it currently sits, instead of a fixed point."
+                  icon={<IconBolt />}
+                  headerRight={
                     <Switch
                       checked={rapidTriggerSectionEnabled}
                       disabled={!connected}
                       onCheckedChange={(enabled) => commitKey({ rapid_trigger_enabled: enabled })}
+                      aria-label="Enable rapid trigger"
                     />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4 flex flex-col gap-4">
-                  <DistanceSlider
-                    label="RT Press Sensitivity"
-                    value={settings.rapid_trigger_press}
-                    min={0.01} max={2.55} step={0.01}
-                    displayDecimals={2}
-                    onLiveChange={v => liveKeyUpdate({ rapid_trigger_press: v })}
-                    onChange={v => commitKey({ rapid_trigger_press: v })}
-                    disabled={!connected || !rapidTriggerSectionEnabled}
-                  />
-                  {isMultiSelection && mixedValues.rapid_trigger_press && (
-                    <p className="-mt-2 text-xs text-muted-foreground">Les valeurs actuelles diffèrent. Bouger le slider écrasera toutes les touches sélectionnées.</p>
-                  )}
-                  <FormRow
-                    label="Use separate release sensitivity"
-                    description="If disabled, release sensitivity follows press sensitivity"
-                  >
-                    <Checkbox
-                      checked={useSeparateReleaseSensitivity}
-                      disabled={!connected || !rapidTriggerSectionEnabled}
-                      onCheckedChange={(checked) => {
-                        const enabled = Boolean(checked);
-                        setUseSeparateReleaseSensitivity(enabled);
-
-                        if (!enabled) {
-                          commitKey({}, { enforceLinkedRapidSensitivity: true });
-                        }
-                      }}
-                    />
-                  </FormRow>
-                  {isMultiSelection && mixedValues.separate_release_sensitivity && (
-                    <p className="-mt-2 text-xs text-muted-foreground">Les valeurs actuelles diffèrent. Changer cette option écrasera toutes les touches sélectionnées.</p>
-                  )}
-
-                  <DistanceSlider
-                    label="RT Release Sensitivity"
-                    value={settings.rapid_trigger_release}
-                    min={0.01} max={2.55} step={0.01}
-                    displayDecimals={2}
-                    onLiveChange={v => liveKeyUpdate({ rapid_trigger_release: v })}
-                    onChange={v => commitKey({ rapid_trigger_release: v })}
-                    disabled={!connected || !rapidTriggerSectionEnabled || !useSeparateReleaseSensitivity}
-                  />
-                  {isMultiSelection && mixedValues.rapid_trigger_release && (
-                    <p className="-mt-2 text-xs text-muted-foreground">Les valeurs actuelles diffèrent. Bouger le slider écrasera toutes les touches sélectionnées.</p>
-                  )}
-
-                  <FormRow label="Continuous RT" description="Track past bottom">
-                    <Switch
-                      checked={settings.continuous_rapid_trigger}
-                      disabled={!connected || !rapidTriggerSectionEnabled}
-                      onCheckedChange={v => commitKey({ continuous_rapid_trigger: v })}
-                    />
-                  </FormRow>
-                  {isMultiSelection && mixedValues.continuous_rapid_trigger && (
-                    <p className="-mt-2 text-xs text-muted-foreground">Les valeurs actuelles diffèrent. Changer ce switch écrasera toutes les touches sélectionnées.</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {noSelection && (
-          <SectionCard title="Global Performance">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="flex flex-col gap-4">
-                <FormRow label="Input Filter" description="ADC noise suppression">
-                  <Switch
-                    checked={filterEnabledQ.data ?? false}
-                    disabled={!connected}
-                    onCheckedChange={v => filterMutation.mutate(v)}
-                  />
-                </FormRow>
-                {filterEnabledQ.data && filterParamsQ.data && (
-                  <>
-                    <div className="grid gap-2">
-                      <span className="text-sm font-medium">Noise Band</span>
-                      <CommitSlider
-                        min={1} max={255} step={1}
-                        value={filterParamsQ.data.noise_band}
-                        onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, noise_band: v })}
-                        onCommit={v => {
-                          void liveFilterParams.cancelAndWait().then(() => {
-                            commitFilterParams({ noise_band: v });
-                          });
-                        }}
+                  }
+                >
+                  {!rapidTriggerSectionEnabled ? (
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Rapid trigger is off for {isMultiSelection ? "these keys" : "this key"}.
+                      Turn it on to set press and release sensitivity.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-5">
+                      <DistanceSlider
+                        label="Press sensitivity"
+                        value={settings.rapid_trigger_press}
+                        min={0.01} max={2.55} step={0.01}
+                        displayDecimals={2}
+                        onLiveChange={v => liveKeyUpdate({ rapid_trigger_press: v })}
+                        onChange={v => commitKey({ rapid_trigger_press: v })}
                         disabled={!connected}
+                        labelRight={mixedNotice(mixedValues.rapid_trigger_press)}
+                        description="Upward travel needed to re-arm the key."
                       />
+
+                      <FormRows>
+                        <FormRow
+                          label="Separate release sensitivity"
+                          description="When off, release sensitivity mirrors press sensitivity."
+                        >
+                          {mixedNotice(mixedValues.separate_release_sensitivity)}
+                          <Checkbox
+                            checked={useSeparateReleaseSensitivity}
+                            disabled={!connected}
+                            onCheckedChange={(checked) => {
+                              const enabled = Boolean(checked);
+                              setUseSeparateReleaseSensitivity(enabled);
+                              if (!enabled) {
+                                commitKey({}, { enforceLinkedRapidSensitivity: true });
+                              }
+                            }}
+                          />
+                        </FormRow>
+                      </FormRows>
+
+                      {useSeparateReleaseSensitivity && (
+                        <DistanceSlider
+                          label="Release sensitivity"
+                          value={settings.rapid_trigger_release}
+                          min={0.01} max={2.55} step={0.01}
+                          displayDecimals={2}
+                          onLiveChange={v => liveKeyUpdate({ rapid_trigger_release: v })}
+                          onChange={v => commitKey({ rapid_trigger_release: v })}
+                          disabled={!connected}
+                          labelRight={mixedNotice(mixedValues.rapid_trigger_release)}
+                          description="Downward travel needed to fire again."
+                        />
+                      )}
+
+                      <FormRows>
+                        <FormRow
+                          label="Continuous rapid trigger"
+                          description="Keep tracking the key past the bottom of its travel."
+                        >
+                          {mixedNotice(mixedValues.continuous_rapid_trigger)}
+                          <Switch
+                            checked={settings.continuous_rapid_trigger}
+                            disabled={!connected}
+                            onCheckedChange={v => commitKey({ continuous_rapid_trigger: v })}
+                          />
+                        </FormRow>
+                      </FormRows>
                     </div>
-                    <div className="grid gap-2">
-                      <span className="text-sm font-medium">Alpha Min Denom</span>
-                      <CommitSlider
-                        min={1} max={255} step={1}
-                        value={filterParamsQ.data.alpha_min_denom}
-                        onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_min_denom: v })}
-                        onCommit={v => {
-                          void liveFilterParams.cancelAndWait().then(() => {
-                            commitFilterParams({ alpha_min_denom: v });
-                          });
-                        }}
-                        disabled={!connected}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <span className="text-sm font-medium">Alpha Max Denom</span>
-                      <CommitSlider
-                        min={1} max={255} step={1}
-                        value={filterParamsQ.data.alpha_max_denom}
-                        onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_max_denom: v })}
-                        onCommit={v => {
-                          void liveFilterParams.cancelAndWait().then(() => {
-                            commitFilterParams({ alpha_max_denom: v });
-                          });
-                        }}
-                        disabled={!connected}
-                      />
-                    </div>
-                  </>
-                )}
+                  )}
+                </SectionCard>
               </div>
-              <div className="flex flex-col gap-4">
-                <div className="grid gap-2">
-                  <span className="text-sm font-medium">Advanced Tick Rate</span>
-                  <CommitSlider
-                    min={1} max={100} step={1}
-                    value={tickRateQ.data ?? 1}
-                    onLiveChange={v => liveTickRate(v)}
+            </div>
+          )}
+        </PageSection>
+
+        <PageSection
+          title="Whole-keyboard settings"
+          description="These apply to every key, regardless of what is selected above."
+        >
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <SectionCard
+              title="Input filter"
+              description="Smooths analog noise coming off the Hall sensors."
+              icon={<IconWaveSine />}
+              headerRight={
+                <Switch
+                  checked={filterEnabledQ.data ?? false}
+                  disabled={!connected}
+                  onCheckedChange={v => filterMutation.mutate(v)}
+                  aria-label="Enable input filter"
+                />
+              }
+            >
+              {!filterEnabledQ.data || !filterParamsQ.data ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Filtering is off. Enable it if resting keys report small random
+                  movements; the cost is a fraction of a millisecond of extra latency.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-5">
+                  <SliderField
+                    label="Noise band"
+                    description="Movement smaller than this is treated as sensor noise."
+                    min={1} max={255} step={1}
+                    value={filterParamsQ.data.noise_band}
+                    onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, noise_band: v })}
                     onCommit={v => {
-                      void liveTickRate.cancelAndWait().then(() => tickMutation.mutate(v));
+                      void liveFilterParams.cancelAndWait().then(() => {
+                        commitFilterParams({ noise_band: v });
+                      });
+                    }}
+                    disabled={!connected}
+                  />
+                  <SliderField
+                    label="Minimum smoothing"
+                    description="Filter strength while the key is moving fast. Lower reacts quicker."
+                    min={1} max={255} step={1}
+                    value={filterParamsQ.data.alpha_min_denom}
+                    onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_min_denom: v })}
+                    onCommit={v => {
+                      void liveFilterParams.cancelAndWait().then(() => {
+                        commitFilterParams({ alpha_min_denom: v });
+                      });
+                    }}
+                    disabled={!connected}
+                  />
+                  <SliderField
+                    label="Maximum smoothing"
+                    description="Filter strength while the key is nearly still. Higher is steadier."
+                    min={1} max={255} step={1}
+                    value={filterParamsQ.data.alpha_max_denom}
+                    onLiveChange={v => liveFilterParams({ ...filterParamsQ.data!, alpha_max_denom: v })}
+                    onCommit={v => {
+                      void liveFilterParams.cancelAndWait().then(() => {
+                        commitFilterParams({ alpha_max_denom: v });
+                      });
                     }}
                     disabled={!connected}
                   />
                 </div>
-                <FormRow
-                  label="Chatter Guard"
-                  description="Debounce: accepts a press or release only after the candidate state remains continuously stable"
-                >
-                  <Switch
-                    checked={chatterGuardValue.enabled}
-                    disabled={!connected || triggerChatterGuardQ.data == null}
-                    onCheckedChange={(enabled) => commitChatterGuard({
-                      enabled,
-                      duration_ms: enabled && chatterGuardValue.duration_ms === 0
-                        ? TRIGGER_CHATTER_GUARD_RECOMMENDED_MS
-                        : chatterGuardValue.duration_ms,
-                    })}
-                  />
-                </FormRow>
-                <div className="grid gap-2">
-                  <span className="text-sm font-medium">Chatter Guard Duration (ms)</span>
-                  <CommitSlider
-                    min={chatterGuardValue.enabled ? 1 : 0}
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Timing"
+              description="Scan cadence and debounce behaviour."
+              icon={<IconClockBolt />}
+            >
+              <div className="flex flex-col gap-5">
+                <SliderField
+                  label="Advanced tick rate"
+                  description="How often advanced-key logic re-evaluates, in scan ticks."
+                  min={1} max={100} step={1}
+                  value={tickRateQ.data ?? 1}
+                  onLiveChange={v => liveTickRate(v)}
+                  onCommit={v => {
+                    void liveTickRate.cancelAndWait().then(() => tickMutation.mutate(v));
+                  }}
+                  disabled={!connected}
+                />
+
+                <FormRows>
+                  <FormRow
+                    label="Chatter guard"
+                    description="Only accept a press or release once the new state has held steady."
+                  >
+                    <Switch
+                      checked={chatterGuardValue.enabled}
+                      disabled={!connected || triggerChatterGuardQ.data == null}
+                      onCheckedChange={(enabled) => commitChatterGuard({
+                        enabled,
+                        duration_ms: enabled && chatterGuardValue.duration_ms === 0
+                          ? TRIGGER_CHATTER_GUARD_RECOMMENDED_MS
+                          : chatterGuardValue.duration_ms,
+                      })}
+                    />
+                  </FormRow>
+                </FormRows>
+
+                {chatterGuardValue.enabled && (
+                  <SliderField
+                    label="Guard window"
+                    description={`How long the state must hold. ${TRIGGER_CHATTER_GUARD_RECOMMENDED_MS} ms is the recommended starting point.`}
+                    min={1}
                     max={TRIGGER_CHATTER_GUARD_MAX_MS}
                     step={1}
+                    unit="ms"
                     value={chatterGuardValue.duration_ms}
-                    onLiveChange={() => {}}
                     onCommit={(duration) => commitChatterGuard({ duration_ms: duration })}
-                    disabled={!connected || triggerChatterGuardQ.data == null || !chatterGuardValue.enabled}
+                    disabled={!connected || triggerChatterGuardQ.data == null}
                   />
-                </div>
+                )}
               </div>
-            </div>
-          </SectionCard>
-        )}
+            </SectionCard>
+          </div>
+        </PageSection>
       </div>
     </KeyboardEditor>
   );

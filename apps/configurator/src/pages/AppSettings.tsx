@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getVersion } from "@tauri-apps/api/app";
 import { isTauri } from "@tauri-apps/api/core";
 import { useRef, useState } from "react";
-import { PageContent } from "@/components/shared/PageLayout";
-import { FormRow, SectionCard } from "@/components/shared/SectionCard";
+import { PageContent, PageSection } from "@/components/shared/PageLayout";
+import { SegmentedControl } from "@/components/shared/SegmentedControl";
+import { FormRow, FormRows, SectionCard } from "@/components/shared/SectionCard";
 import { useTheme } from "@/components/theme-provider";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -190,93 +191,93 @@ export default function AppSettings() {
   });
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <PageContent containerClassName="max-w-2xl">
-        {isTauri() && (
-          <SectionCard
-            title="Application Update"
-            description={
-              appUpdateQ.data?.updateAvailable
-                ? `Release ${appUpdateQ.data.tag ?? appUpdateQ.data.version} is available.`
-                : appUpdateQ.isLoading
-                  ? "Checking GitHub releases..."
-                  : "Application is up to date."
-            }
-          >
-            <FormRow
-              label="Latest Installer"
-              description={appUpdateQ.data?.assetName ?? "No installer update available"}
-            >
-              <div className="flex items-center gap-2">
-                {appUpdateQ.data?.version && (
-                  <Badge variant="secondary" className="font-mono">
-                    {appUpdateQ.data.version}
-                  </Badge>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={appUpdateQ.isFetching || appUpdateMutation.isPending}
-                  onClick={() => {
-                    void appUpdateQ.refetch();
-                  }}
-                  title="Check again"
-                >
-                  <IconRefresh className="size-4" />
-                </Button>
-                <Button
-                  className="gap-2"
-                  disabled={!appUpdateQ.data?.tag || !appUpdateQ.data.updateAvailable || appUpdateMutation.isPending}
-                  onClick={() => {
-                    const tag = appUpdateQ.data?.tag;
-                    if (!tag || appUpdateLaunchRef.current) return;
-                    appUpdateLaunchRef.current = true;
-                    appUpdateMutation.mutate(tag, {
-                      onSettled: () => {
-                        appUpdateLaunchRef.current = false;
-                      },
-                    });
-                  }}
-                >
-                  <IconDownload className="size-4" />
-                  {appUpdateMutation.isPending ? "Downloading..." : "Install Update"}
-                </Button>
-              </div>
-            </FormRow>
-          </SectionCard>
-        )}
-
+    <PageContent containerClassName="max-w-3xl">
+      {isTauri() && (
         <SectionCard
-          title="Appearance"
-          description="Personalize how the configurator looks on this machine."
+          tone={appUpdateQ.data?.updateAvailable ? "accent" : "default"}
+          title="Application update"
+          icon={<IconDownload />}
+          description={
+            appUpdateQ.data?.updateAvailable
+              ? `Release ${appUpdateQ.data.tag ?? appUpdateQ.data.version} is available.`
+              : appUpdateQ.isLoading
+                ? "Checking GitHub releases…"
+                : "You are running the latest release."
+          }
+          headerRight={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={appUpdateQ.isFetching || appUpdateMutation.isPending}
+              onClick={() => {
+                void appUpdateQ.refetch();
+              }}
+              title="Check again"
+            >
+              <IconRefresh className="size-4" />
+            </Button>
+          }
         >
-          <div className="flex flex-col divide-y">
+          <FormRow
+            label="Latest installer"
+            description={appUpdateQ.data?.assetName ?? "No installer update available."}
+          >
+            {appUpdateQ.data?.version && (
+              <Badge variant="secondary" className="font-mono">
+                {appUpdateQ.data.version}
+              </Badge>
+            )}
+            <Button
+              disabled={
+                !appUpdateQ.data?.tag
+                || !appUpdateQ.data.updateAvailable
+                || appUpdateMutation.isPending
+              }
+              onClick={() => {
+                const tag = appUpdateQ.data?.tag;
+                if (!tag || appUpdateLaunchRef.current) return;
+                appUpdateLaunchRef.current = true;
+                appUpdateMutation.mutate(tag, {
+                  onSettled: () => {
+                    appUpdateLaunchRef.current = false;
+                  },
+                });
+              }}
+            >
+              <IconDownload className="size-4" />
+              {appUpdateMutation.isPending ? "Downloading…" : "Install update"}
+            </Button>
+          </FormRow>
+        </SectionCard>
+      )}
+
+      <PageSection title="Appearance">
+        <SectionCard>
+          <FormRows>
             <FormRow
               label="Theme"
-              description={`Current resolved theme: ${resolvedTheme === "dark" ? "Dark" : "Light"}`}
+              description={`Following your choice, currently rendering in ${
+                resolvedTheme === "dark" ? "dark" : "light"
+              } mode.`}
             >
-              <Select value={theme} onValueChange={(value) => setTheme(value as ThemeMode)}>
-                <SelectTrigger className="h-8 w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {THEME_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <SegmentedControl
+                aria-label="Theme"
+                value={theme}
+                size="md"
+                onChange={(value) => setTheme(value as ThemeMode)}
+                options={THEME_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
+              />
             </FormRow>
 
             <FormRow
-              label="Windows Mica Sidebar"
+              label="Translucent sidebar"
               description={
                 micaSupported
-                  ? "Enable translucent Mica material for the sidebar background"
-                  : "Available only in the Windows Tauri app"
+                  ? "Use the Windows Mica material behind the sidebar."
+                  : "Only available in the Windows desktop app."
               }
             >
               <Switch
@@ -289,17 +290,16 @@ export default function AppSettings() {
                 }}
               />
             </FormRow>
-          </div>
+          </FormRows>
         </SectionCard>
+      </PageSection>
 
-        <SectionCard
-          title="Startup"
-          description="Control how the app launches with your operating system."
-        >
-          <div className="flex flex-col divide-y">
+      <PageSection title="Startup">
+        <SectionCard>
+          <FormRows>
             <FormRow
-              label="Launch on System Startup"
-              description="Automatically launch the app when your OS starts"
+              label="Launch on system startup"
+              description="Start the configurator automatically when you sign in."
             >
               <Switch
                 checked={launchOnStartupQ.data ?? false}
@@ -307,9 +307,13 @@ export default function AppSettings() {
                 onCheckedChange={(value) => launchOnStartupMutation.mutate(value)}
               />
             </FormRow>
-            <FormRow label="Startup Window Mode" description="How the app opens when launched">
+            <FormRow
+              label="Window mode at launch"
+              description="How the window appears when the app starts."
+            >
               <Select
                 value={startupMode}
+                items={STARTUP_WINDOW_MODE_OPTIONS}
                 disabled={startupPrefsQ.isLoading || startupModeMutation.isPending}
                 onValueChange={(value) => startupModeMutation.mutate(value as StartupWindowMode)}
               >
@@ -327,77 +331,81 @@ export default function AppSettings() {
                 </SelectContent>
               </Select>
             </FormRow>
-          </div>
+          </FormRows>
         </SectionCard>
+      </PageSection>
 
-        <SectionCard
-          title="Developer"
-          description="Enable advanced tools and firmware diagnostics pages."
-        >
-          <FormRow label="Developer Mode" description="Shows diagnostics and firmware developer options">
-            <Switch checked={developerMode} onCheckedChange={(value) => setDeveloperMode(value)} />
-          </FormRow>
+      <PageSection title="Advanced">
+        <SectionCard>
+          <FormRows>
+            <FormRow
+              label="Developer mode"
+              description="Adds the Diagnostics page and firmware developer options to the sidebar."
+            >
+              <Switch checked={developerMode} onCheckedChange={(value) => setDeveloperMode(value)} />
+            </FormRow>
+            <FormRow
+              label="App version"
+              description="The build of kbhe-configurator currently running."
+            >
+              <Badge variant="secondary" className="font-mono">
+                {isTauri()
+                  ? appVersionQ.data ?? (appVersionQ.isLoading ? "Loading…" : "Unknown")
+                  : "Web preview"}
+              </Badge>
+            </FormRow>
+          </FormRows>
         </SectionCard>
+      </PageSection>
 
+      <PageSection title="Danger zone">
         <SectionCard
-          title="About"
-          description="Build information for this configurator install."
-        >
-          <FormRow
-            label="App Version"
-            description="The version of kbhe-configurator currently running."
-          >
-            <Badge variant="secondary" className="font-mono">
-              {isTauri()
-                ? appVersionQ.data ?? (appVersionQ.isLoading ? "Loading..." : "Unknown")
-                : "Web preview"}
-            </Badge>
-          </FormRow>
-        </SectionCard>
-
-        <SectionCard
-          title="Danger Zone"
-          description="Erase local app data and return settings to defaults."
-        >
-          <FormRow
-            label="Reset Application"
-            description="Clears local profiles, appearance settings, and developer preferences."
-          >
+          tone="danger"
+          title="Reset the application"
+          description="Clears local profiles, appearance settings and developer preferences, then reloads. Your keyboard is not touched."
+          icon={<IconAlertTriangle />}
+          footer={
             <Button
               variant="destructive"
+              size="sm"
               onClick={() => setResetDialogOpen(true)}
               disabled={resetAppMutation.isPending}
             >
-              Reset App
+              Reset app data
             </Button>
-          </FormRow>
+          }
+        >
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Settings stored on the keyboard itself — keymaps, calibration, device profiles —
+            stay exactly as they are. Use the Device page for a factory reset of the hardware.
+          </p>
         </SectionCard>
+      </PageSection>
 
-        <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <div className="mb-2 inline-flex size-10 items-center justify-center rounded-md bg-destructive/10 text-destructive">
-                <IconAlertTriangle className="size-5" />
-              </div>
-              <AlertDialogTitle>Reset application data?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will remove local profiles and app preferences, reset startup options, and reload the app.
-                This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={resetAppMutation.isPending}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                disabled={resetAppMutation.isPending}
-                onClick={() => resetAppMutation.mutate()}
-              >
-                {resetAppMutation.isPending ? "Resetting..." : "Reset App"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </PageContent>
-    </div>
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-2 inline-flex size-10 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+              <IconAlertTriangle className="size-5" />
+            </div>
+            <AlertDialogTitle>Reset application data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes local profiles and app preferences, resets startup options and
+              reloads the app. It cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetAppMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={resetAppMutation.isPending}
+              onClick={() => resetAppMutation.mutate()}
+            >
+              {resetAppMutation.isPending ? "Resetting…" : "Reset app data"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContent>
   );
 }

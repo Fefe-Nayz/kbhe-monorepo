@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, type ReactNode } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,12 @@ interface DistanceSliderProps {
   displayDecimals?: number;
   disabled?: boolean;
   className?: string;
+  /** One line under the track explaining what the distance controls. */
+  description?: ReactNode;
+  /** Rendered beside the label — "Mixed" badges, hints. */
+  labelRight?: ReactNode;
+  /** Hide the min/max endpoints under the track. */
+  hideRange?: boolean;
 }
 
 export function DistanceSlider({
@@ -29,6 +35,9 @@ export function DistanceSlider({
   displayDecimals = 1,
   disabled = false,
   className,
+  description,
+  labelRight,
+  hideRange = false,
 }: DistanceSliderProps) {
   const [draft, setDraft] = useState<number | null>(null);
   const commitRef = useRef<number>(value);
@@ -86,11 +95,15 @@ export function DistanceSlider({
   }, [draft, onChange]);
 
   return (
-    <div className={cn("grid gap-2", className)}>
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">{label}</Label>
-        <span className="text-sm font-mono tabular-nums text-muted-foreground">
-          {displayValue.toFixed(precision)} mm
+    <div className={cn("grid gap-2", disabled && "opacity-55", className)}>
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Label className="truncate text-sm font-medium">{label}</Label>
+          {labelRight}
+        </div>
+        <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs tabular-nums text-foreground">
+          {displayValue.toFixed(precision)}
+          <span className="ml-0.5 text-muted-foreground">mm</span>
         </span>
       </div>
       <div
@@ -109,6 +122,20 @@ export function DistanceSlider({
           className="w-full"
         />
       </div>
+      {(description || !hideRange) && (
+        <div className="flex items-start justify-between gap-3">
+          {description ? (
+            <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
+          ) : (
+            <span />
+          )}
+          {!hideRange && (
+            <span className="shrink-0 font-mono text-[0.68rem] tabular-nums text-muted-foreground/70">
+              {min.toFixed(precision)}–{max.toFixed(precision)} mm
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

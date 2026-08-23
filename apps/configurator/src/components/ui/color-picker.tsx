@@ -389,6 +389,7 @@ export const ColorPickerOutput = ({ className, ...props }: ColorPickerOutputProp
         }
       }}
       value={mode}
+      items={formats.map(format => ({ value: format, label: format.toUpperCase() }))}
     >
       <SelectTrigger className={cn("h-8 w-20 shrink-0 text-xs", className)} {...(props as any)}>
         <SelectValue placeholder="Mode" />

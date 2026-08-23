@@ -31,7 +31,12 @@ import {
 import { queryKeys } from "@/lib/query/keys";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
 import { KeyboardEditor } from "@/components/keyboard-editor";
-import { SectionCard, FormRow } from "@/components/shared/SectionCard";
+import { SectionCard, FormRow, FormRows } from "@/components/shared/SectionCard";
+import { PageSection } from "@/components/shared/PageLayout";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SliderField } from "@/components/shared/SliderField";
+import { Toolbar, ToolbarStat } from "@/components/shared/Toolbar";
+import { Badge } from "@/components/ui/badge";
 import { ColorPicker, type RGBColor } from "@/components/color-picker";
 import { Switch } from "@/components/ui/switch";
 import { CommitSlider } from "@/components/ui/commit-slider";
@@ -43,12 +48,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
+  IconAdjustments,
+  IconArrowsExchange,
   IconBrush,
+  IconBulb,
+  IconEye,
+  IconMoon,
+  IconMusic,
+  IconSearch,
+  IconSparkles,
   IconTrash,
   IconUpload,
   IconDownload,
@@ -1230,30 +1243,45 @@ function NativeLighting() {
 
   const matrixToolsVisible = connected && isMatrixMode;
 
+
   const menubar = (
-    <>
-      <div className="min-w-0">
-        <span className="block truncate text-xs text-muted-foreground">
-          {matrixToolsVisible
-            ? "Matrix mode actif - peins directement sur le clavier"
-            : `${liveKeyboardPreviewEnabled ? "Apercu live" : "Apercu statique"} (lecture seule) - ${effectName(currentEffect)}`}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        {matrixToolsVisible && (
+    <Toolbar
+      left={
+        matrixToolsVisible ? (
           <>
-            <ColorPicker color={paintColor} onChange={setPaintColor} />
-            <Button variant="outline" size="sm" onClick={() => fillMut.mutate(paintColor)}>
-              <IconBrush className="size-3.5 mr-1" />Fill
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => clearMut.mutate()}>
-              <IconTrash className="size-3.5 mr-1" />Clear
-            </Button>
+            <ToolbarStat value="Matrix mode" tone="active" />
+            <span className="truncate text-xs text-muted-foreground">
+              Paint directly on the keyboard above
+            </span>
           </>
-        )}
-        <AutosaveStatus state={saveState} />
-      </div>
-    </>
+        ) : (
+          <>
+            <ToolbarStat label="Effect" value={effectName(currentEffect)} />
+            <span className="truncate text-xs text-muted-foreground">
+              {liveKeyboardPreviewEnabled ? "Live preview" : "Static preview"} — read only
+            </span>
+          </>
+        )
+      }
+      right={
+        <>
+          {matrixToolsVisible && (
+            <>
+              <ColorPicker color={paintColor} onChange={setPaintColor} />
+              <Button variant="outline" size="sm" onClick={() => fillMut.mutate(paintColor)}>
+                <IconBrush className="size-3.5" />
+                Fill
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => clearMut.mutate()}>
+                <IconTrash className="size-3.5" />
+                Clear
+              </Button>
+            </>
+          )}
+          <AutosaveStatus state={saveState} />
+        </>
+      }
+    />
   );
 
   return (
@@ -1261,205 +1289,313 @@ function NativeLighting() {
       keyboard={keyboardPreview}
       menubar={menubar}
     >
-      <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[1fr_320px]">
-        {/* Left column */}
-        <div className="flex flex-col gap-4">
-          <SectionCard title="LED Control">
-            <div className="flex flex-col divide-y">
-              <FormRow label="LEDs Enabled">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        {/* Left column — what the lighting does */}
+        <div className="flex flex-col gap-5">
+          <PageSection title="Effect">
+            <SectionCard
+              title="Effect mode"
+              description="Pick what the RGB matrix renders when no override is active."
+              icon={<IconSparkles />}
+              headerRight={
+                <Badge variant="secondary" className="max-w-40 truncate">
+                  {effectName(currentEffect)}
+                </Badge>
+              }
+            >
+              <div className="mb-4">
+                <div className="relative">
+                  <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={effectSearch}
+                    onChange={(event) => setEffectSearch(event.target.value)}
+                    placeholder="Search effects…"
+                    className="h-8 pl-8"
+                  />
+                </div>
+              </div>
+
+              {groupedEffects.length === 0 ? (
+                <EmptyState
+                  size="sm"
+                  icon={<IconSearch />}
+                  title="No effect matches your search"
+                  description="Try a different term, or clear the box to see everything."
+                />
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {groupedEffects.map((category) => (
+                    <div key={category.key}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                          {category.title}
+                        </p>
+                        <div className="h-px flex-1 bg-border" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {category.effects.map((eff) => {
+                          const active = Number(currentEffectForSelection) === eff.id;
+                          return (
+                            <button
+                              key={eff.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              disabled={!connected || effectQ.data == null}
+                              onClick={() => effectMut.mutate(eff.id)}
+                              className={cn(
+                                "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-medium transition-colors",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                                "disabled:pointer-events-none disabled:opacity-45",
+                                active
+                                  ? "border-primary/50 bg-primary/10 text-foreground ring-1 ring-primary/25"
+                                  : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "size-1.5 shrink-0 rounded-full",
+                                  active ? "bg-primary" : "bg-muted-foreground/30",
+                                )}
+                              />
+                              <span className="truncate">{eff.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {currentEffect === LEDEffect.AUDIO_SPECTRUM && (
+                <div
+                  className={cn(
+                    "mt-4 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs",
+                    connected && pageVisible
+                      ? "border-success/30 bg-success/8 text-success"
+                      : "border-border bg-muted/50 text-muted-foreground",
+                  )}
+                >
+                  <IconMusic className="mt-px size-3.5 shrink-0" />
+                  <span>
+                    {connected && pageVisible
+                      ? "Streaming PC audio FFT bands to the keyboard in real time."
+                      : "Connect a keyboard and keep this page open to stream audio FFT data."}
+                  </span>
+                </div>
+              )}
+            </SectionCard>
+          </PageSection>
+
+          <PageSection title="Output">
+            <SectionCard
+              title="LED output"
+              description="Master power and how hard the matrix is driven."
+              icon={<IconBulb />}
+              headerRight={
                 <Switch
                   checked={enabledQ.data ?? false}
                   disabled={!connected}
                   onCheckedChange={(v) => enabledMut.mutate(v)}
+                  aria-label="Enable LEDs"
                 />
-              </FormRow>
-              <FormRow
-                label="Idle Auto-Off"
-                description="Automatically disable RGB output after inactivity (seconds, 0 = off)"
-              >
-                <div className="flex items-center gap-3 w-52">
-                  <CommitSlider
-                    min={0}
-                    max={255}
-                    step={1}
-                    value={ledIdleTimeoutSeconds}
-                    onLiveChange={() => { }}
-                    onCommit={(v) => commitIdleOptions({ idle_timeout_seconds: v })}
-                    disabled={!connected || idleOptionsQ.data == null}
-                    className="flex-1"
-                  />
-                </div>
-              </FormRow>
-              <FormRow
-                label="Allow System Indicators"
-                description="Keep Caps Lock and volume bar LEDs available when RGB is disabled"
-              >
-                <Switch
-                  checked={allowSystemWhenDisabled}
+              }
+            >
+              <div className="flex flex-col gap-5">
+                <SliderField
+                  label="Global brightness"
+                  description="Applies on top of every effect."
+                  min={0} max={255} step={1}
+                  value={brightnessQ.data ?? 128}
+                  onLiveChange={(v) => liveBrightness(v)}
+                  onCommit={(v) => {
+                    void liveBrightness.cancelAndWait().then(() => brightnessMut.mutate(v));
+                  }}
+                  disabled={!connected || brightnessQ.data == null}
+                />
+                <SliderField
+                  label="Frame rate limit"
+                  description="Caps how often the matrix redraws. 0 leaves it uncapped."
+                  min={0} max={120} step={1}
+                  unit="fps"
+                  valueFormatter={(v) => (v === 0 ? "Uncapped" : String(v))}
+                  value={fpsQ.data ?? 0}
+                  onLiveChange={(v) => liveFps(v)}
+                  onCommit={(v) => {
+                    void liveFps.cancelAndWait().then(() => fpsMut.mutate(v));
+                  }}
+                  disabled={!connected || fpsQ.data == null}
+                />
+              </div>
+            </SectionCard>
+          </PageSection>
+
+          <PageSection title="Power &amp; idle">
+            <SectionCard
+              title="Idle behaviour"
+              description="What happens to the RGB when the keyboard is left alone."
+              icon={<IconMoon />}
+            >
+              <div className="flex flex-col gap-5">
+                <SliderField
+                  label="Auto-off after inactivity"
+                  description="Turn the matrix off once the keyboard has been idle this long."
+                  min={0} max={255} step={1}
+                  unit="s"
+                  valueFormatter={(v) => (v === 0 ? "Never" : String(v))}
+                  value={ledIdleTimeoutSeconds}
+                  onCommit={(v) => commitIdleOptions({ idle_timeout_seconds: v })}
                   disabled={!connected || idleOptionsQ.data == null}
-                  onCheckedChange={(v) => commitIdleOptions({ allow_system_when_disabled: v })}
                 />
-              </FormRow>
-              <FormRow
-                label="Third-Party Stream Keeps Awake"
-                description="Count external RGB stream writes as activity for idle auto-off"
+
+                <FormRows>
+                  <FormRow
+                    label="Keep system indicators"
+                    description="Caps Lock and volume LEDs stay available while the matrix is off."
+                  >
+                    <Switch
+                      checked={allowSystemWhenDisabled}
+                      disabled={!connected || idleOptionsQ.data == null}
+                      onCheckedChange={(v) => commitIdleOptions({ allow_system_when_disabled: v })}
+                    />
+                  </FormRow>
+                  <FormRow
+                    label="External writes count as activity"
+                    description="Third-party RGB software keeps the matrix awake."
+                  >
+                    <Switch
+                      checked={thirdPartyStreamCountsAsActivity}
+                      disabled={!connected || idleOptionsQ.data == null}
+                      onCheckedChange={(v) =>
+                        commitIdleOptions({ third_party_stream_counts_as_activity: v })
+                      }
+                    />
+                  </FormRow>
+                  <FormRow
+                    label="Off on USB suspend"
+                    description="Cut the matrix when the host sleeps but keeps USB powered."
+                  >
+                    <Switch
+                      checked={usbSuspendRgbOff}
+                      disabled={!connected || idleOptionsQ.data == null}
+                      onCheckedChange={(v) => commitIdleOptions({ usb_suspend_rgb_off: v })}
+                    />
+                  </FormRow>
+                </FormRows>
+              </div>
+            </SectionCard>
+          </PageSection>
+
+          {isMatrixMode && (
+            <PageSection title="Matrix">
+              <SectionCard
+                title="Transfer"
+                description="Move the painted matrix between the keyboard and a .led file."
+                icon={<IconArrowsExchange />}
               >
-                <Switch
-                  checked={thirdPartyStreamCountsAsActivity}
-                  disabled={!connected || idleOptionsQ.data == null}
-                  onCheckedChange={(v) => commitIdleOptions({ third_party_stream_counts_as_activity: v })}
-                />
-              </FormRow>
-              <FormRow
-                label="USB Suspend RGB Off"
-                description="Force RGB off when the host USB bus enters suspend (sleep/soft-off with powered USB)"
-              >
-                <Switch
-                  checked={usbSuspendRgbOff}
-                  disabled={!connected || idleOptionsQ.data == null}
-                  onCheckedChange={(v) => commitIdleOptions({ usb_suspend_rgb_off: v })}
-                />
-              </FormRow>
-              <FormRow label="Global Brightness">
-                <div className="flex items-center gap-3 w-44">
-                  <CommitSlider
-                    min={0} max={255} step={1}
-                    value={brightnessQ.data ?? 128}
-                    onLiveChange={(v) => liveBrightness(v)}
-                    onCommit={(v) => {
-                      void liveBrightness.cancelAndWait().then(() => brightnessMut.mutate(v));
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!connected || !pixelColors}
+                    onClick={() => {
+                      if (pixelColors) {
+                        uploadMut.mutate(rgbArrayToPixels(pixelColors));
+                      }
                     }}
-                    disabled={!connected || brightnessQ.data == null}
-                    className="flex-1"
+                  >
+                    <IconUpload className="size-3.5" />
+                    Upload to keyboard
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!connected}
+                    onClick={() => downloadMut.mutate()}
+                  >
+                    <IconDownload className="size-3.5" />
+                    Download from keyboard
+                  </Button>
+                  <div className="mx-1 w-px self-stretch bg-border" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExport}
+                    disabled={!connected || (!matrixPixels && !allPixelsQ.data)}
+                  >
+                    <IconFileExport className="size-3.5" />
+                    Export .led
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!connected}
+                  >
+                    <IconFileImport className="size-3.5" />
+                    Import .led
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".led"
+                    className="hidden"
+                    aria-label="Import .led file"
+                    onChange={handleImport}
                   />
                 </div>
-              </FormRow>
-              <FormRow label="FPS Limit">
-                <div className="flex items-center gap-3 w-44">
-                  <CommitSlider
-                    min={0} max={120} step={1}
-                    value={fpsQ.data ?? 0}
-                    onLiveChange={(v) => liveFps(v)}
-                    onCommit={(v) => {
-                      void liveFps.cancelAndWait().then(() => fpsMut.mutate(v));
-                    }}
-                    disabled={!connected || fpsQ.data == null}
-                    className="flex-1"
-                  />
-                </div>
-              </FormRow>
-              {!isMatrixMode && (
+              </SectionCard>
+            </PageSection>
+          )}
+        </div>
+
+        {/* Right column — tuning for the selected effect, kept in view */}
+        <div className="flex h-fit flex-col gap-4 self-start xl:sticky xl:top-0">
+          <SectionCard
+            title="Effect tuning"
+            description={`Parameters for ${effectName(currentEffect)}.`}
+            icon={<IconAdjustments />}
+            footer={
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleResetEffectParams}
+                disabled={!canResetEffectParams}
+              >
+                <IconRestore className="size-4" />
+                Reset to defaults
+              </Button>
+            }
+          >
+            {renderEffectParams()}
+          </SectionCard>
+
+          {!isMatrixMode && (
+            <SectionCard
+              title="Preview"
+              description="Only affects this window, never the keyboard."
+              icon={<IconEye />}
+            >
+              <FormRows>
                 <FormRow
-                  label="Live Keyboard"
-                  description="Toggle real-time keyboard preview updates outside Matrix mode"
+                  label="Live preview"
+                  description="Mirror the running effect in the keyboard above."
                 >
                   <Switch
                     checked={liveKeyboardPreviewEnabled}
                     onCheckedChange={setLiveKeyboardPreviewEnabled}
                   />
                 </FormRow>
-              )}
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Effect Mode"
-            description={effectName(currentEffect)}
-          >
-            <div className="mb-3">
-              <Input
-                value={effectSearch}
-                onChange={(event) => setEffectSearch(event.target.value)}
-                placeholder="Search effects..."
-                className="h-8"
-              />
-            </div>
-            {groupedEffects.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No effect matches your search.</p>
-            ) : (
-              <RadioGroup
-                value={String(currentEffectForSelection)}
-                onValueChange={(v: string) => effectMut.mutate(Number(v))}
-                disabled={!connected || effectQ.data == null}
-                className="space-y-4"
-              >
-                {groupedEffects.map((category) => (
-                  <div key={category.key} className="space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {category.title}
-                    </p>
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                      {category.effects.map((eff) => (
-                        <div key={eff.id} className="flex items-center gap-2">
-                          <RadioGroupItem value={String(eff.id)} id={`effect-${eff.id}`} />
-                          <Label htmlFor={`effect-${eff.id}`} className="text-sm font-normal cursor-pointer">{eff.name}</Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </RadioGroup>
-            )}
-            {currentEffect === LEDEffect.AUDIO_SPECTRUM && (
-              <p className={`mt-3 text-xs border-t pt-3 ${connected && pageVisible ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                {connected && pageVisible
-                  ? "Streaming PC audio FFT bands to keyboard in real-time."
-                  : "Audio Spectrum: connect a keyboard and keep this page open to stream audio FFT data."}
-              </p>
-            )}
-          </SectionCard>
-
-          {isMatrixMode && (
-            <SectionCard title="Matrix Transfer">
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" disabled={!connected || !pixelColors} onClick={() => {
-                  if (pixelColors) {
-                    uploadMut.mutate(rgbArrayToPixels(pixelColors));
-                  }
-                }}>
-                  <IconUpload className="size-3.5 mr-1" />Upload All
-                </Button>
-                <Button variant="outline" size="sm" disabled={!connected} onClick={() => downloadMut.mutate()}>
-                  <IconDownload className="size-3.5 mr-1" />Download All
-                </Button>
-                <div className="w-px bg-border mx-1 self-stretch" />
-                <Button variant="outline" size="sm" onClick={handleExport} disabled={!connected || (!matrixPixels && !allPixelsQ.data)}>
-                  <IconFileExport className="size-3.5 mr-1" />Export .led
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!connected}>
-                  <IconFileImport className="size-3.5 mr-1" />Import .led
-                </Button>
-                <input ref={fileInputRef} type="file" accept=".led" className="hidden" aria-label="Import .led file" onChange={handleImport} />
-              </div>
+              </FormRows>
             </SectionCard>
           )}
-        </div>
-
-        {/* Right column */}
-        <div className="flex h-fit self-start flex-col gap-4 lg:sticky lg:top-4">
-          <SectionCard
-            title="Effect Tuning"
-            description={effectName(currentEffect)}
-          >
-            {renderEffectParams()}
-            <div className="mt-4 border-t pt-3">
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleResetEffectParams}
-                disabled={!canResetEffectParams}
-                className="w-full"
-              >
-                <IconRestore className="mr-1 size-4" />
-                Reset Effect Params
-              </Button>
-            </div>
-          </SectionCard>
         </div>
       </div>
     </KeyboardEditor>
   );
 }
+
 
 export default function Lighting() {
   const status = useDeviceSession((state) => state.status);
@@ -1518,7 +1654,14 @@ export default function Lighting() {
             title="Select a libhmk keyboard"
             description="Multiple RGB bridges are attached. Choose the physical keyboard by its stable USB serial before any command is sent."
           >
-            <Select value={selectedBridgeSerialNumber ?? undefined} onValueChange={setSelectedBridgeSerialNumber}>
+            <Select
+              value={selectedBridgeSerialNumber ?? undefined}
+              items={bridgeDevices.map((device) => ({
+                value: rgbBridgeSerialNumber(device),
+                label: `${device.product?.trim() || "KBHE 75HE (libhmk)"} · ${rgbBridgeSerialNumber(device)}`,
+              }))}
+              onValueChange={setSelectedBridgeSerialNumber}
+            >
               <SelectTrigger className="w-full min-w-72">
                 <SelectValue placeholder="Choose a keyboard…" />
               </SelectTrigger>

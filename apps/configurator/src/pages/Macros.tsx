@@ -3,13 +3,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   IconBraces,
   IconDeviceFloppy,
+  IconLayersIntersect,
+  IconListNumbers,
   IconPlus,
   IconRefresh,
+  IconToggleLeft,
   IconTrash,
 } from "@tabler/icons-react";
 
-import { PageContent } from "@/components/shared/PageLayout";
-import { FormRow, SectionCard } from "@/components/shared/SectionCard";
+import { PageContent, PageSection } from "@/components/shared/PageLayout";
+import { FormRow, FormRows, SectionCard } from "@/components/shared/SectionCard";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +57,28 @@ import {
 const opcodeValues = Object.values(ActionOpcode).filter(
   (value): value is ActionOpcode => typeof value === "number",
 );
+
+// Base UI shows the raw value in a Select trigger unless Root is handed an
+// items map, so every option list here is declared once and shared.
+const OPCODE_ITEMS = opcodeValues.map((opcode) => ({
+  value: String(opcode),
+  label: ACTION_OPCODE_LABELS[opcode],
+}));
+
+const PROGRAM_SLOT_ITEMS = Array.from({ length: ACTION_PROGRAM_COUNT }, (_, index) => ({
+  value: String(index),
+  label: `Macro ${index + 1}`,
+}));
+
+const OVERLAY_SLOT_ITEMS = Array.from({ length: ACTION_OVERLAY_COUNT }, (_, index) => ({
+  value: String(index),
+  label: `Overlay ${index + 1}`,
+}));
+
+const OVERLAY_POLARITY_ITEMS = [
+  { value: "1", label: "Bit is set" },
+  { value: "0", label: "Bit is clear" },
+];
 
 function clampInteger(value: number, minimum: number, maximum: number): number {
   if (!Number.isFinite(value)) return minimum;
@@ -318,162 +344,474 @@ export default function Macros() {
   return (
     <PageContent containerClassName="max-w-5xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <IconBraces className="size-5" />
-            <h2 className="text-lg font-semibold">On-device macros & modes</h2>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Bounded programs run without the PC. Assign Macro 1–16 from the keymap or a rotary binding.
-          </p>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">On-device macros &amp; modes</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Bounded programs that run without the PC. Assign Macro 1–16 from the keymap
+              or a rotary binding.
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Badge variant="outline">Profile {profileIndex + 1}</Badge>
           {ramOnlyMode && <Badge variant="secondary">Temporary · no flash writes</Badge>}
           <Badge variant={capabilitiesQ.data ? "secondary" : "outline"}>
-            {capabilitiesQ.data ? `${capabilitiesQ.data.programCount} slots · ${capabilitiesQ.data.maxSteps} steps` : "Unavailable"}
+            {capabilitiesQ.data
+              ? `${capabilitiesQ.data.programCount} slots · ${capabilitiesQ.data.maxSteps} steps`
+              : "Capabilities unavailable"}
           </Badge>
         </div>
       </div>
 
-      {message && <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">{message}</div>}
+      {message && (
+        <div className="rounded-lg border bg-muted/40 px-3.5 py-2.5 text-sm">{message}</div>
+      )}
 
-      <SectionCard
-        title="Macro program"
-        description="Sequences are validated and staged before the firmware commits them. Any held outputs are released on abort."
-        headerRight={
-          <div className="flex items-center gap-2">
-            <Select value={String(programIndex)} onValueChange={(value) => setProgramIndex(Number(value))}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+      <PageSection title="Macro program">
+        <SectionCard
+          title="Steps"
+          description="The sequence is validated and staged before the firmware commits it. Any held outputs are released if it aborts."
+          icon={<IconListNumbers />}
+          headerRight={
+            <>
+              <Select
+                value={String(programIndex)}
+                items={PROGRAM_SLOT_ITEMS}
+                onValueChange={(value) => setProgramIndex(Number(value))}
+              >
+                <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PROGRAM_SLOT_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => void programQ.refetch()}
+                disabled={!connected}
+                title="Re-read this macro from the keyboard"
+              >
+                <IconRefresh />
+              </Button>
+            </>
+          }
+          footer={
+            <>
+              {!validation.success && (
+                <p className="mr-auto text-xs text-destructive">
+                  {validation.error.issues[0]?.message}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addStep}
+                disabled={programDraft.steps.length >= ACTION_PROGRAM_MAX_STEPS}
+              >
+                <IconPlus />
+                Add step
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void saveProgram()}
+                disabled={!connected || savingProgram || !validation.success}
+              >
+                <IconDeviceFloppy />
+                {savingProgram ? "Committing…" : "Commit macro"}
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <FormRows>
+              <FormRow
+                label="Cancel on key release"
+                description="Abort the program and release every owned output when the trigger key comes back up."
+              >
+                <Switch
+                  checked={(programDraft.flags & ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE) !== 0}
+                  onCheckedChange={(checked) => setProgramDraft((current) => ({
+                    ...current,
+                    flags: checked
+                      ? current.flags | ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE
+                      : current.flags & ~ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE,
+                  }))}
+                />
+              </FormRow>
+              <FormRow
+                label="Restart on retrigger"
+                description="Pressing the key again cleans up the running instance before starting over."
+              >
+                <Switch
+                  checked={(programDraft.flags & ACTION_PROGRAM_FLAG_RESTART_ON_TRIGGER) !== 0}
+                  onCheckedChange={(checked) => setProgramDraft((current) => ({
+                    ...current,
+                    flags: checked
+                      ? current.flags | ACTION_PROGRAM_FLAG_RESTART_ON_TRIGGER
+                      : current.flags & ~ACTION_PROGRAM_FLAG_RESTART_ON_TRIGGER,
+                  }))}
+                />
+              </FormRow>
+            </FormRows>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <h4 className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Sequence
+                </h4>
+                <span className="rounded-full bg-muted px-1.5 py-px text-[0.65rem] font-medium tabular-nums text-muted-foreground">
+                  {programDraft.steps.length}/{ACTION_PROGRAM_MAX_STEPS}
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {programDraft.steps.map((step, index) => (
+                <div
+                  key={index}
+                  className="rounded-xl border bg-surface-sunken/50 p-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-1.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-[0.7rem] font-medium tabular-nums text-muted-foreground">
+                      {index + 1}
+                    </span>
+
+                    <div className="grid min-w-0 flex-1 gap-2.5 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                      <label className="grid gap-1">
+                        <span className="text-[0.68rem] font-medium uppercase tracking-[0.05em] text-muted-foreground">
+                          Action
+                        </span>
+                        <Select
+                          value={String(step.opcode)}
+                          items={OPCODE_ITEMS}
+                          onValueChange={(value) =>
+                            updateStep(index, { opcode: Number(value) as ActionOpcode })
+                          }
+                        >
+                          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {OPCODE_ITEMS.map((item) => (
+                              <SelectItem key={item.value} value={item.value}>
+                                {item.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+
+                      <label className="grid gap-1">
+                        <span className="text-[0.68rem] font-medium uppercase tracking-[0.05em] text-muted-foreground">
+                          Arg 8-bit
+                        </span>
+                        <Input
+                          className="h-8 font-mono text-xs"
+                          aria-label={`Step ${index + 1} 8-bit argument`}
+                          value={step.arg8}
+                          onChange={(event) =>
+                            updateStep(index, {
+                              arg8: clampInteger(numericInputValue(event.target.value), 0, 255),
+                            })
+                          }
+                        />
+                      </label>
+
+                      <label className="grid gap-1">
+                        <span className="text-[0.68rem] font-medium uppercase tracking-[0.05em] text-muted-foreground">
+                          Arg 16-bit
+                        </span>
+                        <Input
+                          className="h-8 font-mono text-xs"
+                          aria-label={`Step ${index + 1} 16-bit argument`}
+                          value={`0x${step.arg16.toString(16).toUpperCase()}`}
+                          onChange={(event) =>
+                            updateStep(index, {
+                              arg16: clampInteger(numericInputValue(event.target.value), 0, 0xffff),
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="mt-5 shrink-0"
+                      onClick={() => removeStep(index)}
+                      disabled={programDraft.steps.length <= 1}
+                      title="Remove this step"
+                    >
+                      <IconTrash />
+                    </Button>
+                  </div>
+
+                  <p className="mt-2 pl-9 text-xs leading-relaxed text-muted-foreground">
+                    {stepArgumentHelp(step)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      </PageSection>
+
+      <PageSection title="LED overlay">
+        <SectionCard
+          title="State-driven overlay"
+          description="Follows a named mode bit and cross-fades over the underlying effect, entirely on the device."
+          icon={<IconLayersIntersect />}
+          headerRight={
+            <Select
+              value={String(overlayIndex)}
+              items={OVERLAY_SLOT_ITEMS}
+              onValueChange={(value) => setOverlayIndex(Number(value))}
+            >
+              <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {Array.from({ length: ACTION_PROGRAM_COUNT }, (_, index) => (
-                  <SelectItem key={index} value={String(index)}>Macro {index + 1}</SelectItem>
+                {OVERLAY_SLOT_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => void programQ.refetch()} disabled={!connected}>
-              <IconRefresh />
+          }
+          footer={
+            <Button
+              size="sm"
+              onClick={() => void saveOverlay()}
+              disabled={!connected || savingOverlay}
+            >
+              <IconDeviceFloppy />
+              {savingOverlay ? "Committing…" : "Commit overlay"}
             </Button>
-          </div>
-        }
-      >
-        <div className="grid gap-3">
-          <FormRow label="Cancel on key release" description="Abort the program and release every owned output when its trigger is released.">
-            <Switch
-              checked={(programDraft.flags & ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE) !== 0}
-              onCheckedChange={(checked) => setProgramDraft((current) => ({
-                ...current,
-                flags: checked
-                  ? current.flags | ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE
-                  : current.flags & ~ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE,
-              }))}
-            />
-          </FormRow>
-          <FormRow label="Restart on retrigger" description="A second press cleans up the running instance before starting again.">
-            <Switch
-              checked={(programDraft.flags & ACTION_PROGRAM_FLAG_RESTART_ON_TRIGGER) !== 0}
-              onCheckedChange={(checked) => setProgramDraft((current) => ({
-                ...current,
-                flags: checked
-                  ? current.flags | ACTION_PROGRAM_FLAG_RESTART_ON_TRIGGER
-                  : current.flags & ~ACTION_PROGRAM_FLAG_RESTART_ON_TRIGGER,
-              }))}
-            />
-          </FormRow>
-
-          <div className="grid gap-2">
-            {programDraft.steps.map((step, index) => (
-              <div key={index} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[3rem_1fr_7rem_8rem_2rem] md:items-center">
-                <span className="text-xs font-mono text-muted-foreground">#{index + 1}</span>
-                <Select
-                  value={String(step.opcode)}
-                  onValueChange={(value) => updateStep(index, { opcode: Number(value) as ActionOpcode })}
+          }
+        >
+          <div className="flex flex-col gap-5">
+            <div>
+              <SubHeading>Trigger</SubHeading>
+              <FormRows>
+                <FormRow
+                  label="Enabled"
+                  description="Turn this overlay slot on."
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {opcodeValues.map((opcode) => (
-                      <SelectItem key={opcode} value={String(opcode)}>{ACTION_OPCODE_LABELS[opcode]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  aria-label={`Step ${index + 1} arg8`}
-                  value={step.arg8}
-                  onChange={(event) => updateStep(index, { arg8: clampInteger(numericInputValue(event.target.value), 0, 255) })}
-                />
-                <Input
-                  aria-label={`Step ${index + 1} arg16`}
-                  value={`0x${step.arg16.toString(16).toUpperCase()}`}
-                  onChange={(event) => updateStep(index, { arg16: clampInteger(numericInputValue(event.target.value), 0, 0xffff) })}
-                />
-                <Button variant="ghost" size="icon-sm" onClick={() => removeStep(index)} disabled={programDraft.steps.length <= 1}>
-                  <IconTrash />
-                </Button>
-                <p className="text-xs text-muted-foreground md:col-start-2 md:col-span-4">{stepArgumentHelp(step)}</p>
-              </div>
-            ))}
+                  <Switch
+                    checked={overlayDraft.enabled}
+                    onCheckedChange={(enabled) =>
+                      setOverlayDraft((current) => ({ ...current, enabled }))
+                    }
+                  />
+                </FormRow>
+                <FormRow
+                  label="Follow mode state"
+                  description="Show the overlay only while the mode bit below matches."
+                >
+                  <Switch
+                    checked={overlayDraft.followsState}
+                    onCheckedChange={(followsState) =>
+                      setOverlayDraft((current) => ({ ...current, followsState }))
+                    }
+                  />
+                </FormRow>
+                <FormRow
+                  label="Mode bit"
+                  description={`Which of the ${ACTION_STATE_COUNT} mode bits to watch.`}
+                >
+                  <Input
+                    type="number"
+                    className="h-8 w-24 font-mono text-xs"
+                    min={0}
+                    max={ACTION_STATE_COUNT - 1}
+                    value={overlayDraft.stateIndex}
+                    onChange={(event) =>
+                      setOverlayDraft((current) => ({
+                        ...current,
+                        stateIndex: clampInteger(
+                          Number(event.target.value),
+                          0,
+                          ACTION_STATE_COUNT - 1,
+                        ),
+                      }))
+                    }
+                  />
+                </FormRow>
+                <FormRow
+                  label="Shows when"
+                  description="Whether the overlay appears on a set or a cleared bit."
+                >
+                  <Select
+                    value={String(overlayDraft.activeValue ? 1 : 0)}
+                    items={OVERLAY_POLARITY_ITEMS}
+                    onValueChange={(value) =>
+                      setOverlayDraft((current) => ({ ...current, activeValue: Number(value) }))
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {OVERLAY_POLARITY_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormRow>
+              </FormRows>
+            </div>
+
+            <div>
+              <SubHeading>Appearance</SubHeading>
+              <FormRows>
+                <FormRow label="Colour" description="Rendered on top of the running effect.">
+                  <Input
+                    type="color"
+                    className="h-8 w-16 p-1"
+                    value={formatColor(overlayDraft.color)}
+                    onChange={(event) =>
+                      setOverlayDraft((current) => ({
+                        ...current,
+                        color: parseColor(event.target.value),
+                      }))
+                    }
+                  />
+                </FormRow>
+                <FormRow label="Opacity" description="0 is invisible, 255 fully replaces the effect.">
+                  <Input
+                    type="number"
+                    className="h-8 w-24 font-mono text-xs"
+                    min={0}
+                    max={255}
+                    value={overlayDraft.opacity}
+                    onChange={(event) =>
+                      setOverlayDraft((current) => ({
+                        ...current,
+                        opacity: clampInteger(Number(event.target.value), 0, 255),
+                      }))
+                    }
+                  />
+                </FormRow>
+                <FormRow label="Fade in" description="Cross-fade time when the overlay appears.">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      className="h-8 w-24 font-mono text-xs"
+                      min={0}
+                      max={2000}
+                      value={overlayDraft.fadeInMs}
+                      onChange={(event) =>
+                        setOverlayDraft((current) => ({
+                          ...current,
+                          fadeInMs: clampInteger(Number(event.target.value), 0, 2000),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">ms</span>
+                  </div>
+                </FormRow>
+                <FormRow label="Fade out" description="Cross-fade time when it goes away.">
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      className="h-8 w-24 font-mono text-xs"
+                      min={0}
+                      max={2000}
+                      value={overlayDraft.fadeOutMs}
+                      onChange={(event) =>
+                        setOverlayDraft((current) => ({
+                          ...current,
+                          fadeOutMs: clampInteger(Number(event.target.value), 0, 2000),
+                        }))
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">ms</span>
+                  </div>
+                </FormRow>
+              </FormRows>
+            </div>
+
+            <div>
+              <SubHeading>Scope</SubHeading>
+              <FormRows>
+                <FormRow
+                  label="Every key"
+                  description="Light the whole board instead of a chosen set."
+                >
+                  <Switch
+                    checked={overlayDraft.allKeys}
+                    onCheckedChange={(allKeys) =>
+                      setOverlayDraft((current) => ({ ...current, allKeys }))
+                    }
+                  />
+                </FormRow>
+                <FormRow
+                  stacked
+                  label="Key numbers"
+                  description="Comma-separated key indices, used when “Every key” is off."
+                >
+                  <Input
+                    className="font-mono text-xs"
+                    placeholder="1, 2, 14, 40"
+                    value={maskText}
+                    disabled={overlayDraft.allKeys}
+                    onChange={(event) => setMaskText(event.target.value)}
+                  />
+                </FormRow>
+              </FormRows>
+            </div>
           </div>
+        </SectionCard>
+      </PageSection>
 
-          {!validation.success && (
-            <p className="text-sm text-destructive">{validation.error.issues[0]?.message}</p>
-          )}
-          <div className="flex flex-wrap justify-between gap-2">
-            <Button variant="outline" onClick={addStep} disabled={programDraft.steps.length >= ACTION_PROGRAM_MAX_STEPS}>
-              <IconPlus /> Add action
-            </Button>
-            <Button onClick={() => void saveProgram()} disabled={!connected || savingProgram || !validation.success}>
-              <IconDeviceFloppy /> {savingProgram ? "Committing…" : "Commit macro"}
-            </Button>
+      <PageSection title="Testing">
+        <SectionCard
+          title="Live mode states"
+          description="Flip mode bits by hand to check conditionals and LED indicators without running a macro."
+          icon={<IconToggleLeft />}
+        >
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+            {Array.from({ length: ACTION_STATE_COUNT }, (_, stateIndex) => {
+              const active = Boolean((statesQ.data?.bits ?? 0) & (1 << stateIndex));
+              return (
+                <button
+                  key={stateIndex}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => void setRuntimeState(stateIndex, !active)}
+                  disabled={!connected || stateWritePending}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                    "disabled:pointer-events-none disabled:opacity-45",
+                    active
+                      ? "border-success/40 bg-success/12 text-success"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      active ? "bg-success" : "bg-muted-foreground/30",
+                    )}
+                  />
+                  Mode {stateIndex + 1}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="State-driven LED overlay"
-        description="An overlay follows a named mode bit and cross-fades over the underlying effect entirely on the device."
-        headerRight={
-          <Select value={String(overlayIndex)} onValueChange={(value) => setOverlayIndex(Number(value))}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: ACTION_OVERLAY_COUNT }, (_, index) => (
-                <SelectItem key={index} value={String(index)}>Overlay {index + 1}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        }
-      >
-        <div className="grid gap-3 md:grid-cols-2">
-          <FormRow label="Enabled"><Switch checked={overlayDraft.enabled} onCheckedChange={(enabled) => setOverlayDraft((current) => ({ ...current, enabled }))} /></FormRow>
-          <FormRow label="Follow mode state"><Switch checked={overlayDraft.followsState} onCheckedChange={(followsState) => setOverlayDraft((current) => ({ ...current, followsState }))} /></FormRow>
-          <label className="grid gap-1 text-sm">Mode index (0–15)<Input type="number" min={0} max={ACTION_STATE_COUNT - 1} value={overlayDraft.stateIndex} onChange={(event) => setOverlayDraft((current) => ({ ...current, stateIndex: clampInteger(Number(event.target.value), 0, ACTION_STATE_COUNT - 1) }))} /></label>
-          <label className="grid gap-1 text-sm">Active value<Select value={String(overlayDraft.activeValue ? 1 : 0)} onValueChange={(value) => setOverlayDraft((current) => ({ ...current, activeValue: Number(value) }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">On when set</SelectItem><SelectItem value="0">On when clear</SelectItem></SelectContent></Select></label>
-          <label className="grid gap-1 text-sm">Color<Input type="color" value={formatColor(overlayDraft.color)} onChange={(event) => setOverlayDraft((current) => ({ ...current, color: parseColor(event.target.value) }))} /></label>
-          <label className="grid gap-1 text-sm">Opacity<Input type="number" min={0} max={255} value={overlayDraft.opacity} onChange={(event) => setOverlayDraft((current) => ({ ...current, opacity: clampInteger(Number(event.target.value), 0, 255) }))} /></label>
-          <label className="grid gap-1 text-sm">Fade in (ms)<Input type="number" min={0} max={2000} value={overlayDraft.fadeInMs} onChange={(event) => setOverlayDraft((current) => ({ ...current, fadeInMs: clampInteger(Number(event.target.value), 0, 2000) }))} /></label>
-          <label className="grid gap-1 text-sm">Fade out (ms)<Input type="number" min={0} max={2000} value={overlayDraft.fadeOutMs} onChange={(event) => setOverlayDraft((current) => ({ ...current, fadeOutMs: clampInteger(Number(event.target.value), 0, 2000) }))} /></label>
-          <FormRow label="All keys"><Switch checked={overlayDraft.allKeys} onCheckedChange={(allKeys) => setOverlayDraft((current) => ({ ...current, allKeys }))} /></FormRow>
-          <label className="grid gap-1 text-sm md:col-span-2">Key numbers when “All keys” is off<Input placeholder="1, 2, 14, 40" value={maskText} disabled={overlayDraft.allKeys} onChange={(event) => setMaskText(event.target.value)} /></label>
-          <div className="flex justify-end md:col-span-2"><Button onClick={() => void saveOverlay()} disabled={!connected || savingOverlay}><IconDeviceFloppy /> {savingOverlay ? "Committing…" : "Commit overlay"}</Button></div>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Live mode states" description="Useful for testing conditionals and LED indicators without running a macro.">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-8">
-          {Array.from({ length: ACTION_STATE_COUNT }, (_, stateIndex) => {
-            const active = Boolean((statesQ.data?.bits ?? 0) & (1 << stateIndex));
-            return (
-              <Button
-                key={stateIndex}
-                variant={active ? "default" : "outline"}
-                onClick={() => void setRuntimeState(stateIndex, !active)}
-                disabled={!connected || stateWritePending}
-              >
-                Mode {stateIndex + 1}
-              </Button>
-            );
-          })}
-        </div>
-      </SectionCard>
+        </SectionCard>
+      </PageSection>
     </PageContent>
+  );
+}
+
+/** Small divider heading used to break long cards into named runs. */
+function SubHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-1 flex items-center gap-2">
+      <h4 className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        {children}
+      </h4>
+      <div className="h-px flex-1 bg-border" />
+    </div>
   );
 }

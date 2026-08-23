@@ -10,6 +10,15 @@ import { DistanceSlider } from "@/components/distance-slider";
 import { KeyTester } from "@/components/key-tester";
 import { AutosaveStatus, useAutosave } from "@/components/AutosaveStatus";
 import { SectionCard, FormRow } from "@/components/shared/SectionCard";
+import { OptionCard } from "@/components/shared/OptionCard";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Toolbar, ToolbarDivider, ToolbarStat } from "@/components/shared/Toolbar";
+import {
+  IconArrowBigUpLines,
+  IconChevronLeft,
+  IconListDetails,
+  IconTrash,
+} from "@tabler/icons-react";
 import { LayerSelect } from "@/components/layer-select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -722,15 +731,27 @@ export default function AdvancedKeys() {
     });
   }, [activeKeyIndex, activeMenu, settings, updateKeyByIndex]);
 
+  const activeMenuInfo = ADVANCED_MENU_INFO.find((x) => x.id === activeMenu);
+
   const menubar = (
-    <>
-      <div className="flex items-center gap-2">
-        <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
-      </div>
-      <div className="flex items-center gap-2">
-        <AutosaveStatus state={saveState} />
-      </div>
-    </>
+    <Toolbar
+      left={
+        <>
+          <LayerSelect value={currentLayer} onChange={setCurrentLayer} />
+          {panelMode === "configure" && (
+            <>
+              <ToolbarDivider />
+              <Button variant="ghost" size="sm" onClick={closeConfigurePanel}>
+                <IconChevronLeft className="size-4" />
+                All options
+              </Button>
+              <ToolbarStat value={activeMenuInfo?.label ?? activeMenu} tone="active" />
+            </>
+          )}
+        </>
+      }
+      right={<AutosaveStatus state={saveState} />}
+    />
   );
 
   function renderTapHoldConfig() {
@@ -889,7 +910,7 @@ export default function AdvancedKeys() {
 
         <TabsContent value="bindings" className="mt-4">
           <div className="flex flex-col gap-4">
-            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md px-3 py-2">
+            <p className="text-xs text-warning bg-warning/10 rounded-md px-3 py-2">
               Rapid Trigger is automatically disabled for Dynamic Mapping keys. Bottom Out Point controls the "fully pressed" threshold.
             </p>
 
@@ -904,7 +925,7 @@ export default function AdvancedKeys() {
                     selectedDynamicZone === i
                       ? "border-primary bg-primary text-primary-foreground"
                       : z.hid_keycode !== 0
-                      ? "border-green-500/50 bg-green-500/10 text-foreground hover:bg-green-500/20"
+                      ? "border-success/50 bg-success/12 text-foreground hover:bg-success/20"
                       : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
                   }`}
                 >
@@ -1005,7 +1026,7 @@ export default function AdvancedKeys() {
       return (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className={`rounded-lg border p-3 ${touch1Selecting ? "border-primary bg-primary/5" : touch1Selected ? "border-green-500/70 bg-green-500/5" : "border-border"}`}>
+            <div className={`rounded-lg border p-3 ${touch1Selecting ? "border-primary bg-primary/5" : touch1Selected ? "border-success/60 bg-success/8" : "border-border"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Touch 1</p>
@@ -1016,7 +1037,7 @@ export default function AdvancedKeys() {
                 </div>
                 <button
                   type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-full bg-green-500 text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex size-8 items-center justify-center rounded-full bg-success text-success-foreground transition hover:bg-success/85 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => {
                     setAssignState({ kind: "socd", slot: 1 });
                     setPendingSocd({ touch1: null, touch2: null });
@@ -1029,7 +1050,7 @@ export default function AdvancedKeys() {
               </div>
             </div>
 
-            <div className={`rounded-lg border p-3 ${touch2Selecting ? "border-primary bg-primary/5" : touch2Selected ? "border-green-500/70 bg-green-500/5" : "border-border"}`}>
+            <div className={`rounded-lg border p-3 ${touch2Selecting ? "border-primary bg-primary/5" : touch2Selected ? "border-success/60 bg-success/8" : "border-border"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Touch 2</p>
@@ -1040,7 +1061,7 @@ export default function AdvancedKeys() {
                 </div>
                 <button
                   type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-full bg-green-500 text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex size-8 items-center justify-center rounded-full bg-success text-success-foreground transition hover:bg-success/85 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => {
                     if (socdTouch1 == null) return;
                     setPendingSocd({ touch1: socdTouch1, touch2: null });
@@ -1135,7 +1156,7 @@ export default function AdvancedKeys() {
 
     return (
       <div className="flex flex-col gap-4">
-        <div className={`rounded-lg border p-3 ${selectingTarget ? "border-primary bg-primary/5" : targetSelected ? "border-green-500/70 bg-green-500/5" : "border-border"}`}>
+        <div className={`rounded-lg border p-3 ${selectingTarget ? "border-primary bg-primary/5" : targetSelected ? "border-success/60 bg-success/8" : "border-border"}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Target Key</p>
@@ -1146,7 +1167,7 @@ export default function AdvancedKeys() {
             </div>
             <button
               type="button"
-              className="inline-flex size-8 items-center justify-center rounded-full bg-green-500 text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex size-8 items-center justify-center rounded-full bg-success text-success-foreground transition hover:bg-success/85 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => setAssignState({ kind: "behavior", menu: behaviorMenu })}
               disabled={!connected}
               aria-label="Pick target key"
@@ -1209,55 +1230,72 @@ export default function AdvancedKeys() {
     >
       {panelMode === "configure" ? (
         <SectionCard
-          title={ADVANCED_MENU_INFO.find((x) => x.id === activeMenu)?.label ?? activeMenu.toUpperCase()}
-          description={ADVANCED_MENU_INFO.find((x) => x.id === activeMenu)?.description ?? "Configure this advanced option"}
+          title={activeMenuInfo?.label ?? activeMenu.toUpperCase()}
+          description={activeMenuInfo?.description ?? "Configure this advanced option."}
+          icon={activeMenuInfo ? <activeMenuInfo.icon /> : undefined}
+          headerRight={
+            <Button variant="ghost" size="sm" onClick={closeConfigurePanel}>
+              <IconChevronLeft className="size-4" />
+              Back
+            </Button>
+          }
+          footer={
+            <>
+              <Button variant="destructive" size="sm" disabled={!canDeleteCurrent} onClick={handleDeleteCurrent}>
+                <IconTrash className="size-4" />
+                Remove from key
+              </Button>
+              <Button size="sm" onClick={closeConfigurePanel}>
+                Done
+              </Button>
+            </>
+          }
         >
-          <div className="flex flex-col gap-4">
-            {renderActiveMenu()}
-            <div className="flex items-center justify-end gap-2 border-t pt-4">
-              <Button variant="destructive" disabled={!canDeleteCurrent} onClick={handleDeleteCurrent}>
-                Delete
-              </Button>
-              <Button variant="outline" onClick={closeConfigurePanel}>
-                Save
-              </Button>
-            </div>
-          </div>
+          {renderActiveMenu()}
         </SectionCard>
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="flex flex-col gap-4 xl:col-span-7">
             <SectionCard
-              title="Advanced Options"
-              description="Select an advanced option, then assign keys from the keyboard preview."
+              title="Behaviours"
+              description="Pick a behaviour, then click the keys in the preview above to assign it."
+              icon={<IconArrowBigUpLines />}
             >
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {ADVANCED_MENU_INFO.map((item) => (
-                  <Button
-                    key={item.id}
-                    variant="outline"
-                    className="h-auto flex-col items-start gap-2 p-4 text-left"
-                    onClick={() => handleSelectMenu(item.id)}
-                    disabled={!connected}
-                  >
-                    <div className="flex items-center gap-2">
-                      <item.icon className="size-4" />
-                      <span className="font-medium">{item.label}</span>
-                    </div>
-                    <span className="text-xs font-normal text-muted-foreground">{item.description}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={configuredByMenu[item.id] > 0 ? "default" : "secondary"}>
-                        {configuredByMenu[item.id] > 0 ? `${configuredByMenu[item.id]} configured` : "Not configured"}
-                      </Badge>
-                    </div>
-                  </Button>
-                ))}
+                {ADVANCED_MENU_INFO.map((item) => {
+                  const count = configuredByMenu[item.id];
+                  return (
+                    <OptionCard
+                      key={item.id}
+                      icon={<item.icon />}
+                      title={item.label}
+                      description={item.description}
+                      status={
+                        count > 0
+                          ? `${count} ${count === 1 ? "key" : "keys"} configured`
+                          : "Not configured"
+                      }
+                      selected={count > 0}
+                      disabled={!connected}
+                      onClick={() => handleSelectMenu(item.id)}
+                    />
+                  );
+                })}
               </div>
             </SectionCard>
           </div>
 
           <div className="xl:col-span-5">
-            <SectionCard title="Advanced Keys" description="Configured keys are displayed with their keycodes.">
+            <SectionCard
+              title="Assigned keys"
+              description="Everything currently using an advanced behaviour on this layer."
+              icon={<IconListDetails />}
+              headerRight={
+                <Badge variant="secondary" className="tabular-nums">
+                  {socdPairs.length + behaviorKeys.length}
+                </Badge>
+              }
+            >
               {allSettingsQ.isLoading ? (
                 <div className="flex flex-col gap-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
               ) : (
@@ -1273,7 +1311,7 @@ export default function AdvancedKeys() {
                         variant="outline"
                         className={cn(
                           "h-auto justify-start p-3 transition-colors",
-                          isHovered && "border-green-500/70 bg-green-500/5 hover:bg-green-500/10",
+                          isHovered && "border-success/60 bg-success/8 hover:bg-success/12",
                         )}
                         onMouseEnter={() => setHoveredAdvancedItem({ kind: "socd", a, b })}
                         onMouseLeave={() => setHoveredAdvancedItem(null)}
@@ -1313,7 +1351,7 @@ export default function AdvancedKeys() {
                         variant="outline"
                         className={cn(
                           "h-auto justify-start p-3 transition-colors",
-                          isHovered && "border-green-500/70 bg-green-500/5 hover:bg-green-500/10",
+                          isHovered && "border-success/60 bg-success/8 hover:bg-success/12",
                         )}
                         onMouseEnter={() => setHoveredAdvancedItem({ kind: "behavior", keyIndex: item.key_index })}
                         onMouseLeave={() => setHoveredAdvancedItem(null)}
@@ -1339,9 +1377,12 @@ export default function AdvancedKeys() {
                   })}
 
                   {socdPairs.length === 0 && behaviorKeys.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No advanced key assigned yet. Choose an option above and click keys in the keyboard preview.
-                    </p>
+                    <EmptyState
+                      size="sm"
+                      icon={<IconArrowBigUpLines />}
+                      title="Nothing assigned yet"
+                      description="Choose a behaviour on the left, then click keys in the preview above to give them that behaviour."
+                    />
                   )}
                 </div>
               )}
