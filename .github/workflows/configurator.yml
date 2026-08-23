@@ -359,10 +359,28 @@ jobs:
             throw "Release staging directory unexpectedly already exists"
           }
           New-Item -ItemType Directory -Path $staging | Out-Null
-          $records = @(
+          $releaseAssets = @(
             foreach ($installer in $installers) {
-              $destination = Join-Path $staging $installer.Name
-              Copy-Item -LiteralPath $installer.FullName -Destination $destination
+              # GitHub canonicalizes spaces in uploaded asset names to dots. Fix
+              # the public name before hashing/signing so the manifest, Ed25519
+              # role and downloaded release asset all bind the same filename.
+              $releaseName = $installer.Name -replace '[^A-Za-z0-9._-]', '.'
+              if ($releaseName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*\.(exe|msi)$') {
+                throw "Installer cannot be mapped to a safe GitHub asset name: $($installer.Name)"
+              }
+              [pscustomobject]@{
+                Source = $installer
+                Name = $releaseName
+              }
+            }
+          )
+          if (@($releaseAssets | Group-Object Name | Where-Object { $_.Count -ne 1 }).Count -ne 0) {
+            throw "Installer names collide after GitHub-safe canonicalization"
+          }
+          $records = @(
+            foreach ($releaseAsset in $releaseAssets) {
+              $destination = Join-Path $staging $releaseAsset.Name
+              Copy-Item -LiteralPath $releaseAsset.Source.FullName -Destination $destination
               $copy = Get-Item -LiteralPath $destination
               [ordered]@{
                 name = $copy.Name

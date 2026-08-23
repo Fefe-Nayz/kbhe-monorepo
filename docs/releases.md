@@ -236,6 +236,12 @@ Run from the repo root.
    duplicate, untrusted, unexpectedly untimestamped or unexpected asset blocks
    publication.
 
+   Before the private transfer, installer filenames are canonicalized to the
+   GitHub-safe `[A-Za-z0-9._-]` set (for example, `KBHE configurator_...` becomes
+   `KBHE.configurator_...`). GitHub itself replaces spaces in uploaded asset
+   names with dots; canonicalizing first ensures the transfer manifest, the
+   Ed25519 role and the downloaded public asset all bind the exact same name.
+
 Installer signatures use the `KBHEAPP2` domain and bind the normalized app
 version, OS, CPU architecture, exact asset filename, byte length and SHA-512
 digest. The download command also rejects a requested version less than or
