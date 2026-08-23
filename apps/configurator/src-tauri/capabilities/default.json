@@ -14,7 +14,12 @@
     "autostart:default",
     {
       "identifier": "fs:allow-read-file",
-      "allow": [{ "path": "**/*.bin" }]
+      "allow": [
+        { "path": "**/*.bin" },
+        {
+          "path": "$TEMP/kbhe-configurator/firmware/*/kbhe-app.bin.sig"
+        }
+      ]
     }
   ]
 }

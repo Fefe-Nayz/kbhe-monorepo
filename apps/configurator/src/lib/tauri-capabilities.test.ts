@@ -1,0 +1,33 @@
+import { describe, expect, test } from "bun:test";
+
+interface FileScopeEntry {
+  path?: string;
+}
+
+interface PermissionWithScope {
+  identifier?: string;
+  allow?: FileScopeEntry[];
+}
+
+interface TauriCapability {
+  permissions?: Array<string | PermissionWithScope>;
+}
+
+describe("Tauri firmware file scope", () => {
+  test("allows firmware images and their detached signatures", async () => {
+    const capability = await Bun.file(
+      "src-tauri/capabilities/default.json",
+    ).json() as TauriCapability;
+    const readFilePermission = capability.permissions?.find(
+      (permission): permission is PermissionWithScope =>
+        typeof permission !== "string"
+        && permission.identifier === "fs:allow-read-file",
+    );
+    const paths = readFilePermission?.allow?.map(({ path }) => path);
+
+    expect(paths).toContain("**/*.bin");
+    expect(paths).toContain(
+      "$TEMP/kbhe-configurator/firmware/*/kbhe-app.bin.sig",
+    );
+  });
+});
