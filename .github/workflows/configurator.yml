@@ -303,8 +303,6 @@ jobs:
             throw "Windows SDK signtool.exe was not found"
           }
 
-          $mainExecutable = Get-Item `
-            "apps/configurator/src-tauri/target/release/kbhe-configurator.exe"
           $installers = @(
             Get-ChildItem "apps/configurator/src-tauri/target/release/bundle" -Recurse -File |
               Where-Object { $_.Extension -in @(".exe", ".msi") }
@@ -315,8 +313,16 @@ jobs:
           if (@($installers | Group-Object Name | Where-Object { $_.Count -ne 1 }).Count -ne 0) {
             throw "Installer filenames must be unique before artifact transfer"
           }
+          $msiInstallers = @($installers | Where-Object Extension -eq ".msi")
+          $nsisInstallers = @($installers | Where-Object Extension -eq ".exe")
+          if ($msiInstallers.Count -ne 1 -or $nsisInstallers.Count -ne 1) {
+            throw "Expected exactly one MSI and one NSIS installer"
+          }
 
-          foreach ($signedFile in @($mainExecutable) + $installers) {
+          # Tauri signs the bundle-specific executable before packing it, then
+          # restores target/release/kbhe-configurator.exe to its original,
+          # unsigned build output. Only the installers below are release assets.
+          foreach ($signedFile in $installers) {
             if ($env:KBHE_CODESIGN_MODE -eq "public-ca") {
               & $signtool.FullName verify /pa /tw /v $signedFile.FullName
             } else {

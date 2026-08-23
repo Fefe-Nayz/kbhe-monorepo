@@ -70,8 +70,11 @@ not target these environments and never receive release secrets.
 
 The app workflow intentionally runs on two different Windows runners. The
 `app-codesign` runner is the only runner that receives the PFX; it builds and
-Authenticode-signs Tauri, verifies every executable and uploads a one-day
-private Actions artifact. A fresh `app-publish` runner does **not** run Bun,
+Authenticode-signs Tauri, verifies every release installer and uploads a one-day
+private Actions artifact. Tauri signs each bundle-specific application binary
+before packaging it, then restores the unsigned raw build output; that restored
+`target/release` executable is not a release asset and is deliberately excluded
+from post-build verification. A fresh `app-publish` runner does **not** run Bun,
 npm, frontend code, or the Tauri build. It re-verifies the transferred hashes,
 certificate, signer and any timestamp required by the selected mode, then
 receives the app Ed25519 key, creates a draft GitHub Release, re-downloads every
