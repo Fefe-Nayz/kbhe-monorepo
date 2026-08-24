@@ -78,6 +78,11 @@ void trigger_task(void);
 
 key_state_e trigger_get_key_state(uint8_t key);
 
+/* True only when every physical key is released and no transition has been
+ * accepted during the requested quiet interval. Persistence uses this to
+ * keep single-bank Flash stalls out of the live input path. */
+bool trigger_is_input_idle(uint32_t now_ms, uint32_t quiet_period_ms);
+
 /* Apply or suppress the active output of a normal key without changing its
  * physical trigger state. Used exclusively by SOCD resolution. */
 void trigger_socd_set_key_output(uint8_t key, bool pressed);

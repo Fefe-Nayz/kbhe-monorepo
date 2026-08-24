@@ -30,6 +30,7 @@ static key_transition_guard_t key_transition_guards[NUM_KEYS];
 static key_state_e key_states[NUM_KEYS];
 static bool keyboard_blocked_for_calibration = false;
 static uint8_t trigger_active_layer_cache = 0xFFu;
+static uint32_t trigger_last_input_transition_ms = 0u;
 static uint8_t trigger_chatter_guard_enabled =
     (uint8_t)(SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED ? 1u : 0u);
 static uint8_t trigger_chatter_guard_duration_ms =
@@ -651,6 +652,7 @@ static inline bool trigger_commit_press(uint8_t key, int16_t current_distance,
     trigger_apply_hold_on_other_key_press(key);
     trigger_freeze_press_settings(key);
     key_states[key] = PRESSED;
+    trigger_last_input_transition_ms = now_ms;
     trigger_behavior_on_press(key, current_distance, now_ms);
     led_matrix_key_event(key, true);
     socd_on_press(key);
@@ -659,7 +661,7 @@ static inline bool trigger_commit_press(uint8_t key, int16_t current_distance,
     return true;
 }
 
-static inline bool trigger_commit_release(uint8_t key) {
+static inline bool trigger_commit_release(uint8_t key, uint32_t now_ms) {
     if (key_states[key] != PRESSED) {
         return false;
     }
@@ -667,6 +669,7 @@ static inline bool trigger_commit_release(uint8_t key) {
     trigger_behavior_on_release(key);
     led_matrix_key_event(key, false);
     key_states[key] = RELEASED;
+    trigger_last_input_transition_ms = now_ms;
     socd_on_release(key);
     key_behavior_states[key].socd_output_suppressed = false;
     trigger_reconcile_released_toggle_latch(
@@ -693,7 +696,7 @@ static bool trigger_request_state(uint8_t key, key_state_e desired_state,
         return trigger_commit_press(key, current_distance, now_ms);
     }
 
-    return trigger_commit_release(key);
+    return trigger_commit_release(key, now_ms);
 }
 
 static inline void handle_rapid_trigger(uint8_t key, int16_t current_distance,
@@ -834,6 +837,17 @@ inline key_state_e trigger_get_key_state(uint8_t key) {
         return RELEASED;
     }
     return key_states[key];
+}
+
+bool trigger_is_input_idle(uint32_t now_ms, uint32_t quiet_period_ms) {
+    for (uint8_t key = 0u; key < NUM_KEYS; key++) {
+        if (key_states[key] == PRESSED) {
+            return false;
+        }
+    }
+
+    return (uint32_t)(now_ms - trigger_last_input_transition_ms) >=
+           quiet_period_ms;
 }
 
 void trigger_socd_set_key_output(uint8_t key, bool pressed) {
@@ -1024,6 +1038,7 @@ void trigger_get_chatter_guard(bool *enabled, uint8_t *duration_ms) {
 void trigger_init() {
     trigger_deferred_clear();
     trigger_active_layer_cache = 0xFFu;
+    trigger_last_input_transition_ms = HAL_GetTick();
     trigger_chatter_guard_enabled =
         (uint8_t)(SETTINGS_DEFAULT_TRIGGER_CHATTER_GUARD_ENABLED ? 1u : 0u);
     trigger_chatter_guard_duration_ms =

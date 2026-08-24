@@ -365,6 +365,14 @@ uint32_t keyboard_hid_get_transfer_failed_count(void) {
   return report_transfer_failed_count;
 }
 
+bool keyboard_hid_is_transport_idle(void) {
+  if (!tud_mounted()) {
+    return true;
+  }
+  return !desired_report_dirty && !report_in_flight &&
+         keyboard_hid_queue_is_empty() && !report_resync_required;
+}
+
 //--------------------------------------------------------------------+
 // TinyUSB HID Callbacks (requis par TinyUSB)
 //--------------------------------------------------------------------+

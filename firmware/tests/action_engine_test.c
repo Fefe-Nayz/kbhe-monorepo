@@ -730,6 +730,27 @@ static void test_live_profile_revision_tracks_every_publication(void) {
   assert(*revision == before + 1u);
 }
 
+static void test_idle_state_includes_running_and_queued_work(void) {
+  action_program_t program = empty_program();
+
+  action_engine_cancel_all();
+  assert(action_engine_is_idle());
+
+  program.step_count = 2u;
+  program.steps[0].opcode = ACTION_OP_DELAY_MS;
+  program.steps[0].arg16 = 10u;
+  program.steps[1].opcode = ACTION_OP_END;
+  assert(action_engine_set_program(0u, 12u, &program, false));
+  assert(action_engine_trigger_program(12u));
+  assert(!action_engine_is_idle());
+
+  action_engine_tick(8000u);
+  assert(!action_engine_is_idle());
+  action_engine_tick(8010u);
+  assert(action_engine_is_idle());
+  action_engine_release_program_trigger(12u);
+}
+
 int main(void) {
   action_engine_init();
   assert(action_engine_activate_profile(0u));
@@ -750,6 +771,7 @@ int main(void) {
   test_tick_has_one_global_step_budget_and_rotates_fairly();
   test_trusted_publication_is_targeted();
   test_live_profile_revision_tracks_every_publication();
+  test_idle_state_includes_running_and_queued_work();
   puts("action_engine_test: ok");
   return 0;
 }

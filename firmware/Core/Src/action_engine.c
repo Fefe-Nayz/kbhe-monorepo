@@ -600,6 +600,10 @@ uint8_t action_engine_pending_trigger_count(void) {
   return pending_trigger_count;
 }
 
+bool action_engine_is_idle(void) {
+  return active_instance_count == 0u && pending_trigger_count == 0u;
+}
+
 uint32_t action_engine_dropped_trigger_count(void) {
   return dropped_trigger_count;
 }

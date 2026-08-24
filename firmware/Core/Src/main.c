@@ -76,10 +76,11 @@
 #define MCU_LED_THERMAL_HYSTERESIS_C 3
 #define MCU_LED_THERMAL_BRIGHTNESS_MAX 96u
 #define ADC_SCAN_WATCHDOG_MS 100u
-/* Upper bound on how long one granted persistence budget unit may stay
- * parked when the loop never observes slack. Bounds the worst case for a
- * started Flash transaction without putting it back in the scan window. */
-#define KBHE_PERSISTENCE_DEFER_LIMIT_MS 250u
+/* A write becomes eligible only after input and macro traffic have drained.
+ * The STM32F723 has one Flash bank, so even one word can stall instruction
+ * fetch. Keeping the write out of this guard window is more important than
+ * completing persistence while a key remains held. */
+#define KBHE_PERSISTENCE_INPUT_QUIET_MS 4u
 
 /* USER CODE END PD */
 
@@ -727,7 +728,6 @@ int main(void) {
   uint32_t adc_last_progress_ms = HAL_GetTick();
   bool adc_recovery_pending = false;
   bool persistence_step_pending = false;
-  uint32_t persistence_pending_since_ms = adc_last_progress_ms;
 
   /* USER CODE END 2 */
 
@@ -858,7 +858,6 @@ int main(void) {
        * scan for the whole duration of a save. */
       if (!persistence_step_pending) {
         persistence_step_pending = true;
-        persistence_pending_since_ms = adc_last_progress_ms;
       }
     }
 
@@ -879,12 +878,15 @@ int main(void) {
       updater_app_task();
     }
 
-    /* Spend the persistence budget granted by the last completed scan, but
-     * only where a Flash stall costs slack instead of input latency. */
-    if (persistence_step_pending &&
-        (!analog_is_scan_complete() ||
-         (uint32_t)(HAL_GetTick() - persistence_pending_since_ms) >=
-             KBHE_PERSISTENCE_DEFER_LIMIT_MS)) {
+    /* Apply settings immediately in RAM, but advance their durable journal
+     * only after physical input, macros, and keyboard transports are quiet.
+     * There is deliberately no timeout that can force a Flash stall back into
+     * an active key path; a continuously held key simply defers persistence. */
+    if (persistence_step_pending && !analog_is_scan_complete() &&
+        trigger_is_input_idle(HAL_GetTick(),
+                              KBHE_PERSISTENCE_INPUT_QUIET_MS) &&
+        action_engine_is_idle() && keyboard_hid_is_transport_idle() &&
+        keyboard_nkro_hid_is_transport_idle()) {
       flash_storage_metrics_t persistence_before = {0};
       flash_storage_metrics_t persistence_after_profile = {0};
 

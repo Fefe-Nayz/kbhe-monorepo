@@ -378,3 +378,15 @@ uint16_t keyboard_nkro_hid_get_queue_high_watermark(void) {
 uint32_t keyboard_nkro_hid_get_transfer_failed_count(void) {
   return report_transfer_failed_count;
 }
+
+bool keyboard_nkro_hid_is_transport_idle(void) {
+  /* Once routing falls back to 6KRO, an endpoint that never completed must
+   * not block unrelated persistence forever. It is no longer on the live
+   * input path; reconnect cleanup still discards its historical snapshots. */
+  if (!tud_mounted() || runtime_state == NKRO_RUNTIME_FALLBACK ||
+      runtime_state == NKRO_RUNTIME_DISCONNECTED) {
+    return true;
+  }
+  return !desired_report_dirty && !report_in_flight &&
+         keyboard_nkro_hid_queue_is_empty() && !report_resync_required;
+}

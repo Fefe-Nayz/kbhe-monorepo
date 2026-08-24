@@ -102,6 +102,8 @@ bool action_engine_trigger_program(uint8_t program_index);
 void action_engine_release_program_trigger(uint8_t program_index);
 /** Number of accepted triggers currently waiting for a runtime instance. */
 uint8_t action_engine_pending_trigger_count(void);
+/** True when no macro instance is running and no accepted trigger is queued. */
+bool action_engine_is_idle(void);
 /** Monotonic, saturating count of triggers rejected because the FIFO was full. */
 uint32_t action_engine_dropped_trigger_count(void);
 

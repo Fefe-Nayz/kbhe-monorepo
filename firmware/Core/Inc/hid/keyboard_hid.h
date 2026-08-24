@@ -171,6 +171,9 @@ uint32_t keyboard_hid_get_queue_overflow_count(void);
 uint16_t keyboard_hid_get_queue_high_watermark(void);
 uint32_t keyboard_hid_get_transfer_failed_count(void);
 
+/** True when every desired 6KRO state has reached TinyUSB. */
+bool keyboard_hid_is_transport_idle(void);
+
 #ifdef __cplusplus
 }
 #endif
