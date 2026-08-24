@@ -1619,6 +1619,18 @@ class KBHEDevice:
         load_permille = self._unpack_u16(resp, 16)
         temp_valid = bool(resp[18])
 
+        def u16_at(offset: int) -> int:
+            return self._unpack_u16(resp, offset) if len(resp) >= offset + 2 else 0
+
+        def u32_at(offset: int) -> int:
+            return (
+                struct.unpack_from("<I", bytes(resp), offset)[0]
+                if len(resp) >= offset + 4
+                else 0
+            )
+
+        flash_word_program_max_us = u16_at(53)
+
         return {
             "temperature_c": int(temperature_raw) if temp_valid else None,
             "temperature_valid": temp_valid,
@@ -1629,6 +1641,27 @@ class KBHEDevice:
             "work_us": int(work_us),
             "load_percent": float(load_permille) / 10.0,
             "load_permille": int(load_permille),
+            "realtime_persistence_metrics_available": flash_word_program_max_us > 0,
+            "max_scan_cycle_us": u16_at(19),
+            "scan_deadline_miss_count": u32_at(21),
+            "flash_programmed_words": u32_at(25),
+            "flash_async_steps": u32_at(29),
+            "flash_gc_count": u32_at(33),
+            "flash_boot_erase_count": u32_at(37),
+            "flash_runtime_erase_count": u32_at(41),
+            "flash_deferred_no_space_count": u32_at(45),
+            "flash_max_words_per_step": u16_at(49),
+            "flash_async_busy": len(resp) >= 52 and bool(resp[51]),
+            "flash_spare_bank_ready": len(resp) >= 53 and bool(resp[52]),
+            "flash_word_program_datasheet_max_us": flash_word_program_max_us,
+            "flash_hard_8khz_guarantee": len(resp) >= 56 and bool(resp[55]),
+            "p99_scan_cycle_us": u16_at(56),
+            "flash_last_status": int(resp[58]) if len(resp) >= 59 else 0,
+            "keyboard_queue_high_watermark": int(resp[59]) if len(resp) >= 60 else 0,
+            "nkro_queue_high_watermark": int(resp[60]) if len(resp) >= 61 else 0,
+            "keyboard_queue_overflow_count_sat": int(resp[61]) if len(resp) >= 62 else 0,
+            "nkro_queue_overflow_count_sat": int(resp[62]) if len(resp) >= 63 else 0,
+            "keyboard_transfer_failed_count_sat": int(resp[63]) if len(resp) >= 64 else 0,
         }
 
     def get_raw_adc_chunk(self, start_index: int):

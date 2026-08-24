@@ -263,6 +263,11 @@ export interface McuMetrics {
   flash_word_program_datasheet_max_us: number;
   flash_hard_8khz_guarantee: boolean;
   flash_last_status: number;
+  keyboard_queue_high_watermark: number;
+  nkro_queue_high_watermark: number;
+  keyboard_queue_overflow_count_sat: number;
+  nkro_queue_overflow_count_sat: number;
+  keyboard_transfer_failed_count_sat: number;
 }
 
 export interface AdcChunk {
@@ -2336,6 +2341,11 @@ export class KBHEDevice {
     const flashHard8khzGuarantee = response.length >= 56 && Boolean(response[55]);
     const p99ScanCycleUs = response.length >= 58 ? this.unpackU16(response, 56) : 0;
     const flashLastStatus = response.length >= 59 ? (response[58] ?? 0) : 0;
+    const keyboardQueueHighWatermark = response.length >= 60 ? (response[59] ?? 0) : 0;
+    const nkroQueueHighWatermark = response.length >= 61 ? (response[60] ?? 0) : 0;
+    const keyboardQueueOverflowCountSat = response.length >= 62 ? (response[61] ?? 0) : 0;
+    const nkroQueueOverflowCountSat = response.length >= 63 ? (response[62] ?? 0) : 0;
+    const keyboardTransferFailedCountSat = response.length >= 64 ? (response[63] ?? 0) : 0;
 
     return {
       temperature_c: tempValid ? temperatureRaw : null,
@@ -2363,6 +2373,11 @@ export class KBHEDevice {
       flash_word_program_datasheet_max_us: flashWordProgramDatasheetMaxUs,
       flash_hard_8khz_guarantee: flashHard8khzGuarantee,
       flash_last_status: flashLastStatus,
+      keyboard_queue_high_watermark: keyboardQueueHighWatermark,
+      nkro_queue_high_watermark: nkroQueueHighWatermark,
+      keyboard_queue_overflow_count_sat: keyboardQueueOverflowCountSat,
+      nkro_queue_overflow_count_sat: nkroQueueOverflowCountSat,
+      keyboard_transfer_failed_count_sat: keyboardTransferFailedCountSat,
     };
   }
 

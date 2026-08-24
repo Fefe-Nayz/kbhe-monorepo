@@ -301,6 +301,11 @@ describe("KBHEDevice real-time persistence telemetry", () => {
     response[55] = 0;
     setU16(56, 119);
     response[58] = 5;
+    response[59] = 4;
+    response[60] = 7;
+    response[61] = 2;
+    response[62] = 3;
+    response[63] = 1;
 
     const transport = {
       flushInput: async () => 0,
@@ -327,6 +332,11 @@ describe("KBHEDevice real-time persistence telemetry", () => {
       flash_word_program_datasheet_max_us: 100,
       flash_hard_8khz_guarantee: false,
       flash_last_status: 5,
+      keyboard_queue_high_watermark: 4,
+      nkro_queue_high_watermark: 7,
+      keyboard_queue_overflow_count_sat: 2,
+      nkro_queue_overflow_count_sat: 3,
+      keyboard_transfer_failed_count_sat: 1,
     });
   });
 });

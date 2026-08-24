@@ -10,6 +10,8 @@
 #include "analog/analog.h"
 #include "diagnostics.h"
 #include "flash_storage.h"
+#include "hid/keyboard_hid.h"
+#include "hid/keyboard_nkro_hid.h"
 #include "led_indicator.h"
 #include "led_matrix.h"
 #include "layout/keycodes.h"
@@ -2605,7 +2607,31 @@ static void cmd_get_mcu_metrics(const uint8_t *in, uint8_t *out) {
   resp->flash_hard_8khz_guarantee = 0u;
   resp->p99_scan_cycle_us = mcu_scan_cycle_p99_us();
   resp->flash_last_status = (uint8_t)flash_storage_get_last_status();
-  memset(resp->reserved, 0, sizeof(resp->reserved));
+  resp->keyboard_queue_high_watermark =
+      keyboard_hid_get_queue_high_watermark() > UINT8_MAX
+          ? UINT8_MAX
+          : (uint8_t)keyboard_hid_get_queue_high_watermark();
+  resp->nkro_queue_high_watermark =
+      keyboard_nkro_hid_get_queue_high_watermark() > UINT8_MAX
+          ? UINT8_MAX
+          : (uint8_t)keyboard_nkro_hid_get_queue_high_watermark();
+  resp->keyboard_queue_overflow_count_sat =
+      keyboard_hid_get_queue_overflow_count() > UINT8_MAX
+          ? UINT8_MAX
+          : (uint8_t)keyboard_hid_get_queue_overflow_count();
+  resp->nkro_queue_overflow_count_sat =
+      keyboard_nkro_hid_get_queue_overflow_count() > UINT8_MAX
+          ? UINT8_MAX
+          : (uint8_t)keyboard_nkro_hid_get_queue_overflow_count();
+  {
+    uint32_t failures = keyboard_hid_get_transfer_failed_count();
+    uint32_t nkro_failures = keyboard_nkro_hid_get_transfer_failed_count();
+    failures = UINT32_MAX - failures < nkro_failures
+                   ? UINT32_MAX
+                   : failures + nkro_failures;
+    resp->keyboard_transfer_failed_count_sat =
+        failures > UINT8_MAX ? UINT8_MAX : (uint8_t)failures;
+  }
 }
 
 static void cmd_get_lock_states(const uint8_t *in, uint8_t *out) {

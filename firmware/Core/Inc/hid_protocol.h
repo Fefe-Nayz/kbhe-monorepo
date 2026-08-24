@@ -541,7 +541,11 @@ typedef struct __attribute__((packed)) {
   uint8_t flash_hard_8khz_guarantee;
   uint16_t p99_scan_cycle_us;
   uint8_t flash_last_status;
-  uint8_t reserved[5];
+  uint8_t keyboard_queue_high_watermark;
+  uint8_t nkro_queue_high_watermark;
+  uint8_t keyboard_queue_overflow_count_sat;
+  uint8_t nkro_queue_overflow_count_sat;
+  uint8_t keyboard_transfer_failed_count_sat;
 } hid_resp_mcu_metrics_t;
 
 /**

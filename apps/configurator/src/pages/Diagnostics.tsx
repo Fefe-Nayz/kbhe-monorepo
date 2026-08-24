@@ -1533,6 +1533,30 @@ function SystemTab({ connected, active }: { connected: boolean; active: boolean 
                 />
               </MetricGroup>
             )}
+
+            <MetricGroup title="Keyboard transport">
+              <MetricTile
+                label="6KRO queue peak"
+                value={String(mcu.keyboard_queue_high_watermark)}
+                unit="reports"
+              />
+              <MetricTile
+                label="NKRO queue peak"
+                value={String(mcu.nkro_queue_high_watermark)}
+                unit="reports"
+              />
+              <MetricTile
+                label="Queue overflows"
+                value={String(
+                  mcu.keyboard_queue_overflow_count_sat
+                  + mcu.nkro_queue_overflow_count_sat,
+                )}
+              />
+              <MetricTile
+                label="Failed transfers"
+                value={String(mcu.keyboard_transfer_failed_count_sat)}
+              />
+            </MetricGroup>
           </div>
         )}
       </SectionCard>
