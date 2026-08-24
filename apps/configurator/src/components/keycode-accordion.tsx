@@ -256,7 +256,12 @@ export function KeycodeAccordion({
         </div>
       )}
 
-      <div className="sticky top-0 z-20 -mx-5 -mt-5 flex flex-col gap-2.5 border-b bg-background/95 px-5 pb-3 pt-5 backdrop-blur-sm">
+      <div
+        className={cn(
+          "sticky top-0 z-20 -mx-5 flex flex-col gap-2.5 border-b bg-background/95 px-5 pb-3 backdrop-blur-sm",
+          hint ? "pt-0" : "-mt-5 pt-5",
+        )}
+      >
         <div className="relative">
           <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -312,7 +317,12 @@ export function KeycodeAccordion({
           <div className="flex flex-col gap-4 pb-2">
             {filtered.map((cat) => (
               <section key={cat.label}>
-                <div className="sticky top-[6.25rem] z-10 -mx-1 mb-2 flex items-center gap-2 bg-background/95 px-1 py-1.5 backdrop-blur-sm">
+                <div
+                  className={cn(
+                    "sticky z-10 -mx-1 mb-2 flex items-center gap-2 bg-background/95 px-1 py-1.5 backdrop-blur-sm",
+                    hint ? "top-[7.25rem]" : "top-[8.5rem]",
+                  )}
+                >
                   <h4 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     {cat.label}
                   </h4>
