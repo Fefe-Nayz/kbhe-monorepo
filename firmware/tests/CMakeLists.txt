@@ -58,6 +58,18 @@ target_include_directories(consumer_hid_test BEFORE PRIVATE
 )
 add_test(NAME consumer_hid_test COMMAND consumer_hid_test)
 
+add_executable(keyboard_hid_queue_test
+  keyboard_hid_queue_test.c
+  ../Core/Src/hid/keyboard_hid.c
+  ../Core/Src/hid/keyboard_nkro_hid.c
+)
+target_include_directories(keyboard_hid_queue_test BEFORE PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/keyboard_hid_stubs"
+  "${CMAKE_CURRENT_LIST_DIR}/stubs"
+  "${KBHE_CORE_INC}"
+)
+add_test(NAME keyboard_hid_queue_test COMMAND keyboard_hid_queue_test)
+
 add_executable(flash_storage_codec_test
   flash_storage_codec_test.c
   ../Core/Src/flash_storage_codec.c

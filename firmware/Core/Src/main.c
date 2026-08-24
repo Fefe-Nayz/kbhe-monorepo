@@ -761,15 +761,10 @@ int main(void) {
       }
     }
 
-    /* TinyUSB is part of the input path, not best-effort work.  The HID
-     * interfaces publish state rather than queued events, and
-     * tud_hid_n_ready() only clears the endpoint busy flag once tud_task()
-     * drains the transfer-complete event.  Skipping it for a single cycle
-     * makes keyboard_hid_task() fail to arm its report, which silently
-     * collapses a press/release pair into no host report at all on the
-     * 8 kHz interrupt endpoint.  Run it before the scan block so the
-     * endpoint is already free when the HID tasks build this scan's
-     * report. */
+    /* TinyUSB is part of the input path, not best-effort work.
+     * tud_hid_n_ready() clears only after tud_task() drains the endpoint's
+     * transfer-complete event. Service it before the scan block so queued HID
+     * snapshots can advance promptly on the 8 kHz interrupt endpoints. */
     tud_task();
 
     // If a full ADC scan is complete, process keys and restart
@@ -804,10 +799,23 @@ int main(void) {
         uint32_t step_start_cycles = DWT->CYCCNT;
         analog_task();
         task_analog_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
+      } else {
+        analog_task();
+      }
 
-        calibration_guided_on_scan(HAL_GetTick());
+      /* `analog_task()` consumes the just-published DMA buffer. Once guided
+       * calibration has observed the same immutable scan, release the scan
+       * flag and start the next acquisition before the CPU-only trigger/HID
+       * work. The new ~53 us acquisition can then overlap that work. Nothing
+       * below this point may clear scan_complete: the DMA ISR may publish the
+       * next scan while those tasks are still running. */
+      calibration_guided_on_scan(HAL_GetTick());
+      analog_set_scan_complete(false);
+      TIM4_StartOneShot_TRGO();
+      adc_last_progress_ms = HAL_GetTick();
 
-        step_start_cycles = DWT->CYCCNT;
+      if (profile_timing) {
+        uint32_t step_start_cycles = DWT->CYCCNT;
         trigger_task();
         task_trigger_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
@@ -831,8 +839,6 @@ int main(void) {
         xinput_usb_task();
         task_gamepad_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
       } else {
-        analog_task();
-        calibration_guided_on_scan(HAL_GetTick());
         trigger_task();
         socd_task();
         action_engine_tick(HAL_GetTick());
@@ -842,10 +848,6 @@ int main(void) {
         gamepad_hid_task();
         xinput_usb_task();
       }
-
-      analog_set_scan_complete(false);
-      TIM4_StartOneShot_TRGO();
-      adc_last_progress_ms = HAL_GetTick();
 
       /* Grant one CRC/program budget unit per completed scan, but spend it
        * in the best-effort section below.  A single Flash word program can
@@ -868,10 +870,9 @@ int main(void) {
     if (!analog_is_scan_complete()) {
       raw_hid_task();
     }
-    /* Consumer and mouse reports are published as state, exactly like the
-     * keyboard report, so a skipped service collapses a press/release pair
-     * for every key mapped to a media or mouse action. Both are bounded
-     * and no-op when nothing changed. */
+    /* Consumer pulses are queued transactionally; mouse relative pulses are
+     * queued while its button bitmap is resynchronised as state. Both tasks
+     * are bounded and no-op when nothing changed. */
     consumer_hid_task();
     mouse_hid_task();
     if (!analog_is_scan_complete()) {

@@ -86,6 +86,16 @@ void keyboard_nkro_hid_task(void);
  */
 void keyboard_nkro_hid_release_all(void);
 
+/** USB lifecycle hooks used by the shared TinyUSB callback dispatcher. */
+void keyboard_nkro_hid_on_umount(void);
+void keyboard_nkro_hid_on_report_complete(void);
+void keyboard_nkro_hid_on_report_failed(void);
+
+/** Monotonic queue diagnostics, reset only at boot. */
+uint32_t keyboard_nkro_hid_get_queue_overflow_count(void);
+uint16_t keyboard_nkro_hid_get_queue_high_watermark(void);
+uint32_t keyboard_nkro_hid_get_transfer_failed_count(void);
+
 #ifdef __cplusplus
 }
 #endif

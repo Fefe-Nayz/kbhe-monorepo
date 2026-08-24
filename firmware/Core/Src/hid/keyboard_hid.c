@@ -20,26 +20,155 @@
 // Variables internes
 //--------------------------------------------------------------------+
 
-// Rapport clavier courant
-static hid_keyboard_report_t keyboard_report = {0};
-
 /* Keep the complete desired set, not only the six boot-report slots.  This
  * allows a seventh held key to be promoted as soon as one of the first six is
  * released. */
 #define KEYBOARD_HID_MAX_HELD_KEYS 128u
+#define KEYBOARD_HID_REPORT_QUEUE_CAPACITY 129u
+
+static uint8_t desired_modifier = 0u;
+static bool desired_report_dirty = false;
 static uint8_t pressed_keys[KEYBOARD_HID_MAX_HELD_KEYS] = {0};
 static uint8_t num_pressed_keys = 0;
 /* Multiple physical keys/macros may own the same HID usage. */
 static uint8_t key_reference_counts[256] = {0};
 
-// Flag pour indiquer qu'un rapport a changé et doit être envoyé
-static volatile bool report_changed = false;
-
-// Flag pour indiquer qu'un rapport est prêt à être envoyé
-static volatile bool report_pending = false;
+/* Keep every observable keyboard state until TinyUSB confirms delivery. One
+ * slot remains unused so 129 entries hold 128 complete snapshots. */
+static hid_keyboard_report_t report_queue[KEYBOARD_HID_REPORT_QUEUE_CAPACITY];
+static uint16_t report_queue_head = 0u;
+static uint16_t report_queue_tail = 0u;
+static bool report_in_flight = false;
+static bool report_resync_required = false;
+static uint32_t report_queue_overflow_count = 0u;
+static uint16_t report_queue_high_watermark = 0u;
+static uint32_t report_transfer_failed_count = 0u;
 
 static inline bool keyboard_hid_is_modifier(uint8_t keycode) {
   return (keycode >= HID_KEY_CONTROL_LEFT) && (keycode <= HID_KEY_GUI_RIGHT);
+}
+
+static uint16_t keyboard_hid_queue_next(uint16_t index) {
+  index++;
+  return index >= KEYBOARD_HID_REPORT_QUEUE_CAPACITY ? 0u : index;
+}
+
+static bool keyboard_hid_queue_is_empty(void) {
+  return report_queue_head == report_queue_tail;
+}
+
+static bool keyboard_hid_queue_is_full(void) {
+  return keyboard_hid_queue_next(report_queue_tail) == report_queue_head;
+}
+
+static uint16_t keyboard_hid_queue_depth(void) {
+  if (report_queue_tail >= report_queue_head) {
+    return (uint16_t)(report_queue_tail - report_queue_head);
+  }
+  return (uint16_t)(KEYBOARD_HID_REPORT_QUEUE_CAPACITY -
+                    (report_queue_head - report_queue_tail));
+}
+
+static void keyboard_hid_build_desired_report(hid_keyboard_report_t *report) {
+  if (report == NULL) {
+    return;
+  }
+
+  memset(report, 0, sizeof(*report));
+  report->modifier = desired_modifier;
+  for (uint8_t i = 0u; i < num_pressed_keys && i < 6u; i++) {
+    report->keycode[i] = pressed_keys[i];
+  }
+}
+
+static bool
+keyboard_hid_queue_push_snapshot(const hid_keyboard_report_t *report) {
+  uint16_t previous_tail = 0u;
+  uint16_t depth = 0u;
+
+  if (report == NULL) {
+    return false;
+  }
+
+  if (!keyboard_hid_queue_is_empty()) {
+    previous_tail = report_queue_tail == 0u
+                        ? (KEYBOARD_HID_REPORT_QUEUE_CAPACITY - 1u)
+                        : (uint16_t)(report_queue_tail - 1u);
+    if (memcmp(&report_queue[previous_tail], report, sizeof(*report)) == 0) {
+      return true;
+    }
+  }
+
+  if (keyboard_hid_queue_is_full()) {
+    report_queue_overflow_count++;
+    report_resync_required = true;
+    return false;
+  }
+
+  report_queue[report_queue_tail] = *report;
+  report_queue_tail = keyboard_hid_queue_next(report_queue_tail);
+  depth = keyboard_hid_queue_depth();
+  if (depth > report_queue_high_watermark) {
+    report_queue_high_watermark = depth;
+  }
+  return true;
+}
+
+static bool keyboard_hid_queue_desired_report(void) {
+  hid_keyboard_report_t report = {0};
+
+  if (!tud_mounted()) {
+    report_resync_required = true;
+    return true;
+  }
+
+  keyboard_hid_build_desired_report(&report);
+  return keyboard_hid_queue_push_snapshot(&report);
+}
+
+static void keyboard_hid_try_queue_resync(void) {
+  if (!report_resync_required || !tud_mounted() ||
+      keyboard_hid_queue_is_full()) {
+    return;
+  }
+
+  report_resync_required = false;
+  if (!keyboard_hid_queue_desired_report()) {
+    report_resync_required = true;
+  }
+}
+
+/* Drop snapshots that have not reached the USB controller yet. An accepted
+ * head report cannot be cancelled, so retain it and place the desired resync
+ * directly behind it. */
+static void keyboard_hid_discard_pending_reports(void) {
+  if (report_in_flight && !keyboard_hid_queue_is_empty()) {
+    report_queue_tail = keyboard_hid_queue_next(report_queue_head);
+  } else {
+    report_queue_head = 0u;
+    report_queue_tail = 0u;
+    report_in_flight = false;
+  }
+  report_resync_required = false;
+}
+
+static bool keyboard_hid_pump_queue(void) {
+  const hid_keyboard_report_t *report = NULL;
+
+  keyboard_hid_try_queue_resync();
+  if (report_in_flight || keyboard_hid_queue_is_empty() || !tud_mounted() ||
+      !tud_hid_n_ready(HID_ITF_KEYBOARD)) {
+    return false;
+  }
+
+  report = &report_queue[report_queue_head];
+  if (!tud_hid_n_keyboard_report(HID_ITF_KEYBOARD, 0u, report->modifier,
+                                 report->keycode)) {
+    return false;
+  }
+
+  report_in_flight = true;
+  return true;
 }
 
 //--------------------------------------------------------------------+
@@ -59,22 +188,23 @@ bool keyboard_hid_is_boot_protocol_active(void) {
 }
 
 bool keyboard_hid_send_report(uint8_t modifier, const uint8_t keycodes[6]) {
-  if (!tud_hid_n_ready(HID_ITF_KEYBOARD)) {
+  hid_keyboard_report_t report = {0};
+
+  if (!tud_mounted()) {
     return false;
   }
 
-  keyboard_report.modifier = modifier;
-  keyboard_report.reserved = 0;
+  report.modifier = modifier;
 
   if (keycodes != NULL) {
-    memcpy(keyboard_report.keycode, keycodes, 6);
-  } else {
-    memset(keyboard_report.keycode, 0, 6);
+    memcpy(report.keycode, keycodes, sizeof(report.keycode));
   }
 
-  // Use instance-specific function for keyboard (instance 0)
-  return tud_hid_n_keyboard_report(
-      HID_ITF_KEYBOARD, 0, keyboard_report.modifier, keyboard_report.keycode);
+  if (!keyboard_hid_queue_push_snapshot(&report)) {
+    return false;
+  }
+  (void)keyboard_hid_pump_queue();
+  return true;
 }
 
 bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode) {
@@ -83,35 +213,28 @@ bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode) {
 }
 
 bool keyboard_hid_release_all(void) {
-  bool sent = false;
+  bool queued = false;
 
-  /* Clear desired ownership first, then retain a pending neutral report if
-   * the endpoint is momentarily busy. Discarding the state after a failed
-   * immediate send can otherwise leave the host's last 6KRO report stuck. */
-  memset(&keyboard_report, 0, sizeof(keyboard_report));
+  desired_modifier = 0u;
+  desired_report_dirty = false;
   memset(pressed_keys, 0, sizeof(pressed_keys));
   memset(key_reference_counts, 0, sizeof(key_reference_counts));
   num_pressed_keys = 0u;
-  report_changed = true;
-
-  if (tud_mounted() && tud_hid_n_ready(HID_ITF_KEYBOARD)) {
-    sent = keyboard_hid_send_report(0u, NULL);
-    if (sent) {
-      report_changed = false;
-    }
-  }
-  return sent;
+  keyboard_hid_discard_pending_reports();
+  queued = keyboard_hid_queue_desired_report();
+  (void)keyboard_hid_pump_queue();
+  return queued;
 }
 
 void keyboard_hid_reset_state(void) {
-  memset(&keyboard_report, 0, sizeof(keyboard_report));
+  desired_modifier = 0u;
+  desired_report_dirty = false;
   memset(pressed_keys, 0, sizeof(pressed_keys));
   memset(key_reference_counts, 0, sizeof(key_reference_counts));
-  num_pressed_keys = 0;
-  /* Reset is also a logical release. Keep it pending until the USB endpoint
-   * accepts the neutral report. */
-  report_changed = true;
-  report_pending = false;
+  num_pressed_keys = 0u;
+  keyboard_hid_discard_pending_reports();
+  (void)keyboard_hid_queue_desired_report();
+  (void)keyboard_hid_pump_queue();
 }
 
 void keyboard_hid_key_press(uint8_t keycode) {
@@ -128,9 +251,9 @@ void keyboard_hid_key_press(uint8_t keycode) {
 
   if (keyboard_hid_is_modifier(keycode)) {
     uint8_t modifier_mask = (uint8_t)(1u << (keycode - HID_KEY_CONTROL_LEFT));
-    if ((keyboard_report.modifier & modifier_mask) == 0u) {
-      keyboard_report.modifier |= modifier_mask;
-      report_changed = true;
+    if ((desired_modifier & modifier_mask) == 0u) {
+      desired_modifier |= modifier_mask;
+      desired_report_dirty = true;
     }
     return;
   }
@@ -138,7 +261,7 @@ void keyboard_hid_key_press(uint8_t keycode) {
   // Track all logical keys; report generation selects the first six.
   if (num_pressed_keys < KEYBOARD_HID_MAX_HELD_KEYS) {
     pressed_keys[num_pressed_keys++] = keycode;
-    report_changed = true;
+    desired_report_dirty = true;
   } else {
     key_reference_counts[keycode] = 0u;
   }
@@ -158,9 +281,9 @@ void keyboard_hid_key_release(uint8_t keycode) {
 
   if (keyboard_hid_is_modifier(keycode)) {
     uint8_t modifier_mask = (uint8_t)(1u << (keycode - HID_KEY_CONTROL_LEFT));
-    if ((keyboard_report.modifier & modifier_mask) != 0u) {
-      keyboard_report.modifier &= (uint8_t)(~modifier_mask);
-      report_changed = true;
+    if ((desired_modifier & modifier_mask) != 0u) {
+      desired_modifier &= (uint8_t)(~modifier_mask);
+      desired_report_dirty = true;
     }
     return;
   }
@@ -174,36 +297,24 @@ void keyboard_hid_key_release(uint8_t keycode) {
       }
       num_pressed_keys--;
       pressed_keys[num_pressed_keys] = 0;
-      report_changed = true;
+      desired_report_dirty = true;
       return;
     }
   }
 }
 
 bool keyboard_hid_send_report_if_changed(void) {
-  if (!report_changed) {
-    return false;
+  if (desired_report_dirty) {
+    /* Batch every mutation from the published analog scan into one atomic HID
+     * state. A full queue latches a final desired-state resync. */
+    desired_report_dirty = false;
+    (void)keyboard_hid_queue_desired_report();
   }
-
-  if (!tud_mounted() || !tud_hid_n_ready(HID_ITF_KEYBOARD)) {
-    return false;
-  }
-
-  // Build keycodes array
-  uint8_t keycodes[6] = {0};
-  for (uint8_t i = 0; i < num_pressed_keys && i < 6; i++) {
-    keycodes[i] = pressed_keys[i];
-  }
-
-  if (keyboard_hid_send_report(keyboard_report.modifier, keycodes)) {
-    report_changed = false;
-    return true;
-  }
-  return false;
+  return keyboard_hid_pump_queue();
 }
 
 uint8_t keyboard_hid_get_modifier_state(void) {
-  return keyboard_report.modifier;
+  return desired_modifier;
 }
 
 void keyboard_hid_task(void) {
@@ -212,10 +323,46 @@ void keyboard_hid_task(void) {
 }
 
 void keyboard_hid_on_umount(void) {
-  /* Endpoint transfers can be aborted without report-complete. Keep logical
-   * ownership and republish it when the host enumerates again. */
-  report_pending = false;
-  report_changed = true;
+  /* An aborted transfer has no completion callback. Discard historical taps
+   * and publish only the current desired state after re-enumeration. */
+  report_queue_head = 0u;
+  report_queue_tail = 0u;
+  report_in_flight = false;
+  desired_report_dirty = false;
+  report_resync_required = true;
+}
+
+void keyboard_hid_on_report_complete(void) {
+  if (!report_in_flight || keyboard_hid_queue_is_empty()) {
+    return;
+  }
+
+  report_in_flight = false;
+  report_queue_head = keyboard_hid_queue_next(report_queue_head);
+  keyboard_hid_try_queue_resync();
+  (void)keyboard_hid_pump_queue();
+}
+
+void keyboard_hid_on_report_failed(void) {
+  if (!report_in_flight) {
+    return;
+  }
+
+  report_in_flight = false;
+  report_transfer_failed_count++;
+  (void)keyboard_hid_pump_queue();
+}
+
+uint32_t keyboard_hid_get_queue_overflow_count(void) {
+  return report_queue_overflow_count;
+}
+
+uint16_t keyboard_hid_get_queue_high_watermark(void) {
+  return report_queue_high_watermark;
+}
+
+uint32_t keyboard_hid_get_transfer_failed_count(void) {
+  return report_transfer_failed_count;
 }
 
 //--------------------------------------------------------------------+
@@ -228,6 +375,7 @@ void tud_mount_cb(void) { led_matrix_set_usb_suspend_state(false); }
 // Invoked when device is unmounted.
 void tud_umount_cb(void) {
   keyboard_hid_on_umount();
+  keyboard_nkro_hid_on_umount();
   consumer_hid_on_umount();
   mouse_hid_on_umount();
   led_matrix_set_usb_suspend_state(false);
@@ -259,11 +407,13 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
   if ((instance == HID_ITF_KEYBOARD) &&
       (report_type == HID_REPORT_TYPE_INPUT) && buffer != NULL &&
       reqlen > 0u) {
+    hid_keyboard_report_t report = {0};
     // Retourner le rapport clavier courant
-    response_len = reqlen < sizeof(keyboard_report)
+    keyboard_hid_build_desired_report(&report);
+    response_len = reqlen < sizeof(report)
                        ? reqlen
-                       : (uint16_t)sizeof(keyboard_report);
-    memcpy(buffer, &keyboard_report, response_len);
+                       : (uint16_t)sizeof(report);
+    memcpy(buffer, &report, response_len);
     return response_len;
   }
 
@@ -325,7 +475,11 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
 
   switch (instance) {
   case HID_ITF_KEYBOARD:
-    report_pending = false;
+    keyboard_hid_on_report_complete();
+    break;
+
+  case HID_ITF_NKRO:
+    keyboard_nkro_hid_on_report_complete();
     break;
 
   case HID_ITF_RAW_HID:
@@ -338,6 +492,31 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
 
   case HID_ITF_MOUSE:
     mouse_hid_on_report_complete();
+    break;
+
+  default:
+    break;
+  }
+}
+
+void tud_hid_report_failed_cb(uint8_t instance,
+                              hid_report_type_t report_type,
+                              uint8_t const *report,
+                              uint16_t xferred_bytes) {
+  (void)report;
+  (void)xferred_bytes;
+
+  if (report_type != HID_REPORT_TYPE_INPUT) {
+    return;
+  }
+
+  switch (instance) {
+  case HID_ITF_KEYBOARD:
+    keyboard_hid_on_report_failed();
+    break;
+
+  case HID_ITF_NKRO:
+    keyboard_nkro_hid_on_report_failed();
     break;
 
   default:

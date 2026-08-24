@@ -162,6 +162,15 @@ void keyboard_hid_task(void);
 /** Preserve desired keys but force a fresh report after USB re-enumeration. */
 void keyboard_hid_on_umount(void);
 
+/** Advance/retry the lossless report queue after a TinyUSB transfer event. */
+void keyboard_hid_on_report_complete(void);
+void keyboard_hid_on_report_failed(void);
+
+/** Monotonic queue diagnostics, reset only at boot. */
+uint32_t keyboard_hid_get_queue_overflow_count(void);
+uint16_t keyboard_hid_get_queue_high_watermark(void);
+uint32_t keyboard_hid_get_transfer_failed_count(void);
+
 #ifdef __cplusplus
 }
 #endif
