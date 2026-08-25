@@ -614,7 +614,11 @@ export const DeviceSessionManager = {
       }
 
       const latestStatus = useDeviceSession.getState().status;
-      if (latestStatus !== "connected" && latestStatus !== "updater") {
+      if (
+        latestStatus !== "connected"
+        && latestStatus !== "updater"
+        && latestStatus !== "recovery-only"
+      ) {
         stopPresencePolling();
         return;
       }
