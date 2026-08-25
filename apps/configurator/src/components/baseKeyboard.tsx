@@ -13,6 +13,12 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { labelRegistry } from "@/ui/labels/labelRegistry";
 import { cn } from "@/lib/utils";
 import { IconLoader2 } from "@tabler/icons-react";
+import {
+  isAreaSelectionGesture,
+  normalizeSelectionRect,
+  selectIntersectingKeyIds,
+  type SelectionPoint,
+} from "./base-keyboard-selection";
 
 interface BaseKeyboardProps {
   mode: "single" | "multi";
@@ -189,6 +195,7 @@ export default function BaseKeyboard({
   keyColorMap,
 }: BaseKeyboardProps) {
   const selectedKeys = useKeyboardStore((state) => state.selectedKeys);
+  const setSelectedKeys = useKeyboardStore((state) => state.setSelectedKeys);
   const toggleKeySelection = useKeyboardStore((state) => state.toggleKeySelection);
   const setMode = useKeyboardStore((state) => state.setMode);
   const setCurrentLayer = useKeyboardStore((state) => state.setCurrentLayer);
@@ -197,8 +204,12 @@ export default function BaseKeyboard({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const layerSelectorRef = useRef<HTMLDivElement>(null);
-  const [areaStart, setAreaStart] = useState<{ x: number; y: number } | null>(null);
-  const [areaEnd, setAreaEnd] = useState<{ x: number; y: number } | null>(null);
+  const [areaStart, setAreaStart] = useState<SelectionPoint | null>(null);
+  const [areaEnd, setAreaEnd] = useState<SelectionPoint | null>(null);
+  const areaStartClientRef = useRef<SelectionPoint | null>(null);
+  const areaPointerIdRef = useRef<number | null>(null);
+  const suppressAreaClickRef = useRef(false);
+  const suppressAreaClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const parsed = useMemo(
     () => ensureParsedKeyboardLayout(keyboardPreviewBaseLayout),
@@ -249,30 +260,129 @@ export default function BaseKeyboard({
     setMode(mode);
   }, [mode, setMode]);
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (!interactive || mode !== "multi") return;
+  const clearAreaSelectionGesture = useCallback(() => {
+    areaStartClientRef.current = null;
+    areaPointerIdRef.current = null;
+    setAreaStart(null);
+    setAreaEnd(null);
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!interactive || mode !== "multi" || !e.isPrimary || e.button !== 0) return;
+
+      const target = e.target instanceof Element ? e.target : null;
+      const isKeyboardKey = target?.closest("[data-kle-key-id]") != null;
+      if (target?.closest("button") && !isKeyboardKey) return;
+
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
+
+      areaPointerIdRef.current = e.pointerId;
+      areaStartClientRef.current = { x: e.clientX, y: e.clientY };
       setAreaStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       setAreaEnd(null);
     },
     [interactive, mode],
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!interactive || !areaStart || mode !== "multi") return;
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (areaPointerIdRef.current !== e.pointerId || !areaStartClientRef.current) return;
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
+      if (
+        isAreaSelectionGesture(areaStartClientRef.current, { x: e.clientX, y: e.clientY })
+        && !e.currentTarget.hasPointerCapture(e.pointerId)
+      ) {
+        /* Capture only once this is a drag. Immediate capture would retarget a
+         * normal key pointer-up to the container and could suppress its click. */
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
       setAreaEnd({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     },
-    [interactive, areaStart, mode],
+    [],
   );
 
-  const handleMouseUp = useCallback(() => {
-    setAreaStart(null);
-    setAreaEnd(null);
+  const armAreaClickSuppression = useCallback(() => {
+    suppressAreaClickRef.current = true;
+    if (suppressAreaClickTimerRef.current) {
+      clearTimeout(suppressAreaClickTimerRef.current);
+    }
+    suppressAreaClickTimerRef.current = setTimeout(() => {
+      suppressAreaClickRef.current = false;
+      suppressAreaClickTimerRef.current = null;
+    }, 0);
+  }, []);
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const start = areaStartClientRef.current;
+      if (areaPointerIdRef.current !== e.pointerId || !start) return;
+
+      const end = { x: e.clientX, y: e.clientY };
+      if (isAreaSelectionGesture(start, end)) {
+        const container = containerRef.current;
+        if (container) {
+          const keyRects = Array.from(
+            container.querySelectorAll<HTMLElement>(".kle-key-wrapper[data-kle-key-id]"),
+            (element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                id: element.dataset.kleKeyId ?? "",
+                rect: {
+                  left: rect.left,
+                  top: rect.top,
+                  right: rect.right,
+                  bottom: rect.bottom,
+                },
+              };
+            },
+          );
+          const nextSelection = selectIntersectingKeyIds(
+            normalizeSelectionRect(start, end),
+            keyRects,
+          );
+          setSelectedKeys(nextSelection);
+          onButtonClick(nextSelection);
+          armAreaClickSuppression();
+        }
+      }
+
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      clearAreaSelectionGesture();
+    },
+    [armAreaClickSuppression, clearAreaSelectionGesture, onButtonClick, setSelectedKeys],
+  );
+
+  const handlePointerCancel = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (areaPointerIdRef.current !== e.pointerId) return;
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      clearAreaSelectionGesture();
+    },
+    [clearAreaSelectionGesture],
+  );
+
+  const handleClickCapture = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!suppressAreaClickRef.current) return;
+    suppressAreaClickRef.current = false;
+    if (suppressAreaClickTimerRef.current) {
+      clearTimeout(suppressAreaClickTimerRef.current);
+      suppressAreaClickTimerRef.current = null;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  useEffect(() => () => {
+    if (suppressAreaClickTimerRef.current) {
+      clearTimeout(suppressAreaClickTimerRef.current);
+    }
   }, []);
 
   const rotaryLabels: Record<RotaryTargetId, string> = {
@@ -371,9 +481,11 @@ export default function BaseKeyboard({
     <div
       ref={containerRef}
       className="relative h-full min-h-0 w-full rounded-lg p-4"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onClickCapture={handleClickCapture}
     >
       <div className="flex h-full min-h-0 flex-col">
         {showLayerSelector && (
