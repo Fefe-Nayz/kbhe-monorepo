@@ -103,6 +103,31 @@ class DeviceProtocolTest(unittest.TestCase):
             },
         )
 
+    def test_shipped_2_0_0_packed_identity_remains_readable(self) -> None:
+        version = bytearray(64)
+        version[:4] = bytes((Command.GET_FIRMWARE_VERSION, 0, 0x00, 0x02))
+        identity = bytearray(64)
+        identity[:4] = bytes((Command.GET_DEVICE_INFO, 0, 0x00, 0x02))
+        identity[4 : 4 + 12] = b"75HE-LEGACY\0"
+        identity[30 : 30 + 12] = b"Legacy KBHE\0"
+        device = StubDevice(
+            {
+                int(Command.GET_FIRMWARE_VERSION): bytes(version),
+                int(Command.GET_DEVICE_INFO): bytes(identity),
+            }
+        )
+
+        self.assertEqual(device.get_firmware_version(), "2.0.0")
+        self.assertEqual(
+            device.get_device_info(),
+            {
+                "firmware_version": "2.0.0",
+                "firmware_version_raw": 0x020000,
+                "serial_number": "75HE-LEGACY",
+                "keyboard_name": "Legacy KBHE",
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

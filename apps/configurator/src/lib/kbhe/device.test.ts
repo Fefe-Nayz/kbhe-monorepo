@@ -66,6 +66,30 @@ function runtimeDevice(path: string, serialNumber: string | null): KbheTransport
   };
 }
 
+describe("KBHEDevice runtime identity compatibility", () => {
+  test("decodes the shipped 2.0.0 packed version and legacy identity offsets", async () => {
+    const version = new Uint8Array(64);
+    version.set([Command.GET_FIRMWARE_VERSION, Status.OK, 0x00, 0x02]);
+    const identity = new Uint8Array(64);
+    identity.set([Command.GET_DEVICE_INFO, Status.OK, 0x00, 0x02]);
+    identity.set(new TextEncoder().encode("75HE-LEGACY\0"), 4);
+    identity.set(new TextEncoder().encode("Legacy KBHE\0"), 4 + 26);
+    const transport = {
+      sendCommand: async (command: number) => (
+        command === Command.GET_FIRMWARE_VERSION ? version : identity
+      ),
+    } as KbheTransport;
+    const device = new KBHEDevice(new KbheCommander(transport), transport);
+
+    expect(await device.getFirmwareVersion()).toBe("2.0.0");
+    expect(await device.getDeviceInfo()).toEqual({
+      firmware_version: "2.0.0",
+      serial_number: "75HE-LEGACY",
+      keyboard_name: "Legacy KBHE",
+    });
+  });
+});
+
 describe("KBHEDevice bulk key parser", () => {
   test("decodes SOCD Neutral and disable-keyboard-on-gamepad flags", async () => {
     const transport = {

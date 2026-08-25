@@ -292,23 +292,36 @@ class KBHEDevice:
     def _decode_c_string(data):
         raw = bytes(int(v) & 0xFF for v in data)
         return raw.split(b"\x00", 1)[0].decode("ascii", errors="ignore")
-    
+
+    @staticmethod
+    def _decode_runtime_firmware_version(resp):
+        if not resp or len(resp) < 4 or resp[1] != Status.OK:
+            return None
+        first = int(resp[2]) & 0xFF
+        second = int(resp[3]) & 0xFF
+        # Firmware 2.0.0 shipped a packed 0x0200 u16 and started its identity
+        # strings at byte 4. Later releases use major/minor/patch and byte 5.
+        if first == 0x00 and second == 0x02:
+            return 2, 0, 0, 4
+        if len(resp) < 5:
+            return None
+        return first, second, int(resp[4]) & 0xFF, 5
+
     def get_firmware_version(self):
         """Get firmware version."""
         resp = self.send_command(Command.GET_FIRMWARE_VERSION)
-        if resp and len(resp) >= 5 and resp[1] == Status.OK:
-            return f"{int(resp[2])}.{int(resp[3])}.{int(resp[4])}"
-        return None
+        decoded = self._decode_runtime_firmware_version(resp)
+        return f"{decoded[0]}.{decoded[1]}.{decoded[2]}" if decoded else None
 
     def get_device_info(self):
         """Get firmware version, serial number, and keyboard name."""
         resp = self.send_command(Command.GET_DEVICE_INFO)
         if resp and len(resp) >= 64 and resp[1] == Status.OK:
-            major = int(resp[2])
-            minor = int(resp[3])
-            patch = int(resp[4])
+            decoded = self._decode_runtime_firmware_version(resp)
+            if decoded is None:
+                return None
+            major, minor, patch, serial_start = decoded
             version = (major << 16) | (minor << 8) | patch
-            serial_start = 5
             serial_end = serial_start + DEVICE_SERIAL_LENGTH
             keyboard_end = serial_end + KEYBOARD_NAME_LENGTH
             serial = self._decode_c_string(resp[serial_start:serial_end])

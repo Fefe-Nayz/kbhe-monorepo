@@ -37,6 +37,7 @@ import {
   SETTINGS_SAVE_STATUS_PROTOCOL_VERSION,
   SETTINGS_PROFILE_NAME_LENGTH,
   SettingsSaveState,
+  type FirmwareVersion,
   type SettingsSaveStatus,
   LAYER_COUNT,
   Status,
@@ -504,6 +505,34 @@ export class KBHEDevice {
     return String.fromCharCode(...raw).trim();
   }
 
+  private decodeRuntimeFirmwareVersion(
+    response: ArrayLike<number>,
+  ): { version: FirmwareVersion; identityPayloadOffset: number } | null {
+    if (response.length < 4 || response[1] !== Status.OK) return null;
+
+    const first = Number(response[2] ?? 0) & 0xff;
+    const second = Number(response[3] ?? 0) & 0xff;
+    /* Firmware 2.0.0 encoded one packed u16 (0x0200), then placed identity
+     * strings at byte 4. Every later release uses major/minor/patch and byte
+     * 5. Recognise that one shipped layout explicitly so a modern app can
+     * still identify its serial safely before migrating its updater. */
+    if (first === 0x00 && second === 0x02) {
+      return {
+        version: { major: 2, minor: 0, patch: 0 },
+        identityPayloadOffset: 4,
+      };
+    }
+    if (response.length < 5) return null;
+    return {
+      version: {
+        major: first,
+        minor: second,
+        patch: Number(response[4] ?? 0) & 0xff,
+      },
+      identityPayloadOffset: 5,
+    };
+  }
+
   private encodeKeyboardName(name: string): number[] {
     const chars = Array.from(name)
       .filter((char) => {
@@ -686,33 +715,28 @@ export class KBHEDevice {
 
   async getFirmwareVersion(): Promise<string | null> {
     const response = await this.sendCommand(Command.GET_FIRMWARE_VERSION);
-    if (response && response.length >= 5) {
-      return formatFirmwareVersion({
-        major: response[2] ?? 0,
-        minor: response[3] ?? 0,
-        patch: response[4] ?? 0,
-      });
-    }
-    return null;
+    if (!response) return null;
+    const decoded = this.decodeRuntimeFirmwareVersion(response);
+    return decoded ? formatFirmwareVersion(decoded.version) : null;
   }
 
   async ping(timeoutMs = 200): Promise<boolean> {
     const response = await this.sendCommand(Command.GET_FIRMWARE_VERSION, [], timeoutMs);
-    return !!response && response.length >= 5;
+    return response != null && this.decodeRuntimeFirmwareVersion(response) != null;
   }
 
   async getDeviceInfo(): Promise<DeviceIdentity | null> {
     const response = await this.sendCommand(Command.GET_DEVICE_INFO);
     if (response && response.length >= 62 && response[1] === Status.OK) {
-      const major = response[2] ?? 0;
-      const minor = response[3] ?? 0;
-      const patch = response[4] ?? 0;
+      const decoded = this.decodeRuntimeFirmwareVersion(response);
+      if (!decoded) return null;
+      const payloadOffset = decoded.identityPayloadOffset;
       return {
-        firmware_version: formatFirmwareVersion({ major, minor, patch }),
-        serial_number: this.decodeCString(response, 5, DEVICE_SERIAL_MAX_LENGTH),
+        firmware_version: formatFirmwareVersion(decoded.version),
+        serial_number: this.decodeCString(response, payloadOffset, DEVICE_SERIAL_MAX_LENGTH),
         keyboard_name: this.decodeCString(
           response,
-          5 + DEVICE_SERIAL_MAX_LENGTH,
+          payloadOffset + DEVICE_SERIAL_MAX_LENGTH,
           KEYBOARD_NAME_LENGTH,
         ),
       };
