@@ -50,6 +50,9 @@ function Get-WslEnvironmentArguments {
     if (-not [string]::IsNullOrWhiteSpace($env:KBHE_WSL_CARGO_HOME)) {
         $arguments.Add("CARGO_HOME=$($env:KBHE_WSL_CARGO_HOME)")
     }
+    if (-not [string]::IsNullOrWhiteSpace($env:KBHE_WSL_CARGO_TARGET_DIR)) {
+        $arguments.Add("CARGO_TARGET_DIR=$($env:KBHE_WSL_CARGO_TARGET_DIR)")
+    }
     return @($arguments)
 }
 

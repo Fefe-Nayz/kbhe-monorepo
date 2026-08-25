@@ -155,6 +155,8 @@ $env:KBHE_WSL_BUN = "/home/<wsl-user>/.bun/bin/bun"
 $env:KBHE_WSL_CARGO = "/home/<wsl-user>/.cargo/bin/cargo"
 $env:KBHE_WSL_RUSTUP_HOME = "/home/<wsl-user>/.rustup"
 $env:KBHE_WSL_CARGO_HOME = "/home/<wsl-user>/.cargo"
+# Keep Cargo artifacts on the Linux filesystem if /mnt/c produces I/O errors.
+$env:KBHE_WSL_CARGO_TARGET_DIR = "/tmp/kbhe-tauri-target"
 
 .\tools\release\run-release.ps1 -Phase prepare -Target both -BumpPart patch `
   -UseWsl -WslDistribution Ubuntu
