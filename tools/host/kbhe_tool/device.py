@@ -1885,6 +1885,51 @@ class KBHEDevice:
 
         return values
     
+    def get_key_states_chunk(self, start_index: int):
+        """Fetch one read-only key-state/distance chunk.
+
+        Keeping this operation chunked matters for HIL logging: requesting all
+        82 keys for every sample adds six RAW-HID round trips even when only a
+        single switch is under test.
+        """
+        start_index = max(0, min(int(KEY_COUNT) - 1, int(start_index)))
+        resp = self.send_command(
+            Command.GET_KEY_STATES, [0, start_index], timeout_ms=150
+        )
+        if not resp or len(resp) < 4 or resp[1] != Status.OK:
+            return None
+
+        returned_start = int(resp[2])
+        key_count = int(resp[3])
+        if (
+            returned_start != start_index
+            or key_count <= 0
+            or key_count > KEY_STATES_PER_CHUNK
+            or 4 + key_count * 4 > len(resp)
+        ):
+            return None
+
+        states = []
+        distances_norm = []
+        distances_01mm = []
+        distances_mm = []
+        for i in range(key_count):
+            offset = 4 + i * 4
+            value_01mm = self._unpack_u16(resp, offset + 2)
+            states.append(int(resp[offset]))
+            distances_norm.append(int(resp[offset + 1]))
+            distances_01mm.append(value_01mm)
+            distances_mm.append(value_01mm / 100.0)
+
+        return {
+            "start_index": returned_start,
+            "key_count": key_count,
+            "states": states,
+            "distances": distances_norm,
+            "distances_01mm": distances_01mm,
+            "distances_mm": distances_mm,
+        }
+
     def get_key_states(self):
         """Get key states (debug) with actual distances in mm."""
         states = [0] * KEY_COUNT
@@ -1894,23 +1939,17 @@ class KBHEDevice:
         next_index = 0
 
         while next_index < KEY_COUNT:
-            resp = self.send_command(Command.GET_KEY_STATES, [0, next_index], timeout_ms=150)
-            if not resp or len(resp) < 4 or resp[1] != Status.OK:
+            chunk = self.get_key_states_chunk(next_index)
+            if not chunk:
                 return None
 
-            start_index = int(resp[2])
-            key_count = int(resp[3])
-            if start_index != next_index or key_count <= 0 or key_count > KEY_STATES_PER_CHUNK:
-                return None
-
+            key_count = int(chunk["key_count"])
             for i in range(key_count):
-                offset = 4 + i * 4
-                key_index = start_index + i
-                states[key_index] = int(resp[offset])
-                distances_norm[key_index] = int(resp[offset + 1])
-                value_01mm = self._unpack_u16(resp, offset + 2)
-                distances_01mm[key_index] = value_01mm
-                distances_mm[key_index] = value_01mm / 100.0
+                key_index = next_index + i
+                states[key_index] = int(chunk["states"][i])
+                distances_norm[key_index] = int(chunk["distances"][i])
+                distances_01mm[key_index] = int(chunk["distances_01mm"][i])
+                distances_mm[key_index] = float(chunk["distances_mm"][i])
 
             next_index += key_count
 
