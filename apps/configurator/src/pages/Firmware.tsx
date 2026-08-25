@@ -890,6 +890,7 @@ export default function Firmware() {
       } catch (downloadError) {
         throw new Error(
           `No stable signed carrier is available for installed version ${major}.${minor}.${patch}; use the documented ROM-DFU factory recovery (${downloadError instanceof Error ? downloadError.message : String(downloadError)})`,
+          { cause: downloadError },
         );
       }
       setFirmwareUpdateState("flashing");
