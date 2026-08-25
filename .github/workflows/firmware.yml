@@ -64,6 +64,7 @@ jobs:
           ctest --test-dir firmware/build-host-tests --output-on-failure
           python tools/release/test_release_signing.py
           python tools/host/test_firmware_updater_selection.py
+          python tools/host/test_device_protocol.py
 
       - name: Configure Release
         run: cmake --preset Release
@@ -88,6 +89,10 @@ jobs:
           cp build/Release/kbhe_bootloader.hex dist/kbhe-bootloader.hex
           cp build/Release/kbhe_bootloader.elf dist/kbhe-bootloader.elf
           cp build/Release/kbhe_bootloader.map dist/kbhe-bootloader.map
+          cp build/Release/kbhe_updater_migrator.bin dist/kbhe-updater-migrator.bin
+          cp build/Release/kbhe_updater_migrator.hex dist/kbhe-updater-migrator.hex
+          cp build/Release/kbhe_updater_migrator.elf dist/kbhe-updater-migrator.elf
+          cp build/Release/kbhe_updater_migrator.map dist/kbhe-updater-migrator.map
           cp build/Release-apponly/kbhe.bin dist/kbhe-app-only.bin
           cp build/Release-apponly/kbhe.hex dist/kbhe-app-only.hex
           cp build/Release-apponly/kbhe.elf dist/kbhe-app-only.elf
@@ -96,7 +101,8 @@ jobs:
           {
             "tag": "${GITHUB_REF_NAME}",
             "commit": "${GITHUB_SHA}",
-            "primaryBinary": "kbhe-app.bin"
+            "primaryBinary": "kbhe-app.bin",
+            "migrationExecutable": "kbhe-updater-migrator.bin"
           }
           EOF
 
@@ -108,7 +114,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Sign and publish firmware release
+    name: Sign and stage firmware release
     if: startsWith(github.ref, 'refs/tags/firmware-v')
     needs: build
     concurrency:
@@ -167,6 +173,41 @@ jobs:
             --version "$version" \
             --verify-public firmware/keys/firmware-ed25519-public.pem
 
+          migration_inner="$RUNNER_TEMP/kbhe-updater-v2-to-v3-inner.bin"
+          python tools/release/build_updater_migration_package.py prepare \
+            --migrator dist/kbhe-updater-migrator.bin \
+            --bootloader dist/kbhe-bootloader.bin \
+            --output "$migration_inner"
+          python tools/release/sign_release_asset.py firmware \
+            --key "$key_path" \
+            --input "$migration_inner" \
+            --output dist/kbhe-updater-v2-to-v3.bin.sig \
+            --version "$version" \
+            --verify-public firmware/keys/firmware-ed25519-public.pem
+          python tools/release/build_updater_migration_package.py assemble \
+            --image "$migration_inner" \
+            --signature dist/kbhe-updater-v2-to-v3.bin.sig \
+            --version "$version" \
+            --verify-public firmware/keys/firmware-ed25519-public.pem \
+            --output dist/kbhe-updater-v2-to-v3.bin
+          python tools/release/build_updater_migration_package.py inspect \
+            --input dist/kbhe-updater-v2-to-v3.bin \
+            --signature dist/kbhe-updater-v2-to-v3.bin.sig \
+            --version "$version" \
+            --verify-public firmware/keys/firmware-ed25519-public.pem
+          jq '.legacyUpdaterMigration = "kbhe-updater-v2-to-v3.bin" |
+              del(.migrationExecutable)' \
+            dist/firmware-manifest.json > "$RUNNER_TEMP/firmware-manifest.json"
+          mv "$RUNNER_TEMP/firmware-manifest.json" dist/firmware-manifest.json
+
+          # The executable is meaningful only inside the authenticated
+          # migration package. Do not publish a raw, easily confused payload.
+          rm -f \
+            dist/kbhe-updater-migrator.bin \
+            dist/kbhe-updater-migrator.hex \
+            dist/kbhe-updater-migrator.elf \
+            dist/kbhe-updater-migrator.map
+
           python tools/release/build_factory_image.py \
             --bootloader dist/kbhe-bootloader.bin \
             --app dist/kbhe-app.bin \
@@ -186,7 +227,16 @@ jobs:
               --target kbhe-75he-stm32f723vet6 \
               --role "$name" \
               --verify-public firmware/keys/firmware-ed25519-public.pem
-          done < <(find dist -maxdepth 1 -type f ! -name '*.sig' ! -name 'kbhe-app.bin' -print0)
+          # kbhe-updater-v2-to-v3.bin.sig deliberately authenticates the exact
+          # inner migrator image copied into the v3 trailer. Updater v2 cannot
+          # verify signatures; the native host verifies this inner signature
+          # plus the canonical outer capsule before BEGIN. Never replace it
+          # with a generic signature over the assembled outer package.
+          done < <(find dist -maxdepth 1 -type f \
+            ! -name '*.sig' \
+            ! -name 'kbhe-app.bin' \
+            ! -name 'kbhe-updater-v2-to-v3.bin' \
+            -print0)
 
       - name: Create authenticated draft release
         uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
@@ -195,7 +245,7 @@ jobs:
           generate_release_notes: true
           draft: true
 
-      - name: Verify and publish authenticated release
+      - name: Verify authenticated draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -248,4 +298,4 @@ jobs:
               exit 1
             fi
           done < <(find dist -maxdepth 1 -type f -print0)
-          gh release edit "$GITHUB_REF_NAME" --draft=false
+          echo "Authenticated draft verified. Publication is intentionally gated on destructive v2-to-v3 hardware validation."

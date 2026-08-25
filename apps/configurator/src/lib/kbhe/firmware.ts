@@ -30,7 +30,13 @@ const UPDATER_CMD_ABORT = 0x05;
 const UPDATER_CMD_BOOT = 0x06;
 const UPDATER_CMD_AUTH = 0x07;
 const UPDATER_STATUS_OK = 0x00;
+const UPDATER_FLAG_APP_VALID = 1 << 0;
+const UPDATER_FLAG_SESSION_ACTIVE = 1 << 1;
 const UPDATER_FLAG_SIGNATURE_REQUIRED = 1 << 2;
+const UPDATER_KNOWN_FLAGS =
+  UPDATER_FLAG_APP_VALID |
+  UPDATER_FLAG_SESSION_ACTIVE |
+  UPDATER_FLAG_SIGNATURE_REQUIRED;
 const FIRMWARE_SIGNATURE_SIZE = 64;
 
 const STATUS_NAMES: Record<number, string> = {
@@ -169,8 +175,11 @@ function requireUpdaterOk(response: UpdaterResponse, expectedCommand: number): v
 }
 
 function parseHelloPayload(payload: Uint8Array) {
-  if (payload.length < 20) {
-    throw new Error("HELLO payload too short");
+  if (payload.length !== 20) {
+    throw new Error(`HELLO payload has ${payload.length} bytes; expected exactly 20`);
+  }
+  if (payload[19] !== 0) {
+    throw new Error("HELLO reserved byte is non-zero");
   }
   const installedFwVersion: FirmwareVersion = {
     major: payload[16] ?? 0,
@@ -629,13 +638,23 @@ export class KBHEFirmware {
       requireUpdaterOk(hello, UPDATER_CMD_HELLO);
       const helloPayload = parseHelloPayload(hello.payload);
 
+      if (helloPayload.protocolVersion === 0x0002) {
+        throw new Error(
+          "UPDATER_MIGRATION_REQUIRES_DESKTOP: this keyboard uses legacy updater protocol 0x0002. The normal firmware image is blocked because sector-6 storage would invalidate the legacy updater. Use the native KBHE configurator with a signed v2-to-v3 migration package, or follow the factory/ROM-DFU recovery guide.",
+        );
+      }
       if (helloPayload.protocolVersion !== PROTOCOL_VERSION) {
         throw new Error(
-          `unsupported updater protocol 0x${helloPayload.protocolVersion.toString(16)}, expected 0x${PROTOCOL_VERSION.toString(16)}`,
+          `UPDATER_PROTOCOL_UNSUPPORTED: updater protocol 0x${helloPayload.protocolVersion.toString(16).padStart(4, "0")} is not supported; this transport supports 0x${PROTOCOL_VERSION.toString(16).padStart(4, "0")}`,
         );
       }
       if ((helloPayload.flags & UPDATER_FLAG_SIGNATURE_REQUIRED) === 0) {
         throw new Error("updater does not enforce signed firmware");
+      }
+      if ((helloPayload.flags & ~UPDATER_KNOWN_FLAGS) !== 0) {
+        throw new Error(
+          `UPDATER_SECURITY_UNSUPPORTED: updater advertises unknown flags 0x${(helloPayload.flags & ~UPDATER_KNOWN_FLAGS).toString(16).padStart(4, "0")}`,
+        );
       }
       if (helloPayload.appBase !== UPDATER_APP_BASE) {
         throw new Error(

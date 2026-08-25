@@ -1,4 +1,5 @@
 use crate::signing::{verify_app_asset, verify_firmware_asset};
+use crate::updater_compat::{inspect_firmware_artifact, FirmwareArtifact};
 use reqwest::blocking::Client;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,7 @@ const APP_TAG_PREFIX: &str = "app-v";
 const FIRMWARE_TAG_PREFIX: &str = "firmware-v";
 const MAX_APP_INSTALLER_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_FIRMWARE_BYTES: u64 = 0x0002_FF00;
+const MAX_MIGRATION_PACKAGE_BYTES: u64 = 0x0002_FF54;
 const ED25519_SIGNATURE_BYTES: u64 = 64;
 static APP_INSTALLER_LAUNCHED: AtomicBool = AtomicBool::new(false);
 
@@ -86,6 +88,17 @@ pub struct DownloadedFirmware {
     signature_path: String,
     file_name: String,
     version_tag: String,
+    firmware_version: DownloadedFirmwareVersion,
+    migration_path: Option<String>,
+    migration_signature_path: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DownloadedFirmwareVersion {
+    major: u8,
+    minor: u8,
+    patch: u8,
 }
 
 fn client() -> Result<Client, String> {
@@ -187,6 +200,13 @@ fn firmware_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
     assets
         .iter()
         .find(|asset| asset.name == "kbhe-app.bin")
+        .cloned()
+}
+
+fn migration_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
+    assets
+        .iter()
+        .find(|asset| asset.name == "kbhe-updater-v2-to-v3.bin")
         .cloned()
 }
 
@@ -457,11 +477,33 @@ pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFir
             u8::try_from(version.minor).map_err(|_| "firmware minor version exceeds 255")?,
             u8::try_from(version.patch).map_err(|_| "firmware patch version exceeds 255")?,
         ];
-        let (asset, signature_asset) =
-            release_assets_by_tag(&tag, FIRMWARE_TAG_PREFIX, firmware_asset)?;
+        let release = fetch_releases()?
+            .into_iter()
+            .find(|release| release.tag_name == tag && !release.draft && !release.prerelease)
+            .ok_or_else(|| format!("stable release {tag} was not found"))?;
+        let asset = firmware_asset(&release.assets)
+            .ok_or_else(|| format!("release {tag} has no kbhe-app.bin asset"))?;
+        let firmware_signature_asset = signature_asset(&release.assets, &asset)
+            .ok_or_else(|| format!("release {tag} has no valid kbhe-app.bin.sig asset"))?;
+        let migration_asset = migration_asset(&release.assets);
+        let migration_signature_asset = migration_asset
+            .as_ref()
+            .map(|asset| {
+                signature_asset(&release.assets, asset).ok_or_else(|| {
+                    format!(
+                        "release {tag} has a migration package but no valid {}.sig asset",
+                        asset.name
+                    )
+                })
+            })
+            .transpose()?;
         let directory = secure_download_directory("firmware")?;
         let path = download_asset(&asset, &directory, MAX_FIRMWARE_BYTES)?;
-        let signature_path = download_asset(&signature_asset, &directory, ED25519_SIGNATURE_BYTES)?;
+        let signature_path = download_asset(
+            &firmware_signature_asset,
+            &directory,
+            ED25519_SIGNATURE_BYTES,
+        )?;
         let firmware = std::fs::read(&path)
             .map_err(|error| format!("failed to read downloaded firmware: {error}"))?;
         let signature = std::fs::read(&signature_path)
@@ -471,11 +513,62 @@ pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFir
             let _ = std::fs::remove_file(&signature_path);
             return Err(format!("downloaded firmware is not authentic: {error}"));
         }
+        let (migration_path, migration_signature_path) =
+            match (migration_asset, migration_signature_asset) {
+                (Some(migration_asset), Some(migration_signature_asset)) => {
+                    let migration_path =
+                        download_asset(&migration_asset, &directory, MAX_MIGRATION_PACKAGE_BYTES)?;
+                    let migration_signature_path = download_asset(
+                        &migration_signature_asset,
+                        &directory,
+                        ED25519_SIGNATURE_BYTES,
+                    )?;
+                    let migration = std::fs::read(&migration_path).map_err(|error| {
+                        format!("failed to read downloaded updater migration: {error}")
+                    })?;
+                    let migration_signature =
+                        std::fs::read(&migration_signature_path).map_err(|error| {
+                            format!("failed to read updater migration signature: {error}")
+                        })?;
+                    match inspect_firmware_artifact(&migration, version_bytes, &migration_signature)
+                    {
+                        Ok(FirmwareArtifact::V2ToV3Migration(_)) => {}
+                        Ok(FirmwareArtifact::Application) => {
+                            let _ = std::fs::remove_file(&migration_path);
+                            let _ = std::fs::remove_file(&migration_signature_path);
+                            return Err(
+                                "downloaded updater migration has the normal application layout"
+                                    .to_string(),
+                            );
+                        }
+                        Err(error) => {
+                            let _ = std::fs::remove_file(&migration_path);
+                            let _ = std::fs::remove_file(&migration_signature_path);
+                            return Err(format!(
+                                "downloaded updater migration is not authentic: {error}"
+                            ));
+                        }
+                    }
+                    (
+                        Some(migration_path.to_string_lossy().into_owned()),
+                        Some(migration_signature_path.to_string_lossy().into_owned()),
+                    )
+                }
+                (None, None) => (None, None),
+                _ => unreachable!("migration asset pairing was validated above"),
+            };
         Ok(DownloadedFirmware {
             path: path.to_string_lossy().into_owned(),
             signature_path: signature_path.to_string_lossy().into_owned(),
             file_name: asset.name,
             version_tag: tag,
+            firmware_version: DownloadedFirmwareVersion {
+                major: version_bytes[0],
+                minor: version_bytes[1],
+                patch: version_bytes[2],
+            },
+            migration_path,
+            migration_signature_path,
         })
     })
     .await
@@ -572,7 +665,52 @@ pub async fn kbhe_download_and_run_app_installer(tag: String) -> Result<String, 
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_prefixed_version, APP_TAG_PREFIX, FIRMWARE_TAG_PREFIX};
+    use super::{
+        firmware_asset, migration_asset, parse_prefixed_version, signature_asset, GithubAsset,
+        APP_TAG_PREFIX, ED25519_SIGNATURE_BYTES, FIRMWARE_TAG_PREFIX,
+    };
+
+    fn asset(name: &str, size: u64) -> GithubAsset {
+        GithubAsset {
+            name: name.to_string(),
+            browser_download_url: format!("https://example.invalid/{name}"),
+            size,
+        }
+    }
+
+    #[test]
+    fn firmware_release_assets_are_selected_by_exact_role() {
+        let assets = vec![
+            asset("kbhe-app.bin.backup", 10),
+            asset("kbhe-updater-v2-to-v3.bin.old", 10),
+            asset("kbhe-app.bin", 100),
+            asset("kbhe-app.bin.sig", ED25519_SIGNATURE_BYTES),
+            asset("kbhe-updater-v2-to-v3.bin", 200),
+            asset("kbhe-updater-v2-to-v3.bin.sig", ED25519_SIGNATURE_BYTES),
+        ];
+        let app = firmware_asset(&assets).unwrap();
+        let migration = migration_asset(&assets).unwrap();
+        assert_eq!(app.name, "kbhe-app.bin");
+        assert_eq!(migration.name, "kbhe-updater-v2-to-v3.bin");
+        assert_eq!(
+            signature_asset(&assets, &app).unwrap().name,
+            "kbhe-app.bin.sig"
+        );
+        assert_eq!(
+            signature_asset(&assets, &migration).unwrap().name,
+            "kbhe-updater-v2-to-v3.bin.sig"
+        );
+    }
+
+    #[test]
+    fn migration_signature_requires_exact_detached_size() {
+        let migration = asset("kbhe-updater-v2-to-v3.bin", 200);
+        let assets = vec![
+            migration.clone(),
+            asset("kbhe-updater-v2-to-v3.bin.sig", ED25519_SIGNATURE_BYTES + 1),
+        ];
+        assert!(signature_asset(&assets, &migration).is_none());
+    }
 
     #[test]
     fn release_tags_are_canonical_and_stable() {

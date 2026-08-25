@@ -181,6 +181,13 @@ bool updater_is_app_vector_valid_for_image(uint32_t app_base,
                                            uint32_t image_size);
 bool updater_is_app_image_valid_with_trailer(
     const updater_trailer_t *trailer);
+/**
+ * Validate the signed-image-internal KBHEMIG3 descriptor and embedded updater.
+ * The caller must separately authenticate `trailer` before granting any
+ * privilege based on this structural result.
+ */
+bool updater_app_has_valid_migration_descriptor(
+    const updater_trailer_t *trailer);
 bool updater_is_app_image_valid(void);
 bool updater_read_valid_app_version(updater_fw_version_t *version_out);
 updater_fw_version_t updater_get_app_version(void);

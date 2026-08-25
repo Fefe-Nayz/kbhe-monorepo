@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import struct
 import subprocess
 import tempfile
@@ -23,6 +24,17 @@ from build_factory_image import (
     VERSION_FLOOR_OFFSET,
     VERSION_FLOOR_SIZE,
     build_factory_image,
+)
+from build_updater_migration_package import (
+    APP_BASE as MIGRATOR_APP_BASE,
+    FLASH_BASE as MIGRATION_FLASH_BASE,
+    MIGRATION_DESCRIPTOR_SIZE,
+    MIGRATION_PACKAGE_SIZE,
+    V3_TRAILER_OFFSET as MIGRATION_V3_TRAILER_OFFSET,
+    build_migration_image,
+    build_migration_package,
+    inspect_migration_package,
+    parse_migration_descriptor,
 )
 from sign_release_asset import (
     app_manifest,
@@ -73,6 +85,28 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
                 self.assertEqual(
                     result.stdout[-32:].hex(), self.vectors[vector_name]
                 )
+
+    def test_release_version_source_is_the_shared_header(self) -> None:
+        header_path = ROOT / "firmware" / "Core" / "Inc" / "firmware_version.h"
+        header = header_path.read_text(encoding="utf-8")
+        for component in ("MAJOR", "MINOR", "PATCH"):
+            match = re.search(
+                rf"^#define\s+FIRMWARE_VERSION_{component}\s+(\d+)u\s*$",
+                header,
+                re.MULTILINE,
+            )
+            self.assertIsNotNone(match, component)
+            self.assertLessEqual(int(match.group(1)), 255)
+
+        settings = (ROOT / "firmware" / "Core" / "Src" / "settings.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotRegex(settings, r"^#define\s+FIRMWARE_VERSION_",)
+        release_script = (ROOT / "tools" / "release" / "run-release.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("firmware/Core/Inc/firmware_version.h", release_script)
+        self.assertNotIn("firmware/Core/Src/settings.c", release_script)
 
     def test_python_manifests_and_signatures_match_golden(self) -> None:
         firmware = self.vectors["firmware"]
@@ -200,6 +234,106 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
             build_factory_image(
                 shared_ram_stack, app, signature, firmware["version"]
             )
+
+    def test_v2_capsule_detached_signature_is_the_inner_v3_signature(self) -> None:
+        firmware = self.vectors["firmware"]
+        version = firmware["version"]
+        packed_version = tuple(int(part) for part in version.split("."))
+        version_word = (
+            (packed_version[0] << 16)
+            | (packed_version[1] << 8)
+            | packed_version[2]
+        )
+        migrator = b"".join(
+            (
+                struct.pack("<II", 0x2003FF00, MIGRATOR_APP_BASE + 9),
+                bytes(24),
+                struct.pack(
+                    "<III", 0x4B465756, version_word, version_word ^ 0xFFFFFFFF
+                ),
+                bytes(20),
+            )
+        )
+        bootloader = (
+            struct.pack("<II", 0x2003FF00, MIGRATION_FLASH_BASE + 9) + bytes(56)
+        )
+        image = build_migration_image(migrator, bootloader)
+        descriptor = parse_migration_descriptor(image)
+        self.assertEqual(descriptor["image_size"], len(image))
+        self.assertEqual(descriptor["bootloader_size"], len(bootloader))
+        self.assertGreaterEqual(len(image), len(migrator) + len(bootloader) + MIGRATION_DESCRIPTOR_SIZE)
+
+        # The golden signature does not sign this synthetic image; package
+        # construction is intentionally separate from cryptographic verification.
+        signature = bytes.fromhex(firmware["signatureHex"])
+        package = build_migration_package(image, signature, version)
+        inspected = inspect_migration_package(package, signature, version)
+        self.assertEqual(inspected, descriptor)
+        self.assertEqual(len(package), MIGRATION_PACKAGE_SIZE)
+        self.assertEqual(package[: len(image)], image)
+        self.assertEqual(
+            package[len(image) : MIGRATION_V3_TRAILER_OFFSET],
+            b"\xFF" * (MIGRATION_V3_TRAILER_OFFSET - len(image)),
+        )
+        trailer = package[MIGRATION_V3_TRAILER_OFFSET:]
+        magic, image_size, image_crc = struct.unpack_from("<III", trailer)
+        self.assertEqual(magic, TRAILER_MAGIC)
+        self.assertEqual(image_size, len(image))
+        self.assertEqual(image_crc, zlib.crc32(image))
+        self.assertEqual(trailer[16:80], signature)
+        self.assertEqual(struct.unpack_from("<I", trailer, 80)[0], zlib.crc32(trailer[:80]))
+
+        tampered = bytearray(image)
+        tampered[descriptor["bootloader_offset"] + 8] ^= 1
+        with self.assertRaisesRegex(ValueError, "bootloader CRC"):
+            parse_migration_descriptor(bytes(tampered))
+
+        unknown_flags = bytearray(image)
+        descriptor_offset = len(unknown_flags) - MIGRATION_DESCRIPTOR_SIZE
+        flags_offset = descriptor_offset + 16
+        struct.pack_into(
+            "<I",
+            unknown_flags,
+            flags_offset,
+            struct.unpack_from("<I", unknown_flags, flags_offset)[0] | (1 << 31),
+        )
+        struct.pack_into(
+            "<I",
+            unknown_flags,
+            len(unknown_flags) - 4,
+            zlib.crc32(unknown_flags[descriptor_offset : len(unknown_flags) - 4]),
+        )
+        with self.assertRaisesRegex(ValueError, "exact supported recovery contract"):
+            parse_migration_descriptor(bytes(unknown_flags))
+
+        for label, offset in (
+            ("signed image", 20),
+            ("erased padding", len(image)),
+            ("v3 trailer", MIGRATION_V3_TRAILER_OFFSET),
+            ("embedded signature", MIGRATION_V3_TRAILER_OFFSET + 16),
+            ("trailer CRC", len(package) - 1),
+        ):
+            with self.subTest(label=label):
+                corrupted = bytearray(package)
+                corrupted[offset] ^= 1
+                with self.assertRaises(ValueError):
+                    inspect_migration_package(bytes(corrupted), signature, version)
+
+        with self.assertRaisesRegex(ValueError, "detached signature"):
+            inspect_migration_package(package, bytes(64), version)
+
+    def test_firmware_workflow_keeps_migration_release_draft_for_hil(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "firmware.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("build_updater_migration_package.py inspect", workflow)
+        self.assertIn(
+            "kbhe-updater-v2-to-v3.bin.sig deliberately authenticates the exact",
+            workflow,
+        )
+        self.assertIn("! -name 'kbhe-updater-v2-to-v3.bin'", workflow)
+        self.assertIn("draft: true", workflow)
+        self.assertNotIn("--draft=false", workflow)
 
 
 if __name__ == "__main__":

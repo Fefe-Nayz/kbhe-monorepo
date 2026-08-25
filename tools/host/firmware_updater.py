@@ -49,6 +49,7 @@ STATUS_NAMES = {
 
 PROTOCOL_VERSION = 0x0003
 UPDATER_FLAG_SIGNATURE_REQUIRED = 1 << 2
+UPDATER_KNOWN_FLAGS = (1 << 0) | (1 << 1) | UPDATER_FLAG_SIGNATURE_REQUIRED
 FIRMWARE_SIGNATURE_SIZE = 64
 FLASH_WRITE_ALIGN = 4
 UPDATER_APP_BASE = 0x08010000
@@ -190,17 +191,19 @@ def verify_firmware_signature(firmware, firmware_version, signature_path):
 
 
 def read_default_fw_version():
-    settings_path = (
+    version_header_path = (
         pathlib.Path(__file__).resolve().parents[2]
         / "firmware"
         / "Core"
-        / "Src"
-        / "settings.c"
+        / "Inc"
+        / "firmware_version.h"
     )
-    if not settings_path.exists():
-        raise RuntimeError("could not locate firmware/Core/Src/settings.c for firmware version autodetect")
+    if not version_header_path.exists():
+        raise RuntimeError(
+            "could not locate firmware/Core/Inc/firmware_version.h for firmware version autodetect"
+        )
 
-    text = settings_path.read_text(encoding="utf-8", errors="replace")
+    text = version_header_path.read_text(encoding="utf-8", errors="replace")
     components = []
     for name in ("MAJOR", "MINOR", "PATCH"):
         match = re.search(
@@ -209,7 +212,7 @@ def read_default_fw_version():
         )
         if not match:
             raise RuntimeError(
-                f"could not parse FIRMWARE_VERSION_{name} from firmware/Core/Src/settings.c"
+                f"could not parse FIRMWARE_VERSION_{name} from firmware/Core/Inc/firmware_version.h"
             )
         component = int(match.group(1), 0)
         if not 0 <= component <= 0xFF:
@@ -469,9 +472,14 @@ def require_ok(response, expected_command):
 
 
 def parse_hello_payload(payload):
-    if len(payload) < 20:
-        raise RuntimeError("HELLO payload too short")
-    return struct.unpack("<HHIII4B", payload[:20])
+    if len(payload) != 20:
+        raise RuntimeError(
+            f"HELLO payload has {len(payload)} bytes; expected exactly 20"
+        )
+    parsed = struct.unpack("<HHIII4B", payload)
+    if parsed[-1] != 0:
+        raise RuntimeError("HELLO reserved byte is non-zero")
+    return parsed
 
 
 def flash_firmware(
@@ -543,6 +551,11 @@ def flash_firmware(
             )
         if not (flags & UPDATER_FLAG_SIGNATURE_REQUIRED):
             raise RuntimeError("updater does not enforce signed firmware")
+        unknown_flags = flags & ~UPDATER_KNOWN_FLAGS
+        if unknown_flags:
+            raise RuntimeError(
+                f"updater advertises unknown flags 0x{unknown_flags:04X}"
+            )
         if len(firmware) > app_max_size:
             raise RuntimeError(
                 f"firmware is too large ({len(firmware)} bytes), updater max is {app_max_size} bytes"
@@ -696,7 +709,7 @@ def parse_args():
         "--fw-version",
         type=lambda value: int(value, 0),
         default=None,
-        help="Packed 0xMMmmpp firmware version (default: read MAJOR/MINOR/PATCH from settings.c)",
+        help="Packed 0xMMmmpp firmware version (default: read MAJOR/MINOR/PATCH from firmware_version.h)",
     )
     parser.add_argument(
         "--signature",

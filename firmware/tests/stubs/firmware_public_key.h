@@ -1,0 +1,16 @@
+#ifndef FIRMWARE_PUBLIC_KEY_H_
+#define FIRMWARE_PUBLIC_KEY_H_
+
+#include <stdint.h>
+
+/* RFC 8032 test key. Protocol tests own the matching public seed and can
+ * therefore construct several independently signed images; production builds
+ * never include this stub. */
+static const uint8_t KBHE_FIRMWARE_RELEASE_PUBLIC_KEY[32] = {
+    0xD7u, 0x5Au, 0x98u, 0x01u, 0x82u, 0xB1u, 0x0Au, 0xB7u,
+    0xD5u, 0x4Bu, 0xFEu, 0xD3u, 0xC9u, 0x64u, 0x07u, 0x3Au,
+    0x0Eu, 0xE1u, 0x72u, 0xF3u, 0xDAu, 0xA6u, 0x23u, 0x25u,
+    0xAFu, 0x02u, 0x1Au, 0x68u, 0xF7u, 0x07u, 0x51u, 0x1Au,
+};
+
+#endif /* FIRMWARE_PUBLIC_KEY_H_ */

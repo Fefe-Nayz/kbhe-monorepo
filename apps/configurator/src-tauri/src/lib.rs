@@ -3,6 +3,7 @@ mod commands;
 mod releases;
 mod signing;
 mod startup;
+mod updater_compat;
 mod volume;
 
 use tauri::{

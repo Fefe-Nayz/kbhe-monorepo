@@ -239,18 +239,18 @@ function Update-FirmwareVersionFile {
     )
 
     Write-Step "Updating firmware version defines to $Version"
-    $settingsPath = Join-Path $RepoRoot "firmware/Core/Src/settings.c"
+    $versionHeaderPath = Join-Path $RepoRoot "firmware/Core/Inc/firmware_version.h"
     $parsed = Parse-SemVer -Value $Version
     if ($parsed.Major -gt 255 -or $parsed.Minor -gt 255 -or $parsed.Patch -gt 255) {
         throw "Firmware version components must fit one byte: $Version"
     }
-    Replace-FirstMatchInFile -Path $settingsPath `
+    Replace-FirstMatchInFile -Path $versionHeaderPath `
         -Pattern '^(#define\s+FIRMWARE_VERSION_MAJOR\s+)\d+u\s*$' `
         -Replacement ('${1}' + $parsed.Major + 'u') -Label "FIRMWARE_VERSION_MAJOR"
-    Replace-FirstMatchInFile -Path $settingsPath `
+    Replace-FirstMatchInFile -Path $versionHeaderPath `
         -Pattern '^(#define\s+FIRMWARE_VERSION_MINOR\s+)\d+u\s*$' `
         -Replacement ('${1}' + $parsed.Minor + 'u') -Label "FIRMWARE_VERSION_MINOR"
-    Replace-FirstMatchInFile -Path $settingsPath `
+    Replace-FirstMatchInFile -Path $versionHeaderPath `
         -Pattern '^(#define\s+FIRMWARE_VERSION_PATCH\s+)\d+u\s*$' `
         -Replacement ('${1}' + $parsed.Patch + 'u') -Label "FIRMWARE_VERSION_PATCH"
 }
@@ -278,7 +278,7 @@ function Get-AppSourceVersion {
 function Get-FirmwareSourceVersion {
     param([string]$RepoRoot)
 
-    $content = Get-Content (Join-Path $RepoRoot "firmware/Core/Src/settings.c") -Raw
+    $content = Get-Content (Join-Path $RepoRoot "firmware/Core/Inc/firmware_version.h") -Raw
     $parts = @{}
     foreach ($name in @("MAJOR", "MINOR", "PATCH")) {
         $match = [Regex]::Match($content, "(?m)^#define\s+FIRMWARE_VERSION_$name\s+(\d+)u\s*$")
@@ -418,7 +418,7 @@ function Get-AllowedReleasePaths {
         }
     }
     if ($TargetChoice -in @("firmware", "both")) {
-        $paths.Add("firmware/Core/Src/settings.c")
+        $paths.Add("firmware/Core/Inc/firmware_version.h")
     }
     return @($paths)
 }
@@ -690,10 +690,13 @@ foreach ($tag in $plannedTags) {
     Assert-TagAndReleaseDoNotExist -RepoRoot $repoRoot -Tag $tag
 }
 
-Write-Step "Protected publication plan"
+Write-Step "Protected release tag plan"
 Write-Host "Commit: $releaseCommit"
 Write-Host "Tags: $($plannedTags -join ', ')"
 Write-Host "The signing preflight requires independent GitHub environment approval and exposes no key to local tooling."
+if ($needsFirmware) {
+    Write-Host "Firmware tag CI will leave an authenticated draft. Publishing it requires the documented destructive v2-to-v3 HIL gate."
+}
 if (-not (Confirm-Action -Prompt "Dispatch signing preflight and wait for all protected jobs?")) {
     throw "Aborted before signing preflight."
 }
@@ -721,4 +724,8 @@ Write-Host "Release tags were pushed only after main CI and protected signing pr
     -ForegroundColor Green
 foreach ($tag in $plannedTags) {
     Write-Host "Created tag: $tag"
+}
+if ($needsFirmware) {
+    Write-Host "The firmware release remains a draft until recovery-equipped migration HIL passes; CI does not publish it automatically." `
+        -ForegroundColor Yellow
 }

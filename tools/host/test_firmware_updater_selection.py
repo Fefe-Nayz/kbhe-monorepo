@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import pathlib
+import struct
 import sys
+import tempfile
 import types
 import unittest
 from unittest import mock
@@ -20,6 +22,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import firmware_updater
 import firmware_auto_retry
+from kbhe_tool import firmware as kbhe_tool_firmware
 
 
 def candidate(kind: str, serial: str | None, path: bytes) -> dict:
@@ -32,6 +35,38 @@ def candidate(kind: str, serial: str | None, path: bytes) -> dict:
 
 
 class FirmwareUpdaterSelectionTest(unittest.TestCase):
+    def test_updater_hello_parser_is_exact_and_reserved_zero(self) -> None:
+        hello = struct.pack(
+            "<HHIII4B",
+            firmware_updater.PROTOCOL_VERSION,
+            firmware_updater.UPDATER_FLAG_SIGNATURE_REQUIRED,
+            firmware_updater.UPDATER_APP_BASE,
+            firmware_updater.UPDATER_APP_MAX_IMAGE_SIZE,
+            firmware_updater.FLASH_WRITE_ALIGN,
+            2,
+            0,
+            8,
+            0,
+        )
+        self.assertEqual(len(firmware_updater.parse_hello_payload(hello)), 9)
+        with self.assertRaisesRegex(RuntimeError, "exactly 20"):
+            firmware_updater.parse_hello_payload(hello + b"\x00")
+        with self.assertRaisesRegex(RuntimeError, "reserved byte"):
+            firmware_updater.parse_hello_payload(hello[:-1] + b"\x01")
+
+    def test_repo_version_consumers_use_canonical_header(self) -> None:
+        cli_version = firmware_updater.read_default_fw_version()
+        self.assertEqual(kbhe_tool_firmware._read_repo_firmware_version(), cli_version)
+
+        with tempfile.TemporaryDirectory(prefix="kbhe-version-source-") as raw_dir:
+            firmware_path = pathlib.Path(raw_dir) / "no-version.bin"
+            firmware_path.write_bytes(bytes(32))
+            resolved, source = kbhe_tool_firmware.resolve_firmware_version(
+                firmware_path
+            )
+        self.assertEqual(resolved, cli_version)
+        self.assertIn("firmware/Core/Inc/firmware_version.h", source)
+
     def test_same_serial_is_followed_across_reenumeration(self) -> None:
         runtime = candidate("runtime", "TARGET", b"runtime-target")
         updater = candidate("updater", "TARGET", b"updater-target")

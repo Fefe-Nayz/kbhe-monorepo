@@ -9,6 +9,7 @@
 #include "analog/filter.h"
 #include "analog/lut.h"
 #include "flash_storage.h"
+#include "firmware_version.h"
 #include "profile_document_store.h"
 #include "settings_save_policy.h"
 #include "layout/keycodes.h"
@@ -25,28 +26,7 @@
 //--------------------------------------------------------------------+
 // Firmware Version (semver: major.minor.patch)
 //--------------------------------------------------------------------+
-#define FIRMWARE_VERSION_MAJOR 2u
-#define FIRMWARE_VERSION_MINOR 0u
-#define FIRMWARE_VERSION_PATCH 8u
-#define FIRMWARE_VERSION_PACKED                                                \
-  (((uint32_t)FIRMWARE_VERSION_MAJOR << 16) |                                  \
-   ((uint32_t)FIRMWARE_VERSION_MINOR << 8) |                                   \
-   ((uint32_t)FIRMWARE_VERSION_PATCH))
-
-#define KBHE_FW_VERSION_RECORD_MAGIC 0x4B465756u
-
-typedef struct __attribute__((packed)) {
-  uint32_t magic;
-  uint32_t version_packed; // (major << 16) | (minor << 8) | patch
-  uint32_t version_xor;    // version_packed ^ 0xFFFFFFFFu
-} kbhe_fw_version_record_t;
-
-__attribute__((used, section(".kbhe_fw_version")))
-static const kbhe_fw_version_record_t g_kbhe_fw_version_record = {
-    .magic = KBHE_FW_VERSION_RECORD_MAGIC,
-    .version_packed = FIRMWARE_VERSION_PACKED,
-    .version_xor = (uint32_t)(FIRMWARE_VERSION_PACKED ^ 0xFFFFFFFFu),
-};
+KBHE_DECLARE_FIRMWARE_VERSION_RECORD(g_kbhe_fw_version_record);
 
 //--------------------------------------------------------------------+
 // Internal Variables

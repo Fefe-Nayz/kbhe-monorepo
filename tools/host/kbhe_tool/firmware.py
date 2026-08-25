@@ -29,17 +29,17 @@ _RELEASE_NEXT_FN_PREFIXES = (
 
 
 def _read_repo_firmware_version() -> int | None:
-    settings_path = (
+    version_header_path = (
         pathlib.Path(__file__).resolve().parents[3]
         / "firmware"
         / "Core"
-        / "Src"
-        / "settings.c"
+        / "Inc"
+        / "firmware_version.h"
     )
-    if not settings_path.exists():
+    if not version_header_path.exists():
         return None
 
-    text = settings_path.read_text(encoding="utf-8", errors="replace")
+    text = version_header_path.read_text(encoding="utf-8", errors="replace")
     values = []
     for name in ("MAJOR", "MINOR", "PATCH"):
         match = re.search(
@@ -303,7 +303,7 @@ def resolve_firmware_version(firmware_path: str | pathlib.Path, explicit_version
     repo_version = _read_repo_firmware_version()
     if repo_version is not None:
         suffix = "after ambiguous binary signature" if code_signature_error is not None else "repo source fallback"
-        return repo_version, f"firmware/Core/Src/settings.c ({suffix})"
+        return repo_version, f"firmware/Core/Inc/firmware_version.h ({suffix})"
 
     if code_signature_error is not None:
         raise code_signature_error

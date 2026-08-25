@@ -1,6 +1,6 @@
 # Release Model
 
-The monorepo uses tag prefixes to publish the right assets:
+The monorepo uses tag prefixes to build and stage the right assets:
 
 - `firmware-vX.Y.Z`: builds firmware and uploads `.bin`, `.hex`, `.elf`, `.map`, the detached `kbhe-app.bin.sig`, and a bootable signed `kbhe-factory.bin` image.
 - `app-vX.Y.Z`: builds the Tauri configurator installer and uploads a matching `<installer>.sig` authentication asset.
@@ -120,11 +120,15 @@ The workflows split validation, code signing and publication:
 - **Push to `main` / pull request**: CI runs (frontend tests/lint/build, `cargo check --locked` and `cargo test --locked` for the configurator; all native tests plus both ARM builds for firmware). **No release is created.**
 - **Protected signing preflight**: validates all selected key pairs and the
   mode-appropriate Authenticode path without publishing anything.
-- **Push of an `app-v*` or `firmware-v*` tag**: CI runs **and** the protected
-  release jobs build, authenticate and publish the artifacts.
+- **Push of an `app-v*` tag**: CI runs **and** the protected release jobs build,
+  authenticate and publish the installer artifacts.
+- **Push of a `firmware-v*` tag**: CI builds, signs, uploads and remotely
+  verifies an authenticated **draft**. Publication remains a manual action
+  after recovery-equipped updater-migration HIL.
 
-This means a green CI run on `main` does **not** mean a release exists — the
-release only appears after the matching tag is pushed.
+This means a green CI run on `main` does **not** mean a release exists. An app
+release appears after its tag succeeds; a firmware tag initially produces only
+a verified draft.
 
 ## Canonical release automation
 
@@ -284,7 +288,7 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
 ### Pre-push checklist
 
 1. **Bump firmware version constants** in
-   [`firmware/Core/Src/settings.c`](../firmware/Core/Src/settings.c) so they
+   [`firmware/Core/Inc/firmware_version.h`](../firmware/Core/Inc/firmware_version.h) so they
    match the tag you're about to push:
 
    ```c
@@ -323,7 +327,7 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
    git push origin firmware-vX.Y.Z
    ```
 
-6. The release appears at
+6. CI creates and remotely verifies a **draft** release at
    `https://github.com/<owner>/<repo>/releases/tag/firmware-vX.Y.Z` with
    `kbhe-app.bin` plus `kbhe-app.bin.sig`. The signature binds the exact image
    length, CRC32, SHA-512 digest and firmware version from the tag. Every other
@@ -366,10 +370,24 @@ the USB updater erase range but is not protected against an attached hardware
 debugger. Physical production locking, if desired, must be a separate and
 carefully validated manufacturing step.
 
-Firmware publication uses the same draft boundary: every remote asset is
-downloaded and SHA-256-compared with the locally authenticated artifact before
-the draft can become public. Release jobs for one tag are serialized so a
-concurrent retry cannot replace assets between verification and publication.
+Firmware publication has an additional destructive-HIL boundary: every remote
+asset is downloaded and SHA-256-compared with the locally authenticated
+artifact, then CI intentionally leaves the release as a draft. On a recovery-
+equipped keyboard, validate the complete legacy `v2 -> signed migrator -> v3 ->
+final application` path, both option-byte changes, repeated resets and the
+documented recovery path. The exact authenticated-draft download, local
+signature inspection, native sibling-asset flow and required evidence are in
+[Updater compatibility and v2-to-v3 migration](firmware/UPDATER_COMPATIBILITY.md#manual-hil-publication-gate).
+Only after recording that evidence may a release operator publish the
+already-verified draft:
+
+```powershell
+gh release edit firmware-vX.Y.Z --draft=false --repo Fefe-Nayz/kbhe-monorepo
+```
+
+Release jobs for one tag are serialized so a concurrent retry cannot replace
+assets during draft verification. Never use the publish command merely because
+the software-only CI is green.
 
 ### Re-running the firmware build
 
@@ -398,7 +416,8 @@ installer built without them will check the default repository.
 | Tag pushed but the release job didn't run | The tag does not match the exact `app-v*` / `firmware-v*` prefix or the workflow is disabled | Check the tag spelling and the Actions run list; `workflow_dispatch` can be used for diagnostics but does not bypass release guards |
 | In-app "Application is up to date" despite a new release | `KBHE_RELEASE_OWNER`/`KBHE_RELEASE_REPO` defaults point at the wrong repo, or the asset extension is not `.exe`/`.msi` on Windows | Check the compiled-in defaults in `releases.rs`, and confirm the authenticated publish job uploaded the expected installer |
 | In-app firmware update always shown as available | The keyboard reports a version that doesn't match the published tag (e.g. flashed firmware was built before the constants were bumped) | Re-flash the keyboard with a build whose `FIRMWARE_VERSION_*` constants match the tag you published, or bump source + tag together |
-| Updater protocol mismatch error after flashing | The bootloader on the keyboard is older than the configurator's `UPDATER_PROTOCOL_VERSION` | Verify and flash the matching `kbhe-factory.bin` at `0x08000000` with ST-Link/STM32CubeProgrammer; this updates bootloader, app and signed trailer together |
+| `UPDATER_MIGRATION_REQUIRED` before flashing | The keyboard reports updater v2 and the selected file is the normal v3 application; flashing it through v2 would invalidate the legacy trailer when sector-6 storage starts | Use only a published, signed `kbhe-updater-v2-to-v3.bin` after its HIL release gate is enabled; until then verify and flash `kbhe-factory.bin` at `0x08000000` with ROM DFU or ST-Link |
+| `UPDATER_PROTOCOL_UNSUPPORTED` / `UPDATER_GEOMETRY_UNSUPPORTED` | HELLO reports an unknown protocol or unexpected flash layout | Do not force the transfer. Match the device to a documented migration/factory release and preserve the old application with ABORT/BOOT |
 | Firmware signing fails | `KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64` is absent, malformed, or does not match the committed firmware public key | Correct the `firmware-release` environment secret and rerun signing preflight; never weaken the verifier |
 | App detached signing fails | `KBHE_APP_RELEASE_SIGNING_KEY_B64` is absent, malformed, or does not match the committed app public key | Correct the `app-publish` environment secret and rerun signing preflight |
 | Authenticode signing or verification fails | PFX/password, mode, expected thumbprint and committed public certificate disagree; the certificate lacks code-signing EKU/validity; or required `public-ca` RFC3161 timestamping failed | Correct `app-codesign` and mirror its mode/thumbprint variables in `app-publish`, then require a green signing preflight before creating another version tag |

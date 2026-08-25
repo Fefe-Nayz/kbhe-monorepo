@@ -1,4 +1,7 @@
 #include "updater_bootloader.h"
+#include "firmware_public_key.h"
+#include "monocypher-ed25519.h"
+#include "updater_migration.h"
 #include "updater_shared.h"
 #include "updater_version_floor.h"
 
@@ -6,6 +9,7 @@
 
 #include <ctype.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +24,7 @@
 #endif
 
 #define FIXTURE_IMAGE_SIZE 64u
+#define MIGRATION_FIXTURE_IMAGE_SIZE 256u
 
 #define CHECK(condition)                                                       \
   do {                                                                         \
@@ -52,6 +57,27 @@ static uint32_t s_erase_successes;
 static uint32_t s_program_attempts;
 static uint32_t s_program_successes;
 static uint8_t s_next_sequence;
+static const uint8_t s_test_signing_seed[32] = {
+    0x9Du, 0x61u, 0xB1u, 0x9Du, 0xEFu, 0xFDu, 0x5Au, 0x60u,
+    0xBAu, 0x84u, 0x4Au, 0xF4u, 0x92u, 0xECu, 0x2Cu, 0xC4u,
+    0x44u, 0x49u, 0xC5u, 0x69u, 0x7Bu, 0x32u, 0x69u, 0x19u,
+    0x70u, 0x3Bu, 0xACu, 0x03u, 0x1Cu, 0xAEu, 0x7Fu, 0x60u,
+};
+
+static void sign_test_manifest(updater_signature_manifest_t *manifest,
+                               uint8_t signature[UPDATER_SIGNATURE_SIZE]) {
+  uint8_t seed[sizeof(s_test_signing_seed)];
+  uint8_t secret_key[64];
+  uint8_t public_key[32];
+  memcpy(seed, s_test_signing_seed, sizeof(seed));
+  crypto_ed25519_key_pair(secret_key, public_key, seed);
+  CHECK(memcmp(public_key, KBHE_FIRMWARE_RELEASE_PUBLIC_KEY,
+               sizeof(public_key)) == 0);
+  crypto_ed25519_sign(signature, secret_key, (const uint8_t *)manifest,
+                      sizeof(*manifest));
+  crypto_wipe(seed, sizeof(seed));
+  crypto_wipe(secret_key, sizeof(secret_key));
+}
 
 static bool flash_range_is_valid(uint32_t address, uint32_t len) {
   if (address < UPDATER_APP_BASE || len > UPDATER_APP_SLOT_SIZE) {
@@ -224,8 +250,7 @@ static signing_fixture_t load_signing_fixture(void) {
                    sizeof(fixture.image));
   decode_named_hex(firmware_section, "\"manifestHex\"",
                    (uint8_t *)&fixture.manifest, sizeof(fixture.manifest));
-  decode_named_hex(firmware_section, "\"signatureHex\"", fixture.signature,
-                   sizeof(fixture.signature));
+  sign_test_manifest(&fixture.manifest, fixture.signature);
   return fixture;
 }
 
@@ -338,6 +363,133 @@ static updater_packet_t send_data(const uint8_t *image, uint32_t offset,
     *request_out = request;
   }
   return exchange(&request);
+}
+
+static void install_signed_test_image(const uint8_t *image,
+                                      uint32_t image_size,
+                                      updater_fw_version_t version) {
+  updater_signature_manifest_t manifest;
+  updater_trailer_t trailer;
+  uint8_t signature[UPDATER_SIGNATURE_SIZE];
+  uint32_t crc = updater_crc32_compute(image, image_size);
+
+  CHECK(image != NULL);
+  CHECK(image_size <= UPDATER_APP_MAX_IMAGE_SIZE);
+  updater_signature_manifest_prepare(&manifest, image, image_size, crc,
+                                     version);
+  sign_test_manifest(&manifest, signature);
+  updater_trailer_prepare(&trailer, image_size, crc, version, signature);
+  memset(s_flash, 0xff, sizeof(s_flash));
+  memcpy(s_flash, image, image_size);
+  memcpy(&s_flash[UPDATER_TRAILER_ADDR - UPDATER_APP_BASE], &trailer,
+         sizeof(trailer));
+  crypto_wipe(&manifest, sizeof(manifest));
+  crypto_wipe(signature, sizeof(signature));
+}
+
+static void build_migration_test_image(
+    uint8_t image[MIGRATION_FIXTURE_IMAGE_SIZE]) {
+  updater_migration_descriptor_t descriptor = {0};
+  const uint32_t initial_sp = UPDATER_RAM_END;
+  const uint32_t migrator_reset = UPDATER_APP_BASE + 9u;
+  const uint32_t bootloader_reset = UPDATER_BOOTLOADER_BASE + 9u;
+  const uint32_t bootloader_offset = 64u;
+  const uint32_t bootloader_size = 64u;
+  const uint8_t magic[8] = UPDATER_MIGRATION_DESCRIPTOR_MAGIC_BYTES;
+  const uint8_t target_id[16] = UPDATER_MIGRATION_TARGET_ID_BYTES;
+
+  memset(image, 0xff, MIGRATION_FIXTURE_IMAGE_SIZE);
+  memcpy(image, &initial_sp, sizeof(initial_sp));
+  memcpy(image + sizeof(initial_sp), &migrator_reset,
+         sizeof(migrator_reset));
+  memcpy(image + bootloader_offset, &initial_sp, sizeof(initial_sp));
+  memcpy(image + bootloader_offset + sizeof(initial_sp), &bootloader_reset,
+         sizeof(bootloader_reset));
+
+  memcpy(descriptor.magic, magic, sizeof(descriptor.magic));
+  descriptor.schema = UPDATER_MIGRATION_DESCRIPTOR_SCHEMA;
+  descriptor.descriptor_size = sizeof(descriptor);
+  descriptor.source_protocol = UPDATER_MIGRATION_SOURCE_PROTOCOL;
+  descriptor.target_protocol = UPDATER_MIGRATION_TARGET_PROTOCOL;
+  descriptor.flags = UPDATER_MIGRATION_REQUIRED_FLAGS;
+  descriptor.bootloader_offset = bootloader_offset;
+  descriptor.bootloader_size = bootloader_size;
+  descriptor.bootloader_crc32 =
+      updater_crc32_compute(image + bootloader_offset, bootloader_size);
+  descriptor.image_size = MIGRATION_FIXTURE_IMAGE_SIZE;
+  memcpy(descriptor.target_id, target_id, sizeof(descriptor.target_id));
+  crypto_sha512(descriptor.bootloader_sha512, image + bootloader_offset,
+                bootloader_size);
+  descriptor.descriptor_crc32 = updater_crc32_compute(
+      &descriptor,
+      offsetof(updater_migration_descriptor_t, descriptor_crc32));
+  memcpy(image + MIGRATION_FIXTURE_IMAGE_SIZE - sizeof(descriptor),
+         &descriptor, sizeof(descriptor));
+}
+
+static void test_equal_version_migration_replacement(
+    const signing_fixture_t *final_app) {
+  uint8_t migration_image[MIGRATION_FIXTURE_IMAGE_SIZE];
+  updater_trailer_t installed;
+  updater_packet_t response;
+  updater_fw_version_t version = {
+      .major = final_app->manifest.fw_version_major,
+      .minor = final_app->manifest.fw_version_minor,
+      .patch = final_app->manifest.fw_version_patch,
+  };
+
+  simulated_power_on(true);
+  CHECK(updater_version_floor_prepare(version) == UPDATER_VERSION_FLOOR_OK);
+  build_migration_test_image(migration_image);
+  install_signed_test_image(migration_image, sizeof(migration_image), version);
+  simulated_power_on(false);
+  CHECK(updater_read_trailer(&installed));
+  CHECK(updater_is_app_image_valid_with_trailer(&installed));
+  CHECK(updater_app_has_valid_migration_descriptor(&installed));
+
+  /* The signed final application may replace a signed migrator with the exact
+   * same release version. This is the only equal-version exception. */
+  response = send_authorization(final_app, false, false);
+  CHECK(response.status == UPDATER_STATUS_OK);
+
+  install_signed_test_image(final_app->image, sizeof(final_app->image), version);
+  simulated_power_on(false);
+  CHECK(updater_read_trailer(&installed));
+  CHECK(updater_is_app_image_valid_with_trailer(&installed));
+  CHECK(!updater_app_has_valid_migration_descriptor(&installed));
+  response = send_authorization(final_app, false, false);
+  CHECK(response.status == UPDATER_STATUS_ROLLBACK_REJECTED);
+
+  /* Even an authenticated image with a near-miss descriptor cannot unlock the
+   * exception. Re-signing here models a release-key-authorized but malformed
+   * migration artifact. */
+  build_migration_test_image(migration_image);
+  migration_image[sizeof(migration_image) - 1u] ^= 1u;
+  install_signed_test_image(migration_image, sizeof(migration_image), version);
+  simulated_power_on(false);
+  CHECK(updater_read_trailer(&installed));
+  CHECK(updater_is_app_image_valid_with_trailer(&installed));
+  CHECK(!updater_app_has_valid_migration_descriptor(&installed));
+  response = send_authorization(final_app, false, false);
+  CHECK(response.status == UPDATER_STATUS_ROLLBACK_REJECTED);
+
+  /* Unknown signed descriptor capabilities are also fail-closed. Recompute
+   * the descriptor CRC so the rejection specifically covers the flag set. */
+  build_migration_test_image(migration_image);
+  updater_migration_descriptor_t *descriptor =
+      (updater_migration_descriptor_t *)&migration_image[
+          sizeof(migration_image) - sizeof(updater_migration_descriptor_t)];
+  descriptor->flags |= 1u << 31;
+  descriptor->descriptor_crc32 = updater_crc32_compute(
+      descriptor,
+      offsetof(updater_migration_descriptor_t, descriptor_crc32));
+  install_signed_test_image(migration_image, sizeof(migration_image), version);
+  simulated_power_on(false);
+  CHECK(updater_read_trailer(&installed));
+  CHECK(updater_is_app_image_valid_with_trailer(&installed));
+  CHECK(!updater_app_has_valid_migration_descriptor(&installed));
+  response = send_authorization(final_app, false, false);
+  CHECK(response.status == UPDATER_STATUS_ROLLBACK_REJECTED);
 }
 
 static void test_real_manifest_encoder(const signing_fixture_t *fixture) {
@@ -722,6 +874,7 @@ int main(void) {
   test_authentication_gate_and_malformed_packets(&fixture);
   test_power_cut_recovery_and_complete_update(&fixture);
   test_flash_failures_and_abort(&fixture);
+  test_equal_version_migration_replacement(&fixture);
 
   puts("updater_bootloader_protocol_test: ok");
   return EXIT_SUCCESS;

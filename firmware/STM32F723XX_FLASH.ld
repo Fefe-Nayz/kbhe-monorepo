@@ -66,6 +66,9 @@ FLASH (rx)     : ORIGIN = 0x08010000, LENGTH = 0x2FF00
  * image that barely links and cannot absorb security or recovery fixes. */
 ASSERT(__data_source_end <= ORIGIN(FLASH) + LENGTH(FLASH) - 8192,
        "kbhe firmware exceeds FLASH budget (8 KiB headroom required)")
+ASSERT(!DEFINED(KBHE_MIGRATOR_BUILD) ||
+       __data_source_end <= ORIGIN(FLASH) + 0x10000,
+       "updater migrator executable must fit entirely in sector 4")
 
 /* Highest address of the user mode stack */
 _estack = ORIGIN(RAM) + LENGTH(RAM);    /* end of RAM */

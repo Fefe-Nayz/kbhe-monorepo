@@ -1,10 +1,16 @@
-use crate::signing::{firmware_manifest, verify_firmware_asset};
+use crate::signing::firmware_manifest;
+use crate::updater_compat::{
+    inspect_firmware_artifact, negotiate_flash_protocol, parse_updater_hello, FirmwareArtifact,
+    FlashProtocol, UpdaterHello, UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3,
+    UPDATER_V2_APP_MAX_IMAGE_SIZE,
+};
 use hidapi::{DeviceInfo, HidApi, HidDevice};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex, MutexGuard,
@@ -1710,11 +1716,7 @@ const UPDATER_CMD_AUTH: u8 = 0x07;
 const UPDATER_STATUS_OK: u8 = 0x00;
 const APP_CMD_ENTER_BOOTLOADER: u8 = 0x02;
 const DATA_CHUNK_SIZE: usize = 56;
-const UPDATER_PROTOCOL_VERSION: u16 = 0x0003;
-const UPDATER_FLAG_SIGNATURE_REQUIRED: u16 = 1 << 2;
 const FIRMWARE_SIGNATURE_SIZE: usize = 64;
-const UPDATER_APP_BASE: u32 = 0x0801_0000;
-const UPDATER_APP_MAX_IMAGE_SIZE: u32 = 0x0002_FF00;
 const UPDATER_TIMEOUT_MIN_MS: u64 = 1_000;
 const UPDATER_TIMEOUT_MAX_MS: u64 = 30_000;
 const UPDATER_RETRIES_MIN: u32 = 1;
@@ -1936,6 +1938,8 @@ pub struct FirmwareVersion {
 pub async fn kbhe_flash_firmware(
     firmware_path: String,
     firmware_signature_path: String,
+    migration_firmware_path: Option<String>,
+    migration_firmware_signature_path: Option<String>,
     firmware_version: FirmwareVersion,
     expected_serial_number: String,
     timeout_ms: u64,
@@ -1972,6 +1976,8 @@ pub async fn kbhe_flash_firmware(
         kbhe_flash_firmware_blocking(
             firmware_path,
             firmware_signature_path,
+            migration_firmware_path,
+            migration_firmware_signature_path,
             firmware_version,
             expected_serial_number,
             timeout_ms,
@@ -2014,47 +2020,155 @@ fn read_bounded_file(path: &str, label: &str, maximum_size: u64) -> Result<Vec<u
     Ok(bytes)
 }
 
+struct PreparedFlashArtifact {
+    firmware: Vec<u8>,
+    padded: Vec<u8>,
+    signature: Vec<u8>,
+    artifact: FirmwareArtifact,
+    image_crc32: u32,
+    version: FirmwareVersion,
+    total: u32,
+}
+
+fn prepare_flash_artifact(
+    firmware_path: &str,
+    signature_path: &str,
+    version: FirmwareVersion,
+    label: &str,
+) -> Result<PreparedFlashArtifact, String> {
+    let firmware = read_bounded_file(
+        firmware_path,
+        label,
+        u64::from(UPDATER_V2_APP_MAX_IMAGE_SIZE),
+    )?;
+    let signature = read_bounded_file(
+        signature_path,
+        &format!("{label} signature"),
+        FIRMWARE_SIGNATURE_SIZE as u64,
+    )?;
+    if signature.len() != FIRMWARE_SIGNATURE_SIZE {
+        return Err(format!(
+            "{label} signature has {} bytes; expected {FIRMWARE_SIGNATURE_SIZE}",
+            signature.len()
+        ));
+    }
+    let artifact = inspect_firmware_artifact(
+        &firmware,
+        [version.major, version.minor, version.patch],
+        &signature,
+    )?;
+    let aligned_len = (firmware.len() + 3) & !3;
+    let mut padded = firmware.clone();
+    padded.resize(aligned_len, 0xFF);
+    let image_crc32 = crc32_compute(&firmware);
+    let total = u32::try_from(firmware.len())
+        .map_err(|_| format!("{label} length exceeds the updater protocol"))?;
+    Ok(PreparedFlashArtifact {
+        firmware,
+        padded,
+        signature,
+        artifact,
+        image_crc32,
+        version,
+        total,
+    })
+}
+
+fn discover_sibling_migration_assets(
+    firmware_path: &str,
+) -> Result<Option<(String, String)>, String> {
+    let firmware_path = Path::new(firmware_path);
+    if firmware_path.file_name().and_then(|name| name.to_str()) != Some("kbhe-app.bin") {
+        return Ok(None);
+    }
+    let Some(parent) = firmware_path.parent() else {
+        return Ok(None);
+    };
+    let migration = parent.join("kbhe-updater-v2-to-v3.bin");
+    let migration_signature = parent.join("kbhe-updater-v2-to-v3.bin.sig");
+    let migration_present = migration.is_file();
+    let signature_present = migration_signature.is_file();
+    if migration_present != signature_present {
+        return Err(
+            "automatic updater migration found only one of kbhe-updater-v2-to-v3.bin and its detached signature"
+                .to_string(),
+        );
+    }
+    if !migration_present {
+        return Ok(None);
+    }
+    let migration = migration
+        .to_str()
+        .ok_or_else(|| "updater migration path is not valid Unicode".to_string())?;
+    let migration_signature = migration_signature
+        .to_str()
+        .ok_or_else(|| "updater migration signature path is not valid Unicode".to_string())?;
+    Ok(Some((
+        migration.to_string(),
+        migration_signature.to_string(),
+    )))
+}
+
 fn kbhe_flash_firmware_blocking(
     firmware_path: String,
     firmware_signature_path: String,
+    migration_firmware_path: Option<String>,
+    migration_firmware_signature_path: Option<String>,
     firmware_version: FirmwareVersion,
     expected_serial_number: String,
     timeout_ms: u64,
     retries: u32,
     app: AppHandle,
 ) -> Result<(), String> {
-    let firmware = read_bounded_file(
+    let primary = prepare_flash_artifact(
         &firmware_path,
-        "firmware",
-        u64::from(UPDATER_APP_MAX_IMAGE_SIZE),
-    )?;
-    let signature = read_bounded_file(
         &firmware_signature_path,
-        "firmware signature",
-        FIRMWARE_SIGNATURE_SIZE as u64,
+        firmware_version,
+        "firmware",
     )?;
-    if signature.len() != FIRMWARE_SIGNATURE_SIZE {
-        return Err(format!(
-            "firmware signature has {} bytes; expected {FIRMWARE_SIGNATURE_SIZE}",
-            signature.len()
-        ));
+    let (migration_firmware_path, migration_firmware_signature_path) =
+        match (migration_firmware_path, migration_firmware_signature_path) {
+            (None, None) => match discover_sibling_migration_assets(&firmware_path)? {
+                Some((path, signature_path)) => (Some(path), Some(signature_path)),
+                None => (None, None),
+            },
+            pair => pair,
+        };
+    let migration = match (
+        migration_firmware_path.as_deref(),
+        migration_firmware_signature_path.as_deref(),
+    ) {
+        (None, None) => None,
+        (Some(path), Some(signature_path)) => {
+            let candidate = prepare_flash_artifact(
+                path,
+                signature_path,
+                firmware_version,
+                "updater migration package",
+            )?;
+            if !matches!(candidate.artifact, FirmwareArtifact::V2ToV3Migration(_)) {
+                return Err(
+                    "UPDATER_ARTIFACT_MISMATCH: automatic migration input is not the signed kbhe-updater-v2-to-v3 package"
+                        .to_string(),
+                );
+            }
+            Some(candidate)
+        }
+        _ => {
+            return Err(
+                "automatic updater migration requires both the package and its detached signature"
+                    .to_string(),
+            )
+        }
+    };
+    if migration.is_some() && !matches!(primary.artifact, FirmwareArtifact::Application) {
+        return Err(
+            "UPDATER_ARTIFACT_MISMATCH: automatic migration requires the normal signed application as the final image"
+                .to_string(),
+        );
     }
 
-    let aligned_len = (firmware.len() + 3) & !3;
-    let mut padded = firmware.clone();
-    padded.resize(aligned_len, 0xFF);
-
-    let image_crc32 = crc32_compute(&firmware);
-    let fw_version = firmware_version;
-    verify_firmware_asset(
-        &firmware,
-        [fw_version.major, fw_version.minor, fw_version.patch],
-        &signature,
-    )
-    .map_err(|error| format!("firmware authenticity check failed before flashing: {error}"))?;
-    let total = firmware.len() as u32;
-
-    emit_flash_progress(&app, "connecting", 0, total);
+    emit_flash_progress(&app, "connecting", 0, primary.total);
 
     // Resolve one physical keyboard by its stable STM32 UID before sending any
     // device command. Runtime and updater expose the same USB serial number.
@@ -2114,173 +2228,264 @@ fn kbhe_flash_firmware_blocking(
     let device = open_device_by_path(&updater_info.path)?;
     verify_open_device_serial(&device, &expected_serial_number)?;
 
-    let result = flash_with_device(
-        &device,
-        &firmware,
-        &padded,
-        &signature,
-        image_crc32,
-        fw_version,
-        &app,
-        total,
-        timeout_ms,
-        retries,
-    );
+    // HELLO is the only command sent before the exact protocol, geometry and
+    // security contract have been accepted. Unknown/malformed responders are
+    // left untouched instead of guessing that ABORT/BOOT still have v2/v3
+    // semantics.
+    let initial_hello = read_updater_hello(&device, &app, primary.total, timeout_ms, retries)?;
 
-    if result.is_err() {
-        // Best-effort rollback to the previous valid app. BOOT safely refuses
-        // if BEGIN already erased it.
-        let cleanup_retries = retries.min(2);
-        let _ = updater_transact(
+    if initial_hello.protocol_version == UPDATER_PROTOCOL_V2 && migration.is_some() {
+        let migration = migration.as_ref().expect("migration was checked");
+        let protocol = negotiate_flash_protocol(initial_hello, &migration.artifact)?;
+        if let Err(error) = flash_after_hello(
             &device,
-            UPDATER_CMD_ABORT,
-            0xFF,
-            0,
-            &[],
-            cleanup_retries,
-            timeout_ms.min(1_000),
-        );
-        let _ = updater_transact(
+            initial_hello,
+            protocol,
+            migration,
+            &app,
+            timeout_ms,
+            retries,
+        ) {
+            cleanup_updater_session(&device, retries, timeout_ms);
+            return Err(error);
+        }
+        drop(device);
+
+        emit_flash_progress(&app, "migration", migration.total, migration.total);
+        let (v3_device, v3_hello) = wait_for_updater_protocol(
+            &expected_serial_number,
+            UPDATER_PROTOCOL_V3,
+            90_000,
+            &app,
+            primary.total,
+            timeout_ms,
+            retries,
+        )
+        .map_err(|error| {
+            format!(
+                "UPDATER_MIGRATION_INCOMPLETE: updater v3 for keyboard serial {expected_serial_number} did not become ready after the migrator ran: {error}. Keep the keyboard connected and use the documented ROM-DFU recovery if it no longer enumerates."
+            )
+        })?;
+        let protocol = negotiate_flash_protocol(v3_hello, &primary.artifact)
+            .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
+        emit_flash_progress(&app, "migrationReady", primary.total, primary.total);
+        if let Err(error) = flash_after_hello(
+            &v3_device, v3_hello, protocol, &primary, &app, timeout_ms, retries,
+        ) {
+            cleanup_updater_session(&v3_device, retries, timeout_ms);
+            return Err(error);
+        }
+        drop(v3_device);
+    } else {
+        let protocol = negotiate_flash_protocol(initial_hello, &primary.artifact)?;
+        if let Err(error) = flash_after_hello(
             &device,
-            UPDATER_CMD_BOOT,
-            0xFE,
-            0,
-            &[],
-            cleanup_retries,
-            timeout_ms.min(1_000),
-        );
+            initial_hello,
+            protocol,
+            &primary,
+            &app,
+            timeout_ms,
+            retries,
+        ) {
+            cleanup_updater_session(&device, retries, timeout_ms);
+            return Err(error);
+        }
+        drop(device);
     }
 
-    result?;
-
-    // Wait for updater to disconnect then app to come back
-    let _ = wait_for_device_absent(|| find_updater_device(&expected_serial_number), 10_000);
-    wait_for_device_kind(|| find_runtime_device(&expected_serial_number), 15_000).map_err(
-        |error| {
-            format!(
-            "application for keyboard serial {expected_serial_number} did not come back: {error}"
+    if matches!(primary.artifact, FirmwareArtifact::Application) {
+        wait_for_device_absent(|| find_updater_device(&expected_serial_number), 10_000)?;
+        wait_for_device_kind(|| find_runtime_device(&expected_serial_number), 15_000).map_err(
+            |error| format!(
+                "application for keyboard serial {expected_serial_number} did not come back: {error}"
+            ),
+        )?;
+    } else {
+        emit_flash_progress(&app, "migration", primary.total, primary.total);
+        let (_migrated_device, migrated_hello) = wait_for_updater_protocol(
+            &expected_serial_number,
+            UPDATER_PROTOCOL_V3,
+            90_000,
+            &app,
+            primary.total,
+            timeout_ms,
+            retries,
         )
-        },
-    )?;
+        .map_err(|error| format!(
+            "UPDATER_MIGRATION_INCOMPLETE: updater v3 for keyboard serial {expected_serial_number} did not become ready after the migrator ran: {error}"
+        ))?;
+        negotiate_flash_protocol(migrated_hello, &FirmwareArtifact::Application)
+            .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
+        emit_flash_progress(&app, "migrationReady", primary.total, primary.total);
+    }
 
-    emit_flash_progress(&app, "done", total, total);
+    emit_flash_progress(&app, "done", primary.total, primary.total);
     Ok(())
 }
 
-fn flash_with_device(
+fn cleanup_updater_session(device: &HidDevice, retries: u32, timeout_ms: u64) {
+    let cleanup_retries = retries.min(2);
+    let _ = updater_transact(
+        device,
+        UPDATER_CMD_ABORT,
+        0xFF,
+        0,
+        &[],
+        cleanup_retries,
+        timeout_ms.min(1_000),
+    );
+    let _ = updater_transact(
+        device,
+        UPDATER_CMD_BOOT,
+        0xFE,
+        0,
+        &[],
+        cleanup_retries,
+        timeout_ms.min(1_000),
+    );
+}
+
+fn read_updater_hello(
     device: &HidDevice,
-    firmware: &[u8],
-    padded: &[u8],
-    signature: &[u8],
-    image_crc32: u32,
-    fw_version: FirmwareVersion,
     app: &AppHandle,
     total: u32,
     timeout_ms: u64,
     retries: u32,
-) -> Result<(), String> {
-    let mut seq = 1u8;
-
-    // HELLO
+) -> Result<UpdaterHello, String> {
     emit_flash_progress(app, "hello", 0, total);
-    let hello = updater_transact(device, UPDATER_CMD_HELLO, seq, 0, &[], retries, timeout_ms)?;
+    let hello = updater_transact(device, UPDATER_CMD_HELLO, 1, 0, &[], retries, timeout_ms)?;
     if hello.status != UPDATER_STATUS_OK {
         return Err(updater_status_error("HELLO", hello.status));
     }
-    if hello.payload.len() < 20 {
-        return Err("HELLO payload is shorter than the protocol-v3 schema".to_string());
+    emit_flash_progress(app, "compatibility", 0, total);
+    parse_updater_hello(&hello.payload)
+}
+
+fn wait_for_updater_protocol(
+    expected_serial_number: &str,
+    expected_protocol: u16,
+    wait_timeout_ms: u64,
+    app: &AppHandle,
+    total: u32,
+    transaction_timeout_ms: u64,
+    retries: u32,
+) -> Result<(HidDevice, UpdaterHello), String> {
+    let deadline = Instant::now() + Duration::from_millis(wait_timeout_ms);
+    let mut last_observation = "updater has not enumerated".to_string();
+
+    loop {
+        match find_updater_device(expected_serial_number)? {
+            Some(info) => match open_device_by_path(&info.path) {
+                Ok(device) => {
+                    verify_open_device_serial(&device, expected_serial_number)?;
+                    match read_updater_hello(
+                        &device,
+                        app,
+                        total,
+                        transaction_timeout_ms.min(1_000),
+                        retries.min(2),
+                    ) {
+                        Ok(hello) if hello.protocol_version == expected_protocol => {
+                            return Ok((device, hello));
+                        }
+                        Ok(hello) => {
+                            last_observation = format!(
+                                "observed protocol 0x{:04X}, waiting for 0x{expected_protocol:04X}",
+                                hello.protocol_version
+                            );
+                        }
+                        Err(error) => {
+                            last_observation = format!("HELLO is not ready: {error}");
+                        }
+                    }
+                }
+                Err(error) => {
+                    last_observation =
+                        format!("updater is enumerated but cannot be opened: {error}");
+                }
+            },
+            None => {
+                last_observation = "updater is currently disconnected".to_string();
+            }
+        }
+
+        if Instant::now() >= deadline {
+            return Err(format!(
+                "timed out after {wait_timeout_ms} ms; last observation: {last_observation}"
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(DEVICE_POLL_MS));
     }
-    let proto = u16::from_le_bytes([hello.payload[0], hello.payload[1]]);
-    if proto != UPDATER_PROTOCOL_VERSION {
+}
+
+fn flash_after_hello(
+    device: &HidDevice,
+    hello: UpdaterHello,
+    protocol: FlashProtocol,
+    prepared: &PreparedFlashArtifact,
+    app: &AppHandle,
+    timeout_ms: u64,
+    retries: u32,
+) -> Result<FlashProtocol, String> {
+    let mut seq = 1u8;
+    let firmware_size = prepared.total;
+    if firmware_size > hello.app_max_size {
         return Err(format!(
-            "unsupported updater protocol 0x{proto:04X}, expected 0x{UPDATER_PROTOCOL_VERSION:04X}"
-        ));
-    }
-    let flags = u16::from_le_bytes([hello.payload[2], hello.payload[3]]);
-    if flags & UPDATER_FLAG_SIGNATURE_REQUIRED == 0 {
-        return Err("updater does not enforce signed firmware".to_string());
-    }
-    let app_base = u32::from_le_bytes([
-        hello.payload[4],
-        hello.payload[5],
-        hello.payload[6],
-        hello.payload[7],
-    ]);
-    if app_base != UPDATER_APP_BASE {
-        return Err(format!(
-            "unexpected updater app base 0x{app_base:08X}; expected 0x{UPDATER_APP_BASE:08X}"
-        ));
-    }
-    let max_size = u32::from_le_bytes([
-        hello.payload[8],
-        hello.payload[9],
-        hello.payload[10],
-        hello.payload[11],
-    ]);
-    let firmware_size = u32::try_from(firmware.len())
-        .map_err(|_| "firmware length exceeds the updater protocol".to_string())?;
-    if max_size != UPDATER_APP_MAX_IMAGE_SIZE {
-        return Err(format!(
-            "unexpected updater app max {max_size}; expected {UPDATER_APP_MAX_IMAGE_SIZE}"
-        ));
-    }
-    if firmware_size > max_size {
-        return Err(format!(
-            "firmware is too large ({} bytes), updater max is {max_size} bytes",
-            firmware.len()
-        ));
-    }
-    let write_align = u32::from_le_bytes([
-        hello.payload[12],
-        hello.payload[13],
-        hello.payload[14],
-        hello.payload[15],
-    ]);
-    if write_align != 4 {
-        return Err(format!(
-            "unexpected updater write alignment {write_align}; expected 4"
+            "UPDATER_IMAGE_TOO_LARGE: selected artifact has {} bytes, updater protocol 0x{:04X} accepts at most {}",
+            prepared.firmware.len(), hello.protocol_version, hello.app_max_size
         ));
     }
 
-    // AUTH: authenticate the signed manifest before BEGIN is allowed to erase.
-    let mut authorization = firmware_manifest(
-        firmware,
-        [fw_version.major, fw_version.minor, fw_version.patch],
-    )?;
-    authorization.extend_from_slice(signature);
-    let mut auth_offset = 0usize;
-    emit_flash_progress(app, "authenticating", 0, total);
-    while auth_offset < authorization.len() {
-        let end = (auth_offset + DATA_CHUNK_SIZE).min(authorization.len());
-        seq = seq.wrapping_add(1);
-        let auth = updater_transact(
-            device,
-            UPDATER_CMD_AUTH,
-            seq,
-            auth_offset as u32,
-            &authorization[auth_offset..end],
-            retries,
-            timeout_ms,
+    if protocol.requires_auth() {
+        // v3 authenticates the signed manifest on-device before BEGIN can erase.
+        let mut authorization = firmware_manifest(
+            &prepared.firmware,
+            [
+                prepared.version.major,
+                prepared.version.minor,
+                prepared.version.patch,
+            ],
         )?;
-        if auth.status != UPDATER_STATUS_OK {
-            return Err(format!(
-                "AUTH failed at manifest offset {auth_offset}: {} (0x{:02X})",
-                updater_status_name(auth.status),
-                auth.status,
-            ));
+        authorization.extend_from_slice(&prepared.signature);
+        let mut auth_offset = 0usize;
+        emit_flash_progress(app, "authenticating", 0, prepared.total);
+        while auth_offset < authorization.len() {
+            let end = (auth_offset + DATA_CHUNK_SIZE).min(authorization.len());
+            seq = seq.wrapping_add(1);
+            let auth = updater_transact(
+                device,
+                UPDATER_CMD_AUTH,
+                seq,
+                auth_offset as u32,
+                &authorization[auth_offset..end],
+                retries,
+                timeout_ms,
+            )?;
+            if auth.status != UPDATER_STATUS_OK {
+                return Err(format!(
+                    "AUTH failed at manifest offset {auth_offset}: {} (0x{:02X})",
+                    updater_status_name(auth.status),
+                    auth.status,
+                ));
+            }
+            auth_offset = end;
         }
-        auth_offset = end;
+    } else {
+        // Protocol v2 has no AUTH command. Reaching this branch is only possible
+        // for a structurally validated migration package whose signed inner v3
+        // image was verified with the pinned release key before re-enumeration.
+        emit_flash_progress(app, "legacyMigration", 0, prepared.total);
     }
 
     // BEGIN: metadata must match the pre-authorized signed manifest.
     seq = seq.wrapping_add(1);
-    emit_flash_progress(app, "begin", 0, total);
+    emit_flash_progress(app, "begin", 0, prepared.total);
     let mut begin_payload = [0u8; 12];
     begin_payload[0..4].copy_from_slice(&firmware_size.to_le_bytes());
-    begin_payload[4..8].copy_from_slice(&image_crc32.to_le_bytes());
-    begin_payload[8] = fw_version.major;
-    begin_payload[9] = fw_version.minor;
-    begin_payload[10] = fw_version.patch;
+    begin_payload[4..8].copy_from_slice(&prepared.image_crc32.to_le_bytes());
+    begin_payload[8] = prepared.version.major;
+    begin_payload[9] = prepared.version.minor;
+    begin_payload[10] = prepared.version.patch;
     let begin = updater_transact(
         device,
         UPDATER_CMD_BEGIN,
@@ -2297,9 +2502,9 @@ fn flash_with_device(
     // DATA chunks
     let mut offset = 0usize;
     let mut last_percent = u8::MAX;
-    while offset < padded.len() {
-        let end = (offset + DATA_CHUNK_SIZE).min(padded.len());
-        let chunk = &padded[offset..end];
+    while offset < prepared.padded.len() {
+        let end = (offset + DATA_CHUNK_SIZE).min(prepared.padded.len());
+        let chunk = &prepared.padded[offset..end];
         seq = seq.wrapping_add(1);
         let resp = updater_transact(
             device,
@@ -2326,21 +2531,21 @@ fn flash_with_device(
         }
         offset = next_offset;
 
-        let progress = (offset.min(firmware.len()) as u32).min(total);
-        let percent = if total > 0 {
-            ((progress as u64 * 100) / total as u64) as u8
+        let progress = (offset.min(prepared.firmware.len()) as u32).min(prepared.total);
+        let percent = if prepared.total > 0 {
+            ((progress as u64 * 100) / prepared.total as u64) as u8
         } else {
             100
         };
         if percent != last_percent {
-            emit_flash_progress(app, "flashing", progress, total);
+            emit_flash_progress(app, "flashing", progress, prepared.total);
             last_percent = percent;
         }
     }
 
     // FINISH
     seq = seq.wrapping_add(1);
-    emit_flash_progress(app, "finish", total, total);
+    emit_flash_progress(app, "finish", prepared.total, prepared.total);
     let finish = updater_transact(
         device,
         UPDATER_CMD_FINISH,
@@ -2356,7 +2561,7 @@ fn flash_with_device(
 
     // BOOT (device may not respond — best effort)
     seq = seq.wrapping_add(1);
-    emit_flash_progress(app, "boot", total, total);
+    emit_flash_progress(app, "boot", prepared.total, prepared.total);
     if let Ok(boot) = updater_transact(
         device,
         UPDATER_CMD_BOOT,
@@ -2371,7 +2576,7 @@ fn flash_with_device(
         }
     }
 
-    Ok(())
+    Ok(protocol)
 }
 
 #[cfg(test)]

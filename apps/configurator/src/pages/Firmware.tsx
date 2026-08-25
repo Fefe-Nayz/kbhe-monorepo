@@ -451,6 +451,8 @@ export default function Firmware() {
     signature: Uint8Array | null,
     detachedSignaturePath: string | null,
     resetLog = true,
+    migrationPath: string | null = null,
+    migrationSignaturePath: string | null = null,
   ): Promise<FlashResult> => {
     if (flashInFlightRef.current) {
       return { ok: false, error: "A firmware update is already in progress" };
@@ -500,8 +502,12 @@ export default function Firmware() {
         const phaseLabels: Record<string, string> = {
           connecting: "Entering bootloader mode…",
           hello: "Handshaking with bootloader…",
+          compatibility: "Checking updater and artifact compatibility…",
           begin: "Starting firmware transfer…",
           authenticating: "Authenticating firmware signature…",
+          legacyMigration: "Installing the signed updater v2-to-v3 migrator…",
+          migration: "Migrator is installing and verifying updater v3…",
+          migrationReady: "Updater v3 is ready for the final signed firmware…",
           finish: "Verifying firmware…",
           boot: "Rebooting device…",
         };
@@ -533,6 +539,8 @@ export default function Firmware() {
           await invoke("kbhe_flash_firmware", {
             firmwarePath: path,
             firmwareSignaturePath: detachedSignaturePath,
+            migrationFirmwarePath: migrationPath,
+            migrationFirmwareSignaturePath: migrationSignaturePath,
             firmwareVersion: resolvedVersion,
             expectedSerialNumber,
             timeoutMs: timeoutSec * 1000,
@@ -592,26 +600,17 @@ export default function Firmware() {
     try {
       appendLog(`Downloading firmware release ${tag}...`);
       const downloaded = await downloadFirmwareRelease(tag);
-      const bytes = new Uint8Array(await readFile(downloaded.path));
-      const signature = new Uint8Array(await readFile(downloaded.signaturePath));
-      const versionInfo = resolveFirmwareVersion(bytes);
-
-      processSelectedFirmware(
-        bytes,
-        signature,
-        downloaded.fileName,
-        downloaded.path,
-        downloaded.signaturePath,
-      );
       appendLog(`Downloaded ${downloaded.fileName}.`);
       setFirmwareUpdateState("flashing");
       const flashResult = await runFlash(
-        bytes,
+        new Uint8Array(),
         downloaded.path,
-        versionInfo,
-        signature,
+        { version: downloaded.firmwareVersion, source: "authenticated release tag" },
+        null,
         downloaded.signaturePath,
         false,
+        downloaded.migrationPath,
+        downloaded.migrationSignaturePath,
       );
       if (!flashResult.ok) {
         throw new Error(flashResult.error);
@@ -625,7 +624,7 @@ export default function Firmware() {
       setFlashState("error");
       appendLog(`Error: ${msg}`);
     }
-  }, [appendLog, firmwareUpdateQ, processSelectedFirmware, runFlash]);
+  }, [appendLog, firmwareUpdateQ, runFlash]);
 
   const fileSizeKb = firmwareBytes ? (firmwareBytes.length / 1024).toFixed(1) : null;
   const canFlash = connected

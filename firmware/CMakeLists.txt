@@ -22,6 +22,7 @@ endif()
 # Set the project name
 set(CMAKE_PROJECT_NAME kbhe)
 set(KBHE_BOOTLOADER_TARGET kbhe_bootloader)
+set(KBHE_MIGRATOR_TARGET kbhe_updater_migrator)
 option(KBHE_ENABLE_CUSTOM_BOOTLOADER
        "Build the main firmware for the resident custom bootloader layout"
        ON)
@@ -291,4 +292,50 @@ kbhe_configure_binary_target(
     ${KBHE_BOOTLOADER_TARGET}
     ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/STM32F723XX_BOOTLOADER.ld
     0x00000000U
+)
+
+# One-shot updater v2 -> v3 migration payload.  It is deliberately linked at
+# the application base and constrained to sector 4: while it executes there it
+# can replace sectors 0-2 and initialize the version floor in sector 3 without
+# ever erasing the code that is performing the migration.
+add_executable(${KBHE_MIGRATOR_TARGET})
+
+target_sources(${KBHE_MIGRATOR_TARGET} PRIVATE
+    ${STM32_SYSTEM_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/startup_stm32f723xx.s
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/sysmem.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/syscalls.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_shared.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/updater_validation.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Src/updater_version_floor.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Migrator/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Migrator/Src/updater_migrator_plan.c
+    ${MONOCYPHER_DIR}/src/monocypher.c
+    ${MONOCYPHER_DIR}/src/optional/monocypher-ed25519.c
+)
+
+target_include_directories(${KBHE_MIGRATOR_TARGET} BEFORE PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Migrator/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Bootloader/Inc
+)
+
+target_include_directories(${KBHE_MIGRATOR_TARGET} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
+    ${MONOCYPHER_DIR}/src
+    ${MONOCYPHER_DIR}/src/optional
+)
+
+target_link_libraries(${KBHE_MIGRATOR_TARGET}
+    stm32cubemx
+    STM32_Drivers
+)
+
+target_link_options(${KBHE_MIGRATOR_TARGET} PRIVATE
+    "-Wl,--defsym=KBHE_MIGRATOR_BUILD=1"
+)
+
+kbhe_configure_binary_target(
+    ${KBHE_MIGRATOR_TARGET}
+    ${CMAKE_CURRENT_SOURCE_DIR}/STM32F723XX_FLASH.ld
+    0x00010000U
 )

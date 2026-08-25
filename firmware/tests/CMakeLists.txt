@@ -187,6 +187,15 @@ target_compile_definitions(updater_version_floor_test PRIVATE
 )
 add_test(NAME updater_version_floor_test COMMAND updater_version_floor_test)
 
+add_executable(updater_migrator_plan_test
+  updater_migrator_plan_test.c
+  ../Migrator/Src/updater_migrator_plan.c
+)
+target_include_directories(updater_migrator_plan_test PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/../Migrator/Inc"
+)
+add_test(NAME updater_migrator_plan_test COMMAND updater_migrator_plan_test)
+
 add_executable(updater_bootloader_protocol_test
   updater_bootloader_protocol_test.c
   ../Bootloader/Src/updater_bootloader.c

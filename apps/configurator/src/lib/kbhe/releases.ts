@@ -18,6 +18,13 @@ export interface DownloadedFirmware {
   signaturePath: string;
   fileName: string;
   versionTag: string;
+  firmwareVersion: {
+    major: number;
+    minor: number;
+    patch: number;
+  };
+  migrationPath: string | null;
+  migrationSignaturePath: string | null;
 }
 
 export async function checkAppUpdate(): Promise<ReleaseUpdateInfo> {

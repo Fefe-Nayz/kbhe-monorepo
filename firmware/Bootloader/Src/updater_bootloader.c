@@ -339,18 +339,35 @@ static void handle_auth(const updater_packet_t *request,
     }
     updater_trailer_t installed;
     if (updater_read_trailer(&installed) &&
-        updater_is_app_image_valid_with_trailer(&installed) &&
-        !updater_version_is_strictly_newer(
-            s_session.auth.manifest.fw_version_major,
-            s_session.auth.manifest.fw_version_minor,
-            s_session.auth.manifest.fw_version_patch,
-            installed.fw_version_major, installed.fw_version_minor,
-            installed.fw_version_patch)) {
-      crypto_wipe(&s_session.auth, sizeof(s_session.auth));
-      s_session.auth_received = 0u;
-      response->status = UPDATER_STATUS_ROLLBACK_REJECTED;
-      updater_response_set_progress(response, 0u);
-      return;
+        updater_is_app_image_valid_with_trailer(&installed)) {
+      bool strictly_newer = updater_version_is_strictly_newer(
+          s_session.auth.manifest.fw_version_major,
+          s_session.auth.manifest.fw_version_minor,
+          s_session.auth.manifest.fw_version_patch,
+          installed.fw_version_major, installed.fw_version_minor,
+          installed.fw_version_patch);
+      bool same_version =
+          s_session.auth.manifest.fw_version_major ==
+              installed.fw_version_major &&
+          s_session.auth.manifest.fw_version_minor ==
+              installed.fw_version_minor &&
+          s_session.auth.manifest.fw_version_patch ==
+              installed.fw_version_patch;
+      /* The signed one-shot migrator and its final application intentionally
+       * share one release version. Permit that equal-version replacement only
+       * while the currently authenticated image carries a fully valid
+       * KBHEMIG3 descriptor. Once the normal application trailer is installed,
+       * strict anti-rollback applies again. */
+      bool replacing_migrator =
+          same_version &&
+          updater_app_has_valid_migration_descriptor(&installed);
+      if (!strictly_newer && !replacing_migrator) {
+        crypto_wipe(&s_session.auth, sizeof(s_session.auth));
+        s_session.auth_received = 0u;
+        response->status = UPDATER_STATUS_ROLLBACK_REJECTED;
+        updater_response_set_progress(response, 0u);
+        return;
+      }
     }
     s_session.authorized = true;
   }

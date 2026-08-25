@@ -1,9 +1,11 @@
 #include "updater_shared.h"
 #include "firmware_public_key.h"
 #include "monocypher-ed25519.h"
+#include "updater_migration.h"
 #include "updater_validation.h"
 #include "stm32f7xx.h"
 
+#include <stddef.h>
 #include <string.h>
 
 _Static_assert(sizeof(updater_signature_manifest_t) ==
@@ -24,6 +26,10 @@ _Static_assert(sizeof(updater_progress_payload_t) == 16u,
 
 static const uint8_t s_manifest_context[8] = {'K', 'B', 'H', 'E',
                                                'F', 'W', '3', 0};
+static const uint8_t s_migration_descriptor_magic[8] =
+    UPDATER_MIGRATION_DESCRIPTOR_MAGIC_BYTES;
+static const uint8_t s_migration_target_id[16] =
+    UPDATER_MIGRATION_TARGET_ID_BYTES;
 
 #if defined(UPDATER_HOST_TEST)
 /* Supplied by the host updater harness. Keeping the translation behind a
@@ -238,6 +244,76 @@ bool updater_is_app_image_valid_with_trailer(
       updater_signature_manifest_verify(&manifest, trailer->signature);
   crypto_wipe(&manifest, sizeof(manifest));
   return authenticated;
+}
+
+bool updater_app_has_valid_migration_descriptor(
+    const updater_trailer_t *trailer) {
+  updater_migration_descriptor_t descriptor;
+  const uint8_t *image;
+  const uint8_t *bootloader;
+  uint8_t bootloader_sha512[64];
+  uint32_t bootloader_end;
+  uint32_t initial_sp;
+  uint32_t reset_handler;
+  uint32_t reset_address;
+  static const uint8_t zeroes[8] = {0};
+
+  if (!updater_trailer_is_valid(trailer) ||
+      trailer->image_size < sizeof(descriptor)) {
+    return false;
+  }
+  image = updater_flash_address(UPDATER_APP_BASE, trailer->image_size);
+  if (image == NULL) {
+    return false;
+  }
+  memcpy(&descriptor, image + trailer->image_size - sizeof(descriptor),
+         sizeof(descriptor));
+  if (memcmp(descriptor.magic, s_migration_descriptor_magic,
+             sizeof(descriptor.magic)) != 0 ||
+      descriptor.schema != UPDATER_MIGRATION_DESCRIPTOR_SCHEMA ||
+      descriptor.descriptor_size != sizeof(descriptor) ||
+      descriptor.source_protocol != UPDATER_MIGRATION_SOURCE_PROTOCOL ||
+      descriptor.target_protocol != UPDATER_MIGRATION_TARGET_PROTOCOL ||
+      descriptor.flags != UPDATER_MIGRATION_REQUIRED_FLAGS ||
+      descriptor.image_size != trailer->image_size ||
+      memcmp(descriptor.target_id, s_migration_target_id,
+             sizeof(descriptor.target_id)) != 0 ||
+      memcmp(descriptor.reserved, zeroes, sizeof(descriptor.reserved)) != 0 ||
+      descriptor.descriptor_crc32 !=
+          updater_crc32_compute(&descriptor,
+                                offsetof(updater_migration_descriptor_t,
+                                         descriptor_crc32)) ||
+      descriptor.bootloader_offset < 8u ||
+      descriptor.bootloader_offset >
+          UPDATER_MIGRATION_EXECUTABLE_MAX_SIZE ||
+      (descriptor.bootloader_offset & 3u) != 0u ||
+      descriptor.bootloader_size < 8u ||
+      descriptor.bootloader_size > UPDATER_BOOTLOADER_CODE_SIZE ||
+      descriptor.bootloader_offset > UINT32_MAX - descriptor.bootloader_size) {
+    return false;
+  }
+  bootloader_end = descriptor.bootloader_offset + descriptor.bootloader_size;
+  if (bootloader_end > trailer->image_size - sizeof(descriptor)) {
+    return false;
+  }
+  bootloader = image + descriptor.bootloader_offset;
+  memcpy(&initial_sp, bootloader, sizeof(initial_sp));
+  memcpy(&reset_handler, bootloader + sizeof(initial_sp),
+         sizeof(reset_handler));
+  reset_address = reset_handler & ~1u;
+  if (initial_sp <= UPDATER_RAM_BASE || initial_sp > UPDATER_RAM_END ||
+      (initial_sp & 7u) != 0u || (reset_handler & 1u) == 0u ||
+      reset_address < UPDATER_BOOTLOADER_BASE ||
+      reset_address >= UPDATER_BOOTLOADER_BASE + descriptor.bootloader_size ||
+      updater_crc32_compute(bootloader, descriptor.bootloader_size) !=
+          descriptor.bootloader_crc32) {
+    return false;
+  }
+  crypto_sha512(bootloader_sha512, bootloader, descriptor.bootloader_size);
+  bool authenticated_descriptor =
+      crypto_verify64(bootloader_sha512, descriptor.bootloader_sha512) == 0;
+  crypto_wipe(bootloader_sha512, sizeof(bootloader_sha512));
+  return authenticated_descriptor;
 }
 
 bool updater_is_app_image_valid(void) {
