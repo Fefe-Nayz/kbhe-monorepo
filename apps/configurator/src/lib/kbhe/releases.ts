@@ -51,10 +51,12 @@ export async function checkFirmwareUpdate(
 export async function downloadFirmwareRelease(
   tag: string,
   updaterProtocol?: number | null,
+  appOnlyRecovery = false,
 ): Promise<DownloadedFirmware> {
   return invoke<DownloadedFirmware>("kbhe_download_firmware_release", {
     tag,
     updaterProtocol: updaterProtocol ?? undefined,
+    appOnlyRecovery,
   });
 }
 

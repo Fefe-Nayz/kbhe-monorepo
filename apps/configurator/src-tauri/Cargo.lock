@@ -1895,7 +1895,7 @@ dependencies = [
 
 [[package]]
 name = "kbhe-configurator"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "ed25519-dalek",
  "getrandom 0.3.4",

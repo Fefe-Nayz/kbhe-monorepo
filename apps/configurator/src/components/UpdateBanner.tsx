@@ -8,6 +8,7 @@ import { kbheDevice } from "@/lib/kbhe/device";
 import {
   UPDATER_MIGRATION_QUERY_KEY,
   hasCompleteProfileRecovery,
+  hasProfileRecovery,
   isResetCalibration,
   listUpdaterMigrationBackups,
   restoreUpdaterMigrationBackup,
@@ -105,8 +106,10 @@ export function UpdateBanner() {
       : pendingCalibrationBackup
         ? currentCalibrationBackup && runtimeConnected
           ? hasCompleteProfileRecovery(currentCalibrationBackup)
-            ? "A complete pre-migration calibration/profile backup is waiting. Restore and verify every setting before typing or flashing again."
-            : "A legacy calibration-only backup is waiting. It can restore calibration, but cannot authorize a new updater-v2 migration because it contains no profiles."
+            ? "A complete schema-3 keyboard-name/calibration/profile backup is waiting. Restore and verify every setting before typing or flashing again."
+            : hasProfileRecovery(currentCalibrationBackup)
+              ? "A schema-2 calibration/profile backup is waiting. It remains restorable, but cannot authorize a bootloader migration or refresh because it has no keyboard name."
+              : "A schema-1 calibration-only backup is waiting. It remains restorable, but cannot authorize a bootloader migration or refresh because it has no profiles or keyboard name."
           : `Recovery data for keyboard ${pendingCalibrationBackup.serialNumber} is safe. Reconnect that keyboard in runtime mode to restore it.`
         : "Calibration reset detected (all 82 keys are at 2195/2850). Run guided calibration before normal use.";
 
@@ -132,7 +135,9 @@ export function UpdateBanner() {
                 ? "Restoring…"
                 : hasCompleteProfileRecovery(currentCalibrationBackup)
                   ? "Restore all settings"
-                  : "Restore calibration"}
+                  : hasProfileRecovery(currentCalibrationBackup)
+                    ? "Restore profiles"
+                    : "Restore calibration"}
             </Button>
           ) : resetCalibrationDetected ? (
             <Button

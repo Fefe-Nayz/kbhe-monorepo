@@ -18,6 +18,9 @@
         { "path": "**/*.bin" },
         {
           "path": "$TEMP/kbhe-configurator/firmware/*/kbhe-app.bin.sig"
+        },
+        {
+          "path": "$TEMP/kbhe-configurator/firmware/*/kbhe-app-updater-v3.bin.sig"
         }
       ]
     }

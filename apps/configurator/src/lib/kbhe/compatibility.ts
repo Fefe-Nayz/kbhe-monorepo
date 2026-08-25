@@ -31,6 +31,8 @@ export interface CompatibilityPresentation {
 export const COMPATIBILITY_INTRODUCED_APP_VERSION = "0.1.17";
 export const COMPATIBLE_FIRMWARE_MIN = "2.0.8";
 export const COMPATIBLE_FIRMWARE_MAX_EXCLUSIVE = "2.1.0";
+export const UPDATER_REFRESH_MIN_APP_VERSION = "0.1.18";
+export const UPDATER_REFRESH_CARRIER_MIN_FIRMWARE_VERSION = "2.0.10";
 export const SUPPORTED_UPDATER_PROTOCOLS = [0x0002, 0x0003] as const;
 
 interface Semver {
@@ -93,6 +95,8 @@ export function evaluateDeviceCompatibility(input: CompatibilityInput): DeviceCo
     const firmware = parseSemver(firmwareValue);
     const minimumFirmware = parseSemver(COMPATIBLE_FIRMWARE_MIN)!;
     const maximumFirmware = parseSemver(COMPATIBLE_FIRMWARE_MAX_EXCLUSIVE)!;
+    const refreshCarrierMinimum = parseSemver(UPDATER_REFRESH_CARRIER_MIN_FIRMWARE_VERSION)!;
+    const refreshCapableApp = parseSemver(UPDATER_REFRESH_MIN_APP_VERSION)!;
     if (!firmware) {
       return result(input, "unknown", `Firmware version “${firmwareValue}” could not be interpreted safely.`);
     }
@@ -101,6 +105,16 @@ export function evaluateDeviceCompatibility(input: CompatibilityInput): DeviceCo
         input,
         "firmware-too-old",
         `Firmware ${firmwareValue} is older than the supported ${COMPATIBLE_FIRMWARE_MIN} configuration schema.`,
+      );
+    }
+    if (
+      compareSemver(firmware, refreshCarrierMinimum) >= 0
+      && compareSemver(app, refreshCapableApp) < 0
+    ) {
+      return result(
+        input,
+        "app-too-old",
+        `Firmware ${firmwareValue} uses the updater-refresh carrier contract and requires Configurator ${UPDATER_REFRESH_MIN_APP_VERSION} or newer.`,
       );
     }
     if (compareSemver(firmware, maximumFirmware) >= 0) {

@@ -11,7 +11,8 @@ import {
 const STORE_PATH = "updater-migration-recovery.json";
 const STORE_KEY_PREFIX = "calibration:";
 const LEGACY_SCHEMA_VERSION = 1 as const;
-const COMPLETE_SCHEMA_VERSION = 2 as const;
+const PROFILE_SCHEMA_VERSION = 2 as const;
+const COMPLETE_SCHEMA_VERSION = 3 as const;
 const ADC_MIN = 0;
 const ADC_MAX = 4095;
 const RESET_ZERO = 2195;
@@ -41,17 +42,26 @@ export interface FirmwareProfilesMigrationBackup {
   snapshots: Array<FirmwareProfileSnapshot | null>;
 }
 
+export interface LegacyProfilesMigrationBackup extends BaseMigrationBackup {
+  schemaVersion: typeof PROFILE_SCHEMA_VERSION;
+  profiles: FirmwareProfilesMigrationBackup;
+}
+
 export interface CompleteUpdaterMigrationBackup extends BaseMigrationBackup {
   schemaVersion: typeof COMPLETE_SCHEMA_VERSION;
+  keyboardName: string;
   profiles: FirmwareProfilesMigrationBackup;
 }
 
 export type UpdaterMigrationBackup =
   | LegacyCalibrationMigrationBackup
+  | LegacyProfilesMigrationBackup
   | CompleteUpdaterMigrationBackup;
 
 export interface UpdaterMigrationDevice {
   getCalibration(): Promise<CalibrationSettings | null>;
+  getKeyboardName(): Promise<string | null>;
+  setKeyboardName(name: string): Promise<string | null>;
   setCalibration(
     lutZero: number,
     keyZeros: ArrayLike<number>,
@@ -149,6 +159,15 @@ export function normalizeCalibrationSettings(value: unknown): CalibrationSetting
     key_zero_values: keyZeros as number[],
     key_max_values: keyMaxs as number[],
   };
+}
+
+function normalizeKeyboardName(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 32) return null;
+  if (value.endsWith(" ")) return null;
+  return Array.from(value).every((character) => {
+    const code = character.charCodeAt(0);
+    return code >= 0x20 && code <= 0x7e;
+  }) ? value : null;
 }
 
 export function isResetCalibration(value: unknown): boolean {
@@ -337,6 +356,13 @@ export function hasCompleteProfileRecovery(
   return backup?.schemaVersion === COMPLETE_SCHEMA_VERSION;
 }
 
+export function hasProfileRecovery(
+  backup: UpdaterMigrationBackup | null,
+): backup is LegacyProfilesMigrationBackup | CompleteUpdaterMigrationBackup {
+  return backup?.schemaVersion === PROFILE_SCHEMA_VERSION
+    || backup?.schemaVersion === COMPLETE_SCHEMA_VERSION;
+}
+
 function normalizeBackup(value: unknown): UpdaterMigrationBackup | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<UpdaterMigrationBackup>;
@@ -346,6 +372,7 @@ function normalizeBackup(value: unknown): UpdaterMigrationBackup | null {
   const calibration = normalizeCalibrationSettings(candidate.calibration);
   if (
     (candidate.schemaVersion !== LEGACY_SCHEMA_VERSION
+      && candidate.schemaVersion !== PROFILE_SCHEMA_VERSION
       && candidate.schemaVersion !== COMPLETE_SCHEMA_VERSION)
     || !serialNumber
     || !Number.isSafeInteger(candidate.capturedAt)
@@ -354,17 +381,34 @@ function normalizeBackup(value: unknown): UpdaterMigrationBackup | null {
   ) {
     return null;
   }
-  if (candidate.schemaVersion === COMPLETE_SCHEMA_VERSION) {
+  if (
+    candidate.schemaVersion === PROFILE_SCHEMA_VERSION
+    || candidate.schemaVersion === COMPLETE_SCHEMA_VERSION
+  ) {
     const profiles = normalizeProfilesBackup(
-      (candidate as Partial<CompleteUpdaterMigrationBackup>).profiles,
+      (candidate as { profiles?: unknown }).profiles,
       serialNumber,
     );
     if (!profiles) return null;
+    if (candidate.schemaVersion === PROFILE_SCHEMA_VERSION) {
+      return {
+        schemaVersion: PROFILE_SCHEMA_VERSION,
+        serialNumber,
+        capturedAt: Number(candidate.capturedAt),
+        calibration,
+        profiles,
+      };
+    }
+    const keyboardName = normalizeKeyboardName(
+      (candidate as Partial<CompleteUpdaterMigrationBackup>).keyboardName,
+    );
+    if (!keyboardName) return null;
     return {
       schemaVersion: COMPLETE_SCHEMA_VERSION,
       serialNumber,
       capturedAt: Number(candidate.capturedAt),
       calibration,
+      keyboardName,
       profiles,
     };
   }
@@ -501,7 +545,7 @@ async function captureProfilesBackup(
 }
 
 async function restoreProfilesBackup(
-  backup: CompleteUpdaterMigrationBackup,
+  backup: LegacyProfilesMigrationBackup | CompleteUpdaterMigrationBackup,
   device: UpdaterMigrationDevice,
   profileApi: FirmwareProfileMigrationApi,
 ): Promise<void> {
@@ -619,6 +663,12 @@ export async function captureUpdaterMigrationBackup(
       "SETTINGS_BACKUP_REQUIRED: an app profile is active in RAM-only mode (or its state could not be verified). Return to an on-device profile before updater migration.",
     );
   }
+  const keyboardName = normalizeKeyboardName(await device.getKeyboardName());
+  if (!keyboardName) {
+    throw new Error(
+      "SETTINGS_BACKUP_REQUIRED: the persistent keyboard name could not be read exactly; updater migration was not started",
+    );
+  }
   const calibration = normalizeCalibrationSettings(await device.getCalibration());
   if (!calibration) {
     throw new Error(
@@ -626,12 +676,19 @@ export async function captureUpdaterMigrationBackup(
     );
   }
   const profiles = await captureProfilesBackup(serial, device, profileApi);
+  const keyboardNameAfterCapture = normalizeKeyboardName(await device.getKeyboardName());
+  if (keyboardNameAfterCapture !== keyboardName) {
+    throw new Error(
+      "SETTINGS_BACKUP_REQUIRED: the keyboard name changed while settings were captured; updater migration was not started",
+    );
+  }
 
   const backup: CompleteUpdaterMigrationBackup = {
     schemaVersion: COMPLETE_SCHEMA_VERSION,
     serialNumber: serial,
     capturedAt: Date.now(),
     calibration,
+    keyboardName,
     profiles,
   };
   await store.init();
@@ -657,11 +714,12 @@ export async function captureUpdaterMigrationBackup(
   if (
     !hasCompleteProfileRecovery(persisted)
     || persisted.serialNumber !== serial
+    || persisted.keyboardName !== keyboardName
     || !calibrationsEqual(calibration, persisted.calibration)
     || !profilesEqual(profiles, persisted.profiles)
   ) {
     throw new Error(
-      "SETTINGS_BACKUP_REQUIRED: complete calibration/profile recovery data could not be persisted safely; updater migration was not started",
+      "SETTINGS_BACKUP_REQUIRED: complete keyboard-name/calibration/profile recovery data could not be persisted safely; updater migration was not started",
     );
   }
   return persisted;
@@ -677,8 +735,17 @@ export async function restoreUpdaterMigrationBackup(
   const backup = await getUpdaterMigrationBackup(serial, store);
   if (!backup) return false;
 
-  if (hasCompleteProfileRecovery(backup)) {
+  if (hasProfileRecovery(backup)) {
     await restoreProfilesBackup(backup, device, profileApi);
+  }
+
+  if (hasCompleteProfileRecovery(backup)) {
+    const restoredKeyboardName = await device.setKeyboardName(backup.keyboardName);
+    if (restoredKeyboardName !== backup.keyboardName) {
+      throw new Error(
+        "SETTINGS_RESTORE_REQUIRED: the persistent keyboard name could not be restored; the backup was kept for retry",
+      );
+    }
   }
 
   const written = await device.setCalibration(
@@ -704,6 +771,14 @@ export async function restoreUpdaterMigrationBackup(
     );
   }
   if (hasCompleteProfileRecovery(backup)) {
+    const verifiedKeyboardName = normalizeKeyboardName(await device.getKeyboardName());
+    if (verifiedKeyboardName !== backup.keyboardName) {
+      throw new Error(
+        "SETTINGS_RESTORE_REQUIRED: keyboard-name verification failed; the complete backup was kept for retry",
+      );
+    }
+  }
+  if (hasProfileRecovery(backup)) {
     const verifiedProfiles = await captureProfilesBackup(serial, device, profileApi);
     if (!profilesEqual(backup.profiles, verifiedProfiles)) {
       throw new Error(
@@ -712,7 +787,46 @@ export async function restoreUpdaterMigrationBackup(
     }
   }
 
-  await store.delete(backupKey(serial));
-  await store.save();
+  const key = backupKey(serial);
+  await store.delete(key);
+  try {
+    await store.save();
+  } catch (error) {
+    // Do not let a failed acknowledgement make the recovery record disappear
+    // from the running process. The prior durable copy is still authoritative;
+    // restoring the in-memory value also keeps the banner/retry path visible.
+    try {
+      await store.set(key, backup);
+    } catch {
+      // The original durable-store failure remains the actionable error.
+    }
+    throw new Error(
+      `SETTINGS_RESTORE_REQUIRED: every setting was restored and verified, but the recovery record could not be acknowledged; the backup was kept for retry (${error instanceof Error ? error.message : String(error)})`,
+      { cause: error },
+    );
+  }
   return true;
+}
+
+export async function refreshUpdaterMigrationBackup(
+  serialNumber: string,
+  existingBackup: UpdaterMigrationBackup | null,
+  device: UpdaterMigrationDevice = kbheDevice,
+  store: CalibrationMigrationStore = persistentStore,
+  profileApi: FirmwareProfileMigrationApi = firmwareProfileApi,
+): Promise<CompleteUpdaterMigrationBackup> {
+  if (existingBackup) {
+    const restored = await restoreUpdaterMigrationBackup(
+      serialNumber,
+      device,
+      store,
+      profileApi,
+    );
+    if (!restored) {
+      throw new Error(
+        "SETTINGS_BACKUP_REQUIRED: the existing recovery snapshot disappeared before it could be restored and acknowledged",
+      );
+    }
+  }
+  return captureUpdaterMigrationBackup(serialNumber, device, store, profileApi);
 }

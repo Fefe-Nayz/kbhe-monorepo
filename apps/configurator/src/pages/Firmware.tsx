@@ -17,9 +17,10 @@ import { kbheTransport, selectKbheRecoveryTarget } from "@/lib/kbhe/transport";
 import { formatFirmwareVersion, type FirmwareVersion } from "@/lib/kbhe/protocol";
 import {
   UPDATER_MIGRATION_QUERY_KEY,
-  captureUpdaterMigrationBackup,
   getUpdaterMigrationBackup,
   hasCompleteProfileRecovery,
+  hasProfileRecovery,
+  refreshUpdaterMigrationBackup,
   restoreUpdaterMigrationBackup,
   type UpdaterMigrationBackup,
 } from "@/lib/kbhe/calibration-migration";
@@ -113,6 +114,16 @@ export default function Firmware() {
     staleTime: 1_000,
   });
 
+  const updaterInfoQ = useQuery({
+    queryKey: ["firmware", "updaterInfo", recoverySerialNumber],
+    queryFn: () => kbheTransport.getUpdaterInfo(),
+    enabled: isTauri()
+      && updateModeDetected
+      && compatibility?.updaterProtocol === 0x0003
+      && Boolean(recoverySerialNumber),
+    staleTime: 1_000,
+  });
+
   const [firmwareBytes, setFirmwareBytes] = useState<Uint8Array | null>(null);
   const [firmwareSignature, setFirmwareSignature] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -125,6 +136,7 @@ export default function Firmware() {
   const [flashLog, setFlashLog] = useState<string[]>([]);
   const [firmwareUpdateError, setFirmwareUpdateError] = useState<string | null>(null);
   const [firmwareUpdateState, setFirmwareUpdateState] = useState<"idle" | "downloading" | "flashing" | "error">("idle");
+  const [appOnlyRecoveryReady, setAppOnlyRecoveryReady] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [timeoutSec, setTimeoutSec] = useState(5);
   const [retries, setRetries] = useState(5);
@@ -509,6 +521,7 @@ export default function Firmware() {
     migrationSignaturePath: string | null = null,
     bootloaderRefreshPath: string | null = null,
     bootloaderRefreshSignaturePath: string | null = null,
+    appOnlyRecovery = false,
   ): Promise<FlashResult> => {
     if (flashInFlightRef.current) {
       return { ok: false, error: "A firmware update is already in progress" };
@@ -524,6 +537,7 @@ export default function Firmware() {
     let flashTargetSerialNumber: string | undefined;
     let migrationBackup: UpdaterMigrationBackup | null = null;
     let sessionReconnected = false;
+    let settingsRestored = false;
     const reconnectSession = async (requireRuntime = false): Promise<boolean> => {
       if (!flashTargetSerialNumber) return false;
       appendLog("Reconnecting device session...");
@@ -579,7 +593,7 @@ export default function Firmware() {
           migrationBackup = await getUpdaterMigrationBackup(expectedSerialNumber);
         } catch (error) {
           if (!confirmedUpdaterV3) throw error;
-          appendLog("Settings recovery storage is unavailable, but updater v3 is confirmed; no storage-erasing migration is needed.");
+          appendLog("Settings recovery storage is unavailable. Final-app recovery remains available, but any required resident-updater refresh will be refused before erase.");
         }
         const runtimeConnected = session.deviceInfo?.kind === "runtime"
           && session.deviceInfo.serialNumber?.trim() === expectedSerialNumber
@@ -590,24 +604,31 @@ export default function Firmware() {
             "SETTINGS_BACKUP_REQUIRED: an app profile is active in RAM-only mode (or its state could not be verified). Return to an on-device profile before updater migration.",
           );
         }
-        if (runtimeConnected && migrationBackup && !hasCompleteProfileRecovery(migrationBackup)) {
-          appendLog("Restoring the legacy calibration-only backup before creating complete recovery data...");
-          await restoreUpdaterMigrationBackup(expectedSerialNumber);
-          migrationBackup = null;
-        }
-        if (!migrationBackup && runtimeConnected) {
-          appendLog("Saving calibration and all four on-device profile slots before updater negotiation...");
-          migrationBackup = await captureUpdaterMigrationBackup(expectedSerialNumber);
-          appendLog("Complete calibration/profile backup persisted and verified.");
+        if (runtimeConnected) {
+          if (migrationBackup) {
+            appendLog(hasCompleteProfileRecovery(migrationBackup)
+              ? "Restoring and acknowledging the existing schema-3 snapshot before recapturing current runtime state..."
+              : hasProfileRecovery(migrationBackup)
+                ? "Restoring the schema-2 calibration/profile snapshot before creating fresh schema-3 recovery data..."
+                : "Restoring the schema-1 calibration snapshot before creating fresh schema-3 recovery data...");
+          }
+          appendLog("Saving keyboard name, calibration and all four on-device profile slots before updater negotiation...");
+          migrationBackup = await refreshUpdaterMigrationBackup(
+            expectedSerialNumber,
+            migrationBackup,
+          );
+          appendLog("Complete schema-3 settings backup persisted and verified.");
           void queryClient.invalidateQueries({ queryKey: UPDATER_MIGRATION_QUERY_KEY });
         } else if ((!migrationBackup || !hasCompleteProfileRecovery(migrationBackup)) && !confirmedUpdaterV3) {
           throw new Error(
-            "SETTINGS_BACKUP_REQUIRED: updater v2 migration cannot start without complete calibration and four-slot profile recovery data. Return the keyboard to runtime mode, reconnect, and retry so every setting can be captured first.",
+            "SETTINGS_BACKUP_REQUIRED: a bootloader migration/refresh cannot start without a complete schema-3 backup of the keyboard name, calibration and all four profile slots. Return the keyboard to runtime mode, reconnect, and retry so every setting can be captured first.",
           );
         } else if (migrationBackup) {
           appendLog(hasCompleteProfileRecovery(migrationBackup)
             ? "Using the verified complete settings recovery backup already saved for this keyboard."
-            : "Using a legacy calibration-only backup on confirmed updater v3; no storage-erasing migration is needed.");
+            : hasProfileRecovery(migrationBackup)
+              ? "A legacy calibration/profile backup is available, but it cannot authorize a resident-updater change."
+              : "A legacy calibration-only backup is available, but it cannot authorize a resident-updater change.");
         }
       }
 
@@ -633,6 +654,7 @@ export default function Firmware() {
           bootloaderCheck: "Checking the resident updater version…",
           bootloaderRefresh: "Installing the signed updater v3 refresh…",
           bootloaderCurrent: "Resident updater is already current; skipping refresh…",
+          appOnlyBoot: "The installed application is valid; booting it without erasing flash…",
           finish: "Verifying firmware…",
           boot: "Rebooting device…",
         };
@@ -668,6 +690,8 @@ export default function Firmware() {
             migrationFirmwareSignaturePath: migrationSignaturePath,
             bootloaderRefreshPath,
             bootloaderRefreshSignaturePath,
+            settingsBackupComplete: hasCompleteProfileRecovery(migrationBackup),
+            appOnlyRecovery,
             firmwareVersion: resolvedVersion,
             expectedSerialNumber,
             timeoutMs: timeoutSec * 1000,
@@ -693,19 +717,26 @@ export default function Firmware() {
       if (migrationBackup) {
         await reconnectSession(true);
         appendLog(hasCompleteProfileRecovery(migrationBackup)
-          ? "Restoring calibration and all on-device profiles, then verifying them semantically..."
-          : "Restoring the legacy per-key calibration backup...");
+          ? "Restoring keyboard name, calibration and all on-device profiles, then verifying them semantically..."
+          : hasProfileRecovery(migrationBackup)
+            ? "Restoring the legacy calibration/profile backup..."
+            : "Restoring the legacy per-key calibration backup...");
         const restored = await restoreUpdaterMigrationBackup(expectedSerialNumber);
         if (!restored) {
           throw new Error("CALIBRATION_RESTORE_REQUIRED: the saved calibration disappeared before restoration");
         }
         appendLog(hasCompleteProfileRecovery(migrationBackup)
-          ? "Calibration and all profile settings restored, persisted, and verified."
-          : "Legacy calibration restored and verified on all 82 keys.");
+          ? "Keyboard name, calibration and all profile settings restored, persisted, and verified."
+          : hasProfileRecovery(migrationBackup)
+            ? "Legacy calibration/profile settings restored and verified."
+            : "Legacy calibration restored and verified on all 82 keys.");
+        settingsRestored = true;
         await queryClient.invalidateQueries({ queryKey: UPDATER_MIGRATION_QUERY_KEY });
       }
 
-      appendLog(`Flash complete! Version: ${formatFirmwareVersion(finalVersion)}`);
+      appendLog(appOnlyRecovery
+        ? `Runtime recovery complete at version ${formatFirmwareVersion(finalVersion)}. Reconnect runtime, capture schema 3, then relaunch the newer updater refresh.`
+        : `Flash complete! Version: ${formatFirmwareVersion(finalVersion)}`);
       setFlashState("success");
       return { ok: true };
     } catch (err) {
@@ -716,6 +747,23 @@ export default function Firmware() {
     } finally {
       if (!sessionReconnected) {
         await reconnectSession();
+      }
+      if (migrationBackup && !settingsRestored) {
+        const session = useDeviceSession.getState();
+        const runtimeReady = session.deviceInfo?.kind === "runtime"
+          && session.deviceInfo.serialNumber?.trim() === flashTargetSerialNumber;
+        if (runtimeReady) {
+          try {
+            appendLog("Runtime reconnected after an interrupted update; retrying settings restoration...");
+            const restored = await restoreUpdaterMigrationBackup(flashTargetSerialNumber!);
+            if (restored) {
+              settingsRestored = true;
+              appendLog("Saved settings were restored and verified after reconnection.");
+            }
+          } catch (restoreError) {
+            appendLog(`Automatic settings restore could not finish; the backup remains available for retry: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`);
+          }
+        }
       }
       void queryClient.invalidateQueries({ queryKey: UPDATER_MIGRATION_QUERY_KEY });
       flashInFlightRef.current = false;
@@ -762,6 +810,7 @@ export default function Firmware() {
       if (!flashResult.ok) {
         throw new Error(flashResult.error);
       }
+      setAppOnlyRecoveryReady(false);
       setFirmwareUpdateState("idle");
       await firmwareUpdateQ.refetch();
     } catch (err) {
@@ -772,6 +821,112 @@ export default function Firmware() {
       appendLog(`Error: ${msg}`);
     }
   }, [appendLog, compatibility?.updaterProtocol, firmwareUpdateQ, runFlash]);
+
+  const handleAppOnlyRuntimeRecovery = useCallback(async () => {
+    const expectedSerialNumber = recoverySerialNumber;
+    if (!expectedSerialNumber) {
+      setFirmwareUpdateError("Runtime recovery requires the keyboard's stable USB serial number.");
+      return;
+    }
+    setFirmwareUpdateState("flashing");
+    setFirmwareUpdateError(null);
+    appendLog("Trying to boot the already-installed application without downloading or erasing anything...");
+    try {
+      await invoke("kbhe_boot_existing_application", {
+        expectedSerialNumber,
+        timeoutMs: timeoutSec * 1000,
+        retries,
+      });
+      let runtimeReady = false;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        await delay(500);
+        try {
+          await DeviceSessionManager.connect(expectedSerialNumber);
+          const session = useDeviceSession.getState();
+          runtimeReady = session.deviceInfo?.kind === "runtime"
+            && session.deviceInfo.serialNumber?.trim() === expectedSerialNumber;
+          if (runtimeReady) break;
+        } catch {
+          // Keep waiting for the exact serial to re-enumerate as runtime.
+        }
+      }
+      if (!runtimeReady) {
+        throw new Error("The valid application accepted BOOT but runtime did not reconnect yet.");
+      }
+      setAppOnlyRecoveryReady(true);
+      setFirmwareUpdateState("idle");
+      appendLog("The existing application booted with no firmware download, BEGIN or erase. Continue the update to capture schema 3 first.");
+      await firmwareUpdateQ.refetch();
+      return;
+    } catch (bootError) {
+      const bootMessage = bootError instanceof Error ? bootError.message : String(bootError);
+      if (!bootMessage.includes("UPDATER_APP_INVALID")) {
+        setFirmwareUpdateError(bootMessage);
+        setFirmwareUpdateState("error");
+        appendLog(`Existing-application BOOT was not available: ${bootMessage}`);
+        return;
+      }
+      appendLog("The installed application is invalid; falling back to its exact signed installed-version carrier without any refresh asset.");
+    }
+
+    const installed = updaterInfoQ.data?.installedVersion;
+    if (!installed || installed.every((component) => component === 0)) {
+      setFirmwareUpdateError(
+        "The updater did not report a recoverable installed application version. Use the documented ROM-DFU factory recovery; no flash was started.",
+      );
+      return;
+    }
+    const [major, minor, patch] = installed;
+    const version = { major, minor, patch };
+    const tag = `firmware-v${major}.${minor}.${patch}`;
+    setFirmwareUpdateState("downloading");
+    setFirmwareUpdateError(null);
+    appendLog(`Downloading exact installed-version carrier ${tag} for app-only runtime recovery...`);
+
+    try {
+      let recovery;
+      try {
+        recovery = await downloadFirmwareRelease(tag, 0x0003, true);
+      } catch (downloadError) {
+        throw new Error(
+          `No stable signed carrier is available for installed version ${major}.${minor}.${patch}; use the documented ROM-DFU factory recovery (${downloadError instanceof Error ? downloadError.message : String(downloadError)})`,
+        );
+      }
+      setFirmwareUpdateState("flashing");
+      const result = await runFlash(
+        new Uint8Array(),
+        recovery.path,
+        { version, source: "authenticated installed-version recovery tag" },
+        null,
+        recovery.signaturePath,
+        false,
+        null,
+        null,
+        null,
+        null,
+        true,
+      );
+      if (!result.ok) throw new Error(result.error);
+      setAppOnlyRecoveryReady(true);
+      setFirmwareUpdateState("idle");
+      appendLog("Runtime is recoverable without consuming the newer refresh version. Continue the update after runtime reconnects so schema 3 can be captured.");
+      await firmwareUpdateQ.refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setFirmwareUpdateError(message);
+      setFirmwareUpdateState("error");
+      setFlashState("error");
+      appendLog(`App-only runtime recovery failed: ${message}`);
+    }
+  }, [
+    appendLog,
+    firmwareUpdateQ,
+    recoverySerialNumber,
+    retries,
+    runFlash,
+    timeoutSec,
+    updaterInfoQ.data?.installedVersion,
+  ]);
 
   const fileSizeKb = firmwareBytes ? (firmwareBytes.length / 1024).toFixed(1) : null;
   const compatibilityBlocksFlash = compatibility?.status === "app-too-old";
@@ -793,6 +948,10 @@ export default function Firmware() {
   const latestFirmware = firmwareUpdateQ.data;
   const firmwareReleaseBlocked = latestFirmware?.blockedReason ?? null;
   const firmwareReleaseBusy = firmwareUpdateState === "downloading" || firmwareUpdateState === "flashing";
+  const appOnlyRecoveryAvailable = updateModeDetected
+    && compatibility?.updaterProtocol === 0x0003
+    && !hasCompleteProfileRecovery(calibrationRecoveryQ.data ?? null)
+    && firmwareUpdateError?.includes("resident updater refresh was refused before BEGIN");
 
   return (
     <>
@@ -954,9 +1113,46 @@ export default function Firmware() {
                   )}
                 </div>
                 {firmwareUpdateError && (
-                  <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                    <IconAlertTriangle className="size-4 shrink-0" />
-                    {firmwareUpdateError}
+                  <div className="flex flex-col gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    <div className="flex items-center gap-2">
+                      <IconAlertTriangle className="size-4 shrink-0" />
+                      {firmwareUpdateError}
+                    </div>
+                    {appOnlyRecoveryAvailable && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={firmwareReleaseBusy || updaterInfoQ.isLoading}
+                          onClick={() => void handleAppOnlyRuntimeRecovery()}
+                        >
+                          Recover runtime only
+                        </Button>
+                        <span>
+                          The app first tries BOOT with no download or erase. Only an invalid app
+                          needs its exact installed-version carrier; support discovery stays off.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {appOnlyRecoveryReady && (
+                  <div className="flex flex-col gap-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning" role="status">
+                    <span>
+                      Runtime recovery finished without consuming the newer release version.
+                      Reconnect the keyboard in runtime mode, then continue: Configurator will
+                      persist schema 3 before retrying the resident-updater refresh.
+                    </span>
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!connected || updateModeDetected || firmwareReleaseBusy}
+                        onClick={() => void handleFlashLatestFirmware()}
+                      >
+                        Continue updater refresh
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>

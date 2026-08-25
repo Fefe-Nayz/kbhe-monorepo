@@ -421,6 +421,10 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
             'KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION: "0.1.18"',
             workflow,
         )
+        self.assertIn(
+            'KBHE_UPDATER_REFRESH_CARRIER_MIN_FIRMWARE_VERSION: "2.0.10"',
+            workflow,
+        )
         self.assertIn("Require updater-refresh capable configurator release", workflow)
         self.assertIn(".minimumConfiguratorVersion", workflow)
         self.assertIn(
@@ -429,6 +433,15 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
         )
         self.assertIn("! -name 'kbhe-updater-v2-to-v3.bin'", workflow)
         self.assertIn("! -name 'kbhe-updater-v3-refresh.bin'", workflow)
+        self.assertIn(
+            "mv dist/kbhe-app.bin dist/kbhe-app-updater-v3.bin",
+            workflow,
+        )
+        self.assertIn(
+            "Refresh-capable releases must not publish the legacy kbhe-app.bin role",
+            workflow,
+        )
+        self.assertIn(".primaryBinary = $primaryBinary", workflow)
         self.assertIn("draft: true", workflow)
         self.assertNotIn("--draft=false", workflow)
 

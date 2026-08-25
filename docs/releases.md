@@ -2,7 +2,7 @@
 
 The monorepo uses tag prefixes to build and stage the right assets:
 
-- `firmware-vX.Y.Z`: builds firmware and uploads `.bin`, `.hex`, `.elf`, `.map`, the detached `kbhe-app.bin.sig`, and a bootable signed `kbhe-factory.bin` image.
+- `firmware-vX.Y.Z`: builds firmware and uploads `.bin`, `.hex`, `.elf`, `.map`, the versioned final carrier (`kbhe-app.bin` before 2.0.10, `kbhe-app-updater-v3.bin` at/after 2.0.10) with its detached signature, and a bootable signed `kbhe-factory.bin` image.
 - `app-vX.Y.Z`: builds the Tauri configurator installer and uploads a matching `<installer>.sig` authentication asset.
 
 The desktop configurator checks GitHub Releases for both app updates and
@@ -359,11 +359,12 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
    `X`. Older configurators do not understand the exact schema-2
    refresh/capsule roles.
 
-   For the current `firmware-v2.0.9` installed baseline, the intended order is
-   therefore `app-v0.1.18` first, then `firmware-v2.0.10`. If any keyboard has
-   already received application 2.0.10 through an older configurator without
-   the resident refresh, use `firmware-v2.0.11` as the carrier for that cohort;
-   never rebuild or re-sign 2.0.10.
+   For the current `firmware-v2.0.9` source baseline, the minimum intended order
+   is therefore `app-v0.1.18` first, then `firmware-v2.0.10`. The carrier must
+   also be strictly newer than every application version that may already be on
+   affected keyboards: if 2.0.10 reached even one device through an older
+   configurator, this rollout must use `firmware-v2.0.11` (or higher), never a
+   rebuilt or re-signed 2.0.10.
 
 5. **Tag and push** (use semver `X.Y.Z` matching the source constants from
    step 1):
@@ -375,7 +376,8 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
 
 6. CI creates and remotely verifies a **draft** release at
    `https://github.com/<owner>/<repo>/releases/tag/firmware-vX.Y.Z` with
-   `kbhe-app.bin` plus `kbhe-app.bin.sig`, the complete
+   the exact versioned final carrier plus its signature (at/after 2.0.10,
+   `kbhe-app-updater-v3.bin` and `.sig`), the complete
    `kbhe-updater-v2-to-v3.bin` capsule, and the distinct inner
    `kbhe-updater-v3-refresh.bin` image with their signature siblings. The
    firmware signatures bind the exact inner image length, CRC32, SHA-512 digest

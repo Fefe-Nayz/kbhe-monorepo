@@ -14,6 +14,10 @@ use std::time::Duration;
 
 const APP_TAG_PREFIX: &str = "app-v";
 const FIRMWARE_TAG_PREFIX: &str = "firmware-v";
+pub(crate) const LEGACY_FIRMWARE_ASSET_NAME: &str = "kbhe-app.bin";
+pub(crate) const REFRESH_FIRMWARE_ASSET_NAME: &str = "kbhe-app-updater-v3.bin";
+const REFRESH_CARRIER_MIN_FIRMWARE_VERSION: (u64, u64, u64) = (2, 0, 10);
+const UPDATER_REFRESH_MIN_APP_VERSION: (u64, u64, u64) = (0, 1, 18);
 const MAX_APP_INSTALLER_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_FIRMWARE_BYTES: u64 = 0x0002_FF00;
 const MAX_MIGRATION_PACKAGE_BYTES: u64 = 0x0002_FF54;
@@ -205,10 +209,34 @@ fn installer_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
     None
 }
 
-fn firmware_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
+fn installer_asset_for_version(assets: &[GithubAsset], _version: &Version) -> Option<GithubAsset> {
+    installer_asset(assets)
+}
+
+fn version_at_least(version: &Version, minimum: (u64, u64, u64)) -> bool {
+    (version.major, version.minor, version.patch) >= minimum
+}
+
+pub(crate) fn firmware_asset_name_for_version(version: &Version) -> &'static str {
+    if version_at_least(version, REFRESH_CARRIER_MIN_FIRMWARE_VERSION) {
+        REFRESH_FIRMWARE_ASSET_NAME
+    } else {
+        LEGACY_FIRMWARE_ASSET_NAME
+    }
+}
+
+pub(crate) fn is_firmware_carrier_name(name: &str) -> bool {
+    matches!(
+        name,
+        LEGACY_FIRMWARE_ASSET_NAME | REFRESH_FIRMWARE_ASSET_NAME
+    )
+}
+
+fn firmware_asset(assets: &[GithubAsset], version: &Version) -> Option<GithubAsset> {
+    let expected_name = firmware_asset_name_for_version(version);
     assets
         .iter()
-        .find(|asset| asset.name == "kbhe-app.bin")
+        .find(|asset| asset.name == expected_name)
         .cloned()
 }
 
@@ -263,7 +291,7 @@ fn signature_asset(assets: &[GithubAsset], signed_asset: &GithubAsset) -> Option
 fn latest_release_with_asset(
     prefix: &str,
     current_version: Option<&str>,
-    pick_asset: fn(&[GithubAsset]) -> Option<GithubAsset>,
+    pick_asset: fn(&[GithubAsset], &Version) -> Option<GithubAsset>,
 ) -> Result<Option<(GithubRelease, Version, GithubAsset)>, String> {
     let mut candidates = Vec::new();
 
@@ -280,7 +308,7 @@ fn latest_release_with_asset(
             continue;
         }
 
-        let Some(asset) = pick_asset(&release.assets) else {
+        let Some(asset) = pick_asset(&release.assets, &version) else {
             continue;
         };
         if signature_asset(&release.assets, &asset).is_none() {
@@ -333,6 +361,7 @@ fn update_info(result: Option<(GithubRelease, Version, GithubAsset)>) -> Release
 fn firmware_update_info(
     result: Option<(GithubRelease, Version, GithubAsset)>,
     updater_protocol: Option<u16>,
+    app_version: &Version,
 ) -> ReleaseUpdateInfo {
     let Some((release, version, asset)) = result else {
         return update_info(None);
@@ -344,7 +373,14 @@ fn firmware_update_info(
     let missing_migration = migration_required && !migration_available;
     let missing_refresh =
         requires_bootloader_refresh_assets(updater_protocol) && !bootloader_refresh_available;
-    let blocked_reason = (missing_migration || missing_refresh).then(|| match updater_protocol {
+    let app_too_old = version_at_least(&version, REFRESH_CARRIER_MIN_FIRMWARE_VERSION)
+        && !version_at_least(app_version, UPDATER_REFRESH_MIN_APP_VERSION);
+    let blocked_reason = if app_too_old {
+        Some(format!(
+            "Firmware {version} uses the updater-refresh carrier role and requires KBHE Configurator 0.1.18 or newer. Update the configurator before downloading or flashing it."
+        ))
+    } else {
+        (missing_migration || missing_refresh).then(|| match updater_protocol {
         Some(UPDATER_PROTOCOL_V2) => format!(
             "Firmware {version} cannot be installed on this updater-v2 keyboard because release {} lacks the exact signed kbhe-updater-v2-to-v3 capsule pair. Wait for a corrected signed release, or use the documented ROM-DFU factory recovery.",
             release.tag_name
@@ -357,7 +393,8 @@ fn firmware_update_info(
             "Firmware {version} is not offered while the persistent updater is unknown because release {} does not contain both exact recovery roles: the signed v2 capsule and signed v3 refresh image. Enter bootloader to identify it, or wait for a corrected release.",
             release.tag_name
         ),
-    });
+        })
+    };
 
     ReleaseUpdateInfo {
         update_available: blocked_reason.is_none(),
@@ -384,7 +421,8 @@ pub async fn kbhe_check_app_update(
         let current = current_version
             .as_deref()
             .or(Some(env!("CARGO_PKG_VERSION")));
-        latest_release_with_asset(APP_TAG_PREFIX, current, installer_asset).map(update_info)
+        latest_release_with_asset(APP_TAG_PREFIX, current, installer_asset_for_version)
+            .map(update_info)
     })
     .await
     .map_err(|error| format!("app update worker failed: {error}"))?
@@ -396,12 +434,14 @@ pub async fn kbhe_check_firmware_update(
     updater_protocol: Option<u16>,
 ) -> Result<ReleaseUpdateInfo, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let app_version = Version::parse(env!("CARGO_PKG_VERSION"))
+            .map_err(|error| format!("invalid built-in configurator version: {error}"))?;
         latest_release_with_asset(
             FIRMWARE_TAG_PREFIX,
             current_version.as_deref(),
             firmware_asset,
         )
-        .map(|result| firmware_update_info(result, updater_protocol))
+        .map(|result| firmware_update_info(result, updater_protocol, &app_version))
     })
     .await
     .map_err(|error| format!("firmware update worker failed: {error}"))?
@@ -568,6 +608,7 @@ fn release_assets_by_tag(
 pub async fn kbhe_download_firmware_release(
     tag: String,
     updater_protocol: Option<u16>,
+    app_only_recovery: bool,
 ) -> Result<DownloadedFirmware, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let version = parse_prefixed_version(&tag, FIRMWARE_TAG_PREFIX)
@@ -581,18 +622,39 @@ pub async fn kbhe_download_firmware_release(
             .into_iter()
             .find(|release| release.tag_name == tag && !release.draft && !release.prerelease)
             .ok_or_else(|| format!("stable release {tag} was not found"))?;
-        let asset = firmware_asset(&release.assets)
-            .ok_or_else(|| format!("release {tag} has no kbhe-app.bin asset"))?;
+        let app_version = Version::parse(env!("CARGO_PKG_VERSION"))
+            .map_err(|error| format!("invalid built-in configurator version: {error}"))?;
+        if version_at_least(&version, REFRESH_CARRIER_MIN_FIRMWARE_VERSION)
+            && !version_at_least(&app_version, UPDATER_REFRESH_MIN_APP_VERSION)
+        {
+            return Err(format!(
+                "CONFIGURATOR_UPDATE_REQUIRED: firmware {version} requires KBHE Configurator 0.1.18 or newer"
+            ));
+        }
+        let expected_asset_name = firmware_asset_name_for_version(&version);
+        let asset = firmware_asset(&release.assets, &version).ok_or_else(|| {
+            format!("release {tag} has no exact {expected_asset_name} carrier asset")
+        })?;
         let firmware_signature_asset = signature_asset(&release.assets, &asset)
-            .ok_or_else(|| format!("release {tag} has no valid kbhe-app.bin.sig asset"))?;
-        let migration_pair = migration_asset_pair(&release.assets);
-        let bootloader_refresh_pair = bootloader_refresh_asset_pair(&release.assets);
-        if requires_migration_assets(updater_protocol) && migration_pair.is_none() {
+            .ok_or_else(|| {
+                format!("release {tag} has no valid {expected_asset_name}.sig asset")
+            })?;
+        let migration_pair = (!app_only_recovery)
+            .then(|| migration_asset_pair(&release.assets))
+            .flatten();
+        let bootloader_refresh_pair = (!app_only_recovery)
+            .then(|| bootloader_refresh_asset_pair(&release.assets))
+            .flatten();
+        if !app_only_recovery
+            && requires_migration_assets(updater_protocol)
+            && migration_pair.is_none()
+        {
             return Err(format!(
                 "UPDATER_MIGRATION_ASSETS_MISSING: release {tag} cannot be installed until updater v3 is confirmed because it does not contain both kbhe-updater-v2-to-v3.bin and its valid 64-byte detached signature. Enter the KBHE bootloader to verify updater v3, wait for a corrected signed release, or use the documented ROM-DFU factory recovery."
             ));
         }
-        if requires_bootloader_refresh_assets(updater_protocol)
+        if !app_only_recovery
+            && requires_bootloader_refresh_assets(updater_protocol)
             && bootloader_refresh_pair.is_none()
         {
             return Err(format!(
@@ -816,9 +878,11 @@ pub async fn kbhe_download_and_run_app_installer(tag: String) -> Result<String, 
 mod tests {
     use super::{
         bootloader_refresh_asset, bootloader_refresh_asset_pair, firmware_asset,
-        firmware_update_info, migration_asset, migration_asset_pair, parse_prefixed_version,
-        signature_asset, GithubAsset, GithubRelease, APP_TAG_PREFIX, ED25519_SIGNATURE_BYTES,
-        FIRMWARE_TAG_PREFIX, MAX_MIGRATION_PACKAGE_BYTES, UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3,
+        firmware_asset_name_for_version, firmware_update_info, migration_asset,
+        migration_asset_pair, parse_prefixed_version, signature_asset, GithubAsset, GithubRelease,
+        APP_TAG_PREFIX, ED25519_SIGNATURE_BYTES, FIRMWARE_TAG_PREFIX, LEGACY_FIRMWARE_ASSET_NAME,
+        MAX_MIGRATION_PACKAGE_BYTES, REFRESH_FIRMWARE_ASSET_NAME, UPDATER_PROTOCOL_V2,
+        UPDATER_PROTOCOL_V3,
     };
     use semver::Version;
 
@@ -830,12 +894,12 @@ mod tests {
         }
     }
 
-    fn firmware_release(assets: Vec<GithubAsset>) -> GithubRelease {
+    fn firmware_release(version: &str, assets: Vec<GithubAsset>) -> GithubRelease {
         GithubRelease {
-            tag_name: "firmware-v2.0.9".to_string(),
-            name: Some("Firmware 2.0.9".to_string()),
+            tag_name: format!("firmware-v{version}"),
+            name: Some(format!("Firmware {version}")),
             body: None,
-            html_url: "https://example.invalid/firmware-v2.0.9".to_string(),
+            html_url: format!("https://example.invalid/firmware-v{version}"),
             prerelease: false,
             draft: false,
             published_at: Some("2026-08-25T00:00:00Z".to_string()),
@@ -845,20 +909,26 @@ mod tests {
 
     #[test]
     fn firmware_release_assets_are_selected_by_exact_role() {
+        let legacy_version = Version::parse("2.0.9").unwrap();
+        let refresh_version = Version::parse("2.0.10").unwrap();
         let assets = vec![
             asset("kbhe-app.bin.backup", 10),
             asset("kbhe-updater-v2-to-v3.bin.old", 10),
             asset("kbhe-app.bin", 100),
             asset("kbhe-app.bin.sig", ED25519_SIGNATURE_BYTES),
+            asset("kbhe-app-updater-v3.bin", 101),
+            asset("kbhe-app-updater-v3.bin.sig", ED25519_SIGNATURE_BYTES),
             asset("kbhe-updater-v2-to-v3.bin", 200),
             asset("kbhe-updater-v2-to-v3.bin.sig", ED25519_SIGNATURE_BYTES),
             asset("kbhe-updater-v3-refresh.bin", 150),
             asset("kbhe-updater-v3-refresh.bin.sig", ED25519_SIGNATURE_BYTES),
         ];
-        let app = firmware_asset(&assets).unwrap();
+        let app = firmware_asset(&assets, &legacy_version).unwrap();
+        let refresh_app = firmware_asset(&assets, &refresh_version).unwrap();
         let migration = migration_asset(&assets).unwrap();
         let refresh = bootloader_refresh_asset(&assets).unwrap();
         assert_eq!(app.name, "kbhe-app.bin");
+        assert_eq!(refresh_app.name, "kbhe-app-updater-v3.bin");
         assert_eq!(migration.name, "kbhe-updater-v2-to-v3.bin");
         assert_eq!(refresh.name, "kbhe-updater-v3-refresh.bin");
         assert_eq!(
@@ -873,6 +943,26 @@ mod tests {
             signature_asset(&assets, &refresh).unwrap().name,
             "kbhe-updater-v3-refresh.bin.sig"
         );
+        assert_eq!(
+            firmware_asset_name_for_version(&legacy_version),
+            LEGACY_FIRMWARE_ASSET_NAME,
+        );
+        assert_eq!(
+            firmware_asset_name_for_version(&refresh_version),
+            REFRESH_FIRMWARE_ASSET_NAME,
+        );
+    }
+
+    #[test]
+    fn carrier_role_never_falls_back_across_the_refresh_threshold() {
+        let legacy_only = vec![asset("kbhe-app.bin", 100)];
+        let refresh_only = vec![asset("kbhe-app-updater-v3.bin", 100)];
+        let old = Version::parse("2.0.9").unwrap();
+        let threshold = Version::parse("2.0.10").unwrap();
+        assert!(firmware_asset(&legacy_only, &old).is_some());
+        assert!(firmware_asset(&legacy_only, &threshold).is_none());
+        assert!(firmware_asset(&refresh_only, &old).is_none());
+        assert!(firmware_asset(&refresh_only, &threshold).is_some());
     }
 
     #[test]
@@ -896,11 +986,12 @@ mod tests {
 
         let blocked = firmware_update_info(
             Some((
-                firmware_release(base_assets.clone()),
+                firmware_release("2.0.9", base_assets.clone()),
                 Version::parse("2.0.9").unwrap(),
                 app.clone(),
             )),
             Some(UPDATER_PROTOCOL_V2),
+            &Version::parse("0.1.18").unwrap(),
         );
         assert!(!blocked.update_available);
         assert!(blocked.migration_required);
@@ -913,11 +1004,12 @@ mod tests {
 
         let unknown_updater = firmware_update_info(
             Some((
-                firmware_release(base_assets.clone()),
+                firmware_release("2.0.9", base_assets.clone()),
                 Version::parse("2.0.9").unwrap(),
                 app.clone(),
             )),
             None,
+            &Version::parse("0.1.18").unwrap(),
         );
         assert!(!unknown_updater.update_available);
         assert!(unknown_updater.migration_required);
@@ -929,11 +1021,12 @@ mod tests {
 
         let v3_without_refresh = firmware_update_info(
             Some((
-                firmware_release(base_assets),
+                firmware_release("2.0.9", base_assets),
                 Version::parse("2.0.9").unwrap(),
                 app.clone(),
             )),
             Some(0x0003),
+            &Version::parse("0.1.18").unwrap(),
         );
         assert!(!v3_without_refresh.update_available);
         assert!(!v3_without_refresh.migration_required);
@@ -948,11 +1041,12 @@ mod tests {
         ];
         let v2_ready = firmware_update_info(
             Some((
-                firmware_release(complete_assets),
+                firmware_release("2.0.9", complete_assets),
                 Version::parse("2.0.9").unwrap(),
                 app.clone(),
             )),
             Some(UPDATER_PROTOCOL_V2),
+            &Version::parse("0.1.18").unwrap(),
         );
         assert!(v2_ready.update_available);
         assert!(v2_ready.migration_required);
@@ -968,15 +1062,47 @@ mod tests {
         assert!(bootloader_refresh_asset_pair(&refresh_assets).is_some());
         let v3_ready = firmware_update_info(
             Some((
-                firmware_release(refresh_assets),
+                firmware_release("2.0.9", refresh_assets),
                 Version::parse("2.0.9").unwrap(),
                 app,
             )),
             Some(UPDATER_PROTOCOL_V3),
+            &Version::parse("0.1.18").unwrap(),
         );
         assert!(v3_ready.update_available);
         assert!(v3_ready.bootloader_refresh_available);
         assert!(v3_ready.blocked_reason.is_none());
+    }
+
+    #[test]
+    fn refresh_carrier_requires_configurator_0_1_18() {
+        let version = Version::parse("2.0.10").unwrap();
+        let app = asset(REFRESH_FIRMWARE_ASSET_NAME, 100);
+        let assets = vec![
+            app.clone(),
+            asset("kbhe-app-updater-v3.bin.sig", ED25519_SIGNATURE_BYTES),
+            asset("kbhe-updater-v3-refresh.bin", 150),
+            asset("kbhe-updater-v3-refresh.bin.sig", ED25519_SIGNATURE_BYTES),
+        ];
+        let blocked = firmware_update_info(
+            Some((
+                firmware_release("2.0.10", assets.clone()),
+                version.clone(),
+                app.clone(),
+            )),
+            Some(UPDATER_PROTOCOL_V3),
+            &Version::parse("0.1.17").unwrap(),
+        );
+        assert!(!blocked.update_available);
+        assert!(blocked.blocked_reason.unwrap().contains("0.1.18"));
+
+        let ready = firmware_update_info(
+            Some((firmware_release("2.0.10", assets), version, app)),
+            Some(UPDATER_PROTOCOL_V3),
+            &Version::parse("0.1.18").unwrap(),
+        );
+        assert!(ready.update_available);
+        assert!(ready.blocked_reason.is_none());
     }
 
     #[test]

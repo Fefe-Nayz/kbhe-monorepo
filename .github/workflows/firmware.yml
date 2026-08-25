@@ -28,6 +28,7 @@ permissions:
 
 env:
   KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION: "0.1.18"
+  KBHE_UPDATER_REFRESH_CARRIER_MIN_FIRMWARE_VERSION: "2.0.10"
 
 jobs:
   build:
@@ -232,6 +233,19 @@ jobs:
             echo "Firmware version components must fit one byte" >&2
             exit 1
           fi
+          IFS=. read -r carrier_major carrier_minor carrier_patch \
+            <<<"$KBHE_UPDATER_REFRESH_CARRIER_MIN_FIRMWARE_VERSION"
+          refresh_carrier=false
+          if (( major > carrier_major ||
+                (major == carrier_major && minor > carrier_minor) ||
+                (major == carrier_major && minor == carrier_minor && patch >= carrier_patch) )); then
+            refresh_carrier=true
+          fi
+          if [ "$refresh_carrier" = true ]; then
+            primary_binary="kbhe-app-updater-v3.bin"
+          else
+            primary_binary="kbhe-app.bin"
+          fi
 
           python tools/release/sign_release_asset.py firmware \
             --key "$key_path" \
@@ -271,8 +285,11 @@ jobs:
             --signature dist/kbhe-updater-v2-to-v3.bin.sig \
             --version "$version" \
             --verify-public firmware/keys/firmware-ed25519-public.pem
-          jq --arg minimumConfiguratorVersion "$KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION" '
+          jq \
+            --arg minimumConfiguratorVersion "$KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION" \
+            --arg primaryBinary "$primary_binary" '
               .minimumConfiguratorVersion = $minimumConfiguratorVersion |
+              .primaryBinary = $primaryBinary |
               .legacyUpdaterMigration = "kbhe-updater-v2-to-v3.bin" |
               .updaterV3Refresh = "kbhe-updater-v3-refresh.bin" |
               del(.migrationExecutable)' \
@@ -317,6 +334,18 @@ jobs:
             ! -name 'kbhe-updater-v2-to-v3.bin' \
             ! -name 'kbhe-updater-v3-refresh.bin' \
             -print0)
+
+          if [ "$refresh_carrier" = true ]; then
+            mv dist/kbhe-app.bin dist/kbhe-app-updater-v3.bin
+            mv dist/kbhe-app.bin.sig dist/kbhe-app-updater-v3.bin.sig
+            if [ -e dist/kbhe-app.bin ] || [ -e dist/kbhe-app.bin.sig ]; then
+              echo "Refresh-capable releases must not publish the legacy kbhe-app.bin role" >&2
+              exit 1
+            fi
+          elif [ -e dist/kbhe-app-updater-v3.bin ] || [ -e dist/kbhe-app-updater-v3.bin.sig ]; then
+            echo "Legacy releases must not publish the refresh carrier role" >&2
+            exit 1
+          fi
 
       - name: Create authenticated draft release
         uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3

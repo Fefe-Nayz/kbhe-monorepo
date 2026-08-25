@@ -1,11 +1,16 @@
+use crate::releases::{
+    firmware_asset_name_for_version, is_firmware_carrier_name, REFRESH_FIRMWARE_ASSET_NAME,
+};
 use crate::signing::firmware_manifest;
 use crate::updater_compat::{
     bootloader_refresh_required, inspect_firmware_artifact, negotiate_flash_protocol,
     parse_bootloader_info, parse_updater_hello, updater_cleanup_is_safe,
     verify_refreshed_bootloader, BootloaderInfo, FirmwareArtifact, FlashProtocol, UpdaterHello,
-    UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3, UPDATER_V2_APP_MAX_IMAGE_SIZE,
+    UPDATER_FLAG_APP_VALID, UPDATER_FLAG_SIGNATURE_REQUIRED, UPDATER_PROTOCOL_V2,
+    UPDATER_PROTOCOL_V3, UPDATER_V2_APP_MAX_IMAGE_SIZE,
 };
 use hidapi::{DeviceInfo, HidApi, HidDevice};
+use semver::Version as SemverVersion;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -1986,6 +1991,8 @@ pub async fn kbhe_flash_firmware(
     migration_firmware_signature_path: Option<String>,
     bootloader_refresh_path: Option<String>,
     bootloader_refresh_signature_path: Option<String>,
+    settings_backup_complete: bool,
+    app_only_recovery: bool,
     firmware_version: FirmwareVersion,
     expected_serial_number: String,
     timeout_ms: u64,
@@ -2026,6 +2033,8 @@ pub async fn kbhe_flash_firmware(
             migration_firmware_signature_path,
             bootloader_refresh_path,
             bootloader_refresh_signature_path,
+            settings_backup_complete,
+            app_only_recovery,
             firmware_version,
             expected_serial_number,
             timeout_ms,
@@ -2035,6 +2044,83 @@ pub async fn kbhe_flash_firmware(
     })
     .await
     .map_err(|error| format!("firmware flash worker failed: {error}"))?
+}
+
+fn existing_application_recovery_command(hello: UpdaterHello) -> Result<u8, String> {
+    negotiate_flash_protocol(hello, &FirmwareArtifact::Application)?;
+    if hello.flags & UPDATER_FLAG_APP_VALID == 0 {
+        return Err(
+            "UPDATER_APP_INVALID: updater v3 has no valid installed application to boot; no destructive command was sent"
+                .to_string(),
+        );
+    }
+    Ok(UPDATER_CMD_BOOT)
+}
+
+#[tauri::command]
+pub async fn kbhe_boot_existing_application(
+    expected_serial_number: String,
+    timeout_ms: u64,
+    retries: u32,
+    app: AppHandle,
+    state: State<'_, KbheTransportState>,
+) -> Result<(), String> {
+    if !(UPDATER_TIMEOUT_MIN_MS..=UPDATER_TIMEOUT_MAX_MS).contains(&timeout_ms) {
+        return Err(format!(
+            "updater timeout must be {UPDATER_TIMEOUT_MIN_MS}..={UPDATER_TIMEOUT_MAX_MS} ms"
+        ));
+    }
+    if !(UPDATER_RETRIES_MIN..=UPDATER_RETRIES_MAX).contains(&retries) {
+        return Err(format!(
+            "updater retries must be {UPDATER_RETRIES_MIN}..={UPDATER_RETRIES_MAX}"
+        ));
+    }
+    let expected_serial_number = expected_serial_number.trim().to_string();
+    if expected_serial_number.is_empty() {
+        return Err("boot recovery requires a non-empty keyboard serial number".to_string());
+    }
+    let operation_guard =
+        ExclusiveOperationGuard::acquire(&FIRMWARE_FLASH_ACTIVE, "application boot recovery")?;
+    {
+        let mut active = lock_active(&state)?;
+        *active = None;
+    }
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation_guard = operation_guard;
+        let devices = enumerate_kbhe_devices()?;
+        let (runtime, updater) = resolve_flash_target_snapshot(&devices, &expected_serial_number)?;
+        if runtime.is_some() {
+            return Err(
+                "UPDATER_BOOT_RECOVERY_NOT_NEEDED: keyboard runtime is already reachable"
+                    .to_string(),
+            );
+        }
+        let updater = updater.ok_or_else(|| {
+            format!(
+                "updater for keyboard serial {expected_serial_number} was not found unambiguously"
+            )
+        })?;
+        let device = open_device_by_path(&updater.path)?;
+        verify_open_device_serial(&device, &expected_serial_number)?;
+        let hello = read_updater_hello(&device, &app, 0, timeout_ms, retries)?;
+        let command = existing_application_recovery_command(hello)?;
+        let response = updater_transact(
+            &device,
+            command,
+            0xB1,
+            0,
+            &[],
+            retries.min(3),
+            timeout_ms.min(2_000),
+        )?;
+        if response.status != UPDATER_STATUS_OK {
+            return Err(updater_status_error("BOOT", response.status));
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|error| format!("application boot recovery worker failed: {error}"))?
 }
 
 #[tauri::command]
@@ -2196,11 +2282,37 @@ fn prepare_flash_artifact(
     })
 }
 
+fn validate_firmware_carrier_name(
+    firmware_path: &str,
+    firmware_version: FirmwareVersion,
+) -> Result<(), String> {
+    let version = SemverVersion::new(
+        u64::from(firmware_version.major),
+        u64::from(firmware_version.minor),
+        u64::from(firmware_version.patch),
+    );
+    let expected = firmware_asset_name_for_version(&version);
+    let observed = Path::new(firmware_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "firmware carrier path has no valid Unicode file name".to_string())?;
+    if observed != expected {
+        return Err(format!(
+            "UPDATER_CARRIER_ROLE_MISMATCH: firmware {version} must use the exact signed carrier name {expected}; selected {observed}"
+        ));
+    }
+    Ok(())
+}
+
 fn discover_sibling_migration_assets(
     firmware_path: &str,
 ) -> Result<Option<(String, String)>, String> {
     let firmware_path = Path::new(firmware_path);
-    if firmware_path.file_name().and_then(|name| name.to_str()) != Some("kbhe-app.bin") {
+    if !firmware_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(is_firmware_carrier_name)
+    {
         return Ok(None);
     }
     let Some(parent) = firmware_path.parent() else {
@@ -2235,7 +2347,11 @@ fn discover_sibling_bootloader_refresh_assets(
     firmware_path: &str,
 ) -> Result<Option<(String, String)>, String> {
     let firmware_path = Path::new(firmware_path);
-    if firmware_path.file_name().and_then(|name| name.to_str()) != Some("kbhe-app.bin") {
+    if !firmware_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(is_firmware_carrier_name)
+    {
         return Ok(None);
     }
     let Some(parent) = firmware_path.parent() else {
@@ -2266,6 +2382,65 @@ fn discover_sibling_bootloader_refresh_assets(
     )))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DestructiveUpdaterOperation {
+    V2ToV3Migration,
+    V3Refresh,
+}
+
+fn run_bootloader_change_with_backup<T>(
+    operation: DestructiveUpdaterOperation,
+    settings_backup_complete: bool,
+    change: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
+    if !settings_backup_complete {
+        return Err(match operation {
+            DestructiveUpdaterOperation::V2ToV3Migration =>
+                "SETTINGS_BACKUP_REQUIRED: updater v2-to-v3 migration was refused before BEGIN because no verified schema-3 settings backup exists. Return to runtime and retry so the keyboard name, calibration and all profile settings are captured first; use the documented ROM-DFU recovery if runtime is unavailable."
+                    .to_string(),
+            DestructiveUpdaterOperation::V3Refresh => format!(
+                "SETTINGS_BACKUP_REQUIRED: resident updater refresh was refused before BEGIN because no verified schema-3 settings backup exists. If runtime cannot boot, choose Recover runtime only: Configurator will fetch the exact installed-version carrier and disable support-asset discovery. Reconnect runtime, capture schema 3, then retry the newer refresh."
+            ),
+        });
+    }
+    change()
+}
+
+fn support_artifact_discovery_allowed(app_only_recovery: bool) -> bool {
+    !app_only_recovery
+}
+
+fn validate_app_only_recovery_protocol(
+    app_only_recovery: bool,
+    updater_protocol: u16,
+) -> Result<(), String> {
+    if app_only_recovery && updater_protocol != UPDATER_PROTOCOL_V3 {
+        return Err(format!(
+            "UPDATER_APP_ONLY_RECOVERY_UNSUPPORTED: app-only recovery requires updater v3; observed protocol 0x{updater_protocol:04X}. No BEGIN was sent."
+        ));
+    }
+    Ok(())
+}
+
+fn validate_app_only_recovery_version(
+    hello: UpdaterHello,
+    selected: FirmwareVersion,
+) -> Result<(), String> {
+    let selected = [selected.major, selected.minor, selected.patch];
+    if hello.installed_version == [0, 0, 0] || hello.installed_version != selected {
+        return Err(format!(
+            "UPDATER_APP_ONLY_RECOVERY_VERSION_MISMATCH: app-only recovery must use the exact installed application version {}.{}.{}; selected {}.{}.{}. No BEGIN was sent.",
+            hello.installed_version[0],
+            hello.installed_version[1],
+            hello.installed_version[2],
+            selected[0],
+            selected[1],
+            selected[2],
+        ));
+    }
+    Ok(())
+}
+
 fn kbhe_flash_firmware_blocking(
     firmware_path: String,
     firmware_signature_path: String,
@@ -2273,20 +2448,35 @@ fn kbhe_flash_firmware_blocking(
     migration_firmware_signature_path: Option<String>,
     bootloader_refresh_path: Option<String>,
     bootloader_refresh_signature_path: Option<String>,
+    settings_backup_complete: bool,
+    app_only_recovery: bool,
     firmware_version: FirmwareVersion,
     expected_serial_number: String,
     timeout_ms: u64,
     retries: u32,
     app: AppHandle,
 ) -> Result<(), String> {
+    validate_firmware_carrier_name(&firmware_path, firmware_version)?;
     let primary = prepare_flash_artifact(
         &firmware_path,
         &firmware_signature_path,
         firmware_version,
         "firmware",
     )?;
+    if app_only_recovery
+        && (migration_firmware_path.is_some()
+            || migration_firmware_signature_path.is_some()
+            || bootloader_refresh_path.is_some()
+            || bootloader_refresh_signature_path.is_some())
+    {
+        return Err(
+            "UPDATER_APP_ONLY_RECOVERY_INVALID: app-only recovery cannot accept bootloader migration or refresh inputs"
+                .to_string(),
+        );
+    }
     let (migration_firmware_path, migration_firmware_signature_path) =
         match (migration_firmware_path, migration_firmware_signature_path) {
+            (None, None) if !support_artifact_discovery_allowed(app_only_recovery) => (None, None),
             (None, None) => match discover_sibling_migration_assets(&firmware_path)? {
                 Some((path, signature_path)) => (Some(path), Some(signature_path)),
                 None => (None, None),
@@ -2322,6 +2512,7 @@ fn kbhe_flash_firmware_blocking(
     };
     let (bootloader_refresh_path, bootloader_refresh_signature_path) =
         match (bootloader_refresh_path, bootloader_refresh_signature_path) {
+            (None, None) if !support_artifact_discovery_allowed(app_only_recovery) => (None, None),
             (None, None) => match discover_sibling_bootloader_refresh_assets(&firmware_path)? {
                 Some((path, signature_path)) => (Some(path), Some(signature_path)),
                 None => (None, None),
@@ -2355,8 +2546,9 @@ fn kbhe_flash_firmware_blocking(
     };
     if matches!(primary.artifact, FirmwareArtifact::V3BootloaderRefresh(_)) {
         return Err(
-            "UPDATER_ARTIFACT_MISMATCH: kbhe-updater-v3-refresh.bin is a support image, not final firmware; select the matching signed kbhe-app.bin"
-                .to_string(),
+            format!(
+                "UPDATER_ARTIFACT_MISMATCH: kbhe-updater-v3-refresh.bin is a support image, not final firmware; select the matching signed {REFRESH_FIRMWARE_ASSET_NAME}"
+            )
         );
     }
     if (migration.is_some() || bootloader_refresh.is_some())
@@ -2374,6 +2566,13 @@ fn kbhe_flash_firmware_blocking(
     // device command. Runtime and updater expose the same USB serial number.
     let devices = enumerate_kbhe_devices()?;
     let (runtime, updater) = resolve_flash_target_snapshot(&devices, &expected_serial_number)?;
+
+    if app_only_recovery && updater.is_none() {
+        return Err(
+            "UPDATER_APP_ONLY_RECOVERY_NOT_NEEDED: app-only recovery is available only while this keyboard already enumerates in updater mode; runtime is reachable, so capture schema 3 and run the normal update"
+                .to_string(),
+        );
+    }
 
     // Request bootloader from the selected runtime device if it is not already
     // present in updater mode.
@@ -2433,31 +2632,65 @@ fn kbhe_flash_firmware_blocking(
     // left untouched instead of guessing that ABORT/BOOT still have v2/v3
     // semantics.
     let initial_hello = read_updater_hello(&device, &app, primary.total, timeout_ms, retries)?;
+    validate_app_only_recovery_protocol(app_only_recovery, initial_hello.protocol_version)?;
+    if app_only_recovery {
+        validate_app_only_recovery_version(initial_hello, firmware_version)?;
+        negotiate_flash_protocol_with_cleanup(
+            &device,
+            initial_hello,
+            &primary.artifact,
+            retries,
+            timeout_ms,
+        )?;
+        if initial_hello.flags & UPDATER_FLAG_APP_VALID != 0 {
+            emit_flash_progress(&app, "appOnlyBoot", 0, primary.total);
+            let boot = updater_transact(
+                &device,
+                UPDATER_CMD_BOOT,
+                0xB1,
+                0,
+                &[],
+                retries.min(3),
+                timeout_ms.min(2_000),
+            )?;
+            if boot.status != UPDATER_STATUS_OK {
+                return Err(updater_status_error("BOOT", boot.status));
+            }
+            return Ok(());
+        }
+    }
 
     if initial_hello.protocol_version == UPDATER_PROTOCOL_V2 && migration.is_some() {
         let migration = migration.as_ref().expect("migration was checked");
         let FirmwareArtifact::V2ToV3Migration(migration_metadata) = &migration.artifact else {
             unreachable!("migration artifact was checked during preparation");
         };
-        let protocol = negotiate_flash_protocol_with_cleanup(
-            &device,
-            initial_hello,
-            &migration.artifact,
-            retries,
-            timeout_ms,
+        run_bootloader_change_with_backup(
+            DestructiveUpdaterOperation::V2ToV3Migration,
+            settings_backup_complete,
+            || {
+                let protocol = negotiate_flash_protocol_with_cleanup(
+                    &device,
+                    initial_hello,
+                    &migration.artifact,
+                    retries,
+                    timeout_ms,
+                )?;
+                if let Err(error) = flash_after_hello(
+                    &device,
+                    initial_hello,
+                    protocol,
+                    migration,
+                    &app,
+                    timeout_ms,
+                    retries,
+                ) {
+                    cleanup_updater_session(&device, retries, timeout_ms);
+                    return Err(error);
+                }
+                Ok(())
+            },
         )?;
-        if let Err(error) = flash_after_hello(
-            &device,
-            initial_hello,
-            protocol,
-            migration,
-            &app,
-            timeout_ms,
-            retries,
-        ) {
-            cleanup_updater_session(&device, retries, timeout_ms);
-            return Err(error);
-        }
         drop(device);
 
         emit_flash_progress(&app, "migration", migration.total, migration.total);
@@ -2517,26 +2750,33 @@ fn kbhe_flash_firmware_blocking(
         let installed_bootloader =
             read_updater_bootloader_info(&device, timeout_ms.min(1_000), retries.min(2))?;
         if bootloader_refresh_required(installed_bootloader, refresh_metadata)? {
-            emit_flash_progress(&app, "bootloaderRefresh", 0, refresh.total);
-            let protocol = negotiate_flash_protocol_with_cleanup(
-                &device,
-                initial_hello,
-                &refresh.artifact,
-                retries,
-                timeout_ms,
+            run_bootloader_change_with_backup(
+                DestructiveUpdaterOperation::V3Refresh,
+                settings_backup_complete,
+                || {
+                    emit_flash_progress(&app, "bootloaderRefresh", 0, refresh.total);
+                    let protocol = negotiate_flash_protocol_with_cleanup(
+                        &device,
+                        initial_hello,
+                        &refresh.artifact,
+                        retries,
+                        timeout_ms,
+                    )?;
+                    if let Err(error) = flash_after_hello(
+                        &device,
+                        initial_hello,
+                        protocol,
+                        refresh,
+                        &app,
+                        timeout_ms,
+                        retries,
+                    ) {
+                        cleanup_updater_session(&device, retries, timeout_ms);
+                        return Err(error);
+                    }
+                    Ok(())
+                },
             )?;
-            if let Err(error) = flash_after_hello(
-                &device,
-                initial_hello,
-                protocol,
-                refresh,
-                &app,
-                timeout_ms,
-                retries,
-            ) {
-                cleanup_updater_session(&device, retries, timeout_ms);
-                return Err(error);
-            }
             drop(device);
 
             let (refreshed_device, refreshed_hello) = wait_for_updater_protocol(
@@ -2957,14 +3197,20 @@ fn flash_after_hello(
 #[cfg(test)]
 mod transport_tests {
     use super::{
-        firmware_flash_blocks_transport, is_supported_libhmk_rgb_effect,
-        matches_libhmk_rgb_identity, normalize_rgb_bridge_response, parse_rgb_bridge_capabilities,
-        read_sibling_firmware_signature, resolve_flash_target_snapshot, response_matches_request,
-        rgb_bridge_report, rgb_bridge_response_matches_request, rgb_live_write_plan,
-        select_unique_flash_device, select_unique_rgb_bridge_device, KbheDeviceKind,
-        KbheHidDeviceInfo, KbheRgbBridgeDeviceInfo, KBHE_APP_PID, KBHE_LIBHMK_PID,
-        KBHE_LIBHMK_USAGE, KBHE_LIBHMK_USAGE_PAGE, KBHE_PACKET_SIZE, KBHE_UPDATER_PID, KBHE_VID,
-        RGB_CMD_FILL, RGB_CMD_GET_CAPABILITIES, RGB_CMD_SET_FRAME_CHUNK,
+        existing_application_recovery_command, firmware_flash_blocks_transport,
+        is_supported_libhmk_rgb_effect, matches_libhmk_rgb_identity, normalize_rgb_bridge_response,
+        parse_rgb_bridge_capabilities, read_sibling_firmware_signature,
+        resolve_flash_target_snapshot, response_matches_request, rgb_bridge_report,
+        rgb_bridge_response_matches_request, rgb_live_write_plan,
+        run_bootloader_change_with_backup, select_unique_flash_device,
+        select_unique_rgb_bridge_device, support_artifact_discovery_allowed,
+        validate_app_only_recovery_protocol, validate_app_only_recovery_version,
+        validate_firmware_carrier_name, DestructiveUpdaterOperation, FirmwareVersion,
+        KbheDeviceKind, KbheHidDeviceInfo, KbheRgbBridgeDeviceInfo, UpdaterHello, KBHE_APP_PID,
+        KBHE_LIBHMK_PID, KBHE_LIBHMK_USAGE, KBHE_LIBHMK_USAGE_PAGE, KBHE_PACKET_SIZE,
+        KBHE_UPDATER_PID, KBHE_VID, RGB_CMD_FILL, RGB_CMD_GET_CAPABILITIES,
+        RGB_CMD_SET_FRAME_CHUNK, UPDATER_CMD_BEGIN, UPDATER_CMD_BOOT, UPDATER_FLAG_APP_VALID,
+        UPDATER_FLAG_SIGNATURE_REQUIRED, UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3,
     };
 
     fn firmware_device(
@@ -3226,6 +3472,138 @@ mod transport_tests {
             .contains("absolute .bin"));
 
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn schema_one_and_two_cannot_reach_bootloader_begin() {
+        use std::cell::Cell;
+
+        for legacy_schema in [1, 2] {
+            let begin_calls = Cell::new(0u8);
+            let error = run_bootloader_change_with_backup(
+                DestructiveUpdaterOperation::V3Refresh,
+                false,
+                || {
+                    begin_calls.set(begin_calls.get() + 1);
+                    Ok(())
+                },
+            )
+            .unwrap_err();
+            assert_eq!(begin_calls.get(), 0, "schema {legacy_schema} reached BEGIN");
+            assert!(error.contains("refused before BEGIN"));
+        }
+
+        let begin_calls = Cell::new(0u8);
+        run_bootloader_change_with_backup(DestructiveUpdaterOperation::V3Refresh, true, || {
+            begin_calls.set(begin_calls.get() + 1);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(begin_calls.get(), 1);
+    }
+
+    #[test]
+    fn bootloader_migration_uses_the_same_pre_begin_backup_gate() {
+        let error = run_bootloader_change_with_backup(
+            DestructiveUpdaterOperation::V2ToV3Migration,
+            false,
+            || -> Result<(), String> {
+                panic!("migration BEGIN must not be reachable without schema 3")
+            },
+        )
+        .unwrap_err();
+        assert!(error.contains("v2-to-v3 migration"));
+        assert!(error.contains("refused before BEGIN"));
+    }
+
+    #[test]
+    fn local_firmware_selection_uses_the_exact_versioned_carrier_role() {
+        let legacy = FirmwareVersion {
+            major: 2,
+            minor: 0,
+            patch: 9,
+        };
+        let refresh = FirmwareVersion {
+            major: 2,
+            minor: 0,
+            patch: 10,
+        };
+        assert!(validate_firmware_carrier_name("/tmp/kbhe-app.bin", legacy).is_ok());
+        assert!(validate_firmware_carrier_name("/tmp/kbhe-app-updater-v3.bin", refresh,).is_ok());
+        assert!(validate_firmware_carrier_name("/tmp/kbhe-app.bin", refresh)
+            .unwrap_err()
+            .contains("UPDATER_CARRIER_ROLE_MISMATCH"));
+        assert!(validate_firmware_carrier_name("/tmp/kbhe-app-updater-v3.bin", legacy,).is_err());
+    }
+
+    #[test]
+    fn explicit_app_only_recovery_disables_support_discovery_and_requires_v3() {
+        assert!(support_artifact_discovery_allowed(false));
+        assert!(!support_artifact_discovery_allowed(true));
+        assert!(validate_app_only_recovery_protocol(true, UPDATER_PROTOCOL_V3).is_ok());
+        let error = validate_app_only_recovery_protocol(true, UPDATER_PROTOCOL_V2).unwrap_err();
+        assert!(error.contains("requires updater v3"));
+        assert!(error.contains("No BEGIN was sent"));
+
+        let hello = UpdaterHello {
+            protocol_version: UPDATER_PROTOCOL_V3,
+            flags: 0,
+            app_base: 0x0801_0000,
+            app_max_size: 0x0002_FF00,
+            write_align: 4,
+            installed_version: [2, 0, 9],
+        };
+        assert!(validate_app_only_recovery_version(
+            hello,
+            FirmwareVersion {
+                major: 2,
+                minor: 0,
+                patch: 9,
+            },
+        )
+        .is_ok());
+        let mismatch = validate_app_only_recovery_version(
+            hello,
+            FirmwareVersion {
+                major: 2,
+                minor: 0,
+                patch: 10,
+            },
+        )
+        .unwrap_err();
+        assert!(mismatch.contains("exact installed application version"));
+        assert!(mismatch.contains("No BEGIN was sent"));
+    }
+
+    #[test]
+    fn existing_v3_application_recovery_plans_boot_only() {
+        let valid = UpdaterHello {
+            protocol_version: UPDATER_PROTOCOL_V3,
+            flags: UPDATER_FLAG_SIGNATURE_REQUIRED | UPDATER_FLAG_APP_VALID,
+            app_base: 0x0801_0000,
+            app_max_size: 0x0002_FF00,
+            write_align: 4,
+            installed_version: [2, 0, 9],
+        };
+        let command = existing_application_recovery_command(valid).unwrap();
+        assert_eq!(command, UPDATER_CMD_BOOT);
+        assert_ne!(command, UPDATER_CMD_BEGIN);
+
+        let invalid = UpdaterHello {
+            flags: UPDATER_FLAG_SIGNATURE_REQUIRED,
+            ..valid
+        };
+        assert!(existing_application_recovery_command(invalid)
+            .unwrap_err()
+            .contains("no destructive command"));
+
+        let v2 = UpdaterHello {
+            protocol_version: UPDATER_PROTOCOL_V2,
+            flags: UPDATER_FLAG_APP_VALID,
+            app_max_size: 0x0004_FF00,
+            ..valid
+        };
+        assert!(existing_application_recovery_command(v2).is_err());
     }
 
     #[test]

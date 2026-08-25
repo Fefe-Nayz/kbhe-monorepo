@@ -8,7 +8,7 @@ firmware version: the bootloader is persistent and the two versions can differ.
 
 | Updater | Geometry | Allowed artifact | Transfer |
 |---|---|---|---|
-| v3 (`0x0003`) | app `0x08010000`, max `0x2FF00`, 4-byte writes | normal signed `kbhe-app.bin` or exact signed `kbhe-updater-v3-refresh.bin` inner image | `HELLO -> [BOOTLOADER_INFO] -> AUTH -> BEGIN -> DATA -> FINISH -> BOOT` |
+| v3 (`0x0003`) | app `0x08010000`, max `0x2FF00`, 4-byte writes | exact final carrier (`kbhe-app.bin` before 2.0.10, `kbhe-app-updater-v3.bin` at/after 2.0.10) or exact signed `kbhe-updater-v3-refresh.bin` inner image | `HELLO -> [BOOTLOADER_INFO] -> AUTH -> BEGIN -> DATA -> FINISH -> BOOT` |
 | v2 (`0x0002`) | app `0x08010000`, max `0x4FF00`, 4-byte writes | exact signed `kbhe-updater-v2-to-v3.bin` package only | `HELLO -> BEGIN -> DATA -> FINISH -> BOOT` |
 | other | exact matching is required | none | fail before `BEGIN` |
 
@@ -19,6 +19,19 @@ bootloader and exact hardware target. An older v3 updater returns
 resident bootloader and refreshes once. If the reported target matches and the
 resident version is equal to or newer than the refresh asset, the configurator
 skips the refresh and flashes the final application directly.
+
+A destructive bootloader stage also requires a durable schema-3 settings
+backup. Schema 1 (calibration) and schema 2 (calibration/profiles) remain valid
+restore inputs but do not contain the complete keyboard identity and never open
+the destructive gate. Starting already in updater v3 without schema 3 permits
+only HELLO and BOOTLOADER_INFO; a required refresh is refused before BEGIN.
+**Recover runtime only** first sends BOOT to a validated v3 `APP_VALID` image,
+with no download, BEGIN or erase. Only an invalid app downloads the exact
+installed-version carrier with all support-asset discovery disabled, then
+recovers sectors 4–5 without consuming the newer refresh version.
+After runtime reconnect, **Continue updater refresh** captures schema 3 and
+retries the newer release. This explicit recovery is v3-only because updater
+v2 geometry overlaps a profile bank.
 
 The bootloader version is not the application release version. It is stored in
 the `KBLV` record defined by `updater_bootloader_version.h` and is bumped only
@@ -153,16 +166,16 @@ $hil = Join-Path $env:TEMP "kbhe-$tag-hil"
 New-Item -ItemType Directory -Path $hil | Out-Null
 gh release view $tag --repo Fefe-Nayz/kbhe-monorepo --json isDraft,assets
 gh release download $tag --repo Fefe-Nayz/kbhe-monorepo --dir $hil `
-  --pattern 'kbhe-app.bin' `
-  --pattern 'kbhe-app.bin.sig' `
+  --pattern 'kbhe-app-updater-v3.bin' `
+  --pattern 'kbhe-app-updater-v3.bin.sig' `
   --pattern 'kbhe-updater-v2-to-v3.bin' `
   --pattern 'kbhe-updater-v2-to-v3.bin.sig' `
   --pattern 'kbhe-updater-v3-refresh.bin' `
   --pattern 'kbhe-updater-v3-refresh.bin.sig'
 
 python tools/release/sign_release_asset.py firmware `
-  --input "$hil/kbhe-app.bin" `
-  --signature "$hil/kbhe-app.bin.sig" `
+  --input "$hil/kbhe-app-updater-v3.bin" `
+  --signature "$hil/kbhe-app-updater-v3.bin.sig" `
   --version $version `
   --verify-public firmware/keys/firmware-ed25519-public.pem
 python tools/release/build_updater_migration_package.py inspect `
@@ -179,7 +192,7 @@ python tools/release/build_updater_migration_package.py inspect-image `
 
 Confirm `isDraft` is `true` and that exactly one asset with each required name
 was downloaded. Keep all six files together. In the native configurator,
-select `kbhe-app.bin` and its detached signature; the native updater command
+select `kbhe-app-updater-v3.bin` and its detached signature; the native updater command
 discovers the exact sibling support pairs and authenticates them before
 touching the keyboard. It performs either `v2 -> full package -> migrator ->
 v3 -> final app -> runtime`, `old v3 -> refresh image -> migrator -> current v3

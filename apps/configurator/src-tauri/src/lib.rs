@@ -297,6 +297,7 @@ pub fn run() {
             commands::kbhe_detect_bootloader_presence,
             commands::kbhe_get_os_key_variants,
             commands::kbhe_read_firmware_signature,
+            commands::kbhe_boot_existing_application,
             commands::kbhe_flash_firmware,
             releases::kbhe_check_app_update,
             releases::kbhe_check_firmware_update,

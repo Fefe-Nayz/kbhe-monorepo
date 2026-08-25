@@ -29,9 +29,16 @@ describe("Tauri firmware file scope", () => {
     expect(paths).toContain(
       "$TEMP/kbhe-configurator/firmware/*/kbhe-app.bin.sig",
     );
+    expect(paths).toContain(
+      "$TEMP/kbhe-configurator/firmware/*/kbhe-app-updater-v3.bin.sig",
+    );
     expect(paths).not.toContain("**/*.bin.sig");
 
     const firmwarePage = await Bun.file("src/pages/Firmware.tsx").text();
     expect(firmwarePage).toContain('invoke<number[]>("kbhe_read_firmware_signature"');
+    expect(firmwarePage).toContain("downloadFirmwareRelease(tag, 0x0003, true)");
+    expect(firmwarePage).toContain('invoke("kbhe_boot_existing_application"');
+    expect(firmwarePage).toContain("Recover runtime only");
+    expect(firmwarePage).toContain("Continue updater refresh");
   });
 });

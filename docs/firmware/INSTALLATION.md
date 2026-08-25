@@ -66,8 +66,10 @@ that configurator before the firmware release carrying the refresh assets.
 2. Open **Firmware** and choose **Check for updates**.
 3. Download and install the offered release.
 
-The configurator downloads `kbhe-app.bin` and its exact
-`kbhe-app.bin.sig`, verifies the signature locally, then sends AUTH before the
+For releases before 2.0.10 the configurator downloads the legacy
+`kbhe-app.bin` role. Starting at 2.0.10 it accepts only the exact
+`kbhe-app-updater-v3.bin` carrier and its `.sig`; those releases never publish
+the old name. It verifies the signature locally, then sends AUTH before the
 bootloader is permitted to erase sectors 4–5. Stable releases also carry a
 locally verified `kbhe-updater-v2-to-v3.bin` capsule and the distinct
 `kbhe-updater-v3-refresh.bin` inner image. When HELLO reports v2, one native
@@ -78,6 +80,13 @@ resident bootloader identity. Older v3 implementations that do not know that
 command are refreshed once; an equal or newer matching bootloader is skipped.
 The bootloader re-verifies each firmware signature before BEGIN, after
 programming, and on every boot.
+
+Before any v2 migration or required v3 resident refresh, Configurator persists
+and reads back a schema-3 recovery record containing the keyboard name, all 82
+calibration pairs, profile topology, every used profile and global settings.
+Schema 1/2 records remain restorable but cannot authorize a bootloader change.
+If the keyboard starts in updater v3 without schema 3, the configurator reads
+HELLO/BOOTLOADER_INFO but refuses before BEGIN when refresh is needed.
 
 The configurator negotiates updater v2 and v3 explicitly. A normal application
 is never sent to updater v2 because the legacy validity trailer and the current
@@ -106,9 +115,21 @@ path.
 
 ## Manual signed USB update
 
-Download the matching pair `kbhe-app.bin` and `kbhe-app.bin.sig`. In the
+Download the exact pair for the release: `kbhe-app.bin[.sig]` before 2.0.10,
+or `kbhe-app-updater-v3.bin[.sig]` from 2.0.10 onward. In the
 configurator, select the BIN; when prompted, select its SIG sibling. Unsigned,
 mismatched and non-newer images are rejected before application flash erase.
+
+If runtime is unavailable but updater v3 still enumerates and no schema-3
+backup exists, choose **Recover runtime only** on the Firmware page. The app
+first validates updater v3 plus `APP_VALID` and sends BOOT with no download,
+BEGIN or erase. Only when the installed app is invalid does it download the
+exact release matching HELLO's installed version, while explicitly disabling
+migration/refresh discovery, and recover sectors 4–5 without consuming the
+newer refresh version. Reconnect runtime and choose **Continue updater refresh**;
+Configurator then captures schema 3 before the normal newer release. Updater
+v2 cannot use this shortcut; use the documented ROM-DFU factory recovery when
+its runtime cannot be reached.
 
 The Python host performs the same authenticated flow:
 

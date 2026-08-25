@@ -10,6 +10,10 @@ describe("release compatibility matrix", () => {
   test.each([
     ["0.1.17", "2.0.8", 0x0003, "compatible"],
     ["0.1.99", "2.0.9", null, "compatible"],
+    ["0.1.17", "2.0.10", 0x0003, "app-too-old"],
+    ["0.1.18", "2.0.10", 0x0003, "compatible"],
+    ["0.1.18", null, 0x0002, "compatible"],
+    ["0.1.18", null, 0x0003, "compatible"],
     ["0.1.17", null, 0x0002, "compatible"],
     ["0.1.17", "2.0.0", null, "firmware-too-old"],
     ["0.1.17", "2.1.0", null, "app-too-old"],

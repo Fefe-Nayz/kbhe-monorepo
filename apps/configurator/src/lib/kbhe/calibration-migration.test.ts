@@ -3,8 +3,10 @@ import {
   captureUpdaterMigrationBackup,
   getUpdaterMigrationBackup,
   hasCompleteProfileRecovery,
+  hasProfileRecovery,
   isResetCalibration,
   normalizeCalibrationSettings,
+  refreshUpdaterMigrationBackup,
   restoreUpdaterMigrationBackup,
   type CalibrationMigrationStore,
   type FirmwareProfileMigrationApi,
@@ -143,18 +145,22 @@ function legacyProfileSnapshot(
 class MemoryStore implements CalibrationMigrationStore {
   readonly values = new Map<string, unknown>();
   failSave = false;
+  deleteCalls = 0;
+  saveCalls = 0;
+  setCalls = 0;
   async init() {}
   async get(key: string) { return this.values.get(key); }
-  async set(key: string, value: unknown) { this.values.set(key, structuredClone(value)); }
-  async delete(key: string) { return this.values.delete(key); }
+  async set(key: string, value: unknown) { this.setCalls += 1; this.values.set(key, structuredClone(value)); }
+  async delete(key: string) { this.deleteCalls += 1; return this.values.delete(key); }
   async entries() { return Array.from(this.values.entries()); }
-  async save() { if (this.failSave) throw new Error("disk unavailable"); }
+  async save() { this.saveCalls += 1; if (this.failSave) throw new Error("disk unavailable"); }
 }
 
 class MemoryProfileApi implements FirmwareProfileMigrationApi {
   snapshots = new Map<number, FirmwareProfileSnapshot>();
   applied: number[] = [];
   corruptVerification = false;
+  failApplyOnceAt: number | null = null;
   async capture(profileIndex: number) {
     const snapshot = this.snapshots.get(profileIndex);
     if (!snapshot) return null;
@@ -163,6 +169,10 @@ class MemoryProfileApi implements FirmwareProfileMigrationApi {
     return captured;
   }
   async apply(snapshot: FirmwareProfileSnapshot, targetProfileIndex: number) {
+    if (this.failApplyOnceAt === targetProfileIndex) {
+      this.failApplyOnceAt = null;
+      return false;
+    }
     // Production intentionally strips globals from per-profile apply. The fake
     // restores them from its existing state so verification models live reads.
     // A migrated firmware also exposes default action storage even when the
@@ -208,8 +218,11 @@ class MemoryDevice implements UpdaterMigrationDevice {
     public activeProfileIndex: number,
     public defaultProfileIndex: number,
     public names: Array<string | null>,
+    public keyboardName = "KBHE",
   ) {}
   async getCalibration() { return this.current ? structuredClone(this.current) : null; }
+  async getKeyboardName() { return this.keyboardName; }
+  async setKeyboardName(name: string) { this.keyboardName = name; return name; }
   async setCalibration(lutZero: number, keyZeros: ArrayLike<number>, keyMaxs: ArrayLike<number>) {
     this.current = { lut_zero_value: lutZero, key_zero_values: Array.from(keyZeros), key_max_values: Array.from(keyMaxs) };
     return true;
@@ -286,12 +299,22 @@ describe("complete updater migration recovery", () => {
     const original = originalDevice(serial);
     const backup = await captureUpdaterMigrationBackup(serial, original.device, store, original.profiles);
     expect(hasCompleteProfileRecovery(backup)).toBeTrue();
+    expect(backup.schemaVersion).toBe(3);
+    expect(backup.keyboardName).toBe("KBHE");
     expect(backup.profiles.usedMask).toBe(0b0101);
-    const migrated = new MemoryDevice(calibration(100), 0b0001, 0, 0, ["Default", null, null, null]);
+    const migrated = new MemoryDevice(
+      calibration(100),
+      0b0001,
+      0,
+      0,
+      ["Default", null, null, null],
+      "Factory name",
+    );
     const migratedProfiles = new MemoryProfileApi();
     migratedProfiles.snapshots.set(0, profileSnapshot(0, serial));
     expect(await restoreUpdaterMigrationBackup(serial, migrated, store, migratedProfiles)).toBeTrue();
     expect(migrated.current).toEqual(calibration());
+    expect(migrated.keyboardName).toBe("KBHE");
     expect(migrated.usedMask).toBe(0b0101);
     expect(migrated.names).toEqual(["Main", null, "Game", null]);
     expect([migrated.activeProfileIndex, migrated.defaultProfileIndex]).toEqual([2, 0]);
@@ -343,6 +366,91 @@ describe("complete updater migration recovery", () => {
     expect(await getUpdaterMigrationBackup(serial, store)).not.toBeNull();
   });
 
+  test("keeps a partially restored backup and retries idempotently", async () => {
+    const serial = "KBHE-RETRY";
+    const store = new MemoryStore();
+    const original = originalDevice(serial);
+    await captureUpdaterMigrationBackup(serial, original.device, store, original.profiles);
+    const migrated = new MemoryDevice(
+      calibration(100),
+      1,
+      0,
+      0,
+      ["Default", null, null, null],
+      "Factory name",
+    );
+    const profiles = new MemoryProfileApi();
+    profiles.snapshots.set(0, profileSnapshot(0, serial));
+    profiles.failApplyOnceAt = 2;
+
+    await expect(restoreUpdaterMigrationBackup(serial, migrated, store, profiles))
+      .rejects.toThrow("SETTINGS_RESTORE_REQUIRED");
+    expect(await getUpdaterMigrationBackup(serial, store)).not.toBeNull();
+
+    expect(await restoreUpdaterMigrationBackup(serial, migrated, store, profiles)).toBeTrue();
+    expect(migrated.keyboardName).toBe("KBHE");
+    expect(migrated.current).toEqual(calibration());
+    expect(migrated.usedMask).toBe(0b0101);
+    expect(await getUpdaterMigrationBackup(serial, store)).toBeNull();
+  });
+
+  test("restores and acknowledges an existing schema 3 before capturing a fresh gate", async () => {
+    const serial = "KBHE-FRESH-GATE";
+    const store = new MemoryStore();
+    const original = originalDevice(serial);
+    const existing = await captureUpdaterMigrationBackup(
+      serial,
+      original.device,
+      store,
+      original.profiles,
+    );
+    store.deleteCalls = 0;
+    store.saveCalls = 0;
+    store.setCalls = 0;
+    original.device.keyboardName = "Changed after interruption";
+
+    const fresh = await refreshUpdaterMigrationBackup(
+      serial,
+      existing,
+      original.device,
+      store,
+      original.profiles,
+    );
+    expect(fresh.schemaVersion).toBe(3);
+    expect(fresh.keyboardName).toBe("KBHE");
+    expect(original.device.keyboardName).toBe("KBHE");
+    expect(store.deleteCalls).toBe(1);
+    expect(store.setCalls).toBe(1);
+    expect(store.saveCalls).toBe(2);
+    expect(hasCompleteProfileRecovery(await getUpdaterMigrationBackup(serial, store))).toBeTrue();
+  });
+
+  test("keeps the verified backup visible when acknowledgement persistence fails", async () => {
+    const serial = "KBHE-ACK-RETRY";
+    const store = new MemoryStore();
+    const original = originalDevice(serial);
+    await captureUpdaterMigrationBackup(serial, original.device, store, original.profiles);
+    const migrated = new MemoryDevice(
+      calibration(100),
+      1,
+      0,
+      0,
+      ["Default", null, null, null],
+      "Factory name",
+    );
+    const profiles = new MemoryProfileApi();
+    profiles.snapshots.set(0, profileSnapshot(0, serial));
+    store.failSave = true;
+
+    await expect(restoreUpdaterMigrationBackup(serial, migrated, store, profiles))
+      .rejects.toThrow("backup was kept for retry");
+    expect(await getUpdaterMigrationBackup(serial, store)).not.toBeNull();
+
+    store.failSave = false;
+    expect(await restoreUpdaterMigrationBackup(serial, migrated, store, profiles)).toBeTrue();
+    expect(await getUpdaterMigrationBackup(serial, store)).toBeNull();
+  });
+
   test("restores legacy calibration-only data but never considers it complete", async () => {
     const serial = "KBHE-LEGACY";
     const store = new MemoryStore();
@@ -353,6 +461,43 @@ describe("complete updater migration recovery", () => {
     expect(await restoreUpdaterMigrationBackup(serial, runtime.device, store, runtime.profiles)).toBeTrue();
     expect(runtime.device.current).toEqual(calibration());
     expect(runtime.profiles.applied).toEqual([]);
+  });
+
+  test("restores schema 2 profiles but never authorizes a destructive updater change", async () => {
+    const serial = "KBHE-SCHEMA-2";
+    const store = new MemoryStore();
+    const original = originalDevice(serial);
+    const complete = await captureUpdaterMigrationBackup(
+      serial,
+      original.device,
+      store,
+      original.profiles,
+    );
+    store.values.set(`calibration:${serial}`, {
+      schemaVersion: 2,
+      serialNumber: serial,
+      capturedAt: complete.capturedAt,
+      calibration: complete.calibration,
+      profiles: complete.profiles,
+    });
+    const legacyProfiles = await getUpdaterMigrationBackup(serial, store);
+    expect(hasProfileRecovery(legacyProfiles)).toBeTrue();
+    expect(hasCompleteProfileRecovery(legacyProfiles)).toBeFalse();
+
+    const migrated = new MemoryDevice(
+      calibration(100),
+      1,
+      0,
+      0,
+      ["Default", null, null, null],
+      "Keep this name",
+    );
+    const profiles = new MemoryProfileApi();
+    profiles.snapshots.set(0, profileSnapshot(0, serial));
+    expect(await restoreUpdaterMigrationBackup(serial, migrated, store, profiles)).toBeTrue();
+    expect(migrated.current).toEqual(calibration());
+    expect(migrated.usedMask).toBe(0b0101);
+    expect(migrated.keyboardName).toBe("Keep this name");
   });
 
   test("blocks RAM-only app profiles and incomplete used slots", async () => {
