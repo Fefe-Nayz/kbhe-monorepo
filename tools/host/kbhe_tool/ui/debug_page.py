@@ -19,6 +19,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..protocol import (
+    FILTER_DEFAULT_ALPHA_MAX_DENOM,
+    FILTER_DEFAULT_ALPHA_MIN_DENOM,
+    FILTER_DEFAULT_ENABLED,
+    FILTER_DEFAULT_NOISE_BAND,
+)
+
 
 def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
@@ -240,14 +247,20 @@ class DebugPage(QWidget):
         self.filter_enabled_check = QCheckBox("Enable ADC EMA Filter")
         self.filter_enabled_check.toggled.connect(self.on_filter_enabled_change)
         fl.addWidget(self.filter_enabled_check)
-        self.filter_noise_band_spin = self._spin(1, 100, 30)
-        self.filter_alpha_min_spin = self._spin(2, 128, 32)
-        self.filter_alpha_max_spin = self._spin(1, 32, 4)
+        self.filter_noise_band_spin = self._spin(
+            1, 255, FILTER_DEFAULT_NOISE_BAND
+        )
+        self.filter_alpha_min_spin = self._spin(
+            1, 255, FILTER_DEFAULT_ALPHA_MIN_DENOM
+        )
+        self.filter_alpha_max_spin = self._spin(
+            1, 255, FILTER_DEFAULT_ALPHA_MAX_DENOM
+        )
         form = QGridLayout()
         for row, (label, spin, hint) in enumerate([
-            ("Noise Band (ADC counts)", self.filter_noise_band_spin, "(default: 30)"),
-            ("Alpha Min (1/N, slow)", self.filter_alpha_min_spin, "(default: 32 -> 1/32)"),
-            ("Alpha Max (1/N, fast)", self.filter_alpha_max_spin, "(default: 4 -> 1/4)"),
+            ("Noise band (ADC counts)", self.filter_noise_band_spin, "(default: 8)"),
+            ("Minimum smoothing (fast)", self.filter_alpha_min_spin, "(default: 1 -> 1/1)"),
+            ("Maximum smoothing (rest)", self.filter_alpha_max_spin, "(default: 8 -> 1/8)"),
         ]):
             form.addWidget(QLabel(label), row, 0)
             form.addWidget(spin, row, 1)
@@ -568,27 +581,41 @@ class DebugPage(QWidget):
         if self.device is None:
             self._set_status("Connect a device before applying filter settings.", "warn")
             return
-        noise_band = _clamp(self.filter_noise_band_spin.value(), 1, 100)
-        alpha_min = _clamp(self.filter_alpha_min_spin.value(), 2, 128)
-        alpha_max = _clamp(self.filter_alpha_max_spin.value(), 1, 32)
+        noise_band = _clamp(self.filter_noise_band_spin.value(), 1, 255)
+        alpha_min = _clamp(self.filter_alpha_min_spin.value(), 1, 255)
+        alpha_max = _clamp(self.filter_alpha_max_spin.value(), 1, 255)
+        if alpha_min > alpha_max:
+            alpha_min, alpha_max = alpha_max, alpha_min
         self.filter_noise_band_spin.setValue(noise_band)
         self.filter_alpha_min_spin.setValue(alpha_min)
         self.filter_alpha_max_spin.setValue(alpha_max)
         if self._device_call("set_filter_params", False, noise_band, alpha_min, alpha_max):
-            self._set_status(f"Filter params applied: band={noise_band}, alpha_min=1/{alpha_min}, alpha_max=1/{alpha_max}", "ok")
+            self._set_status(
+                f"Filter params applied: band={noise_band}, "
+                f"fast=1/{alpha_min}, rest=1/{alpha_max}",
+                "ok",
+            )
         else:
             self._set_status("Error applying filter parameters.", "error")
 
     def reset_filter_defaults(self):
-        self.filter_enabled_check.setChecked(True)
-        self.filter_noise_band_spin.setValue(30)
-        self.filter_alpha_min_spin.setValue(32)
-        self.filter_alpha_max_spin.setValue(4)
+        self.filter_enabled_check.setChecked(bool(FILTER_DEFAULT_ENABLED))
+        self.filter_noise_band_spin.setValue(FILTER_DEFAULT_NOISE_BAND)
+        self.filter_alpha_min_spin.setValue(FILTER_DEFAULT_ALPHA_MIN_DENOM)
+        self.filter_alpha_max_spin.setValue(FILTER_DEFAULT_ALPHA_MAX_DENOM)
         if self.device is None:
             self._set_status("Connect a device before resetting filter defaults.", "warn")
             return
-        enabled_ok = self._device_call("set_filter_enabled", False, True)
-        params_ok = self._device_call("set_filter_params", False, 30, 32, 4)
+        enabled_ok = self._device_call(
+            "set_filter_enabled", False, bool(FILTER_DEFAULT_ENABLED)
+        )
+        params_ok = self._device_call(
+            "set_filter_params",
+            False,
+            FILTER_DEFAULT_NOISE_BAND,
+            FILTER_DEFAULT_ALPHA_MIN_DENOM,
+            FILTER_DEFAULT_ALPHA_MAX_DENOM,
+        )
         if enabled_ok and params_ok:
             self._set_status("Filter reset to defaults.", "ok")
         else:
@@ -623,8 +650,8 @@ class DebugPage(QWidget):
             "ADC Filter:",
             f"  - Enabled:    {'Yes' if filter_enabled else 'No'}",
             f"  - Noise Band: {filter_params.get('noise_band', 'Unknown')}",
-            f"  - Alpha Min:  {filter_params.get('alpha_min_denom', 'Unknown')}",
-            f"  - Alpha Max:  {filter_params.get('alpha_max_denom', 'Unknown')}",
+            f"  - Fast/min smoothing: {filter_params.get('alpha_min_denom', 'Unknown')}",
+            f"  - Rest/max smoothing: {filter_params.get('alpha_max_denom', 'Unknown')}",
             "",
             "Note: Live changes are applied immediately but are not saved to flash until you explicitly save them.",
         ]

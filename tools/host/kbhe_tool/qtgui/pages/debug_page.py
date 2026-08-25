@@ -380,8 +380,8 @@ class DebugPage(QWidget):
         for row_i, (label, spin) in enumerate(
             [
                 ("Noise band", self.noise_spin),
-                ("Alpha min denom", self.alpha_min_spin),
-                ("Alpha max denom", self.alpha_max_spin),
+                ("Minimum smoothing (fast)", self.alpha_min_spin),
+                ("Maximum smoothing (rest)", self.alpha_max_spin),
             ]
         ):
             lbl = QLabel(label)
@@ -730,8 +730,8 @@ class DebugPage(QWidget):
                 "Filter:",
                 f"  Enabled: {'Unknown' if filter_enabled is None else bool(filter_enabled)}",
                 f"  Noise Band: {filter_params.get('noise_band', '--')}",
-                f"  Alpha Min: 1/{filter_params.get('alpha_min_denom', '--')}",
-                f"  Alpha Max: 1/{filter_params.get('alpha_max_denom', '--')}",
+                f"  Fast/min smoothing: 1/{filter_params.get('alpha_min_denom', '--')}",
+                f"  Rest/max smoothing: 1/{filter_params.get('alpha_max_denom', '--')}",
                 "",
                 "Lighting:",
                 f"  Effect Mode: {led_effect}",
@@ -754,9 +754,23 @@ class DebugPage(QWidget):
             self.filter_enabled_check.setChecked(bool(enabled))
             self.filter_enabled_check.blockSignals(False)
         if params:
-            self.noise_spin.setValue(int(params.get("noise_band", 30)))
-            self.alpha_min_spin.setValue(int(params.get("alpha_min_denom", 32)))
-            self.alpha_max_spin.setValue(int(params.get("alpha_max_denom", 4)))
+            self.noise_spin.setValue(
+                int(params.get("noise_band", FILTER_DEFAULT_NOISE_BAND))
+            )
+            self.alpha_min_spin.setValue(
+                int(
+                    params.get(
+                        "alpha_min_denom", FILTER_DEFAULT_ALPHA_MIN_DENOM
+                    )
+                )
+            )
+            self.alpha_max_spin.setValue(
+                int(
+                    params.get(
+                        "alpha_max_denom", FILTER_DEFAULT_ALPHA_MAX_DENOM
+                    )
+                )
+            )
         if enabled is None or not params:
             self._update_status("Filter settings unavailable from firmware; keeping current UI values.", "warning")
 
@@ -774,7 +788,7 @@ class DebugPage(QWidget):
         noise = _clamp(self.noise_spin.value(), 1, 255)
         alpha_min = _clamp(self.alpha_min_spin.value(), 1, 255)
         alpha_max = _clamp(self.alpha_max_spin.value(), 1, 255)
-        if alpha_min < alpha_max:
+        if alpha_min > alpha_max:
             alpha_min, alpha_max = alpha_max, alpha_min
             self.alpha_min_spin.setValue(alpha_min)
             self.alpha_max_spin.setValue(alpha_max)
@@ -786,7 +800,7 @@ class DebugPage(QWidget):
             return
         self.load_filter_settings()
         self._update_status(
-            f"Filter params applied: band={noise}, alpha_min=1/{alpha_min}, alpha_max=1/{alpha_max}.",
+            f"Filter params applied: band={noise}, fast=1/{alpha_min}, rest=1/{alpha_max}.",
             "success",
         )
 

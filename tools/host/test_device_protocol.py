@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 sys.modules.setdefault("hid", types.SimpleNamespace())
 
 from kbhe_tool.device import KBHEDevice  # noqa: E402
+from kbhe_tool.demo import DemoDevice  # noqa: E402
 from kbhe_tool.protocol import (  # noqa: E402
     Command,
     FILTER_DEFAULT_ALPHA_MAX_DENOM,
@@ -38,6 +39,19 @@ class StubDevice(KBHEDevice):
 
 
 class DeviceProtocolTest(unittest.TestCase):
+    def test_demo_filter_defaults_match_protocol(self) -> None:
+        demo = DemoDevice()
+
+        self.assertEqual(demo.get_filter_enabled(), FILTER_DEFAULT_ENABLED)
+        self.assertEqual(
+            demo.get_filter_params(),
+            {
+                "noise_band": FILTER_DEFAULT_NOISE_BAND,
+                "alpha_min_denom": FILTER_DEFAULT_ALPHA_MIN_DENOM,
+                "alpha_max_denom": FILTER_DEFAULT_ALPHA_MAX_DENOM,
+            },
+        )
+
     def test_filter_defaults_match_firmware_and_configurator(self) -> None:
         filter_header = (
             REPO_ROOT / "firmware/Core/Inc/analog/filter.h"

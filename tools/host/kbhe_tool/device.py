@@ -1550,9 +1550,9 @@ class KBHEDevice:
     
     def set_filter_params(self, noise_band, alpha_min_denom, alpha_max_denom):
         """Set ADC filter parameters.
-        noise_band: Noise band in ADC counts (default 30)
-        alpha_min_denom: Alpha min denominator 1/N (default 32)
-        alpha_max_denom: Alpha max denominator 1/N (default 4)
+        noise_band: Noise band in ADC counts (default 8)
+        alpha_min_denom: Fast-motion/minimum-smoothing denominator (default 1)
+        alpha_max_denom: Near-rest/maximum-smoothing denominator (default 8)
         """
         data = [0, noise_band, alpha_min_denom, alpha_max_denom]
         resp = self.send_command(Command.SET_FILTER_PARAMS, data)

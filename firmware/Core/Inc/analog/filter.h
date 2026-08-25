@@ -1,3 +1,6 @@
+#ifndef KBHE_ANALOG_FILTER_H_
+#define KBHE_ANALOG_FILTER_H_
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -29,3 +32,5 @@ void filter_get_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
 
 void filter_set_params(uint8_t noise_band, uint8_t alpha_min_denom,
                        uint8_t alpha_max_denom);
+
+#endif /* KBHE_ANALOG_FILTER_H_ */

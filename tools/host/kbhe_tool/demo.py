@@ -6,6 +6,10 @@ from .protocol import (
     ADVANCED_TICK_RATE_DEFAULT,
     ADVANCED_TICK_RATE_MAX,
     ADVANCED_TICK_RATE_MIN,
+    FILTER_DEFAULT_ALPHA_MAX_DENOM,
+    FILTER_DEFAULT_ALPHA_MIN_DENOM,
+    FILTER_DEFAULT_ENABLED,
+    FILTER_DEFAULT_NOISE_BAND,
     GAMEPAD_API_MODES,
     GAMEPAD_KEYBOARD_ROUTING,
     KEY_COUNT,
@@ -98,11 +102,11 @@ class DemoDevice:
                 {"x_01mm": 400, "x_mm": 4.0, "y": 255},
             ],
         }
-        self._filter_enabled = True
+        self._filter_enabled = FILTER_DEFAULT_ENABLED
         self._filter_params = {
-            "noise_band": 30,
-            "alpha_min_denom": 32,
-            "alpha_max_denom": 4,
+            "noise_band": FILTER_DEFAULT_NOISE_BAND,
+            "alpha_min_denom": FILTER_DEFAULT_ALPHA_MIN_DENOM,
+            "alpha_max_denom": FILTER_DEFAULT_ALPHA_MAX_DENOM,
         }
         self._calibration = {
             "lut_zero_value": 2048,

@@ -10,8 +10,8 @@ static bool filter_enabled = FILTER_DEFAULT_ENABLED != 0U;
 static uint8_t filter_noise_band = FILTER_DEFAULT_NOISE_BAND;
 static uint8_t filter_alpha_min_denom = FILTER_DEFAULT_ALPHA_MIN_DENOM;
 static uint8_t filter_alpha_max_denom = FILTER_DEFAULT_ALPHA_MAX_DENOM;
-static uint16_t filter_alpha_min_q = 0U;
-static uint16_t filter_alpha_max_q = 0U;
+static uint16_t filter_near_rest_alpha_q = 0U;
+static uint16_t filter_fast_motion_alpha_q = 0U;
 
 static inline uint8_t clamp_u8(uint8_t value, uint8_t min_value,
                                uint8_t max_value) {
@@ -34,14 +34,16 @@ static uint16_t denom_to_alpha_q(uint8_t denom) {
 }
 
 static void filter_prepare_alpha_lut(void) {
-    if (filter_alpha_min_denom < filter_alpha_max_denom) {
-        uint8_t temp = filter_alpha_min_denom;
-        filter_alpha_min_denom = filter_alpha_max_denom;
-        filter_alpha_max_denom = temp;
-    }
-
-    filter_alpha_min_q = denom_to_alpha_q(filter_alpha_min_denom);
-    filter_alpha_max_q = denom_to_alpha_q(filter_alpha_max_denom);
+    /* The public denominators describe smoothing strength, not the numeric
+     * alpha value: `min` is the fast-motion (least smoothing) denominator and
+     * `max` is the near-rest (most smoothing) denominator. Keep that wire
+     * order stable and invert only while deriving alpha. The previous code
+     * swapped the stored values in-place, so merely applying 1/8 made the
+     * firmware report and persist 8/1 on the next read. */
+    filter_fast_motion_alpha_q =
+        denom_to_alpha_q(filter_alpha_min_denom);
+    filter_near_rest_alpha_q =
+        denom_to_alpha_q(filter_alpha_max_denom);
 
     uint32_t ramp_span = (filter_noise_band > 0U) ? (uint32_t)(filter_noise_band * 7U) : 1U;
     if (ramp_span == 0U) {
@@ -50,17 +52,19 @@ static void filter_prepare_alpha_lut(void) {
 
     for (uint16_t i = 0; i <= FILTER_BYPASS_THRESHOLD; i++) {
         if (i <= filter_noise_band) {
-            alpha_lut_q[i] = filter_alpha_min_q;
+            alpha_lut_q[i] = filter_near_rest_alpha_q;
             continue;
         }
 
         uint32_t step = i - filter_noise_band;
         uint32_t alpha =
-            filter_alpha_min_q +
-            ((step * (uint32_t)(filter_alpha_max_q - filter_alpha_min_q) + (ramp_span / 2U)) /
+            filter_near_rest_alpha_q +
+            ((step * (uint32_t)(filter_fast_motion_alpha_q -
+                                filter_near_rest_alpha_q) +
+              (ramp_span / 2U)) /
              ramp_span);
-        if (alpha > filter_alpha_max_q) {
-            alpha = filter_alpha_max_q;
+        if (alpha > filter_fast_motion_alpha_q) {
+            alpha = filter_fast_motion_alpha_q;
         }
         alpha_lut_q[i] = (uint16_t)alpha;
     }
@@ -157,9 +161,18 @@ void filter_get_params(uint8_t *noise_band, uint8_t *alpha_min_denom,
 
 void filter_set_params(uint8_t noise_band, uint8_t alpha_min_denom,
                        uint8_t alpha_max_denom) {
+    uint8_t temp = 0U;
+
     filter_noise_band = clamp_u8(noise_band, 1U, 255U);
     filter_alpha_min_denom = clamp_u8(alpha_min_denom, 1U, 255U);
     filter_alpha_max_denom = clamp_u8(alpha_max_denom, 1U, 255U);
+    /* Accept snapshots written by the old in-place swap bug, then expose one
+     * canonical ordering to settings, USB clients, and future saves. */
+    if (filter_alpha_min_denom > filter_alpha_max_denom) {
+        temp = filter_alpha_min_denom;
+        filter_alpha_min_denom = filter_alpha_max_denom;
+        filter_alpha_max_denom = temp;
+    }
     alpha_lut_ready = false;
     filter_prepare_alpha_lut();
 }
