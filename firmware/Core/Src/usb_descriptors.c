@@ -245,7 +245,11 @@ static uint16_t usb_descriptors_bcd_usb(void) {
 }
 
 static uint16_t usb_descriptors_bcd_device(void) {
-  return usb_descriptors_use_xinput() ? 0x0105u : 0x0104u;
+  /* Keep the XInput identity separate from HID mode and bump it whenever the
+   * Microsoft compatible ID changes. Windows caches the OS descriptor by USB
+   * identity, so reusing 0x0105 would leave existing devices bound as a
+   * four-slot wireless receiver after the XUSB20 -> XUSB10 correction. */
+  return usb_descriptors_use_xinput() ? 0x0106u : 0x0104u;
 }
 
 static void generate_desc_configuration(uint8_t *dst) {
@@ -378,9 +382,11 @@ static uint8_t const desc_ms_os_20[] = {
     U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION),
     ITF_NUM_XINPUT, 0x00, U16_TO_U8S_LE(0x00A0),
 
-    // Compatible ID descriptor: XUSB20
+    /* Compatible ID descriptor: XUSB10 (single wired controller).
+     * XUSB20 selects Windows' wireless-receiver path, which manufactures
+     * multiple controller views for one physical interface. */
     U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID),
-    'X', 'U', 'S', 'B', '2', '0', 0x00, 0x00,
+    'X', 'U', 'S', 'B', '1', '0', 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
     // Registry property descriptor: DeviceInterfaceGUIDs (REG_MULTI_SZ)
