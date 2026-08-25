@@ -17,6 +17,40 @@ static inline uint8_t led_overlay_blend_channel(uint8_t base,
                    255u);
 }
 
+static inline uint8_t led_overlay_add_channel(uint8_t base, uint8_t overlay,
+                                              uint8_t alpha) {
+  uint16_t sum =
+      (uint16_t)base + led_overlay_scale_u8(overlay, alpha);
+  return sum > 255u ? 255u : (uint8_t)sum;
+}
+
+/* Replace differs from alpha composition: opacity controls the intensity of
+ * the replacement colour, while transition_alpha cross-fades from the
+ * existing effect to that colour. At the end of the transition no underlying
+ * effect contribution remains. */
+static inline uint8_t led_overlay_replace_channel(uint8_t base,
+                                                  uint8_t overlay,
+                                                  uint8_t opacity,
+                                                  uint8_t transition_alpha) {
+  uint8_t target = led_overlay_scale_u8(overlay, opacity);
+  return led_overlay_blend_channel(base, target, transition_alpha);
+}
+
+/* Interpolate an 8-bit overlay alpha without overshooting either endpoint.
+ * The elapsed value is deliberately 32-bit for HAL tick arithmetic, while
+ * durations remain bounded to uint16_t by the overlay protocol. */
+static inline uint8_t led_overlay_transition_u8(uint8_t from, uint8_t to,
+                                                uint32_t elapsed,
+                                                uint16_t duration) {
+  int32_t delta = (int32_t)to - (int32_t)from;
+
+  if (duration == 0u || elapsed >= (uint32_t)duration) {
+    return to;
+  }
+  return (uint8_t)((int32_t)from +
+                   ((delta * (int32_t)elapsed) / (int32_t)duration));
+}
+
 /* Prepare a progress-bar pixel for composition. In filled-only mode the
  * unfilled region has no overlay contribution at all and a fractional edge
  * scales opacity, preserving the effect underneath. The classic mode instead

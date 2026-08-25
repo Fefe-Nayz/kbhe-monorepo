@@ -43,6 +43,36 @@ static void test_classic_unfilled_pixel_retains_shaded_track(void) {
   assert(led_overlay_blend_channel(100u, r, alpha) < 100u);
 }
 
+static void test_interrupted_overlay_transitions_are_continuous(void) {
+  uint8_t fade_in_midpoint =
+      led_overlay_transition_u8(0u, 255u, 40u, 80u);
+  uint8_t fade_out_midpoint =
+      led_overlay_transition_u8(fade_in_midpoint, 0u, 50u, 100u);
+  uint8_t resumed =
+      led_overlay_transition_u8(fade_out_midpoint, 255u, 0u, 80u);
+
+  assert(fade_in_midpoint == 127u);
+  assert(fade_out_midpoint < fade_in_midpoint);
+  assert(resumed == fade_out_midpoint);
+  assert(led_overlay_transition_u8(fade_out_midpoint, 255u, 80u, 80u) ==
+         255u);
+  assert(led_overlay_transition_u8(200u, 0u, 100u, 100u) == 0u);
+  assert(led_overlay_transition_u8(12u, 99u, 0u, 0u) == 99u);
+}
+
+static void test_state_overlay_blend_modes_are_distinct(void) {
+  uint8_t base = 40u;
+  uint8_t overlay = 200u;
+  uint8_t opacity = 128u;
+  uint8_t alpha = led_overlay_scale_u8(opacity, 255u);
+
+  assert(led_overlay_blend_channel(base, overlay, alpha) == 120u);
+  assert(led_overlay_add_channel(base, overlay, alpha) == 140u);
+  assert(led_overlay_replace_channel(base, overlay, opacity, 255u) == 100u);
+  assert(led_overlay_replace_channel(base, overlay, opacity, 0u) == base);
+  assert(led_overlay_add_channel(250u, 255u, 255u) == 255u);
+}
+
 static void test_persisted_rotary_flag_survives_motion_updates(void) {
   settings_rotary_encoder_t rotary = {0};
 
@@ -62,6 +92,8 @@ int main(void) {
   test_filled_only_unfilled_pixel_is_transparent();
   test_filled_only_partial_pixel_crossfades_by_alpha();
   test_classic_unfilled_pixel_retains_shaded_track();
+  test_interrupted_overlay_transitions_are_continuous();
+  test_state_overlay_blend_modes_are_distinct();
   test_persisted_rotary_flag_survives_motion_updates();
   puts("led_overlay_math_test: ok");
   return 0;

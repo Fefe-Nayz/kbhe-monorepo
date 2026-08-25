@@ -80,6 +80,12 @@ const OVERLAY_POLARITY_ITEMS = [
   { value: "0", label: "Bit is clear" },
 ];
 
+const OVERLAY_BLEND_ITEMS = [
+  { value: "0", label: "Alpha cross-fade" },
+  { value: "1", label: "Additive glow" },
+  { value: "2", label: "Replace effect" },
+];
+
 function clampInteger(value: number, minimum: number, maximum: number): number {
   if (!Number.isFinite(value)) return minimum;
   return Math.max(minimum, Math.min(maximum, Math.trunc(value)));
@@ -675,7 +681,60 @@ export default function Macros() {
                     }
                   />
                 </FormRow>
-                <FormRow label="Opacity" description="0 is invisible, 255 fully replaces the effect.">
+                <FormRow
+                  label="Blend"
+                  description={
+                    overlayDraft.blendMode === 1
+                      ? "Adds light to the running effect without darkening it."
+                      : overlayDraft.blendMode === 2
+                        ? "Cross-fades to a replacement colour with no underlying effect left at the end."
+                        : "Cross-fades the colour transparently over the running effect."
+                  }
+                >
+                  <Select
+                    value={String(overlayDraft.blendMode)}
+                    items={OVERLAY_BLEND_ITEMS}
+                    onValueChange={(value) =>
+                      setOverlayDraft((current) => ({
+                        ...current,
+                        blendMode: Number(value),
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {OVERLAY_BLEND_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormRow>
+                <FormRow
+                  label="Priority"
+                  description="Higher values are composited last when overlays overlap."
+                >
+                  <Input
+                    type="number"
+                    className="h-8 w-24 font-mono text-xs"
+                    min={0}
+                    max={255}
+                    value={overlayDraft.priority}
+                    onChange={(event) =>
+                      setOverlayDraft((current) => ({
+                        ...current,
+                        priority: clampInteger(Number(event.target.value), 0, 255),
+                      }))
+                    }
+                  />
+                </FormRow>
+                <FormRow
+                  label="Opacity"
+                  description={
+                    overlayDraft.blendMode === 2
+                      ? "Scales the replacement colour from black (0) to full intensity (255)."
+                      : "0 is invisible; 255 uses the full overlay colour."
+                  }
+                >
                   <Input
                     type="number"
                     className="h-8 w-24 font-mono text-xs"

@@ -478,33 +478,33 @@ export default function Rotary() {
                       </SelectContent>
                     </Select>
                   </FormRow>
-                  {s.rotation_action === 0 && (
-                    <FormRow
-                      label="Volume overlay"
-                      description="Whether unfilled keys dim, or keep the underlying RGB effect untouched."
-                    >
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={s.progress_filled_only ? "filled" : "classic"}
-                          disabled={!connected}
-                          items={[
-                            { value: "filled", label: "Filled only" },
-                            { value: "classic", label: "Dim background" },
-                          ]}
-                          onValueChange={(value) => write({ progress_filled_only: value === "filled" })}
-                        >
-                          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="filled">Filled only (transparent)</SelectItem>
-                            <SelectItem value="classic">Dim unfilled keys (classic)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  <FormRow
+                    label="Progress overlay"
+                    description="Whether unfilled keys dim, or keep the underlying RGB effect untouched."
+                  >
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={s.progress_filled_only ? "filled" : "classic"}
+                        disabled={!connected}
+                        items={[
+                          { value: "filled", label: "Filled only" },
+                          { value: "classic", label: "Dim background" },
+                        ]}
+                        onValueChange={(value) => write({ progress_filled_only: value === "filled" })}
+                      >
+                        <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="filled">Filled only (transparent)</SelectItem>
+                          <SelectItem value="classic">Dim unfilled keys (classic)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {s.rotation_action === ROTARY_ACTIONS.Volume && (
                         <Badge variant={isVolumeServiceRunning() ? "default" : "secondary"}>
                           {isVolumeServiceRunning() ? "Active" : "Inactive"}
                         </Badge>
-                      </div>
-                    </FormRow>
-                  )}
+                      )}
+                    </div>
+                  </FormRow>
                   <FormRow
                     stacked
                     label="Sensitivity"

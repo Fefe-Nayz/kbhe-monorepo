@@ -141,7 +141,11 @@ static bool    alpha_key_mask_configured = false;
 static bool volume_overlay_active = false;
 static uint8_t volume_overlay_level = 0u;
 static uint32_t volume_overlay_start_ms = 0u;
+static uint8_t volume_overlay_fade_in_from_alpha = 0u;
 static uint32_t volume_overlay_expire_ms = 0u;
+static bool volume_overlay_fade_out_active = false;
+static uint8_t volume_overlay_fade_out_from_alpha = 0u;
+static uint32_t volume_overlay_fade_out_start_ms = 0u;
 static uint8_t volume_overlay_rendered_alpha = 0u;
 static bool volume_overlay_render_dirty = false;
 static settings_rotary_encoder_t volume_overlay_render_config = {0};
@@ -737,15 +741,25 @@ static uint8_t volume_overlay_alpha(uint32_t now_ms) {
   if (!volume_overlay_active) {
     return 0u;
   }
+  if (volume_overlay_fade_out_active) {
+    age_ms = (uint32_t)(now_ms - volume_overlay_fade_out_start_ms);
+    alpha = led_overlay_transition_u8(
+        volume_overlay_fade_out_from_alpha, 0u, age_ms,
+        VOLUME_OVERLAY_FADE_OUT_MS);
+    if (age_ms >= VOLUME_OVERLAY_FADE_OUT_MS) {
+      volume_overlay_active = false;
+      volume_overlay_fade_out_active = false;
+    }
+    return alpha;
+  }
   if (volume_overlay_is_expired(now_ms)) {
     volume_overlay_active = false;
     return 0u;
   }
 
   age_ms = (uint32_t)(now_ms - volume_overlay_start_ms);
-  if (age_ms < VOLUME_OVERLAY_FADE_IN_MS) {
-    alpha = (uint8_t)((age_ms * 255u) / VOLUME_OVERLAY_FADE_IN_MS);
-  }
+  alpha = led_overlay_transition_u8(volume_overlay_fade_in_from_alpha, 255u,
+                                    age_ms, VOLUME_OVERLAY_FADE_IN_MS);
 
   remaining_ms = (uint32_t)(volume_overlay_expire_ms - now_ms);
   if (remaining_ms < VOLUME_OVERLAY_FADE_OUT_MS) {
@@ -802,7 +816,6 @@ static uint8_t state_overlay_transition_alpha(uint8_t overlay_id,
   uint16_t duration = runtime->target_active ? config->fade_in_ms
                                              : config->fade_out_ms;
   uint32_t elapsed = (uint32_t)(now_ms - runtime->transition_start_ms);
-  int16_t delta = (int16_t)target - (int16_t)runtime->from_alpha;
 
   if (!runtime->visible || !config->enabled) {
     return 0u;
@@ -814,8 +827,8 @@ static uint8_t state_overlay_transition_alpha(uint8_t overlay_id,
     return target;
   }
 
-  return (uint8_t)((int16_t)runtime->from_alpha +
-                   (int16_t)((delta * (int32_t)elapsed) / duration));
+  return led_overlay_transition_u8(runtime->from_alpha, target, elapsed,
+                                   duration);
 }
 
 static uint8_t state_overlay_alpha(uint8_t overlay_id, uint32_t now_ms) {
@@ -858,18 +871,24 @@ static void apply_state_overlays(uint8_t index, uint32_t now_ms, uint8_t *r,
     }
 
     transition_alpha = state_overlay_alpha(overlay_id, now_ms);
-    alpha = scale_u8(config->opacity, transition_alpha);
-    if (alpha == 0u) {
+    if (transition_alpha == 0u) {
       continue;
     }
+    alpha = scale_u8(config->opacity, transition_alpha);
 
-    if (config->blend_mode == (uint8_t)LED_OVERLAY_BLEND_ADD) {
-      uint16_t add_r = (uint16_t)*r + scale_u8(config->color_r, alpha);
-      uint16_t add_g = (uint16_t)*g + scale_u8(config->color_g, alpha);
-      uint16_t add_b = (uint16_t)*b + scale_u8(config->color_b, alpha);
-      *r = (add_r > 255u) ? 255u : (uint8_t)add_r;
-      *g = (add_g > 255u) ? 255u : (uint8_t)add_g;
-      *b = (add_b > 255u) ? 255u : (uint8_t)add_b;
+    if (config->blend_mode == (uint8_t)LED_OVERLAY_BLEND_REPLACE) {
+      *r = led_overlay_replace_channel(*r, config->color_r, config->opacity,
+                                       transition_alpha);
+      *g = led_overlay_replace_channel(*g, config->color_g, config->opacity,
+                                       transition_alpha);
+      *b = led_overlay_replace_channel(*b, config->color_b, config->opacity,
+                                       transition_alpha);
+    } else if (alpha == 0u) {
+      continue;
+    } else if (config->blend_mode == (uint8_t)LED_OVERLAY_BLEND_ADD) {
+      *r = led_overlay_add_channel(*r, config->color_r, alpha);
+      *g = led_overlay_add_channel(*g, config->color_g, alpha);
+      *b = led_overlay_add_channel(*b, config->color_b, alpha);
     } else {
       *r = led_overlay_blend_channel(*r, config->color_r, alpha);
       *g = led_overlay_blend_channel(*g, config->color_g, alpha);
@@ -2220,11 +2239,29 @@ static void led_matrix_apply_idle_state(uint32_t now_ms) {
 
 void led_matrix_set_progress_overlay(uint8_t level) {
   uint32_t now_ms = HAL_GetTick();
+  bool was_fading_out = false;
+  uint8_t current_alpha = 0u;
 
   led_matrix_mark_activity(now_ms);
-  if (!volume_overlay_active || volume_overlay_is_expired(now_ms)) {
+  if (volume_overlay_active && !volume_overlay_is_expired(now_ms)) {
+    uint32_t remaining_ms =
+        (uint32_t)(volume_overlay_expire_ms - now_ms);
+    was_fading_out = volume_overlay_fade_out_active ||
+                     remaining_ms < VOLUME_OVERLAY_FADE_OUT_MS;
+    current_alpha = volume_overlay_alpha(now_ms);
+  } else {
+    volume_overlay_active = false;
+  }
+
+  if (!volume_overlay_active) {
+    volume_overlay_fade_in_from_alpha = 0u;
+    volume_overlay_start_ms = now_ms;
+  } else if (was_fading_out) {
+    /* Resume from the exact rendered alpha instead of jumping to fully on. */
+    volume_overlay_fade_in_from_alpha = current_alpha;
     volume_overlay_start_ms = now_ms;
   }
+  volume_overlay_fade_out_active = false;
   volume_overlay_active = true;
   volume_overlay_level = level;
   volume_overlay_expire_ms = now_ms + VOLUME_OVERLAY_VISIBLE_MS;
@@ -2239,10 +2276,22 @@ void led_matrix_set_progress_overlay(uint8_t level) {
 void led_matrix_clear_progress_overlay(void) {
   uint32_t now_ms = HAL_GetTick();
   if (volume_overlay_active && !volume_overlay_is_expired(now_ms)) {
-    volume_overlay_expire_ms = now_ms + VOLUME_OVERLAY_FADE_OUT_MS;
+    uint8_t current_alpha = volume_overlay_alpha(now_ms);
+    if (current_alpha == 0u) {
+      volume_overlay_active = false;
+      volume_overlay_fade_out_active = false;
+    } else if (!volume_overlay_fade_out_active) {
+      /* A clear during fade-in must decrease monotonically from the current
+       * rendered alpha; reusing the automatic fade window produces a pulse. */
+      volume_overlay_fade_out_active = true;
+      volume_overlay_fade_out_from_alpha = current_alpha;
+      volume_overlay_fade_out_start_ms = now_ms;
+      volume_overlay_expire_ms = now_ms + VOLUME_OVERLAY_FADE_OUT_MS;
+    }
     volume_overlay_render_dirty = true;
   } else {
     volume_overlay_active = false;
+    volume_overlay_fade_out_active = false;
     volume_overlay_render_dirty = volume_overlay_rendered_alpha != 0u;
   }
 
