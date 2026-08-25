@@ -1,5 +1,4 @@
 #include "hid/consumer_hid.h"
-#include "adc_capture.h"
 #include "action_engine.h"
 #include "hid/gamepad_hid.h"
 #include "hid/keyboard_hid.h"
@@ -57,31 +56,6 @@ typedef enum {
   LAYOUT_OUTPUT_MOUSE_PULSE,
   LAYOUT_OUTPUT_GAMEPAD,
 } layout_output_route_t;
-
-static adc_input_trace_route_t
-layout_input_trace_route(layout_output_route_t route) {
-  if (route == LAYOUT_OUTPUT_KEYBOARD_6KRO) {
-    return ADC_INPUT_TRACE_ROUTE_6KRO;
-  }
-  if (route == LAYOUT_OUTPUT_KEYBOARD_NKRO) {
-    return ADC_INPUT_TRACE_ROUTE_NKRO;
-  }
-  return ADC_INPUT_TRACE_ROUTE_OTHER;
-}
-
-static void layout_input_trace_action(uint8_t source_key, uint16_t keycode,
-                                      layout_output_route_t route,
-                                      bool pressed) {
-  if (source_key >= NUM_KEYS || adc_input_trace_route == NULL) {
-    return;
-  }
-  adc_input_trace_route(source_key, keycode, layout_input_trace_route(route),
-                        pressed);
-}
-
-/* Keep each trace action immediately before its dispatch below. Keyboard HID
- * dispatch queues synchronously, so the enqueue hook must see this route as
- * pending before the report snapshot is pushed. */
 
 typedef struct {
   uint16_t keycode;
@@ -1053,8 +1027,6 @@ static void layout_press_action_for_source(uint8_t source,
       return;
     }
     binding->references++;
-    layout_input_trace_action(route_source_key, keycode,
-                              (layout_output_route_t)binding->route, true);
     layout_dispatch_binding_press(binding);
     return;
   }
@@ -1067,13 +1039,10 @@ static void layout_press_action_for_source(uint8_t source,
   binding->route =
       (uint8_t)layout_resolve_output_route(route_source_key, keycode);
   binding->references = 1u;
-  layout_input_trace_action(route_source_key, keycode,
-                            (layout_output_route_t)binding->route, true);
   layout_dispatch_binding_press(binding);
 }
 
 static void layout_release_action_for_source(uint8_t source,
-                                             uint8_t route_source_key,
                                              uint16_t keycode) {
   layout_action_binding_t *binding =
       layout_find_action_binding(source, keycode);
@@ -1082,8 +1051,6 @@ static void layout_release_action_for_source(uint8_t source,
     return;
   }
 
-  layout_input_trace_action(route_source_key, keycode,
-                            (layout_output_route_t)binding->route, false);
   layout_dispatch_binding_release(binding);
   binding->references--;
   if (binding->references == 0u) {
@@ -1098,7 +1065,7 @@ void layout_press_action_for_key(uint8_t source_key, uint16_t keycode) {
 
 void layout_release_action_for_key(uint8_t source_key, uint16_t keycode) {
   layout_release_action_for_source(layout_normalize_action_source(source_key),
-                                   source_key, keycode);
+                                   keycode);
 }
 
 void layout_press_action(uint16_t keycode) {
@@ -1121,8 +1088,7 @@ void layout_release_action_owned(uint8_t owner, uint16_t keycode) {
   if (owner >= LAYOUT_ACTION_OWNER_COUNT) {
     return;
   }
-  layout_release_action_for_source(layout_owned_action_source(owner),
-                                   LAYOUT_GLOBAL_ACTION_SOURCE, keycode);
+  layout_release_action_for_source(layout_owned_action_source(owner), keycode);
 }
 
 void layout_tap_action(uint16_t keycode) {

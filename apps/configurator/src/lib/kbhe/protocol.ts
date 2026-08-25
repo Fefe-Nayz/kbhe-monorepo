@@ -203,9 +203,6 @@ export enum Command {
   GET_FILTERED_ADC_CHUNK = 0xe7,
   GET_CALIBRATED_ADC_CHUNK = 0xe8,
   GET_MCU_METRICS = 0xe9,
-  INPUT_TRACE_START = 0xea,
-  INPUT_TRACE_STATUS = 0xeb,
-  INPUT_TRACE_READ = 0xec,
 
   ECHO = 0xfe,
 }

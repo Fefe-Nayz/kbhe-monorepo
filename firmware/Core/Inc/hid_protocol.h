@@ -6,7 +6,6 @@
 #ifndef HID_PROTOCOL_H_
 #define HID_PROTOCOL_H_
 
-#include "adc_capture.h"
 #include "settings.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -149,9 +148,6 @@ typedef enum {
   CMD_GET_FILTERED_ADC_CHUNK = 0xE7,
   CMD_GET_CALIBRATED_ADC_CHUNK = 0xE8,
   CMD_GET_MCU_METRICS = 0xE9,
-  CMD_INPUT_TRACE_START = 0xEA,
-  CMD_INPUT_TRACE_STATUS = 0xEB,
-  CMD_INPUT_TRACE_READ = 0xEC,
 
   // Echo command for testing (0xFE)
   CMD_ECHO = 0xFE,
@@ -647,56 +643,6 @@ typedef struct __attribute__((packed)) {
   uint16_t filtered_samples[12];
   uint8_t reserved[3];
 } hid_resp_adc_capture_read_t;
-
-typedef struct __attribute__((packed)) {
-  uint8_t command_id;
-  uint8_t status;
-  uint32_t duration_ms;
-  uint8_t reserved[58];
-} hid_req_input_trace_start_t;
-
-typedef struct __attribute__((packed)) {
-  uint8_t command_id;
-  uint8_t status;
-  uint8_t active;
-  uint8_t record_size;
-  uint32_t duration_ms;
-  uint32_t scan_count;
-  uint16_t record_count;
-  uint32_t overflow_count;
-  uint32_t max_process_cycles;
-  uint32_t total_process_cycles;
-  uint32_t core_clock_hz;
-  uint8_t reserved[34];
-} hid_resp_input_trace_status_t;
-
-typedef struct __attribute__((packed)) {
-  uint8_t command_id;
-  uint8_t status;
-  uint16_t record_index;
-  uint8_t reserved[60];
-} hid_req_input_trace_read_t;
-
-typedef struct __attribute__((packed)) {
-  uint8_t command_id;
-  uint8_t status;
-  uint8_t active;
-  uint8_t record_size;
-  uint16_t total_records;
-  uint16_t record_index;
-  adc_input_trace_record_t record;
-  uint8_t reserved[14];
-} hid_resp_input_trace_read_t;
-
-_Static_assert(sizeof(hid_req_input_trace_start_t) == HID_PROTOCOL_PACKET_SIZE,
-               "input trace start request must remain one RAW HID packet");
-_Static_assert(sizeof(hid_resp_input_trace_status_t) ==
-                   HID_PROTOCOL_PACKET_SIZE,
-               "input trace status must remain one RAW HID packet");
-_Static_assert(sizeof(hid_req_input_trace_read_t) == HID_PROTOCOL_PACKET_SIZE,
-               "input trace read request must remain one RAW HID packet");
-_Static_assert(sizeof(hid_resp_input_trace_read_t) == HID_PROTOCOL_PACKET_SIZE,
-               "input trace record must remain one RAW HID packet");
 
 /**
  * @brief LED single pixel packet

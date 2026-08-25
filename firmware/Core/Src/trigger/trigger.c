@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include "action_engine.h"
 #include "trigger/trigger.h"
-#include "adc_capture.h"
 #include "analog/calibration.h"
 #include "board_config.h"
 #include "analog/analog.h"
@@ -644,13 +643,11 @@ static inline bool trigger_commit_press(uint8_t key, int16_t current_distance,
     trigger_freeze_press_settings(key);
     key_states[key] = PRESSED;
     trigger_last_input_transition_ms = now_ms;
-    if (adc_input_trace_trigger != NULL) {
-        adc_input_trace_trigger(key, true);
-    }
     trigger_behavior_on_press(key, current_distance, now_ms);
     led_matrix_key_event(key, true);
     socd_on_press(key);
     trigger_transition_guard_cancel(key);
+
     return true;
 }
 
@@ -659,9 +656,6 @@ static inline bool trigger_commit_release(uint8_t key, uint32_t now_ms) {
         return false;
     }
 
-    if (adc_input_trace_trigger != NULL) {
-        adc_input_trace_trigger(key, false);
-    }
     trigger_behavior_on_release(key);
     led_matrix_key_event(key, false);
     key_states[key] = RELEASED;
@@ -672,6 +666,7 @@ static inline bool trigger_commit_release(uint8_t key, uint32_t now_ms) {
         key, key_trigger_settings[key].behavior_mode,
         key_trigger_settings[key].primary_keycode);
     trigger_transition_guard_cancel(key);
+
     return true;
 }
 

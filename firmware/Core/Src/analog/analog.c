@@ -266,13 +266,7 @@ void analog_task() {
     uint32_t now_ms = HAL_GetTick();
     analog_rest_estimator_observe(&analog_rest_estimator,
                                   logical_raw_values, NUM_KEYS, now_ms);
-    if (adc_input_trace_is_active()) {
-        uint32_t trace_start_cycles = DWT->CYCCNT;
-        adc_capture_process_scan(filtered_values, NUM_KEYS, now_ms);
-        adc_input_trace_record_process_cycles(DWT->CYCCNT - trace_start_cycles);
-    } else {
-        adc_capture_process_scan(filtered_values, NUM_KEYS, now_ms);
-    }
+    adc_capture_process_scan(filtered_values, NUM_KEYS, now_ms);
 }
 
 /*
