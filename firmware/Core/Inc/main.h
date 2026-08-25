@@ -101,6 +101,7 @@ extern uint32_t task_total_us;
 extern uint32_t mcu_scan_cycle_us_live;
 extern uint32_t mcu_scan_cycle_us_max;
 extern uint32_t mcu_scan_deadline_miss_count;
+extern uint32_t mcu_adc_recovery_count;
 uint16_t mcu_scan_cycle_p99_us(void);
 extern uint32_t mcu_work_us_live;
 extern uint16_t mcu_load_permille_live;

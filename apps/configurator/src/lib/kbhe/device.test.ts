@@ -329,6 +329,9 @@ describe("KBHEDevice real-time persistence telemetry", () => {
     };
     response[0] = Command.GET_MCU_METRICS;
     response[1] = 0;
+    // Recovery telemetry shares the legacy temperature-valid status byte.
+    // Upper bits must not make an invalid temperature appear valid.
+    response[18] = 5 << 1;
     setU16(19, 141);
     setU32(21, 7);
     setU32(25, 1234);
@@ -359,6 +362,8 @@ describe("KBHEDevice real-time persistence telemetry", () => {
     const device = new KBHEDevice(new KbheCommander(transport), transport);
 
     expect(await device.getMcuMetrics()).toMatchObject({
+      temperature_valid: false,
+      adc_recovery_count_sat: 5,
       realtime_persistence_metrics_available: true,
       max_scan_cycle_us: 141,
       p99_scan_cycle_us: 119,

@@ -525,7 +525,10 @@ typedef struct __attribute__((packed)) {
   uint16_t scan_rate_hz;
   uint16_t work_us;
   uint16_t load_permille;
-  uint8_t temp_valid;
+  /* Bit 0: internal temperature valid. Bits 1..7: saturated count of full
+   * regular ADC/DMA recoveries. Keeping both values in the existing status
+   * byte preserves every subsequent field offset and the 64-byte report. */
+  uint8_t sensor_status_flags;
   uint16_t max_scan_cycle_us;
   uint32_t scan_deadline_miss_count;
   uint32_t flash_programmed_words;
@@ -547,6 +550,10 @@ typedef struct __attribute__((packed)) {
   uint8_t nkro_queue_overflow_count_sat;
   uint8_t keyboard_transfer_failed_count_sat;
 } hid_resp_mcu_metrics_t;
+
+#define HID_MCU_SENSOR_STATUS_TEMP_VALID 0x01u
+#define HID_MCU_SENSOR_STATUS_ADC_RECOVERY_SHIFT 1u
+#define HID_MCU_SENSOR_STATUS_ADC_RECOVERY_MAX 0x7Fu
 
 /**
  * @brief Key states response (debug)

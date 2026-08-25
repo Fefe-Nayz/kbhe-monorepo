@@ -218,6 +218,7 @@ class HILInputLoggerTest(unittest.TestCase):
                     "scan_cycle_us": 111,
                     "p99_scan_cycle_us": 120,
                     "max_scan_cycle_us": 140,
+                    "adc_recovery_count_sat": 2,
                     "scan_deadline_miss_count": 10,
                     "keyboard_queue_overflow_count_sat": 0,
                     "nkro_queue_overflow_count_sat": 0,
@@ -229,6 +230,7 @@ class HILInputLoggerTest(unittest.TestCase):
                     "scan_cycle_us": 125,
                     "p99_scan_cycle_us": 130,
                     "max_scan_cycle_us": 160,
+                    "adc_recovery_count_sat": 3,
                     "scan_deadline_miss_count": 13,
                     "keyboard_queue_overflow_count_sat": 0,
                     "nkro_queue_overflow_count_sat": 1,
@@ -238,10 +240,14 @@ class HILInputLoggerTest(unittest.TestCase):
         )
         self.assertEqual(summary["scan_rate_hz"]["min"], 8000)
         self.assertEqual(summary["scan_rate_hz"]["samples_below_8khz"], 0)
+        self.assertEqual(summary["counter_deltas"]["adc_recovery_count_sat"], 1)
         self.assertEqual(summary["counter_deltas"]["scan_deadline_miss_count"], 3)
         self.assertEqual(summary["counter_deltas"]["nkro_queue_overflow_count_sat"], 1)
         self.assertFalse(
             summary["operational_8khz_acceptance"]["scan_deadline_miss_delta_zero"]
+        )
+        self.assertFalse(
+            summary["operational_8khz_acceptance"]["adc_recovery_delta_zero"]
         )
 
 

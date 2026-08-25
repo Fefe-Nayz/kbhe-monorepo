@@ -246,6 +246,7 @@ export interface AdcDebugValues {
 export interface McuMetrics {
   temperature_c: number | null;
   temperature_valid: boolean;
+  adc_recovery_count_sat: number;
   vref_mv: number;
   core_clock_hz: number;
   scan_cycle_us: number;
@@ -2352,7 +2353,9 @@ export class KBHEDevice {
     const scanRateHz = this.unpackU16(response, 12);
     const workUs = this.unpackU16(response, 14);
     const loadPermille = this.unpackU16(response, 16);
-    const tempValid = Boolean(response[18]);
+    const sensorStatusFlags = response[18] ?? 0;
+    const tempValid = Boolean(sensorStatusFlags & 0x01);
+    const adcRecoveryCountSat = sensorStatusFlags >>> 1;
     const maxScanCycleUs = response.length >= 21 ? this.unpackU16(response, 19) : 0;
     const scanDeadlineMissCount = response.length >= 25 ? u32le(response, 21) : 0;
     const flashProgrammedWords = response.length >= 29 ? u32le(response, 25) : 0;
@@ -2379,6 +2382,7 @@ export class KBHEDevice {
     return {
       temperature_c: tempValid ? temperatureRaw : null,
       temperature_valid: tempValid,
+      adc_recovery_count_sat: adcRecoveryCountSat,
       vref_mv: vrefMv,
       core_clock_hz: coreClockHz,
       scan_cycle_us: scanCycleUs,

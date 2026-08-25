@@ -1703,7 +1703,9 @@ class KBHEDevice:
         scan_rate_hz = self._unpack_u16(resp, 12)
         work_us = self._unpack_u16(resp, 14)
         load_permille = self._unpack_u16(resp, 16)
-        temp_valid = bool(resp[18])
+        sensor_status_flags = int(resp[18])
+        temp_valid = bool(sensor_status_flags & 0x01)
+        adc_recovery_count_sat = sensor_status_flags >> 1
 
         def u16_at(offset: int) -> int:
             return self._unpack_u16(resp, offset) if len(resp) >= offset + 2 else 0
@@ -1720,6 +1722,7 @@ class KBHEDevice:
         return {
             "temperature_c": int(temperature_raw) if temp_valid else None,
             "temperature_valid": temp_valid,
+            "adc_recovery_count_sat": adc_recovery_count_sat,
             "vref_mv": int(vref_mv),
             "core_clock_hz": int(core_clock_hz),
             "scan_cycle_us": int(scan_cycle_us),

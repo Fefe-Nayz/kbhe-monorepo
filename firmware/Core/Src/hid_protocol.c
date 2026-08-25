@@ -2598,7 +2598,15 @@ static void cmd_get_mcu_metrics(const uint8_t *in, uint8_t *out) {
                            : 0u;
   resp->work_us = (uint16_t)mcu_work_us_live;
   resp->load_permille = mcu_load_permille_live;
-  resp->temp_valid = mcu_temperature_valid_live ? 1u : 0u;
+  {
+    uint32_t recoveries = mcu_adc_recovery_count;
+    if (recoveries > HID_MCU_SENSOR_STATUS_ADC_RECOVERY_MAX) {
+      recoveries = HID_MCU_SENSOR_STATUS_ADC_RECOVERY_MAX;
+    }
+    resp->sensor_status_flags =
+        (mcu_temperature_valid_live ? HID_MCU_SENSOR_STATUS_TEMP_VALID : 0u) |
+        (uint8_t)(recoveries << HID_MCU_SENSOR_STATUS_ADC_RECOVERY_SHIFT);
+  }
   flash_storage_get_metrics(&flash_metrics);
   resp->max_scan_cycle_us =
       mcu_scan_cycle_us_max > UINT16_MAX ? UINT16_MAX

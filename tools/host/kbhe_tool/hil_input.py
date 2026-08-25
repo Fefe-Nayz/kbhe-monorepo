@@ -558,6 +558,7 @@ def summarize_metrics(metrics: list[dict[str, Any]]) -> dict[str, Any]:
     last = metrics[-1]
     scan_rates = values("scan_rate_hz")
     counter_names = (
+        "adc_recovery_count_sat",
         "scan_deadline_miss_count",
         "keyboard_queue_overflow_count_sat",
         "nkro_queue_overflow_count_sat",
@@ -592,6 +593,10 @@ def summarize_metrics(metrics: list[dict[str, Any]]) -> dict[str, Any]:
                 last.get("scan_deadline_miss_count", 0)
             )
             == int(first.get("scan_deadline_miss_count", 0)),
+            "adc_recovery_delta_zero": int(
+                last.get("adc_recovery_count_sat", 0)
+            )
+            == int(first.get("adc_recovery_count_sat", 0)),
         },
         "last": {name: last.get(name) for name in sorted(last) if name != "t_ms"},
     }

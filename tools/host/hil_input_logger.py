@@ -51,6 +51,7 @@ CSV_FIELDS = (
     "p99_scan_cycle_us",
     "max_scan_cycle_us",
     "scan_deadline_miss_count",
+    "adc_recovery_count_sat",
     "keyboard_queue_high_watermark",
     "nkro_queue_high_watermark",
     "keyboard_queue_overflow_count_sat",

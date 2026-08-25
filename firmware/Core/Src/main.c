@@ -186,6 +186,7 @@ uint32_t task_total_us = 0;
 uint32_t mcu_scan_cycle_us_live = 0;
 uint32_t mcu_scan_cycle_us_max = 0;
 uint32_t mcu_scan_deadline_miss_count = 0;
+uint32_t mcu_adc_recovery_count = 0;
 #define MCU_SCAN_HISTOGRAM_BIN_US 4u
 #define MCU_SCAN_HISTOGRAM_BIN_COUNT 256u
 static uint64_t mcu_scan_cycle_histogram[MCU_SCAN_HISTOGRAM_BIN_COUNT];
@@ -773,6 +774,9 @@ int main(void) {
       if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) == HAL_OK) {
         /* HAL_ADC_Start_DMA() re-enables both transfer callbacks. */
         __HAL_DMA_DISABLE_IT(hadc1.DMA_Handle, DMA_IT_HT);
+        if (mcu_adc_recovery_count < UINT32_MAX) {
+          mcu_adc_recovery_count++;
+        }
         adc_full_cycle_start_cycles = DWT->CYCCNT;
         adc_last_progress_ms = adc_now_ms;
         adc_recovery_pending = false;
