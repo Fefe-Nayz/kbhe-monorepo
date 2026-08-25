@@ -32,7 +32,7 @@ python tools/release/sign_release_asset.py artifact `
 The expected SHA-256 fingerprint of the public-key DER is:
 
 ```text
-c4f5921f9886ed50500b14d6f7fe60a7115a96fe78f56148e82405269895bb50
+db13e9328460d0d0cedc22dc736c6ba20679957ecea64b555da97e0b220c4bd4
 ```
 
 Compare the fingerprint with an independently distributed value (for example

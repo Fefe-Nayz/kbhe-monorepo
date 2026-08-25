@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import re
@@ -85,6 +86,32 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
                 self.assertEqual(
                     result.stdout[-32:].hex(), self.vectors[vector_name]
                 )
+
+    def test_documented_firmware_public_key_fingerprint_matches_pem(self) -> None:
+        result = subprocess.run(
+            [
+                "openssl",
+                "pkey",
+                "-pubin",
+                "-in",
+                str(FIRMWARE_PUBLIC_KEY_PATH),
+                "-outform",
+                "DER",
+            ],
+            capture_output=True,
+            check=True,
+        )
+        derived_fingerprint = hashlib.sha256(result.stdout).hexdigest()
+        installation_guide = (
+            ROOT / "docs" / "firmware" / "INSTALLATION.md"
+        ).read_text(encoding="utf-8")
+        documented = re.search(
+            r"expected SHA-256 fingerprint of the public-key DER is:\s*"
+            r"```text\s*([0-9a-fA-F]{64})\s*```",
+            installation_guide,
+        )
+        self.assertIsNotNone(documented)
+        self.assertEqual(documented.group(1).lower(), derived_fingerprint)
 
     def test_release_version_source_is_the_shared_header(self) -> None:
         header_path = ROOT / "firmware" / "Core" / "Inc" / "firmware_version.h"
