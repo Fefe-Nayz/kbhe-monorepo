@@ -263,7 +263,7 @@ export default function Keymap() {
     <KeyboardEditor
       keyboard={
         <BaseKeyboard
-          mode="single"
+          mode="multi"
           onButtonClick={() => { }}
           showLayerSelector={false}
           showRotary={false}

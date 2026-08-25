@@ -250,16 +250,18 @@ export function KeycodeAccordion({
   return (
     <div className={cn("flex flex-col", className)}>
       {hint && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/8 px-3 py-2 text-xs text-primary">
-          <IconSearch className="size-3.5 shrink-0" />
-          <span>{hint}</span>
+        <div className="sticky top-0 z-30 -mx-5 bg-background px-5 pb-3 pt-0.5">
+          <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/8 px-3 py-2 text-xs text-primary">
+            <IconSearch className="size-3.5 shrink-0" />
+            <span>{hint}</span>
+          </div>
         </div>
       )}
 
       <div
         className={cn(
-          "sticky top-0 z-20 -mx-5 flex flex-col gap-2.5 border-b bg-background/95 px-5 pb-3 backdrop-blur-sm",
-          hint ? "pt-0" : "-mt-5 pt-5",
+          "sticky z-20 -mx-5 flex flex-col gap-2.5 border-b bg-background/95 px-5 pb-3 backdrop-blur-sm",
+          hint ? "top-12 pt-0" : "-mt-5 top-0 pt-5",
         )}
       >
         <div className="relative">
@@ -320,7 +322,7 @@ export function KeycodeAccordion({
                 <div
                   className={cn(
                     "sticky z-10 -mx-1 mb-2 flex items-center gap-2 bg-background/95 px-1 py-1.5 backdrop-blur-sm",
-                    hint ? "top-[7.25rem]" : "top-[8.5rem]",
+                    hint ? "top-[10.25rem]" : "top-[8.5rem]",
                   )}
                 >
                   <h4 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
