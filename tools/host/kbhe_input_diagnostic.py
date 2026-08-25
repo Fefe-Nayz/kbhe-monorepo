@@ -951,7 +951,11 @@ def _write_json(path: Path, document: dict[str, object]) -> None:
     )
 
 
-def run_gui() -> int:
+def run_gui(
+    *,
+    output_path: Path | None = None,
+    auto_start_ms: int | None = None,
+) -> int:
     """Run an explicit GUI session; the ordered numeric stream stays in memory."""
 
     if os.name != "nt":
@@ -1059,6 +1063,7 @@ def run_gui() -> int:
         notebook.select(events_tab)
         start_button.configure(state="disabled")
         copy_button.configure(state="disabled")
+        close_button.configure(state="disabled")
         status.set("Capture active — 20,0 s restantes")
         started_clock[0] = time.perf_counter()
         threading.Thread(target=worker, daemon=True, name="kbhe-raw-input").start()
@@ -1097,6 +1102,11 @@ def run_gui() -> int:
                     result = payload
                     assert isinstance(result, DiagnosticResult)
                     result_holder[0] = result
+                    if output_path is not None:
+                        _write_json(
+                            output_path,
+                            result.as_dict(include_events=True),
+                        )
                     for bucket in result.summary():
                         summary_view.insert(
                             "",
@@ -1110,14 +1120,17 @@ def run_gui() -> int:
                             ),
                         )
                     progress.configure(value=CAPTURE_SECONDS)
+                    saved = f" Enregistré dans {output_path}." if output_path else ""
                     status.set(
                         f"Terminé: {len(result.events)} transitions, "
-                        f"{len(result.summary())} usages distincts."
+                        f"{len(result.summary())} usages distincts.{saved}"
                     )
                     copy_button.configure(state="normal")
+                    close_button.configure(state="normal")
                 else:
                     status.set(f"Erreur: {payload}")
                     start_button.configure(state="normal")
+                    close_button.configure(state="normal")
                     started_clock[0] = None
         except queue.Empty:
             pass
@@ -1129,6 +1142,9 @@ def run_gui() -> int:
         root.after(25, poll)
 
     def close() -> None:
+        if started_clock[0] is not None and result_holder[0] is None:
+            status.set("Capture active : la fermeture est verrouillée jusqu'à la fin.")
+            return
         cancel.set()
         root.destroy()
 
@@ -1137,6 +1153,15 @@ def run_gui() -> int:
     close_button.configure(command=close)
     root.protocol("WM_DELETE_WINDOW", close)
     root.after(25, poll)
+    if auto_start_ms is not None:
+        if auto_start_ms < 0:
+            raise ValueError("auto-start delay must be non-negative")
+        status.set(
+            f"Capture automatique dans {auto_start_ms / 1000.0:.1f} s; "
+            "relâchez les touches."
+        )
+        close_button.configure(state="disabled")
+        root.after(auto_start_ms, start)
     root.mainloop()
     return 0
 
@@ -1148,7 +1173,17 @@ def _build_parser() -> argparse.ArgumentParser:
         )
     )
     subparsers = parser.add_subparsers(dest="command")
-    subparsers.add_parser("gui", help="visible 20-second Raw Input session")
+    gui = subparsers.add_parser("gui", help="visible 20-second Raw Input session")
+    gui.add_argument(
+        "--output",
+        type=Path,
+        help="optional JSON destination for this explicit diagnostic session",
+    )
+    gui.add_argument(
+        "--auto-start-ms",
+        type=int,
+        help="optional visible-session auto-start delay in milliseconds",
+    )
 
     capture = subparsers.add_parser(
         "capture", help="20-second Raw Input session (console/automation)"
@@ -1179,7 +1214,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     command = args.command or "gui"
     try:
         if command == "gui":
-            return run_gui()
+            return run_gui(
+                output_path=args.output,
+                auto_start_ms=args.auto_start_ms,
+            )
         if command == "capture":
             result = capture_raw_input()
         elif command == "usbpcap":

@@ -67,6 +67,13 @@ class HidReportParserTest(unittest.TestCase):
 
 
 class RawInputParserTest(unittest.TestCase):
+    def test_gui_can_opt_in_to_saved_auto_started_capture(self) -> None:
+        args = diagnostic._build_parser().parse_args(
+            ["gui", "--output", "capture.json", "--auto-start-ms", "3000"]
+        )
+        self.assertEqual(args.output, pathlib.Path("capture.json"))
+        self.assertEqual(args.auto_start_ms, 3000)
+
     def test_target_path_match_is_exact_and_case_insensitive(self) -> None:
         self.assertTrue(
             diagnostic.is_target_device_path(
