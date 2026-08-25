@@ -26,6 +26,8 @@
 #include "analog/analog.h"
 #include "analog/filter.h"
 #include "analog/calibration.h"
+#include "analog/internal_sensor_sampler.h"
+#include "analog/scan_watchdog.h"
 #include "diagnostics.h"
 #include "realtime_scan_policy.h"
 
@@ -75,7 +77,6 @@
 #define MCU_LED_THERMAL_LIMIT_C 70
 #define MCU_LED_THERMAL_HYSTERESIS_C 3
 #define MCU_LED_THERMAL_BRIGHTNESS_MAX 96u
-#define ADC_SCAN_WATCHDOG_MS 100u
 /* A write becomes eligible only after input and macro traffic have drained.
  * The STM32F723 has one Flash bank, so even one word can stall instruction
  * fetch. Keeping the write out of this guard window is more important than
@@ -196,8 +197,7 @@ uint16_t mcu_vref_mv_live = 0;
 uint8_t mcu_temperature_valid_live = 0;
 static uint8_t timing_profile_counter = 0u;
 static uint32_t mcu_metrics_next_sample_ms = 0u;
-static uint32_t mcu_metrics_conversion_started_ms = 0u;
-static bool mcu_metrics_conversion_pending = false;
+static adc_internal_sensor_sampler_t mcu_internal_sensor_sampler;
 static bool mcu_led_thermal_limit_active = false;
 static uint8_t mcu_led_last_applied_brightness = 0xFFu;
 
@@ -372,57 +372,70 @@ static void mcu_init_injected_sensors(void) {
   }
 }
 
-static void mcu_sample_internal_sensors(uint32_t now_ms) {
-  if (mcu_metrics_conversion_pending) {
-    if (HAL_ADCEx_InjectedPollForConversion(&hadc1, 0u) == HAL_OK) {
-      uint32_t vref_raw =
-          HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_1);
-      uint32_t temp_raw =
-          HAL_ADCEx_InjectedGetValue(&hadc1, ADC_INJECTED_RANK_2);
-      (void)HAL_ADCEx_InjectedStop(&hadc1);
-      mcu_metrics_conversion_pending = false;
+/* Return true when the shared ADC must be recovered.  The regular key scanner
+ * owns ADC1 continuously, so the injected VREF/temperature sequence must not
+ * use HAL_ADCEx_InjectedPollForConversion(..., 0): on a normal not-yet-ready
+ * result that HAL routine assigns HAL_ADC_STATE_TIMEOUT to the whole handle,
+ * erasing HAL_ADC_STATE_REG_BUSY.  A following HAL_ADCEx_InjectedStop() then
+ * believes no regular conversion is active and disables ADC1 underneath the
+ * DMA scanner. Under a light main-loop load this can happen once per thermal
+ * sample and leave all keys on a stale snapshot until the watchdog fires.
+ *
+ * Inspect JEOC without side effects and start the already-configured injected
+ * sequence directly.  ADC1 remains enabled and the regular DMA ownership/state
+ * is never changed. */
+static bool mcu_sample_internal_sensors(uint32_t now_ms) {
+  adc_internal_sensor_values_t values = {0};
+  adc_internal_sensor_result_t result =
+      adc_internal_sensor_sampler_poll(&mcu_internal_sensor_sampler, &hadc1,
+                                       now_ms, &values);
 
-      if (vref_raw == 0u || temp_raw == 0u) {
-        mcu_temperature_valid_live = 0u;
-        return;
-      }
+  if (result == ADC_INTERNAL_SENSOR_READY) {
+    uint32_t vref_raw = values.vref_raw;
+    uint32_t temp_raw = values.temperature_raw;
 
-      uint32_t vref_mv =
-          __LL_ADC_CALC_VREFANALOG_VOLTAGE(vref_raw, LL_ADC_RESOLUTION_12B);
-      int32_t temperature_c =
-          __LL_ADC_CALC_TEMPERATURE(vref_mv, temp_raw, LL_ADC_RESOLUTION_12B);
-
-      mcu_vref_mv_live = (uint16_t)vref_mv;
-      mcu_temperature_c_live = (int16_t)temperature_c;
-      mcu_temperature_valid_live = 1u;
-      return;
-    }
-
-    /* A peripheral fault must not turn the 4 ms diagnostic timeout into a
-     * blocking hole in the scan loop. Poll once per loop and abort later. */
-    if ((uint32_t)(now_ms - mcu_metrics_conversion_started_ms) >= 4u) {
-      (void)HAL_ADCEx_InjectedStop(&hadc1);
-      mcu_metrics_conversion_pending = false;
+    if (vref_raw == 0u || temp_raw == 0u) {
       mcu_temperature_valid_live = 0u;
+      return false;
     }
-    return;
+
+    uint32_t vref_mv =
+        __LL_ADC_CALC_VREFANALOG_VOLTAGE(vref_raw, LL_ADC_RESOLUTION_12B);
+    int32_t temperature_c =
+        __LL_ADC_CALC_TEMPERATURE(vref_mv, temp_raw, LL_ADC_RESOLUTION_12B);
+
+    mcu_vref_mv_live = (uint16_t)vref_mv;
+    mcu_temperature_c_live = (int16_t)temperature_c;
+    mcu_temperature_valid_live = 1u;
+    return false;
+  }
+  if (result == ADC_INTERNAL_SENSOR_RECOVERY_REQUIRED) {
+    /* A two-channel, 480-cycle injected sequence completes in under 40 us at
+     * the configured ADC clock. A 4 ms timeout therefore indicates a shared
+     * peripheral fault; recover the complete regular scanner instead of
+     * trying to stop one ADC group independently. */
+    mcu_temperature_valid_live = 0u;
+    return true;
+  }
+  if (result == ADC_INTERNAL_SENSOR_PENDING) {
+    return false;
   }
 
   if (!diagnostics_is_perf_active() &&
       !settings_is_led_thermal_protection_enabled()) {
-    return;
+    return false;
   }
   if (now_ms < mcu_metrics_next_sample_ms) {
-    return;
+    return false;
   }
   mcu_metrics_next_sample_ms = now_ms + 1000u;
 
-  if (HAL_ADCEx_InjectedStart(&hadc1) != HAL_OK) {
+  if (!adc_internal_sensor_sampler_start(&mcu_internal_sensor_sampler, &hadc1,
+                                         now_ms)) {
     mcu_temperature_valid_live = 0u;
-    return;
+    return true;
   }
-  mcu_metrics_conversion_started_ms = now_ms;
-  mcu_metrics_conversion_pending = true;
+  return false;
 }
 
 uint16_t mcu_scan_cycle_p99_us(void) {
@@ -709,6 +722,7 @@ int main(void) {
   xinput_usb_init();
   diagnostics_init();
   mcu_init_injected_sensors();
+  adc_internal_sensor_sampler_init(&mcu_internal_sensor_sampler);
 
   // triggerInit();
 
@@ -745,15 +759,16 @@ int main(void) {
     uint32_t live_scan_cycle_us = 0;
 
     uint32_t adc_now_ms = HAL_GetTick();
-    if (analog_take_scan_fault() ||
-        (!analog_is_scan_complete() &&
-         (uint32_t)(adc_now_ms - adc_last_progress_ms) >=
-             ADC_SCAN_WATCHDOG_MS)) {
+    bool adc_scan_complete = analog_is_scan_complete();
+    if (adc_scan_watchdog_should_recover(analog_take_scan_fault(),
+                                         adc_scan_complete, adc_now_ms,
+                                         adc_last_progress_ms)) {
       adc_recovery_pending = true;
     }
     if (adc_recovery_pending) {
       TIM4->CR1 &= ~TIM_CR1_CEN;
       (void)HAL_ADC_Stop_DMA(&hadc1);
+      adc_internal_sensor_sampler_abort(&mcu_internal_sensor_sampler, &hadc1);
       analog_reset_scan_state();
       if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, NUM_MUX) == HAL_OK) {
         /* HAL_ADC_Start_DMA() re-enables both transfer callbacks. */
@@ -932,7 +947,9 @@ int main(void) {
     // "no scan complete" branch effectively starves LED effects.
     uint32_t now_ms = HAL_GetTick();
     if (best_effort_allowed && !analog_is_scan_complete()) {
-      mcu_sample_internal_sensors(now_ms);
+      if (mcu_sample_internal_sensors(now_ms)) {
+        adc_recovery_pending = true;
+      }
     }
     uint32_t led_start_cycles = 0u;
     if (profile_timing) {

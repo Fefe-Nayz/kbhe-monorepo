@@ -148,6 +148,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # ADC filtering
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_ema.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/filter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/internal_sensor_sampler.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/analog/rest_estimator.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_capture.c
     # Key trigger logic
