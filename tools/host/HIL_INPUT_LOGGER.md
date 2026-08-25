@@ -57,4 +57,3 @@ capture with misleading timestamps. Sensor Distance RGB uses normalized
 calibrated/LUT data, while Key State Demo uses trigger logical state. RGB runs at
 about 60 fps, therefore a real pulse shorter than 16.7 ms can be absent from the
 visible LED animation even when the trigger saw it.
-
