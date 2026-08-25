@@ -418,6 +418,12 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
         self.assertIn("build_updater_migration_package.py inspect-lineage", workflow)
         self.assertIn("Enforce resident bootloader version lineage", workflow)
         self.assertIn(
+            'KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION: "0.1.18"',
+            workflow,
+        )
+        self.assertIn("Require updater-refresh capable configurator release", workflow)
+        self.assertIn(".minimumConfiguratorVersion", workflow)
+        self.assertIn(
             "Both updater migration/refresh .sig files deliberately authenticate",
             workflow,
         )

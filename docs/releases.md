@@ -350,12 +350,20 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
    `firmware`, approve the `firmware-release` environment job, and require a
    successful private/public key derivation plus signing round trip.
 
-   For a release that changes the resident bootloader, publish the compatible
-   configurator first. Deployed v3 updaters accept the migrator only under a
-   strictly newer firmware release version; if application `X` was already
-   installed by an older configurator without refresh, issue `X+1` rather than
-   trying to weaken anti-rollback or reuse `X`. Older configurators also do not
-   understand the exact schema-2 refresh/capsule roles.
+   For a release that changes the resident bootloader, publish stable
+   configurator `app-v0.1.18` first. Firmware tag CI checks this minimum and
+   writes it into `firmware-manifest.json`. Deployed v3 updaters accept the
+   migrator only under a strictly newer firmware release version; if
+   application `X` was already installed by an older configurator without
+   refresh, issue `X+1` rather than trying to weaken anti-rollback or reuse
+   `X`. Older configurators do not understand the exact schema-2
+   refresh/capsule roles.
+
+   For the current `firmware-v2.0.9` installed baseline, the intended order is
+   therefore `app-v0.1.18` first, then `firmware-v2.0.10`. If any keyboard has
+   already received application 2.0.10 through an older configurator without
+   the resident refresh, use `firmware-v2.0.11` as the carrier for that cohort;
+   never rebuild or re-sign 2.0.10.
 
 5. **Tag and push** (use semver `X.Y.Z` matching the source constants from
    step 1):

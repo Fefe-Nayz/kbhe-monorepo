@@ -59,6 +59,9 @@ option-byte locking is a separate manufacturing decision.
 
 ## Automatic update from KBHE Configurator
 
+Resident updater refresh requires KBHE Configurator 0.1.18 or newer; publish
+that configurator before the firmware release carrying the refresh assets.
+
 1. Connect the keyboard in normal mode.
 2. Open **Firmware** and choose **Check for updates**.
 3. Download and install the offered release.

@@ -30,13 +30,16 @@ torn resident with no valid KBLV remains eligible so initial migration and
 power-cut recovery cannot be locked out.
 
 An old v3 updater requires the refresh image's firmware release version to be
-strictly newer than its currently valid normal application. Consequently, ship
-the configurator that understands descriptor schema 2 and both asset roles
-before publishing the firmware release that first carries a resident updater
-fix. If an older configurator has already installed application release `X`
-without refreshing the bootloader, `X` cannot be reused for the retrofit;
-publish a signed `X+1` release. This follows from the deployed v3 anti-rollback
-contract and must not be bypassed by weakening equal-version acceptance.
+strictly newer than its currently valid normal application. Consequently,
+publish configurator `app-v0.1.18` (the minimum version that understands
+descriptor schema 2 and both asset roles) before the firmware release that
+first carries a resident updater fix. Firmware tag CI enforces that this stable
+configurator release already exists and records the minimum in
+`firmware-manifest.json`. If an older configurator has already installed
+application release `X` without refreshing the bootloader, `X` cannot be reused
+for the retrofit; publish a signed `X+1` release. This follows from the deployed
+v3 anti-rollback contract and must not be bypassed by weakening equal-version
+acceptance.
 
 The v2 path must never be implemented as “skip AUTH and flash the normal
 application”. Updater v2 erases sectors 4–6 and stores its validity trailer at

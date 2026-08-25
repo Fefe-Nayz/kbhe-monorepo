@@ -26,6 +26,9 @@ on:
 permissions:
   contents: read
 
+env:
+  KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION: "0.1.18"
+
 jobs:
   build:
     name: Build firmware
@@ -144,6 +147,17 @@ jobs:
           name: kbhe-firmware-${{ github.sha }}
           path: dist
 
+      - name: Require updater-refresh capable configurator release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          minimum_app_tag="app-v${KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION}"
+          release_json="$(gh release view "$minimum_app_tag" --json isDraft,isPrerelease)"
+          if ! jq -e '.isDraft == false and .isPrerelease == false' <<<"$release_json" >/dev/null; then
+            echo "Firmware refresh assets require published stable configurator $minimum_app_tag first" >&2
+            exit 1
+          fi
+
       - name: Enforce resident bootloader version lineage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -256,7 +270,9 @@ jobs:
             --signature dist/kbhe-updater-v2-to-v3.bin.sig \
             --version "$version" \
             --verify-public firmware/keys/firmware-ed25519-public.pem
-          jq '.legacyUpdaterMigration = "kbhe-updater-v2-to-v3.bin" |
+          jq --arg minimumConfiguratorVersion "$KBHE_UPDATER_REFRESH_MIN_CONFIGURATOR_VERSION" '
+              .minimumConfiguratorVersion = $minimumConfiguratorVersion |
+              .legacyUpdaterMigration = "kbhe-updater-v2-to-v3.bin" |
               .updaterV3Refresh = "kbhe-updater-v3-refresh.bin" |
               del(.migrationExecutable)' \
             dist/firmware-manifest.json > "$RUNNER_TEMP/firmware-manifest.json"
