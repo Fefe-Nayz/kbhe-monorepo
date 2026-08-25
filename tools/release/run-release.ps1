@@ -419,6 +419,8 @@ function Run-FirmwareChecks {
         -Executable "python" -Arguments @("tools/host/test_device_protocol.py")
     Invoke-External -Name "Firmware: HIL logger tests" -WorkingDirectory $RepoRoot `
         -Executable "python" -Arguments @("tools/host/test_hil_input_logger.py")
+    Invoke-External -Name "Firmware: bounded input diagnostic tests" -WorkingDirectory $RepoRoot `
+        -Executable "python" -Arguments @("tools/host/test_kbhe_input_diagnostic.py")
     Invoke-External -Name "Firmware: cmake --preset Release" -WorkingDirectory $RepoRoot `
         -Executable "cmake" -Arguments @("--preset", "Release")
     Invoke-External -Name "Firmware: cmake --build --preset Release" -WorkingDirectory $RepoRoot `

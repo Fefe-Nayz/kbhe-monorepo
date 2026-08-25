@@ -66,6 +66,7 @@ jobs:
           python tools/host/test_firmware_updater_selection.py
           python tools/host/test_device_protocol.py
           python tools/host/test_hil_input_logger.py
+          python tools/host/test_kbhe_input_diagnostic.py
 
       - name: Configure Release
         run: cmake --preset Release
