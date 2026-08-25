@@ -370,6 +370,32 @@ static uint8_t settings_sanitize_advanced_tick_rate(uint8_t tick_rate) {
   return tick_rate;
 }
 
+static void settings_sanitize_filter_params(uint8_t *noise_band,
+                                            uint8_t *alpha_min_denom,
+                                            uint8_t *alpha_max_denom) {
+  uint8_t temp = 0u;
+
+  if (noise_band == NULL || alpha_min_denom == NULL ||
+      alpha_max_denom == NULL) {
+    return;
+  }
+
+  if (*noise_band == 0u) {
+    *noise_band = 1u;
+  }
+  if (*alpha_min_denom == 0u) {
+    *alpha_min_denom = 1u;
+  }
+  if (*alpha_max_denom == 0u) {
+    *alpha_max_denom = 1u;
+  }
+  if (*alpha_min_denom > *alpha_max_denom) {
+    temp = *alpha_min_denom;
+    *alpha_min_denom = *alpha_max_denom;
+    *alpha_max_denom = temp;
+  }
+}
+
 static uint8_t
 settings_sanitize_trigger_chatter_guard_duration(uint8_t duration_ms) {
   if (duration_ms > SETTINGS_TRIGGER_CHATTER_GUARD_MAX_MS) {
@@ -1166,6 +1192,9 @@ static void settings_profile_apply_slot(uint8_t profile_index) {
   current_settings.filter_noise_band = profile->filter_noise_band;
   current_settings.filter_alpha_min = profile->filter_alpha_min;
   current_settings.filter_alpha_max = profile->filter_alpha_max;
+  settings_sanitize_filter_params(&current_settings.filter_noise_band,
+                                  &current_settings.filter_alpha_min,
+                                  &current_settings.filter_alpha_max);
   current_settings.advanced_tick_rate = profile->advanced_tick_rate;
   current_settings.rotary = profile->rotary;
   settings_sync_led_effect_speed_cache();
@@ -1687,6 +1716,9 @@ settings_sanitize_profile_snapshot(settings_profile_t *profile) {
   settings_gamepad_sanitize(&profile->gamepad);
   settings_rotary_encoder_sanitize(&profile->rotary);
   profile->filter_enabled = profile->filter_enabled ? 1u : 0u;
+  settings_sanitize_filter_params(&profile->filter_noise_band,
+                                  &profile->filter_alpha_min,
+                                  &profile->filter_alpha_max);
   profile->advanced_tick_rate =
       settings_sanitize_advanced_tick_rate(profile->advanced_tick_rate);
   settings_sanitize_trigger_chatter_guard_storage(&profile->led);
