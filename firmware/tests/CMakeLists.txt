@@ -134,6 +134,16 @@ add_executable(transition_filter_test transition_filter_test.c)
 target_include_directories(transition_filter_test PRIVATE "${KBHE_CORE_INC}")
 add_test(NAME transition_filter_test COMMAND transition_filter_test)
 
+add_executable(filter_test
+  filter_test.c
+  ../Core/Src/analog/filter.c
+)
+target_include_directories(filter_test BEFORE PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/filter_test_stubs"
+  "${KBHE_CORE_INC}"
+)
+add_test(NAME filter_test COMMAND filter_test)
+
 add_executable(realtime_scan_policy_test realtime_scan_policy_test.c)
 target_include_directories(realtime_scan_policy_test PRIVATE "${KBHE_CORE_INC}")
 add_test(NAME realtime_scan_policy_test COMMAND realtime_scan_policy_test)
