@@ -5,7 +5,7 @@
 
 #define FIRMWARE_VERSION_MAJOR 2u
 #define FIRMWARE_VERSION_MINOR 0u
-#define FIRMWARE_VERSION_PATCH 9u
+#define FIRMWARE_VERSION_PATCH 10u
 #define FIRMWARE_VERSION_PACKED                                                \
   (((uint32_t)FIRMWARE_VERSION_MAJOR << 16) |                                  \
    ((uint32_t)FIRMWARE_VERSION_MINOR << 8) |                                   \
