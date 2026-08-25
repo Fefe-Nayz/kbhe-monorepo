@@ -4,6 +4,7 @@
  */
 
 #include "hid/keyboard_nkro_hid.h"
+#include "adc_capture.h"
 #include "layout/layout.h"
 #include "stm32f7xx_hal.h"
 #include "tusb.h"
@@ -147,6 +148,9 @@ static bool keyboard_nkro_hid_queue_push_snapshot(
   if (keyboard_nkro_hid_queue_is_full()) {
     report_queue_overflow_count++;
     report_resync_required = true;
+    if (adc_input_trace_hid_enqueue != NULL) {
+      adc_input_trace_hid_enqueue(ADC_INPUT_TRACE_ROUTE_NKRO, false);
+    }
     return false;
   }
 
@@ -155,6 +159,9 @@ static bool keyboard_nkro_hid_queue_push_snapshot(
   depth = keyboard_nkro_hid_queue_depth();
   if (depth > report_queue_high_watermark) {
     report_queue_high_watermark = depth;
+  }
+  if (adc_input_trace_hid_enqueue != NULL) {
+    adc_input_trace_hid_enqueue(ADC_INPUT_TRACE_ROUTE_NKRO, true);
   }
   return true;
 }

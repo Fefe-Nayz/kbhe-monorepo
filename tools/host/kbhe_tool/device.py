@@ -2049,6 +2049,93 @@ class KBHEDevice:
             'filtered_samples': filtered_samples,
         }
 
+    def input_trace_start(self, duration_ms=20000):
+        """Arm the autonomous all-key trace in MCU RAM.
+
+        No settings or flash are touched. The caller should wait for the whole
+        duration without polling, then use ``input_trace_status`` and
+        ``input_trace_read``.
+        """
+        duration_ms = int(duration_ms)
+        data = [
+            0,
+            duration_ms & 0xFF,
+            (duration_ms >> 8) & 0xFF,
+            (duration_ms >> 16) & 0xFF,
+            (duration_ms >> 24) & 0xFF,
+        ]
+        resp = self.send_command(Command.INPUT_TRACE_START, data)
+        return self._parse_input_trace_status(resp)
+
+    def input_trace_status(self):
+        """Read trace metadata once capture is expected to be complete."""
+        return self._parse_input_trace_status(
+            self.send_command(Command.INPUT_TRACE_STATUS)
+        )
+
+    @staticmethod
+    def _parse_input_trace_status(resp):
+        if not resp or len(resp) < 30 or resp[1] != Status.OK:
+            return None
+        packet = bytes(resp)
+        return {
+            'active': bool(resp[2]),
+            'record_size': resp[3],
+            'duration_ms': struct.unpack_from('<I', packet, 4)[0],
+            'scan_count': struct.unpack_from('<I', packet, 8)[0],
+            'record_count': struct.unpack_from('<H', packet, 12)[0],
+            'overflow_count': struct.unpack_from('<I', packet, 14)[0],
+            'max_process_cycles': struct.unpack_from('<I', packet, 18)[0],
+            'total_process_cycles': struct.unpack_from('<I', packet, 22)[0],
+            'core_clock_hz': struct.unpack_from('<I', packet, 26)[0],
+        }
+
+    def input_trace_read(self, record_index):
+        """Read one completed 42-byte sparse trace record from MCU RAM."""
+        record_index = int(record_index)
+        data = [0, record_index & 0xFF, (record_index >> 8) & 0xFF]
+        resp = self.send_command(Command.INPUT_TRACE_READ, data)
+        if not resp or len(resp) < 50 or resp[1] != Status.OK:
+            return None
+
+        packet = bytes(resp)
+        values = struct.unpack_from('<I14H10B', packet, 8)
+        names = (
+            'start_scan',
+            'duration_scans',
+            'trigger_press_scan',
+            'trigger_release_scan',
+            'route_press_scan',
+            'route_release_scan',
+            'enqueue_press_scan',
+            'enqueue_release_scan',
+            'raw_baseline',
+            'raw_min',
+            'raw_max',
+            'filtered_baseline',
+            'filtered_max',
+            'distance_max_um',
+            'keycode',
+            'key_index',
+            'route',
+            'trigger_press_count',
+            'trigger_release_count',
+            'route_press_count',
+            'route_release_count',
+            'enqueue_press_count',
+            'enqueue_release_count',
+            'flags',
+            'enqueue_failure_count',
+        )
+        record = dict(zip(names, values))
+        record.update({
+            'active': bool(resp[2]),
+            'record_size': resp[3],
+            'total_records': struct.unpack_from('<H', packet, 4)[0],
+            'record_index': struct.unpack_from('<H', packet, 6)[0],
+        })
+        return record
+
     def get_lock_states(self):
         """Get keyboard lock states (Caps, Num, Scroll)."""
         resp = self.send_command(Command.GET_LOCK_STATES)

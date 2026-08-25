@@ -2750,6 +2750,72 @@ static void cmd_adc_capture_read(const uint8_t *in, uint8_t *out) {
   }
 }
 
+static void input_trace_fill_status(hid_resp_input_trace_status_t *resp,
+                                    uint8_t command_id, uint8_t status) {
+  resp->command_id = command_id;
+  resp->status = status;
+  resp->active = adc_input_trace_is_active() ? 1u : 0u;
+  resp->record_size = (uint8_t)sizeof(adc_input_trace_record_t);
+  resp->duration_ms = adc_input_trace_duration_ms();
+  resp->scan_count = adc_input_trace_scan_count();
+  resp->record_count = adc_input_trace_record_count();
+  resp->overflow_count = adc_input_trace_overflow_count();
+  resp->max_process_cycles = adc_input_trace_max_process_cycles();
+  resp->total_process_cycles = adc_input_trace_total_process_cycles();
+  resp->core_clock_hz = SystemCoreClock;
+}
+
+static void cmd_input_trace_start(const uint8_t *in, uint8_t *out) {
+  const hid_req_input_trace_start_t *req =
+      (const hid_req_input_trace_start_t *)in;
+  hid_resp_input_trace_status_t *resp =
+      (hid_resp_input_trace_status_t *)out;
+  uint8_t status = HID_RESP_OK;
+
+  /* Intentionally no diagnostics_live_ping(): once armed, this recorder must
+   * run under the user's normal RGB/effect/load conditions, not the optional
+   * profiling mode used by live polling tools. */
+  if (req->duration_ms == 0u ||
+      req->duration_ms > ADC_INPUT_TRACE_MAX_DURATION_MS) {
+    status = HID_RESP_INVALID_PARAM;
+  } else if (!adc_input_trace_start(req->duration_ms)) {
+    status = HID_RESP_ERROR;
+  }
+  input_trace_fill_status(resp, CMD_INPUT_TRACE_START, status);
+}
+
+static void cmd_input_trace_status(const uint8_t *in, uint8_t *out) {
+  (void)in;
+  input_trace_fill_status((hid_resp_input_trace_status_t *)out,
+                          CMD_INPUT_TRACE_STATUS, HID_RESP_OK);
+}
+
+static void cmd_input_trace_read(const uint8_t *in, uint8_t *out) {
+  const hid_req_input_trace_read_t *req =
+      (const hid_req_input_trace_read_t *)in;
+  hid_resp_input_trace_read_t *resp =
+      (hid_resp_input_trace_read_t *)out;
+  adc_input_trace_record_t record = {0};
+
+  resp->command_id = CMD_INPUT_TRACE_READ;
+  resp->active = adc_input_trace_is_active() ? 1u : 0u;
+  resp->record_size = (uint8_t)sizeof(record);
+  resp->total_records = adc_input_trace_record_count();
+  resp->record_index = req->record_index;
+
+  if (resp->active != 0u) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
+  if (!adc_input_trace_read(req->record_index, &record)) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  resp->status = HID_RESP_OK;
+  memcpy(&resp->record, &record, sizeof(record));
+}
+
 static void cmd_echo(const uint8_t *in, uint8_t *out) {
   // Simply copy input to output with OK status
   memcpy(out, in, HID_PROTOCOL_PACKET_SIZE);
@@ -3216,6 +3282,18 @@ bool hid_protocol_process(const uint8_t *in_packet, uint8_t *out_packet) {
 
   case CMD_GET_MCU_METRICS:
     cmd_get_mcu_metrics(in_packet, out_packet);
+    break;
+
+  case CMD_INPUT_TRACE_START:
+    cmd_input_trace_start(in_packet, out_packet);
+    break;
+
+  case CMD_INPUT_TRACE_STATUS:
+    cmd_input_trace_status(in_packet, out_packet);
+    break;
+
+  case CMD_INPUT_TRACE_READ:
+    cmd_input_trace_read(in_packet, out_packet);
     break;
 
   // Echo for testing

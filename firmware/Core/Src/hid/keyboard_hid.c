@@ -5,6 +5,7 @@
  */
 
 #include "hid/keyboard_hid.h"
+#include "adc_capture.h"
 #include "hid/consumer_hid.h"
 #include "hid/gamepad_hid.h"
 #include "hid/mouse_hid.h"
@@ -103,6 +104,9 @@ keyboard_hid_queue_push_snapshot(const hid_keyboard_report_t *report) {
   if (keyboard_hid_queue_is_full()) {
     report_queue_overflow_count++;
     report_resync_required = true;
+    if (adc_input_trace_hid_enqueue != NULL) {
+      adc_input_trace_hid_enqueue(ADC_INPUT_TRACE_ROUTE_6KRO, false);
+    }
     return false;
   }
 
@@ -111,6 +115,9 @@ keyboard_hid_queue_push_snapshot(const hid_keyboard_report_t *report) {
   depth = keyboard_hid_queue_depth();
   if (depth > report_queue_high_watermark) {
     report_queue_high_watermark = depth;
+  }
+  if (adc_input_trace_hid_enqueue != NULL) {
+    adc_input_trace_hid_enqueue(ADC_INPUT_TRACE_ROUTE_6KRO, true);
   }
   return true;
 }

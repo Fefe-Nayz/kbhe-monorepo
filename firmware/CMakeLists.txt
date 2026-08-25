@@ -187,6 +187,15 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${MONOCYPHER_DIR}/src/optional/monocypher-ed25519.c
 )
 
+# The diagnostic recorder and RAW-HID command dispatcher are cold-path code
+# except for inexpensive active/queue checks. Size-optimize them so optional
+# HIL observability does not consume the mandatory 8 KiB image headroom.
+set_source_files_properties(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/adc_capture.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/hid_protocol.c
+    PROPERTIES COMPILE_OPTIONS "-Os;-fno-lto"
+)
+
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # TinyUSB includes

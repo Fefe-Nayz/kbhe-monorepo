@@ -666,6 +666,15 @@ class DemoDevice:
     def adc_capture_read(self, *args, **kwargs):
         return None
 
+    def input_trace_start(self, *args, **kwargs):
+        return None
+
+    def input_trace_status(self):
+        return None
+
+    def input_trace_read(self, *args, **kwargs):
+        return None
+
     def get_rotary_encoder_settings(self):
         return deepcopy(self._rotary_settings)
 

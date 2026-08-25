@@ -740,8 +740,11 @@ def capture_raw_input(
     *,
     on_event: Callable[[UsageTransition], None] | None = None,
     cancel_event: threading.Event | None = None,
+    duration_s: float = CAPTURE_SECONDS,
 ) -> DiagnosticResult:
-    """Capture the fixed KBHE target for exactly (at most) 20 seconds."""
+    """Capture the fixed KBHE target for a bounded duration."""
+
+    duration_s = max(0.1, min(float(duration_s), 30.0))
 
     user32, kernel32 = _win32_functions()
     target_devices = discover_target_raw_input_devices()
@@ -808,7 +811,7 @@ def capture_raw_input(
                     raw.raw[offset : offset + ctypes.sizeof(RAWKEYBOARD)]
                 )
                 elapsed = time.perf_counter() - start_clock
-                if elapsed > CAPTURE_SECONDS:
+                if elapsed > duration_s:
                     return user32.DefWindowProcW(hwnd, message, wparam, lparam)
                 usage = raw_input_usage(
                     keyboard.MakeCode, keyboard.Flags, keyboard.VKey
@@ -839,7 +842,7 @@ def capture_raw_input(
                 return 0
             if message == WM_TIMER:
                 if (
-                    time.perf_counter() - start_clock >= CAPTURE_SECONDS
+                    time.perf_counter() - start_clock >= duration_s
                     or (cancel_event is not None and cancel_event.is_set())
                 ):
                     stopped = True
@@ -932,7 +935,7 @@ def capture_raw_input(
             f"observed {gate.orphan_break} break event(s) without a make in this session"
         )
     completed_utc = datetime.now(timezone.utc)
-    elapsed_s = min(time.perf_counter() - start_clock, CAPTURE_SECONDS)
+    elapsed_s = min(time.perf_counter() - start_clock, duration_s)
     return DiagnosticResult(
         layer="Windows Raw Input (post-HID keyboard stack; not USB URB packets)",
         started_at_utc=started_utc.isoformat(),
