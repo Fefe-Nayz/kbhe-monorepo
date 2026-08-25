@@ -1,30 +1,83 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
-import { kbheDevice, type CalibrationSettings } from "./device";
-import { KEY_COUNT } from "./protocol";
+import { kbheDevice, type CalibrationSettings, type ProfileInfo } from "./device";
+import { KEY_COUNT, LAYER_COUNT, SETTINGS_PROFILE_COUNT } from "./protocol";
+import {
+  applyFirmwareProfileSnapshot,
+  captureFirmwareProfileSnapshot,
+  parseFirmwareProfileSnapshot,
+  type FirmwareProfileSnapshot,
+} from "./profile-sync";
 
 const STORE_PATH = "updater-migration-recovery.json";
 const STORE_KEY_PREFIX = "calibration:";
-const SCHEMA_VERSION = 1 as const;
+const LEGACY_SCHEMA_VERSION = 1 as const;
+const COMPLETE_SCHEMA_VERSION = 2 as const;
 const ADC_MIN = 0;
 const ADC_MAX = 4095;
 const RESET_ZERO = 2195;
 const RESET_MAX = 2850;
 
-export const CALIBRATION_MIGRATION_QUERY_KEY = ["calibration", "updaterMigrationRecovery"] as const;
+export const UPDATER_MIGRATION_QUERY_KEY = ["calibration", "updaterMigrationRecovery"] as const;
 
-export interface CalibrationMigrationBackup {
-  schemaVersion: typeof SCHEMA_VERSION;
+interface BaseMigrationBackup {
   serialNumber: string;
   capturedAt: number;
   calibration: CalibrationSettings;
 }
 
-export interface CalibrationMigrationDevice {
+export interface LegacyCalibrationMigrationBackup extends BaseMigrationBackup {
+  schemaVersion: typeof LEGACY_SCHEMA_VERSION;
+}
+
+export interface FirmwareProfilesMigrationBackup {
+  usedMask: number;
+  activeProfileIndex: number;
+  defaultProfileIndex: number;
+  globals: {
+    options: NonNullable<FirmwareProfileSnapshot["options"]>;
+    nkroEnabled: boolean;
+  };
+  names: Array<string | null>;
+  snapshots: Array<FirmwareProfileSnapshot | null>;
+}
+
+export interface CompleteUpdaterMigrationBackup extends BaseMigrationBackup {
+  schemaVersion: typeof COMPLETE_SCHEMA_VERSION;
+  profiles: FirmwareProfilesMigrationBackup;
+}
+
+export type UpdaterMigrationBackup =
+  | LegacyCalibrationMigrationBackup
+  | CompleteUpdaterMigrationBackup;
+
+export interface UpdaterMigrationDevice {
   getCalibration(): Promise<CalibrationSettings | null>;
   setCalibration(
     lutZero: number,
     keyZeros: ArrayLike<number>,
     keyMaxs: ArrayLike<number>,
+  ): Promise<boolean>;
+  getActiveProfile(): Promise<ProfileInfo | null>;
+  getDefaultProfile(): Promise<{ profile_index: number; profile_used_mask: number } | null>;
+  getProfileName(profileIndex: number): Promise<{ name: string; profile_used_mask: number } | null>;
+  createProfile(name?: string): Promise<ProfileInfo | null>;
+  resetProfileSlot(profileIndex: number): Promise<ProfileInfo | null>;
+  deleteProfile(profileIndex: number): Promise<ProfileInfo | null>;
+  setProfileName(profileIndex: number, name: string): Promise<{ name: string } | null>;
+  setActiveProfile(profileIndex: number): Promise<ProfileInfo | null>;
+  setDefaultProfile(profileIndex: number): Promise<{ profile_index: number; profile_used_mask: number } | null>;
+  saveSettings(): Promise<boolean>;
+  getRamOnlyMode(): Promise<boolean | null>;
+  setOptions(options: NonNullable<FirmwareProfileSnapshot["options"]>): Promise<boolean>;
+  setNkroEnabled(enabled: boolean): Promise<boolean>;
+}
+
+export interface FirmwareProfileMigrationApi {
+  capture(profileIndex: number): Promise<FirmwareProfileSnapshot | null>;
+  apply(
+    snapshot: FirmwareProfileSnapshot,
+    targetProfileIndex: number,
+    options: { persistToFlash: boolean; restoreActiveProfile: boolean },
   ): Promise<boolean>;
 }
 
@@ -45,6 +98,12 @@ const persistentStore: CalibrationMigrationStore = {
   delete: (key) => lazyStore.delete(key),
   entries: () => lazyStore.entries<unknown>(),
   save: () => lazyStore.save(),
+};
+const firmwareProfileApi: FirmwareProfileMigrationApi = {
+  capture: (profileIndex) => captureFirmwareProfileSnapshot(profileIndex),
+  apply: (snapshot, profileIndex, options) => (
+    applyFirmwareProfileSnapshot(snapshot, profileIndex, options)
+  ),
 };
 
 function normalizedSerialNumber(serialNumber: string): string {
@@ -102,15 +161,150 @@ export function isResetCalibration(value: unknown): boolean {
   );
 }
 
-function normalizeBackup(value: unknown): CalibrationMigrationBackup | null {
+function normalizeCompleteProfileSnapshot(
+  value: unknown,
+  profileIndex: number,
+  serialNumber: string,
+): FirmwareProfileSnapshot | null {
+  const snapshot = parseFirmwareProfileSnapshot(value);
+  if (
+    !snapshot
+    || snapshot.schemaVersion !== 2
+    || snapshot.sourceProfileIndex !== profileIndex
+    || snapshot.deviceId !== serialNumber
+    || snapshot.keySettings.length !== KEY_COUNT * LAYER_COUNT
+    || snapshot.keyGamepadMaps == null
+    || snapshot.gamepadSettings == null
+    || snapshot.rotarySettings == null
+    || snapshot.filterEnabled == null
+    || snapshot.filterParams == null
+    || snapshot.options == null
+    || typeof snapshot.options.led_thermal_protection_enabled !== "boolean"
+    || snapshot.nkroEnabled == null
+    || snapshot.advancedTickRate == null
+    || snapshot.actionPrograms == null
+    || snapshot.actionOverlays == null
+    || snapshot.actionStateBits == null
+    || snapshot.actionProgramNames == null
+    || snapshot.actionOverlayNames == null
+    || !snapshot.capabilities?.includes("action-programs-v1")
+    || !snapshot.capabilities.includes("state-overlays-v1")
+    || snapshot.led == null
+    || snapshot.led.enabled == null
+    || snapshot.led.brightness == null
+    || snapshot.led.pixels == null
+    || snapshot.led.effectMode == null
+    || snapshot.led.fpsLimit == null
+    || snapshot.led.effectParams == null
+    || snapshot.led.idleOptions == null
+    || snapshot.led.triggerChatterGuard == null
+  ) {
+    return null;
+  }
+  return snapshot;
+}
+
+function normalizeProfilesBackup(
+  value: unknown,
+  serialNumber: string,
+): FirmwareProfilesMigrationBackup | null {
   if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<CalibrationMigrationBackup>;
+  const candidate = value as Partial<FirmwareProfilesMigrationBackup>;
+  const globalsCandidate = candidate.globals as Partial<FirmwareProfilesMigrationBackup["globals"]> | undefined;
+  const globalOptions = globalsCandidate?.options;
+  if (
+    !Number.isInteger(candidate.usedMask)
+    || Number(candidate.usedMask) <= 0
+    || Number(candidate.usedMask) >= (1 << SETTINGS_PROFILE_COUNT)
+    || !Number.isInteger(candidate.activeProfileIndex)
+    || !Number.isInteger(candidate.defaultProfileIndex)
+    || !Array.isArray(candidate.names)
+    || candidate.names.length !== SETTINGS_PROFILE_COUNT
+    || !Array.isArray(candidate.snapshots)
+    || candidate.snapshots.length !== SETTINGS_PROFILE_COUNT
+    || !globalOptions
+    || typeof globalOptions.keyboard_enabled !== "boolean"
+    || typeof globalOptions.gamepad_enabled !== "boolean"
+    || typeof globalOptions.raw_hid_echo !== "boolean"
+    || typeof globalOptions.led_thermal_protection_enabled !== "boolean"
+    || typeof globalsCandidate?.nkroEnabled !== "boolean"
+  ) {
+    return null;
+  }
+
+  const usedMask = Number(candidate.usedMask);
+  const activeProfileIndex = Number(candidate.activeProfileIndex);
+  const defaultProfileIndex = Number(candidate.defaultProfileIndex);
+  if (
+    activeProfileIndex < 0
+    || activeProfileIndex >= SETTINGS_PROFILE_COUNT
+    || !(usedMask & (1 << activeProfileIndex))
+    || (defaultProfileIndex !== 0xff && (
+      defaultProfileIndex < 0
+      || defaultProfileIndex >= SETTINGS_PROFILE_COUNT
+      || !(usedMask & (1 << defaultProfileIndex))
+    ))
+  ) {
+    return null;
+  }
+
+  const names: Array<string | null> = [];
+  const snapshots: Array<FirmwareProfileSnapshot | null> = [];
+  for (let profileIndex = 0; profileIndex < SETTINGS_PROFILE_COUNT; profileIndex += 1) {
+    const used = Boolean(usedMask & (1 << profileIndex));
+    const name = candidate.names[profileIndex];
+    const snapshot = candidate.snapshots[profileIndex];
+    if (!used) {
+      if (name != null || snapshot != null) return null;
+      names.push(null);
+      snapshots.push(null);
+      continue;
+    }
+    if (typeof name !== "string") return null;
+    const completeSnapshot = normalizeCompleteProfileSnapshot(snapshot, profileIndex, serialNumber);
+    if (
+      !completeSnapshot
+      || JSON.stringify(completeSnapshot.options) !== JSON.stringify(globalOptions)
+      || completeSnapshot.nkroEnabled !== globalsCandidate.nkroEnabled
+    ) return null;
+    names.push(name);
+    snapshots.push(completeSnapshot);
+  }
+
+  return {
+    usedMask,
+    activeProfileIndex,
+    defaultProfileIndex,
+    globals: {
+      options: {
+        keyboard_enabled: globalOptions.keyboard_enabled,
+        gamepad_enabled: globalOptions.gamepad_enabled,
+        raw_hid_echo: globalOptions.raw_hid_echo,
+        led_thermal_protection_enabled: globalOptions.led_thermal_protection_enabled,
+      },
+      nkroEnabled: globalsCandidate.nkroEnabled,
+    },
+    names,
+    snapshots,
+  };
+}
+
+export function hasCompleteProfileRecovery(
+  backup: UpdaterMigrationBackup | null,
+): backup is CompleteUpdaterMigrationBackup {
+  return backup?.schemaVersion === COMPLETE_SCHEMA_VERSION;
+}
+
+function normalizeBackup(value: unknown): UpdaterMigrationBackup | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<UpdaterMigrationBackup>;
   const serialNumber = typeof candidate.serialNumber === "string"
     ? candidate.serialNumber.trim()
     : "";
   const calibration = normalizeCalibrationSettings(candidate.calibration);
   if (
-    candidate.schemaVersion !== SCHEMA_VERSION
+    (candidate.schemaVersion !== LEGACY_SCHEMA_VERSION
+      && candidate.schemaVersion !== COMPLETE_SCHEMA_VERSION)
     || !serialNumber
     || !Number.isSafeInteger(candidate.capturedAt)
     || Number(candidate.capturedAt) <= 0
@@ -118,8 +312,22 @@ function normalizeBackup(value: unknown): CalibrationMigrationBackup | null {
   ) {
     return null;
   }
+  if (candidate.schemaVersion === COMPLETE_SCHEMA_VERSION) {
+    const profiles = normalizeProfilesBackup(
+      (candidate as Partial<CompleteUpdaterMigrationBackup>).profiles,
+      serialNumber,
+    );
+    if (!profiles) return null;
+    return {
+      schemaVersion: COMPLETE_SCHEMA_VERSION,
+      serialNumber,
+      capturedAt: Number(candidate.capturedAt),
+      calibration,
+      profiles,
+    };
+  }
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: LEGACY_SCHEMA_VERSION,
     serialNumber,
     capturedAt: Number(candidate.capturedAt),
     calibration,
@@ -132,10 +340,180 @@ function calibrationsEqual(left: CalibrationSettings, right: CalibrationSettings
     && left.key_max_values.every((value, index) => value === right.key_max_values[index]);
 }
 
-export async function getCalibrationMigrationBackup(
+function snapshotSemantics(snapshot: FirmwareProfileSnapshot): unknown {
+  const semantic = { ...snapshot } as Record<string, unknown>;
+  delete semantic.capturedAt;
+  delete semantic.profileId;
+  delete semantic.revision;
+  delete semantic.options;
+  delete semantic.nkroEnabled;
+  return semantic;
+}
+
+function profilesEqual(
+  left: FirmwareProfilesMigrationBackup,
+  right: FirmwareProfilesMigrationBackup,
+): boolean {
+  if (
+    left.usedMask !== right.usedMask
+    || left.activeProfileIndex !== right.activeProfileIndex
+    || left.defaultProfileIndex !== right.defaultProfileIndex
+    || JSON.stringify(left.globals) !== JSON.stringify(right.globals)
+    || left.names.some((name, index) => name !== right.names[index])
+  ) {
+    return false;
+  }
+  return left.snapshots.every((snapshot, index) => {
+    const other = right.snapshots[index];
+    if (snapshot == null || other == null) return snapshot === other;
+    return JSON.stringify(snapshotSemantics(snapshot)) === JSON.stringify(snapshotSemantics(other));
+  });
+}
+
+async function captureProfilesBackup(
+  serialNumber: string,
+  device: UpdaterMigrationDevice,
+  profileApi: FirmwareProfileMigrationApi,
+): Promise<FirmwareProfilesMigrationBackup> {
+  const [active, defaultProfile] = await Promise.all([
+    device.getActiveProfile(),
+    device.getDefaultProfile(),
+  ]);
+  if (
+    !active
+    || !defaultProfile
+    || active.profile_used_mask !== defaultProfile.profile_used_mask
+  ) {
+    throw new Error(
+      "SETTINGS_BACKUP_REQUIRED: profile metadata could not be read consistently; updater migration was not started",
+    );
+  }
+
+  const usedMask = active.profile_used_mask & ((1 << SETTINGS_PROFILE_COUNT) - 1);
+  let globals: FirmwareProfilesMigrationBackup["globals"] | null = null;
+  const names: Array<string | null> = Array(SETTINGS_PROFILE_COUNT).fill(null);
+  const snapshots: Array<FirmwareProfileSnapshot | null> = Array(SETTINGS_PROFILE_COUNT).fill(null);
+  for (let profileIndex = 0; profileIndex < SETTINGS_PROFILE_COUNT; profileIndex += 1) {
+    if (!(usedMask & (1 << profileIndex))) continue;
+    const name = await device.getProfileName(profileIndex);
+    const snapshot = await profileApi.capture(profileIndex);
+    const completeSnapshot = normalizeCompleteProfileSnapshot(snapshot, profileIndex, serialNumber);
+    if (!name || name.profile_used_mask !== usedMask || !completeSnapshot) {
+      throw new Error(
+        `SETTINGS_BACKUP_REQUIRED: on-device profile ${profileIndex + 1} could not be captured completely; updater migration was not started`,
+      );
+    }
+    const snapshotGlobals: FirmwareProfilesMigrationBackup["globals"] = {
+      options: completeSnapshot.options!,
+      nkroEnabled: completeSnapshot.nkroEnabled!,
+    };
+    if (globals && JSON.stringify(globals) !== JSON.stringify(snapshotGlobals)) {
+      throw new Error(
+        "SETTINGS_BACKUP_REQUIRED: global options changed while profiles were captured; updater migration was not started",
+      );
+    }
+    globals = snapshotGlobals;
+    names[profileIndex] = name.name;
+    snapshots[profileIndex] = completeSnapshot;
+  }
+
+  const captured = normalizeProfilesBackup({
+    usedMask,
+    activeProfileIndex: active.profile_index,
+    defaultProfileIndex: defaultProfile.profile_index,
+    globals,
+    names,
+    snapshots,
+  }, serialNumber);
+  const activeAfterCapture = await device.getActiveProfile();
+  if (
+    !captured
+    || !activeAfterCapture
+    || activeAfterCapture.profile_index !== captured.activeProfileIndex
+    || activeAfterCapture.profile_used_mask !== captured.usedMask
+  ) {
+    throw new Error(
+      "SETTINGS_BACKUP_REQUIRED: profile capture did not preserve active profile metadata; updater migration was not started",
+    );
+  }
+  return captured;
+}
+
+async function restoreProfilesBackup(
+  backup: CompleteUpdaterMigrationBackup,
+  device: UpdaterMigrationDevice,
+  profileApi: FirmwareProfileMigrationApi,
+): Promise<void> {
+  let active = await device.getActiveProfile();
+  if (!active) {
+    throw new Error("SETTINGS_RESTORE_REQUIRED: profile metadata is unavailable");
+  }
+
+  while (active.profile_used_mask !== (1 << SETTINGS_PROFILE_COUNT) - 1) {
+    const before = active.profile_used_mask;
+    const created = await device.createProfile();
+    if (!created || created.profile_used_mask === before) {
+      throw new Error("SETTINGS_RESTORE_REQUIRED: all profile slots could not be recreated");
+    }
+    active = created;
+  }
+
+  for (let profileIndex = 0; profileIndex < SETTINGS_PROFILE_COUNT; profileIndex += 1) {
+    if (!(backup.profiles.usedMask & (1 << profileIndex))) continue;
+    const snapshot = backup.profiles.snapshots[profileIndex];
+    const name = backup.profiles.names[profileIndex];
+    if (!snapshot || name == null || !(await device.resetProfileSlot(profileIndex))) {
+      throw new Error(`SETTINGS_RESTORE_REQUIRED: profile ${profileIndex + 1} could not be reset`);
+    }
+    // Options/NKRO are global, so never let a per-profile apply decide their
+    // final value. They are restored once from the explicitly captured globals.
+    const applied = await profileApi.apply({
+      ...snapshot,
+      options: null,
+      nkroEnabled: null,
+    }, profileIndex, {
+      persistToFlash: true,
+      restoreActiveProfile: false,
+    });
+    if (!applied) {
+      throw new Error(`SETTINGS_RESTORE_REQUIRED: profile ${profileIndex + 1} could not be restored`);
+    }
+    const renamed = await device.setProfileName(profileIndex, name);
+    if (!renamed || renamed.name !== name) {
+      throw new Error(`SETTINGS_RESTORE_REQUIRED: profile ${profileIndex + 1} name could not be restored`);
+    }
+  }
+
+  if (!(await device.setActiveProfile(backup.profiles.activeProfileIndex))) {
+    throw new Error("SETTINGS_RESTORE_REQUIRED: active profile could not be restored");
+  }
+  for (let profileIndex = 0; profileIndex < SETTINGS_PROFILE_COUNT; profileIndex += 1) {
+    if (backup.profiles.usedMask & (1 << profileIndex)) continue;
+    if (!(await device.deleteProfile(profileIndex))) {
+      throw new Error(`SETTINGS_RESTORE_REQUIRED: unused profile slot ${profileIndex + 1} could not be removed`);
+    }
+  }
+  if (!(await device.setDefaultProfile(backup.profiles.defaultProfileIndex))) {
+    throw new Error("SETTINGS_RESTORE_REQUIRED: default profile could not be restored");
+  }
+  if (!(await device.setActiveProfile(backup.profiles.activeProfileIndex))) {
+    throw new Error("SETTINGS_RESTORE_REQUIRED: active profile could not be finalized");
+  }
+  if (
+    !(await device.setOptions(backup.profiles.globals.options))
+    || !(await device.setNkroEnabled(backup.profiles.globals.nkroEnabled))
+  ) {
+    throw new Error("SETTINGS_RESTORE_REQUIRED: global keyboard options could not be restored");
+  }
+  if (!(await device.saveSettings())) {
+    throw new Error("SETTINGS_RESTORE_REQUIRED: restored profiles could not be persisted");
+  }
+}
+
+export async function getUpdaterMigrationBackup(
   serialNumber: string,
   store: CalibrationMigrationStore = persistentStore,
-): Promise<CalibrationMigrationBackup | null> {
+): Promise<UpdaterMigrationBackup | null> {
   const serial = normalizedSerialNumber(serialNumber);
   await store.init();
   const raw = await store.get(backupKey(serial));
@@ -143,23 +521,23 @@ export async function getCalibrationMigrationBackup(
   const backup = normalizeBackup(raw);
   if (!backup || backup.serialNumber !== serial) {
     throw new Error(
-      "CALIBRATION_BACKUP_INVALID: the saved pre-migration calibration is corrupt or belongs to another keyboard",
+      "UPDATER_BACKUP_INVALID: the saved pre-migration recovery data is corrupt or belongs to another keyboard",
     );
   }
   return backup;
 }
 
-export async function listCalibrationMigrationBackups(
+export async function listUpdaterMigrationBackups(
   store: CalibrationMigrationStore = persistentStore,
-): Promise<CalibrationMigrationBackup[]> {
+): Promise<UpdaterMigrationBackup[]> {
   await store.init();
-  const backups: CalibrationMigrationBackup[] = [];
+  const backups: UpdaterMigrationBackup[] = [];
   for (const [key, raw] of await store.entries()) {
     if (!key.startsWith(STORE_KEY_PREFIX)) continue;
     const backup = normalizeBackup(raw);
     if (!backup || backupKey(backup.serialNumber) !== key) {
       throw new Error(
-        "CALIBRATION_BACKUP_INVALID: a saved pre-migration calibration is corrupt",
+        "UPDATER_BACKUP_INVALID: saved pre-migration recovery data is corrupt",
       );
     }
     backups.push(backup);
@@ -167,24 +545,33 @@ export async function listCalibrationMigrationBackups(
   return backups.sort((left, right) => right.capturedAt - left.capturedAt);
 }
 
-export async function captureCalibrationMigrationBackup(
+export async function captureUpdaterMigrationBackup(
   serialNumber: string,
-  device: CalibrationMigrationDevice = kbheDevice,
+  device: UpdaterMigrationDevice = kbheDevice,
   store: CalibrationMigrationStore = persistentStore,
-): Promise<CalibrationMigrationBackup> {
+  profileApi: FirmwareProfileMigrationApi = firmwareProfileApi,
+): Promise<CompleteUpdaterMigrationBackup> {
   const serial = normalizedSerialNumber(serialNumber);
+  const ramOnlyMode = await device.getRamOnlyMode();
+  if (ramOnlyMode !== false) {
+    throw new Error(
+      "SETTINGS_BACKUP_REQUIRED: an app profile is active in RAM-only mode (or its state could not be verified). Return to an on-device profile before updater migration.",
+    );
+  }
   const calibration = normalizeCalibrationSettings(await device.getCalibration());
   if (!calibration) {
     throw new Error(
       "CALIBRATION_BACKUP_REQUIRED: the keyboard's complete 82-key calibration could not be read; updater migration was not started",
     );
   }
+  const profiles = await captureProfilesBackup(serial, device, profileApi);
 
-  const backup: CalibrationMigrationBackup = {
-    schemaVersion: SCHEMA_VERSION,
+  const backup: CompleteUpdaterMigrationBackup = {
+    schemaVersion: COMPLETE_SCHEMA_VERSION,
     serialNumber: serial,
     capturedAt: Date.now(),
     calibration,
+    profiles,
   };
   await store.init();
   const key = backupKey(serial);
@@ -200,28 +587,38 @@ export async function captureCalibrationMigrationBackup(
       // The original persistence failure is the actionable error.
     }
     throw new Error(
-      `CALIBRATION_BACKUP_REQUIRED: the pre-migration calibration could not be saved; updater migration was not started (${error instanceof Error ? error.message : String(error)})`,
+      `SETTINGS_BACKUP_REQUIRED: complete pre-migration recovery data could not be saved; updater migration was not started (${error instanceof Error ? error.message : String(error)})`,
       { cause: error },
     );
   }
 
   const persisted = normalizeBackup(await store.get(key));
-  if (!persisted || persisted.serialNumber !== serial || !calibrationsEqual(calibration, persisted.calibration)) {
+  if (
+    !hasCompleteProfileRecovery(persisted)
+    || persisted.serialNumber !== serial
+    || !calibrationsEqual(calibration, persisted.calibration)
+    || !profilesEqual(profiles, persisted.profiles)
+  ) {
     throw new Error(
-      "CALIBRATION_BACKUP_REQUIRED: the pre-migration calibration could not be persisted safely; updater migration was not started",
+      "SETTINGS_BACKUP_REQUIRED: complete calibration/profile recovery data could not be persisted safely; updater migration was not started",
     );
   }
   return persisted;
 }
 
-export async function restoreCalibrationMigrationBackup(
+export async function restoreUpdaterMigrationBackup(
   serialNumber: string,
-  device: CalibrationMigrationDevice = kbheDevice,
+  device: UpdaterMigrationDevice = kbheDevice,
   store: CalibrationMigrationStore = persistentStore,
+  profileApi: FirmwareProfileMigrationApi = firmwareProfileApi,
 ): Promise<boolean> {
   const serial = normalizedSerialNumber(serialNumber);
-  const backup = await getCalibrationMigrationBackup(serial, store);
+  const backup = await getUpdaterMigrationBackup(serial, store);
   if (!backup) return false;
+
+  if (hasCompleteProfileRecovery(backup)) {
+    await restoreProfilesBackup(backup, device, profileApi);
+  }
 
   const written = await device.setCalibration(
     backup.calibration.lut_zero_value,
@@ -233,12 +630,25 @@ export async function restoreCalibrationMigrationBackup(
       "CALIBRATION_RESTORE_REQUIRED: firmware updated, but the saved calibration could not be written; the backup was kept for retry",
     );
   }
+  if (!(await device.saveSettings())) {
+    throw new Error(
+      "SETTINGS_RESTORE_REQUIRED: calibration/profile recovery could not be persisted; the backup was kept for retry",
+    );
+  }
 
   const verified = normalizeCalibrationSettings(await device.getCalibration());
   if (!verified || !calibrationsEqual(backup.calibration, verified)) {
     throw new Error(
       "CALIBRATION_RESTORE_REQUIRED: calibration verification failed after the update; the backup was kept for retry",
     );
+  }
+  if (hasCompleteProfileRecovery(backup)) {
+    const verifiedProfiles = await captureProfilesBackup(serial, device, profileApi);
+    if (!profilesEqual(backup.profiles, verifiedProfiles)) {
+      throw new Error(
+        "SETTINGS_RESTORE_REQUIRED: semantic profile verification failed; the complete backup was kept for retry",
+      );
+    }
   }
 
   await store.delete(backupKey(serial));

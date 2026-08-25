@@ -7,6 +7,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as tauriOpen } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
+import { kbheDevice } from "@/lib/kbhe/device";
 import { kbheFirmware, resolveFirmwareVersion, type FirmwareResolveResult } from "@/lib/kbhe/firmware";
 import {
   checkFirmwareUpdate,
@@ -15,11 +16,12 @@ import {
 import { kbheTransport, selectKbheRecoveryTarget } from "@/lib/kbhe/transport";
 import { formatFirmwareVersion, type FirmwareVersion } from "@/lib/kbhe/protocol";
 import {
-  CALIBRATION_MIGRATION_QUERY_KEY,
-  captureCalibrationMigrationBackup,
-  getCalibrationMigrationBackup,
-  restoreCalibrationMigrationBackup,
-  type CalibrationMigrationBackup,
+  UPDATER_MIGRATION_QUERY_KEY,
+  captureUpdaterMigrationBackup,
+  getUpdaterMigrationBackup,
+  hasCompleteProfileRecovery,
+  restoreUpdaterMigrationBackup,
+  type UpdaterMigrationBackup,
 } from "@/lib/kbhe/calibration-migration";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -60,7 +62,7 @@ function delay(ms: number): Promise<void> {
 export default function Firmware() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { status, deviceInfo, firmwareVersion, compatibility, developerMode } = useDeviceSession();
+  const { status, deviceInfo, firmwareVersion, compatibility, developerMode, ramOnlyMode } = useDeviceSession();
   const sessionDetected = status === "connected"
     || status === "updater"
     || status === "recovery-only";
@@ -105,8 +107,8 @@ export default function Firmware() {
     || bootloaderDetected;
 
   const calibrationRecoveryQ = useQuery({
-    queryKey: [...CALIBRATION_MIGRATION_QUERY_KEY, recoverySerialNumber],
-    queryFn: () => getCalibrationMigrationBackup(recoverySerialNumber!),
+    queryKey: [...UPDATER_MIGRATION_QUERY_KEY, recoverySerialNumber],
+    queryFn: () => getUpdaterMigrationBackup(recoverySerialNumber!),
     enabled: isTauri() && Boolean(recoverySerialNumber),
     staleTime: 1_000,
   });
@@ -518,7 +520,7 @@ export default function Firmware() {
     }
 
     let flashTargetSerialNumber: string | undefined;
-    let calibrationBackup: CalibrationMigrationBackup | null = null;
+    let migrationBackup: UpdaterMigrationBackup | null = null;
     let sessionReconnected = false;
     const reconnectSession = async (requireRuntime = false): Promise<boolean> => {
       if (!flashTargetSerialNumber) return false;
@@ -550,7 +552,7 @@ export default function Firmware() {
       appendLog(`Reconnect failed: ${lastError}`);
       if (requireRuntime) {
         throw new Error(
-          `CALIBRATION_RESTORE_REQUIRED: ${lastError}. The calibration backup was kept; reconnect this keyboard and use the recovery banner to restore it.`,
+          `SETTINGS_RESTORE_REQUIRED: ${lastError}. The recovery backup was kept; reconnect this keyboard and use the recovery banner to restore it.`,
         );
       }
       return false;
@@ -572,26 +574,38 @@ export default function Firmware() {
         const confirmedUpdaterV3 = session.deviceInfo?.kind === "updater"
           && session.compatibility?.updaterProtocol === 0x0003;
         try {
-          calibrationBackup = await getCalibrationMigrationBackup(expectedSerialNumber);
+          migrationBackup = await getUpdaterMigrationBackup(expectedSerialNumber);
         } catch (error) {
           if (!confirmedUpdaterV3) throw error;
-          appendLog("Calibration recovery storage is unavailable, but updater v3 is confirmed; no storage-erasing migration is needed.");
+          appendLog("Settings recovery storage is unavailable, but updater v3 is confirmed; no storage-erasing migration is needed.");
         }
         const runtimeConnected = session.deviceInfo?.kind === "runtime"
           && session.deviceInfo.serialNumber?.trim() === expectedSerialNumber
           && (session.status === "connected" || session.status === "recovery-only");
 
-        if (!calibrationBackup && runtimeConnected) {
-          appendLog("Saving the complete 82-key calibration before updater negotiation...");
-          calibrationBackup = await captureCalibrationMigrationBackup(expectedSerialNumber);
-          appendLog("Calibration backup persisted and verified.");
-          void queryClient.invalidateQueries({ queryKey: CALIBRATION_MIGRATION_QUERY_KEY });
-        } else if (!calibrationBackup && !confirmedUpdaterV3) {
+        if (runtimeConnected && await kbheDevice.getRamOnlyMode() !== false) {
           throw new Error(
-            "CALIBRATION_BACKUP_REQUIRED: updater v2 migration cannot start while the keyboard is already in update mode without a saved calibration. Return it to runtime mode, reconnect, and retry so the app can save all 82 zero/max values first.",
+            "SETTINGS_BACKUP_REQUIRED: an app profile is active in RAM-only mode (or its state could not be verified). Return to an on-device profile before updater migration.",
           );
-        } else if (calibrationBackup) {
-          appendLog("Using the verified calibration recovery backup already saved for this keyboard.");
+        }
+        if (runtimeConnected && migrationBackup && !hasCompleteProfileRecovery(migrationBackup)) {
+          appendLog("Restoring the legacy calibration-only backup before creating complete recovery data...");
+          await restoreUpdaterMigrationBackup(expectedSerialNumber);
+          migrationBackup = null;
+        }
+        if (!migrationBackup && runtimeConnected) {
+          appendLog("Saving calibration and all four on-device profile slots before updater negotiation...");
+          migrationBackup = await captureUpdaterMigrationBackup(expectedSerialNumber);
+          appendLog("Complete calibration/profile backup persisted and verified.");
+          void queryClient.invalidateQueries({ queryKey: UPDATER_MIGRATION_QUERY_KEY });
+        } else if ((!migrationBackup || !hasCompleteProfileRecovery(migrationBackup)) && !confirmedUpdaterV3) {
+          throw new Error(
+            "SETTINGS_BACKUP_REQUIRED: updater v2 migration cannot start without complete calibration and four-slot profile recovery data. Return the keyboard to runtime mode, reconnect, and retry so every setting can be captured first.",
+          );
+        } else if (migrationBackup) {
+          appendLog(hasCompleteProfileRecovery(migrationBackup)
+            ? "Using the verified complete settings recovery backup already saved for this keyboard."
+            : "Using a legacy calibration-only backup on confirmed updater v3; no storage-erasing migration is needed.");
         }
       }
 
@@ -669,15 +683,19 @@ export default function Firmware() {
         });
       }
 
-      if (calibrationBackup) {
+      if (migrationBackup) {
         await reconnectSession(true);
-        appendLog("Restoring the saved per-key zero and maximum calibration...");
-        const restored = await restoreCalibrationMigrationBackup(expectedSerialNumber);
+        appendLog(hasCompleteProfileRecovery(migrationBackup)
+          ? "Restoring calibration and all on-device profiles, then verifying them semantically..."
+          : "Restoring the legacy per-key calibration backup...");
+        const restored = await restoreUpdaterMigrationBackup(expectedSerialNumber);
         if (!restored) {
           throw new Error("CALIBRATION_RESTORE_REQUIRED: the saved calibration disappeared before restoration");
         }
-        appendLog("Calibration restored and verified on all 82 keys.");
-        await queryClient.invalidateQueries({ queryKey: CALIBRATION_MIGRATION_QUERY_KEY });
+        appendLog(hasCompleteProfileRecovery(migrationBackup)
+          ? "Calibration and all profile settings restored, persisted, and verified."
+          : "Legacy calibration restored and verified on all 82 keys.");
+        await queryClient.invalidateQueries({ queryKey: UPDATER_MIGRATION_QUERY_KEY });
       }
 
       appendLog(`Flash complete! Version: ${formatFirmwareVersion(finalVersion)}`);
@@ -692,7 +710,7 @@ export default function Firmware() {
       if (!sessionReconnected) {
         await reconnectSession();
       }
-      void queryClient.invalidateQueries({ queryKey: CALIBRATION_MIGRATION_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: UPDATER_MIGRATION_QUERY_KEY });
       flashInFlightRef.current = false;
     }
   }, [timeoutSec, retries, appendLog, queryClient, recoverySerialNumber]);
@@ -750,11 +768,13 @@ export default function Firmware() {
   const compatibilityBlocksFlash = compatibility?.status === "app-too-old";
   const updaterV2NeedsCalibrationBackup = updateModeDetected
     && compatibility?.updaterProtocol === 0x0002;
+  const ramOnlyProfileBlocksFlash = status === "connected" && ramOnlyMode === true;
   const calibrationMigrationBlocked = updaterV2NeedsCalibrationBackup
-    && calibrationRecoveryQ.data == null;
+    && !hasCompleteProfileRecovery(calibrationRecoveryQ.data ?? null);
   const canFlash = connected
     && !compatibilityBlocksFlash
     && !calibrationMigrationBlocked
+    && !ramOnlyProfileBlocksFlash
     && !!firmwareBytes
     && fileVersion !== null
     && fileError === null
@@ -806,6 +826,16 @@ export default function Firmware() {
           )}
         </div>
 
+        {ramOnlyProfileBlocksFlash && (
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive" role="alert">
+            <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>
+              Firmware migration is blocked while an app profile is active in RAM-only mode.
+              Return to an on-device profile first so the four durable slots can be captured exactly.
+            </span>
+          </div>
+        )}
+
         {updaterV2NeedsCalibrationBackup && (
           <div
             className={cn(
@@ -819,12 +849,12 @@ export default function Firmware() {
             <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
             <span>
               {calibrationRecoveryQ.isLoading
-                ? "Checking for the required pre-migration calibration backup…"
+                ? "Checking for the required complete pre-migration settings backup…"
                 : calibrationRecoveryQ.error
                   ? `Calibration recovery storage could not be read: ${calibrationRecoveryQ.error instanceof Error ? calibrationRecoveryQ.error.message : String(calibrationRecoveryQ.error)}. Migration is blocked.`
                   : calibrationMigrationBlocked
-                    ? "Updater v2 migration is blocked because no complete 82-key calibration backup exists. Return the keyboard to runtime mode, reconnect it, then start the update here so zero and maximum values can be saved first."
-                    : "The complete per-key calibration backup is safe. Migration can continue and the app will restore and verify it after runtime reconnects."}
+                    ? "Updater v2 migration is blocked because no complete calibration plus four-profile backup exists. Return the keyboard to runtime mode, reconnect it, then start the update here so every setting can be saved first. A legacy calibration-only backup is preserved but is not sufficient to migrate."
+                    : "The complete calibration and four-profile backup is safe. Migration can continue and the app will restore, persist, and verify every captured setting after runtime reconnects."}
             </span>
           </div>
         )}
@@ -898,7 +928,7 @@ export default function Firmware() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
-                    disabled={!connected || compatibilityBlocksFlash || calibrationMigrationBlocked || firmwareReleaseBusy || flashState === "flashing"}
+                    disabled={!connected || compatibilityBlocksFlash || calibrationMigrationBlocked || ramOnlyProfileBlocksFlash || firmwareReleaseBusy || flashState === "flashing"}
                     onClick={() => void handleFlashLatestFirmware()}
                   >
                     <IconDownload className="size-4" />

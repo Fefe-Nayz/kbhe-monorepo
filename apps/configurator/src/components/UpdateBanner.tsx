@@ -6,10 +6,11 @@ import { checkAppUpdate, checkFirmwareUpdate } from "@/lib/kbhe/releases";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import {
-  CALIBRATION_MIGRATION_QUERY_KEY,
+  UPDATER_MIGRATION_QUERY_KEY,
+  hasCompleteProfileRecovery,
   isResetCalibration,
-  listCalibrationMigrationBackups,
-  restoreCalibrationMigrationBackup,
+  listUpdaterMigrationBackups,
+  restoreUpdaterMigrationBackup,
 } from "@/lib/kbhe/calibration-migration";
 import { IconAlertTriangle, IconDownload, IconRefresh } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,8 @@ export function UpdateBanner() {
     && (status === "connected" || status === "recovery-only");
 
   const calibrationRecoveryQ = useQuery({
-    queryKey: CALIBRATION_MIGRATION_QUERY_KEY,
-    queryFn: () => listCalibrationMigrationBackups(),
+    queryKey: UPDATER_MIGRATION_QUERY_KEY,
+    queryFn: () => listUpdaterMigrationBackups(),
     enabled: isTauri(),
     refetchInterval: 3_000,
     staleTime: 1_000,
@@ -64,11 +65,11 @@ export function UpdateBanner() {
       if (!serialNumber || !currentCalibrationBackup || !runtimeConnected) {
         throw new Error("Reconnect the matching keyboard in runtime mode before restoring calibration.");
       }
-      const restored = await restoreCalibrationMigrationBackup(serialNumber);
-      if (!restored) throw new Error("The calibration backup is no longer available.");
+      const restored = await restoreUpdaterMigrationBackup(serialNumber);
+      if (!restored) throw new Error("The updater recovery backup is no longer available.");
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: CALIBRATION_MIGRATION_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: UPDATER_MIGRATION_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: ["calibration"] });
     },
   });
@@ -103,8 +104,10 @@ export function UpdateBanner() {
       ? `Calibration recovery needs attention: ${calibrationRecoveryError instanceof Error ? calibrationRecoveryError.message : String(calibrationRecoveryError)}`
       : pendingCalibrationBackup
         ? currentCalibrationBackup && runtimeConnected
-          ? "A complete pre-migration calibration backup is waiting for this keyboard. Restore and verify it before typing or flashing again."
-          : `A calibration backup for keyboard ${pendingCalibrationBackup.serialNumber} is safe. Reconnect that keyboard in runtime mode to restore it.`
+          ? hasCompleteProfileRecovery(currentCalibrationBackup)
+            ? "A complete pre-migration calibration/profile backup is waiting. Restore and verify every setting before typing or flashing again."
+            : "A legacy calibration-only backup is waiting. It can restore calibration, but cannot authorize a new updater-v2 migration because it contains no profiles."
+          : `Recovery data for keyboard ${pendingCalibrationBackup.serialNumber} is safe. Reconnect that keyboard in runtime mode to restore it.`
         : "Calibration reset detected (all 82 keys are at 2195/2850). Run guided calibration before normal use.";
 
     return (
@@ -125,7 +128,11 @@ export function UpdateBanner() {
               disabled={calibrationRestoreM.isPending}
               onClick={() => calibrationRestoreM.mutate()}
             >
-              {calibrationRestoreM.isPending ? "Restoring…" : "Restore calibration"}
+              {calibrationRestoreM.isPending
+                ? "Restoring…"
+                : hasCompleteProfileRecovery(currentCalibrationBackup)
+                  ? "Restore all settings"
+                  : "Restore calibration"}
             </Button>
           ) : resetCalibrationDetected ? (
             <Button
