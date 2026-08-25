@@ -170,16 +170,24 @@ int main(void) {
   bool stay_in_updater = boot_request_take(BOOT_REQUEST_ACTION_ENTER_UPDATER);
   updater_fw_version_t installed = {0};
 
+  /* Image authentication hashes the complete application and performs an
+   * Ed25519 verification.  Run it at the configured core frequency instead of
+   * the 16 MHz reset clock; otherwise this work delays USB enumeration by
+   * several seconds on every cold boot. */
+  HAL_Init();
+  s_hal_initialized = true;
+  SystemClock_Config();
+
   if (!stay_in_updater && updater_read_valid_app_version(&installed) &&
       updater_version_floor_allows(installed)) {
-    jump_to_application(false);
+    /* HAL and the PLL are now live solely for validation.  Restore the reset
+     * clock/peripheral state before handing control to the application, whose
+     * startup configures them independently. */
+    jump_to_application(true);
   }
 
   boot_request_clear();
 
-  HAL_Init();
-  s_hal_initialized = true;
-  SystemClock_Config();
   USB_HS_Init();
 
   updater_bootloader_init();
