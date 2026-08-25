@@ -3,6 +3,9 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export interface ReleaseUpdateInfo {
   updateAvailable: boolean;
+  blockedReason: string | null;
+  migrationRequired: boolean;
+  migrationAvailable: boolean;
   version: string | null;
   tag: string | null;
   name: string | null;
@@ -32,14 +35,24 @@ export async function checkAppUpdate(): Promise<ReleaseUpdateInfo> {
   return invoke<ReleaseUpdateInfo>("kbhe_check_app_update", { currentVersion });
 }
 
-export async function checkFirmwareUpdate(currentVersion?: string | null): Promise<ReleaseUpdateInfo> {
+export async function checkFirmwareUpdate(
+  currentVersion?: string | null,
+  updaterProtocol?: number | null,
+): Promise<ReleaseUpdateInfo> {
   return invoke<ReleaseUpdateInfo>("kbhe_check_firmware_update", {
     currentVersion: currentVersion ?? undefined,
+    updaterProtocol: updaterProtocol ?? undefined,
   });
 }
 
-export async function downloadFirmwareRelease(tag: string): Promise<DownloadedFirmware> {
-  return invoke<DownloadedFirmware>("kbhe_download_firmware_release", { tag });
+export async function downloadFirmwareRelease(
+  tag: string,
+  updaterProtocol?: number | null,
+): Promise<DownloadedFirmware> {
+  return invoke<DownloadedFirmware>("kbhe_download_firmware_release", {
+    tag,
+    updaterProtocol: updaterProtocol ?? undefined,
+  });
 }
 
 export async function downloadAndRunAppInstaller(tag: string): Promise<string> {

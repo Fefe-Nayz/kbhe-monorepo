@@ -1,8 +1,8 @@
 use crate::signing::firmware_manifest;
 use crate::updater_compat::{
-    inspect_firmware_artifact, negotiate_flash_protocol, parse_updater_hello, FirmwareArtifact,
-    FlashProtocol, UpdaterHello, UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3,
-    UPDATER_V2_APP_MAX_IMAGE_SIZE,
+    inspect_firmware_artifact, negotiate_flash_protocol, parse_updater_hello,
+    updater_cleanup_is_safe, FirmwareArtifact, FlashProtocol, UpdaterHello, UPDATER_PROTOCOL_V2,
+    UPDATER_PROTOCOL_V3, UPDATER_V2_APP_MAX_IMAGE_SIZE,
 };
 use hidapi::{DeviceInfo, HidApi, HidDevice};
 use serde::Serialize;
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex, MutexGuard,
@@ -849,15 +849,7 @@ pub fn kbhe_get_updater_info(
         return Err("the active KBHE session is not an updater".to_string());
     }
 
-    let response = updater_transact(
-        &connection.device,
-        UPDATER_CMD_HELLO,
-        1,
-        0,
-        &[],
-        2,
-        750,
-    )?;
+    let response = updater_transact(&connection.device, UPDATER_CMD_HELLO, 1, 0, &[], 2, 750)?;
     if response.status != UPDATER_STATUS_OK {
         return Err(updater_status_error("HELLO", response.status));
     }
@@ -2038,6 +2030,80 @@ pub async fn kbhe_flash_firmware(
     .map_err(|error| format!("firmware flash worker failed: {error}"))?
 }
 
+#[tauri::command]
+pub fn kbhe_read_firmware_signature(firmware_path: String) -> Result<Vec<u8>, String> {
+    read_sibling_firmware_signature(&firmware_path)
+}
+
+fn reject_link_or_reparse_point(path: &Path, label: &str) -> Result<std::fs::Metadata, String> {
+    let metadata = std::fs::symlink_metadata(path)
+        .map_err(|error| format!("failed to inspect {label}: {error}"))?;
+    if metadata.file_type().is_symlink() {
+        return Err(format!("refusing symbolic link for {label}"));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(format!("refusing Windows reparse point for {label}"));
+        }
+    }
+    if !metadata.is_file() {
+        return Err(format!("{label} path is not a regular file"));
+    }
+    Ok(metadata)
+}
+
+fn read_sibling_firmware_signature(firmware_path: &str) -> Result<Vec<u8>, String> {
+    let firmware = Path::new(firmware_path);
+    if !firmware.is_absolute()
+        || !firmware
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("bin"))
+    {
+        return Err("firmware path must be an absolute .bin file".to_string());
+    }
+
+    let firmware_metadata = reject_link_or_reparse_point(firmware, "firmware")?;
+    if firmware_metadata.len() == 0
+        || firmware_metadata.len() > u64::from(UPDATER_V2_APP_MAX_IMAGE_SIZE)
+    {
+        return Err(format!(
+            "firmware has {} bytes; expected 1..={UPDATER_V2_APP_MAX_IMAGE_SIZE}",
+            firmware_metadata.len()
+        ));
+    }
+
+    let mut signature_name = firmware.as_os_str().to_os_string();
+    signature_name.push(".sig");
+    let signature = PathBuf::from(signature_name);
+    let signature_metadata = reject_link_or_reparse_point(&signature, "firmware signature")?;
+    if signature_metadata.len() != FIRMWARE_SIGNATURE_SIZE as u64 {
+        return Err(format!(
+            "firmware signature has {} bytes; expected {FIRMWARE_SIGNATURE_SIZE}",
+            signature_metadata.len()
+        ));
+    }
+
+    let signature_path = signature
+        .to_str()
+        .ok_or_else(|| "firmware signature path is not valid Unicode".to_string())?;
+    let bytes = read_bounded_file(
+        signature_path,
+        "firmware signature",
+        FIRMWARE_SIGNATURE_SIZE as u64,
+    )?;
+    if bytes.len() != FIRMWARE_SIGNATURE_SIZE {
+        return Err(format!(
+            "firmware signature has {} bytes; expected {FIRMWARE_SIGNATURE_SIZE}",
+            bytes.len()
+        ));
+    }
+    Ok(bytes)
+}
+
 fn read_bounded_file(path: &str, label: &str, maximum_size: u64) -> Result<Vec<u8>, String> {
     let file = File::open(path).map_err(|error| format!("failed to open {label}: {error}"))?;
     let metadata = file
@@ -2285,7 +2351,13 @@ fn kbhe_flash_firmware_blocking(
 
     if initial_hello.protocol_version == UPDATER_PROTOCOL_V2 && migration.is_some() {
         let migration = migration.as_ref().expect("migration was checked");
-        let protocol = negotiate_flash_protocol(initial_hello, &migration.artifact)?;
+        let protocol = negotiate_flash_protocol_with_cleanup(
+            &device,
+            initial_hello,
+            &migration.artifact,
+            retries,
+            timeout_ms,
+        )?;
         if let Err(error) = flash_after_hello(
             &device,
             initial_hello,
@@ -2315,8 +2387,14 @@ fn kbhe_flash_firmware_blocking(
                 "UPDATER_MIGRATION_INCOMPLETE: updater v3 for keyboard serial {expected_serial_number} did not become ready after the migrator ran: {error}. Keep the keyboard connected and use the documented ROM-DFU recovery if it no longer enumerates."
             )
         })?;
-        let protocol = negotiate_flash_protocol(v3_hello, &primary.artifact)
-            .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
+        let protocol = negotiate_flash_protocol_with_cleanup(
+            &v3_device,
+            v3_hello,
+            &primary.artifact,
+            retries,
+            timeout_ms,
+        )
+        .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
         emit_flash_progress(&app, "migrationReady", primary.total, primary.total);
         if let Err(error) = flash_after_hello(
             &v3_device, v3_hello, protocol, &primary, &app, timeout_ms, retries,
@@ -2326,7 +2404,13 @@ fn kbhe_flash_firmware_blocking(
         }
         drop(v3_device);
     } else {
-        let protocol = negotiate_flash_protocol(initial_hello, &primary.artifact)?;
+        let protocol = negotiate_flash_protocol_with_cleanup(
+            &device,
+            initial_hello,
+            &primary.artifact,
+            retries,
+            timeout_ms,
+        )?;
         if let Err(error) = flash_after_hello(
             &device,
             initial_hello,
@@ -2351,7 +2435,7 @@ fn kbhe_flash_firmware_blocking(
         )?;
     } else {
         emit_flash_progress(&app, "migration", primary.total, primary.total);
-        let (_migrated_device, migrated_hello) = wait_for_updater_protocol(
+        let (migrated_device, migrated_hello) = wait_for_updater_protocol(
             &expected_serial_number,
             UPDATER_PROTOCOL_V3,
             90_000,
@@ -2363,8 +2447,14 @@ fn kbhe_flash_firmware_blocking(
         .map_err(|error| format!(
             "UPDATER_MIGRATION_INCOMPLETE: updater v3 for keyboard serial {expected_serial_number} did not become ready after the migrator ran: {error}"
         ))?;
-        negotiate_flash_protocol(migrated_hello, &FirmwareArtifact::Application)
-            .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
+        negotiate_flash_protocol_with_cleanup(
+            &migrated_device,
+            migrated_hello,
+            &FirmwareArtifact::Application,
+            retries,
+            timeout_ms,
+        )
+        .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
         emit_flash_progress(&app, "migrationReady", primary.total, primary.total);
     }
 
@@ -2392,6 +2482,21 @@ fn cleanup_updater_session(device: &HidDevice, retries: u32, timeout_ms: u64) {
         cleanup_retries,
         timeout_ms.min(1_000),
     );
+}
+
+fn negotiate_flash_protocol_with_cleanup(
+    device: &HidDevice,
+    hello: UpdaterHello,
+    artifact: &FirmwareArtifact,
+    retries: u32,
+    timeout_ms: u64,
+) -> Result<FlashProtocol, String> {
+    negotiate_flash_protocol(hello, artifact).map_err(|error| {
+        if updater_cleanup_is_safe(hello) {
+            cleanup_updater_session(device, retries, timeout_ms);
+        }
+        error
+    })
 }
 
 fn read_updater_hello(
@@ -2633,12 +2738,12 @@ mod transport_tests {
     use super::{
         firmware_flash_blocks_transport, is_supported_libhmk_rgb_effect,
         matches_libhmk_rgb_identity, normalize_rgb_bridge_response, parse_rgb_bridge_capabilities,
-        resolve_flash_target_snapshot, response_matches_request, rgb_bridge_report,
-        rgb_bridge_response_matches_request, rgb_live_write_plan, select_unique_flash_device,
-        select_unique_rgb_bridge_device, KbheDeviceKind, KbheHidDeviceInfo,
-        KbheRgbBridgeDeviceInfo, KBHE_APP_PID, KBHE_LIBHMK_PID, KBHE_LIBHMK_USAGE,
-        KBHE_LIBHMK_USAGE_PAGE, KBHE_PACKET_SIZE, KBHE_UPDATER_PID, KBHE_VID, RGB_CMD_FILL,
-        RGB_CMD_GET_CAPABILITIES, RGB_CMD_SET_FRAME_CHUNK,
+        read_sibling_firmware_signature, resolve_flash_target_snapshot, response_matches_request,
+        rgb_bridge_report, rgb_bridge_response_matches_request, rgb_live_write_plan,
+        select_unique_flash_device, select_unique_rgb_bridge_device, KbheDeviceKind,
+        KbheHidDeviceInfo, KbheRgbBridgeDeviceInfo, KBHE_APP_PID, KBHE_LIBHMK_PID,
+        KBHE_LIBHMK_USAGE, KBHE_LIBHMK_USAGE_PAGE, KBHE_PACKET_SIZE, KBHE_UPDATER_PID, KBHE_VID,
+        RGB_CMD_FILL, RGB_CMD_GET_CAPABILITIES, RGB_CMD_SET_FRAME_CHUNK,
     };
 
     fn firmware_device(
@@ -2868,6 +2973,38 @@ mod transport_tests {
     fn native_transport_is_blocked_for_the_entire_flash_lease() {
         assert!(firmware_flash_blocks_transport(true));
         assert!(!firmware_flash_blocks_transport(false));
+    }
+
+    #[test]
+    fn native_signature_reader_accepts_only_the_exact_bounded_sibling() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "kbhe-signature-reader-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let firmware = directory.join("kbhe-app.bin");
+        let signature = directory.join("kbhe-app.bin.sig");
+        std::fs::write(&firmware, [0xA5; 8]).unwrap();
+        std::fs::write(&signature, [0x5A; 64]).unwrap();
+
+        let bytes = read_sibling_firmware_signature(firmware.to_str().unwrap()).unwrap();
+        assert_eq!(bytes, vec![0x5A; 64]);
+
+        std::fs::write(&signature, [0x5A; 63]).unwrap();
+        assert!(read_sibling_firmware_signature(firmware.to_str().unwrap())
+            .unwrap_err()
+            .contains("expected 64"));
+        assert!(read_sibling_firmware_signature("relative.bin")
+            .unwrap_err()
+            .contains("absolute .bin"));
+
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

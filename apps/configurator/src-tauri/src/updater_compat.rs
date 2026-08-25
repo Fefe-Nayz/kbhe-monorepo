@@ -349,10 +349,7 @@ pub(crate) fn inspect_firmware_artifact(
     Ok(FirmwareArtifact::Application)
 }
 
-pub(crate) fn negotiate_flash_protocol(
-    hello: UpdaterHello,
-    artifact: &FirmwareArtifact,
-) -> Result<FlashProtocol, String> {
+fn validate_updater_contract(hello: UpdaterHello) -> Result<FlashProtocol, String> {
     if hello.flags & !UPDATER_KNOWN_FLAGS != 0 {
         return Err(format!(
             "UPDATER_SECURITY_UNSUPPORTED: HELLO advertises unknown flags 0x{:04X}",
@@ -386,12 +383,6 @@ pub(crate) fn negotiate_flash_protocol(
                         .to_string(),
                 );
             }
-            if matches!(artifact, FirmwareArtifact::V2ToV3Migration(_)) {
-                return Err(
-                    "UPDATER_ARTIFACT_MISMATCH: this keyboard already has updater protocol v3; select the normal signed kbhe-app.bin image"
-                        .to_string(),
-                );
-            }
             Ok(FlashProtocol::SignedV3)
         }
         UPDATER_PROTOCOL_V2 => {
@@ -407,9 +398,36 @@ pub(crate) fn negotiate_flash_protocol(
                         .to_string(),
                 );
             }
+            Ok(FlashProtocol::LegacyMigrationV2)
+        }
+        protocol => Err(format!(
+            "UPDATER_PROTOCOL_UNSUPPORTED: updater protocol 0x{protocol:04X} is not supported; supported protocols are 0x0002 (signed migration package only) and 0x0003"
+        )),
+    }
+}
+
+pub(crate) fn updater_cleanup_is_safe(hello: UpdaterHello) -> bool {
+    validate_updater_contract(hello).is_ok()
+}
+
+pub(crate) fn negotiate_flash_protocol(
+    hello: UpdaterHello,
+    artifact: &FirmwareArtifact,
+) -> Result<FlashProtocol, String> {
+    let protocol = validate_updater_contract(hello)?;
+    match protocol {
+        FlashProtocol::SignedV3 => {
+            if matches!(artifact, FirmwareArtifact::V2ToV3Migration(_)) {
+                return Err(
+                    "UPDATER_ARTIFACT_MISMATCH: this keyboard already has updater protocol v3; select the normal signed kbhe-app.bin image"
+                        .to_string(),
+                );
+            }
+        }
+        FlashProtocol::LegacyMigrationV2 => {
             let FirmwareArtifact::V2ToV3Migration(package) = artifact else {
                 return Err(
-                    "UPDATER_MIGRATION_REQUIRED: this keyboard uses legacy updater protocol 0x0002. The normal firmware image is intentionally blocked because its sector-6 storage would invalidate the legacy updater on first boot. Use the signed kbhe-updater-v2-to-v3 migration package, or perform the documented factory/ROM-DFU recovery."
+                    "UPDATER_MIGRATION_REQUIRED: this keyboard uses legacy updater protocol 0x0002. The normal firmware image is intentionally blocked because its sector-6 storage would invalidate the legacy updater on first boot. Use a stable release containing the signed kbhe-updater-v2-to-v3 migration pair, or perform the documented factory/ROM-DFU recovery."
                         .to_string(),
                 );
             };
@@ -425,12 +443,9 @@ pub(crate) fn negotiate_flash_protocol(
                     hello.installed_version[2],
                 ));
             }
-            Ok(FlashProtocol::LegacyMigrationV2)
         }
-        protocol => Err(format!(
-            "UPDATER_PROTOCOL_UNSUPPORTED: updater protocol 0x{protocol:04X} is not supported; supported protocols are 0x0002 (signed migration package only) and 0x0003"
-        )),
     }
+    Ok(protocol)
 }
 
 #[cfg(test)]
@@ -666,6 +681,36 @@ mod tests {
         )
         .unwrap_err();
         assert!(unknown_flags.contains("UPDATER_SECURITY_UNSUPPORTED"));
+    }
+
+    #[test]
+    fn cleanup_is_allowed_only_after_the_exact_known_contract() {
+        assert!(updater_cleanup_is_safe(hello(
+            UPDATER_PROTOCOL_V2,
+            0,
+            UPDATER_V2_APP_MAX_IMAGE_SIZE,
+        )));
+        assert!(updater_cleanup_is_safe(hello(
+            UPDATER_PROTOCOL_V3,
+            UPDATER_FLAG_SIGNATURE_REQUIRED,
+            UPDATER_V3_APP_MAX_IMAGE_SIZE,
+        )));
+
+        assert!(!updater_cleanup_is_safe(hello(
+            4,
+            UPDATER_FLAG_SIGNATURE_REQUIRED,
+            UPDATER_V3_APP_MAX_IMAGE_SIZE,
+        )));
+        assert!(!updater_cleanup_is_safe(hello(
+            UPDATER_PROTOCOL_V2,
+            0,
+            UPDATER_V2_APP_MAX_IMAGE_SIZE - 4,
+        )));
+        assert!(!updater_cleanup_is_safe(hello(
+            UPDATER_PROTOCOL_V3,
+            UPDATER_FLAG_SIGNATURE_REQUIRED | (1 << 15),
+            UPDATER_V3_APP_MAX_IMAGE_SIZE,
+        )));
     }
 
     #[test]

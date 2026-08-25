@@ -1,5 +1,7 @@
 use crate::signing::{verify_app_asset, verify_firmware_asset};
-use crate::updater_compat::{inspect_firmware_artifact, FirmwareArtifact};
+use crate::updater_compat::{
+    inspect_firmware_artifact, FirmwareArtifact, UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3,
+};
 use reqwest::blocking::Client;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -71,6 +73,9 @@ struct GithubAsset {
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseUpdateInfo {
     update_available: bool,
+    blocked_reason: Option<String>,
+    migration_required: bool,
+    migration_available: bool,
     version: Option<String>,
     tag: Option<String>,
     name: Option<String>,
@@ -210,6 +215,19 @@ fn migration_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
         .cloned()
 }
 
+fn migration_asset_pair(assets: &[GithubAsset]) -> Option<(GithubAsset, GithubAsset)> {
+    let migration = migration_asset(assets)?;
+    if migration.size != MAX_MIGRATION_PACKAGE_BYTES {
+        return None;
+    }
+    let signature = signature_asset(assets, &migration)?;
+    Some((migration, signature))
+}
+
+fn requires_migration_assets(updater_protocol: Option<u16>) -> bool {
+    updater_protocol != Some(UPDATER_PROTOCOL_V3)
+}
+
 fn signature_asset(assets: &[GithubAsset], signed_asset: &GithubAsset) -> Option<GithubAsset> {
     let expected_name = format!("{}.sig", signed_asset.name);
     assets
@@ -256,6 +274,9 @@ fn update_info(result: Option<(GithubRelease, Version, GithubAsset)>) -> Release
     if let Some((release, version, asset)) = result {
         ReleaseUpdateInfo {
             update_available: true,
+            blocked_reason: None,
+            migration_required: false,
+            migration_available: false,
             version: Some(version.to_string()),
             tag: Some(release.tag_name),
             name: release.name,
@@ -268,6 +289,9 @@ fn update_info(result: Option<(GithubRelease, Version, GithubAsset)>) -> Release
     } else {
         ReleaseUpdateInfo {
             update_available: false,
+            blocked_reason: None,
+            migration_required: false,
+            migration_available: false,
             version: None,
             tag: None,
             name: None,
@@ -277,6 +301,44 @@ fn update_info(result: Option<(GithubRelease, Version, GithubAsset)>) -> Release
             asset_name: None,
             asset_size: None,
         }
+    }
+}
+
+fn firmware_update_info(
+    result: Option<(GithubRelease, Version, GithubAsset)>,
+    updater_protocol: Option<u16>,
+) -> ReleaseUpdateInfo {
+    let Some((release, version, asset)) = result else {
+        return update_info(None);
+    };
+
+    let migration_required = requires_migration_assets(updater_protocol);
+    let migration_available = migration_asset_pair(&release.assets).is_some();
+    let blocked_reason =
+        (migration_required && !migration_available).then(|| match updater_protocol {
+            Some(UPDATER_PROTOCOL_V2) => format!(
+                "Firmware {version} cannot be installed on this updater-v2 keyboard because release {} does not contain both kbhe-updater-v2-to-v3.bin and its valid 64-byte detached signature. Wait for a corrected signed release, or use the documented ROM-DFU factory recovery.",
+                release.tag_name
+            ),
+            _ => format!(
+                "Firmware {version} is not offered while the keyboard's persistent updater protocol is unknown because release {} lacks the signed v2-to-v3 migration pair. Use Device → Enter bootloader to verify updater v3, or wait for a corrected signed release.",
+                release.tag_name
+            ),
+        });
+
+    ReleaseUpdateInfo {
+        update_available: blocked_reason.is_none(),
+        blocked_reason,
+        migration_required,
+        migration_available,
+        version: Some(version.to_string()),
+        tag: Some(release.tag_name),
+        name: release.name,
+        notes: release.body,
+        published_at: release.published_at,
+        html_url: Some(release.html_url),
+        asset_name: Some(asset.name),
+        asset_size: Some(asset.size),
     }
 }
 
@@ -297,6 +359,7 @@ pub async fn kbhe_check_app_update(
 #[tauri::command]
 pub async fn kbhe_check_firmware_update(
     current_version: Option<String>,
+    updater_protocol: Option<u16>,
 ) -> Result<ReleaseUpdateInfo, String> {
     tauri::async_runtime::spawn_blocking(move || {
         latest_release_with_asset(
@@ -304,7 +367,7 @@ pub async fn kbhe_check_firmware_update(
             current_version.as_deref(),
             firmware_asset,
         )
-        .map(update_info)
+        .map(|result| firmware_update_info(result, updater_protocol))
     })
     .await
     .map_err(|error| format!("firmware update worker failed: {error}"))?
@@ -468,7 +531,10 @@ fn release_assets_by_tag(
 }
 
 #[tauri::command]
-pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFirmware, String> {
+pub async fn kbhe_download_firmware_release(
+    tag: String,
+    updater_protocol: Option<u16>,
+) -> Result<DownloadedFirmware, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let version = parse_prefixed_version(&tag, FIRMWARE_TAG_PREFIX)
             .ok_or_else(|| format!("invalid firmware release tag: {tag}"))?;
@@ -485,18 +551,12 @@ pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFir
             .ok_or_else(|| format!("release {tag} has no kbhe-app.bin asset"))?;
         let firmware_signature_asset = signature_asset(&release.assets, &asset)
             .ok_or_else(|| format!("release {tag} has no valid kbhe-app.bin.sig asset"))?;
-        let migration_asset = migration_asset(&release.assets);
-        let migration_signature_asset = migration_asset
-            .as_ref()
-            .map(|asset| {
-                signature_asset(&release.assets, asset).ok_or_else(|| {
-                    format!(
-                        "release {tag} has a migration package but no valid {}.sig asset",
-                        asset.name
-                    )
-                })
-            })
-            .transpose()?;
+        let migration_pair = migration_asset_pair(&release.assets);
+        if requires_migration_assets(updater_protocol) && migration_pair.is_none() {
+            return Err(format!(
+                "UPDATER_MIGRATION_ASSETS_MISSING: release {tag} cannot be installed until updater v3 is confirmed because it does not contain both kbhe-updater-v2-to-v3.bin and its valid 64-byte detached signature. Enter the KBHE bootloader to verify updater v3, wait for a corrected signed release, or use the documented ROM-DFU factory recovery."
+            ));
+        }
         let directory = secure_download_directory("firmware")?;
         let path = download_asset(&asset, &directory, MAX_FIRMWARE_BYTES)?;
         let signature_path = download_asset(
@@ -514,8 +574,8 @@ pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFir
             return Err(format!("downloaded firmware is not authentic: {error}"));
         }
         let (migration_path, migration_signature_path) =
-            match (migration_asset, migration_signature_asset) {
-                (Some(migration_asset), Some(migration_signature_asset)) => {
+            match migration_pair {
+                Some((migration_asset, migration_signature_asset)) => {
                     let migration_path =
                         download_asset(&migration_asset, &directory, MAX_MIGRATION_PACKAGE_BYTES)?;
                     let migration_signature_path = download_asset(
@@ -554,8 +614,7 @@ pub async fn kbhe_download_firmware_release(tag: String) -> Result<DownloadedFir
                         Some(migration_signature_path.to_string_lossy().into_owned()),
                     )
                 }
-                (None, None) => (None, None),
-                _ => unreachable!("migration asset pairing was validated above"),
+                None => (None, None),
             };
         Ok(DownloadedFirmware {
             path: path.to_string_lossy().into_owned(),
@@ -666,15 +725,31 @@ pub async fn kbhe_download_and_run_app_installer(tag: String) -> Result<String, 
 #[cfg(test)]
 mod tests {
     use super::{
-        firmware_asset, migration_asset, parse_prefixed_version, signature_asset, GithubAsset,
-        APP_TAG_PREFIX, ED25519_SIGNATURE_BYTES, FIRMWARE_TAG_PREFIX,
+        firmware_asset, firmware_update_info, migration_asset, migration_asset_pair,
+        parse_prefixed_version, signature_asset, GithubAsset, GithubRelease, APP_TAG_PREFIX,
+        ED25519_SIGNATURE_BYTES, FIRMWARE_TAG_PREFIX, MAX_MIGRATION_PACKAGE_BYTES,
+        UPDATER_PROTOCOL_V2,
     };
+    use semver::Version;
 
     fn asset(name: &str, size: u64) -> GithubAsset {
         GithubAsset {
             name: name.to_string(),
             browser_download_url: format!("https://example.invalid/{name}"),
             size,
+        }
+    }
+
+    fn firmware_release(assets: Vec<GithubAsset>) -> GithubRelease {
+        GithubRelease {
+            tag_name: "firmware-v2.0.9".to_string(),
+            name: Some("Firmware 2.0.9".to_string()),
+            body: None,
+            html_url: "https://example.invalid/firmware-v2.0.9".to_string(),
+            prerelease: false,
+            draft: false,
+            published_at: Some("2026-08-25T00:00:00Z".to_string()),
+            assets,
         }
     }
 
@@ -704,12 +779,86 @@ mod tests {
 
     #[test]
     fn migration_signature_requires_exact_detached_size() {
-        let migration = asset("kbhe-updater-v2-to-v3.bin", 200);
+        let migration = asset("kbhe-updater-v2-to-v3.bin", MAX_MIGRATION_PACKAGE_BYTES);
         let assets = vec![
             migration.clone(),
             asset("kbhe-updater-v2-to-v3.bin.sig", ED25519_SIGNATURE_BYTES + 1),
         ];
         assert!(signature_asset(&assets, &migration).is_none());
+        assert!(migration_asset_pair(&assets).is_none());
+    }
+
+    #[test]
+    fn updater_v2_never_offers_a_release_without_the_signed_migration_pair() {
+        let app = asset("kbhe-app.bin", 100);
+        let base_assets = vec![
+            app.clone(),
+            asset("kbhe-app.bin.sig", ED25519_SIGNATURE_BYTES),
+        ];
+
+        let blocked = firmware_update_info(
+            Some((
+                firmware_release(base_assets.clone()),
+                Version::parse("2.0.9").unwrap(),
+                app.clone(),
+            )),
+            Some(UPDATER_PROTOCOL_V2),
+        );
+        assert!(!blocked.update_available);
+        assert!(blocked.migration_required);
+        assert!(!blocked.migration_available);
+        assert!(blocked
+            .blocked_reason
+            .as_deref()
+            .unwrap()
+            .contains("ROM-DFU factory recovery"));
+
+        let unknown_updater = firmware_update_info(
+            Some((
+                firmware_release(base_assets.clone()),
+                Version::parse("2.0.9").unwrap(),
+                app.clone(),
+            )),
+            None,
+        );
+        assert!(!unknown_updater.update_available);
+        assert!(unknown_updater.migration_required);
+        assert!(unknown_updater
+            .blocked_reason
+            .as_deref()
+            .unwrap()
+            .contains("Enter bootloader"));
+
+        let v3 = firmware_update_info(
+            Some((
+                firmware_release(base_assets),
+                Version::parse("2.0.9").unwrap(),
+                app.clone(),
+            )),
+            Some(0x0003),
+        );
+        assert!(v3.update_available);
+        assert!(!v3.migration_required);
+        assert!(!v3.migration_available);
+
+        let complete_assets = vec![
+            app.clone(),
+            asset("kbhe-app.bin.sig", ED25519_SIGNATURE_BYTES),
+            asset("kbhe-updater-v2-to-v3.bin", MAX_MIGRATION_PACKAGE_BYTES),
+            asset("kbhe-updater-v2-to-v3.bin.sig", ED25519_SIGNATURE_BYTES),
+        ];
+        let v2_ready = firmware_update_info(
+            Some((
+                firmware_release(complete_assets),
+                Version::parse("2.0.9").unwrap(),
+                app,
+            )),
+            Some(UPDATER_PROTOCOL_V2),
+        );
+        assert!(v2_ready.update_available);
+        assert!(v2_ready.migration_required);
+        assert!(v2_ready.migration_available);
+        assert!(v2_ready.blocked_reason.is_none());
     }
 
     #[test]

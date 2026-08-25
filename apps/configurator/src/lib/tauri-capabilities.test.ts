@@ -29,5 +29,9 @@ describe("Tauri firmware file scope", () => {
     expect(paths).toContain(
       "$TEMP/kbhe-configurator/firmware/*/kbhe-app.bin.sig",
     );
+    expect(paths).not.toContain("**/*.bin.sig");
+
+    const firmwarePage = await Bun.file("src/pages/Firmware.tsx").text();
+    expect(firmwarePage).toContain('invoke<number[]>("kbhe_read_firmware_signature"');
   });
 });

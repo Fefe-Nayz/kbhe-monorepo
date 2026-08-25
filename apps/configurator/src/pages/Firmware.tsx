@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { isTauri, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -13,6 +14,13 @@ import {
 } from "@/lib/kbhe/releases";
 import { kbheTransport, selectKbheRecoveryTarget } from "@/lib/kbhe/transport";
 import { formatFirmwareVersion, type FirmwareVersion } from "@/lib/kbhe/protocol";
+import {
+  CALIBRATION_MIGRATION_QUERY_KEY,
+  captureCalibrationMigrationBackup,
+  getCalibrationMigrationBackup,
+  restoreCalibrationMigrationBackup,
+  type CalibrationMigrationBackup,
+} from "@/lib/kbhe/calibration-migration";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +58,8 @@ function delay(ms: number): Promise<void> {
 }
 
 export default function Firmware() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { status, deviceInfo, firmwareVersion, compatibility, developerMode } = useDeviceSession();
   const sessionDetected = status === "connected"
     || status === "updater"
@@ -81,8 +91,8 @@ export default function Firmware() {
   });
 
   const firmwareUpdateQ = useQuery({
-    queryKey: ["release", "firmware", firmwareVersion],
-    queryFn: () => checkFirmwareUpdate(firmwareVersion),
+    queryKey: ["release", "firmware", firmwareVersion, compatibility?.updaterProtocol ?? null],
+    queryFn: () => checkFirmwareUpdate(firmwareVersion, compatibility?.updaterProtocol),
     enabled: isTauri(),
     refetchInterval: 30 * 60 * 1000,
     staleTime: 10 * 60 * 1000,
@@ -93,6 +103,13 @@ export default function Firmware() {
   const updateModeDetected = status === "updater"
     || (status === "recovery-only" && deviceInfo?.kind === "updater")
     || bootloaderDetected;
+
+  const calibrationRecoveryQ = useQuery({
+    queryKey: [...CALIBRATION_MIGRATION_QUERY_KEY, recoverySerialNumber],
+    queryFn: () => getCalibrationMigrationBackup(recoverySerialNumber!),
+    enabled: isTauri() && Boolean(recoverySerialNumber),
+    staleTime: 1_000,
+  });
 
   const [firmwareBytes, setFirmwareBytes] = useState<Uint8Array | null>(null);
   const [firmwareSignature, setFirmwareSignature] = useState<Uint8Array | null>(null);
@@ -193,9 +210,23 @@ export default function Firmware() {
     firmwarePath: string,
     explicitSignaturePath?: string,
   ): Promise<{ bytes: Uint8Array; path: string } | null> => {
+    const siblingPath = `${firmwarePath}.sig`;
+    if (isTauri() && (!explicitSignaturePath || explicitSignaturePath === siblingPath)) {
+      try {
+        const bytes = new Uint8Array(await invoke<number[]>("kbhe_read_firmware_signature", {
+          firmwarePath,
+        }));
+        if (bytes.length === 64) {
+          return { bytes, path: siblingPath };
+        }
+      } catch {
+        // Fall back to the plugin scope. Dialog/drop selections are scoped by Tauri.
+      }
+    }
+
     const candidates = explicitSignaturePath
       ? [explicitSignaturePath]
-      : [`${firmwarePath}.sig`];
+      : [siblingPath];
     for (const candidate of candidates) {
       try {
         const bytes = new Uint8Array(await readFile(candidate));
@@ -487,24 +518,42 @@ export default function Firmware() {
     }
 
     let flashTargetSerialNumber: string | undefined;
-    const reconnectSession = async () => {
+    let calibrationBackup: CalibrationMigrationBackup | null = null;
+    let sessionReconnected = false;
+    const reconnectSession = async (requireRuntime = false): Promise<boolean> => {
+      if (!flashTargetSerialNumber) return false;
       appendLog("Reconnecting device session...");
-      await delay(1200);
-      try {
-        await DeviceSessionManager.connect(flashTargetSerialNumber);
-        const sessionStatus = useDeviceSession.getState().status;
-        if (
-          sessionStatus !== "connected"
-          && sessionStatus !== "updater"
-          && sessionStatus !== "recovery-only"
-        ) {
-          throw new Error("The keyboard has not reappeared yet");
+      await delay(500);
+      let lastError = "The keyboard has not reappeared yet";
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        try {
+          await DeviceSessionManager.connect(flashTargetSerialNumber);
+          const session = useDeviceSession.getState();
+          const serialMatches = session.deviceInfo?.serialNumber?.trim() === flashTargetSerialNumber;
+          const recognized = session.status === "connected"
+            || session.status === "updater"
+            || session.status === "recovery-only";
+          const runtimeReady = session.deviceInfo?.kind === "runtime";
+          if (serialMatches && recognized && (!requireRuntime || runtimeReady)) {
+            appendLog("Reconnected successfully.");
+            sessionReconnected = true;
+            return true;
+          }
+          lastError = requireRuntime
+            ? "The keyboard runtime has not reappeared yet"
+            : "The keyboard has not reappeared yet";
+        } catch (reconnectError) {
+          lastError = reconnectError instanceof Error ? reconnectError.message : String(reconnectError);
         }
-        appendLog("Reconnected successfully.");
-      } catch (reconnectError) {
-        const reconnectMsg = reconnectError instanceof Error ? reconnectError.message : String(reconnectError);
-        appendLog(`Reconnect failed: ${reconnectMsg}`);
+        await delay(500);
       }
+      appendLog(`Reconnect failed: ${lastError}`);
+      if (requireRuntime) {
+        throw new Error(
+          `CALIBRATION_RESTORE_REQUIRED: ${lastError}. The calibration backup was kept; reconnect this keyboard and use the recovery banner to restore it.`,
+        );
+      }
+      return false;
     };
 
     try {
@@ -516,13 +565,43 @@ export default function Firmware() {
         throw new Error("The connected keyboard does not expose a stable USB serial number; refusing an ambiguous flash target.");
       }
       flashTargetSerialNumber = expectedSerialNumber;
+
+      const nativeFlash = Boolean(path && detachedSignaturePath && isTauri());
+      if (nativeFlash) {
+        const session = useDeviceSession.getState();
+        const confirmedUpdaterV3 = session.deviceInfo?.kind === "updater"
+          && session.compatibility?.updaterProtocol === 0x0003;
+        try {
+          calibrationBackup = await getCalibrationMigrationBackup(expectedSerialNumber);
+        } catch (error) {
+          if (!confirmedUpdaterV3) throw error;
+          appendLog("Calibration recovery storage is unavailable, but updater v3 is confirmed; no storage-erasing migration is needed.");
+        }
+        const runtimeConnected = session.deviceInfo?.kind === "runtime"
+          && session.deviceInfo.serialNumber?.trim() === expectedSerialNumber
+          && (session.status === "connected" || session.status === "recovery-only");
+
+        if (!calibrationBackup && runtimeConnected) {
+          appendLog("Saving the complete 82-key calibration before updater negotiation...");
+          calibrationBackup = await captureCalibrationMigrationBackup(expectedSerialNumber);
+          appendLog("Calibration backup persisted and verified.");
+          void queryClient.invalidateQueries({ queryKey: CALIBRATION_MIGRATION_QUERY_KEY });
+        } else if (!calibrationBackup && !confirmedUpdaterV3) {
+          throw new Error(
+            "CALIBRATION_BACKUP_REQUIRED: updater v2 migration cannot start while the keyboard is already in update mode without a saved calibration. Return it to runtime mode, reconnect, and retry so the app can save all 82 zero/max values first.",
+          );
+        } else if (calibrationBackup) {
+          appendLog("Using the verified calibration recovery backup already saved for this keyboard.");
+        }
+      }
+
       appendLog("Preparing flash session...");
       await DeviceSessionManager.disconnect();
       await delay(250);
 
       let finalVersion: FirmwareVersion;
 
-      if (path && detachedSignaturePath && isTauri()) {
+      if (nativeFlash && path && detachedSignaturePath) {
         // Native fast path: entire flash loop runs in Rust (no IPC per packet)
         const { version: resolvedVersion } = resolveFirmwareVersion(bytes, versionInfo?.version);
 
@@ -590,6 +669,17 @@ export default function Firmware() {
         });
       }
 
+      if (calibrationBackup) {
+        await reconnectSession(true);
+        appendLog("Restoring the saved per-key zero and maximum calibration...");
+        const restored = await restoreCalibrationMigrationBackup(expectedSerialNumber);
+        if (!restored) {
+          throw new Error("CALIBRATION_RESTORE_REQUIRED: the saved calibration disappeared before restoration");
+        }
+        appendLog("Calibration restored and verified on all 82 keys.");
+        await queryClient.invalidateQueries({ queryKey: CALIBRATION_MIGRATION_QUERY_KEY });
+      }
+
       appendLog(`Flash complete! Version: ${formatFirmwareVersion(finalVersion)}`);
       setFlashState("success");
       return { ok: true };
@@ -599,10 +689,13 @@ export default function Firmware() {
       setFlashState("error");
       return { ok: false, error: msg };
     } finally {
-      await reconnectSession();
+      if (!sessionReconnected) {
+        await reconnectSession();
+      }
+      void queryClient.invalidateQueries({ queryKey: CALIBRATION_MIGRATION_QUERY_KEY });
       flashInFlightRef.current = false;
     }
-  }, [timeoutSec, retries, appendLog, recoverySerialNumber]);
+  }, [timeoutSec, retries, appendLog, queryClient, recoverySerialNumber]);
 
   const handleFlash = useCallback(async () => {
     if (!firmwareBytes) return;
@@ -626,7 +719,7 @@ export default function Firmware() {
 
     try {
       appendLog(`Downloading firmware release ${tag}...`);
-      const downloaded = await downloadFirmwareRelease(tag);
+      const downloaded = await downloadFirmwareRelease(tag, compatibility?.updaterProtocol);
       appendLog(`Downloaded ${downloaded.fileName}.`);
       setFirmwareUpdateState("flashing");
       const flashResult = await runFlash(
@@ -651,12 +744,17 @@ export default function Firmware() {
       setFlashState("error");
       appendLog(`Error: ${msg}`);
     }
-  }, [appendLog, firmwareUpdateQ, runFlash]);
+  }, [appendLog, compatibility?.updaterProtocol, firmwareUpdateQ, runFlash]);
 
   const fileSizeKb = firmwareBytes ? (firmwareBytes.length / 1024).toFixed(1) : null;
   const compatibilityBlocksFlash = compatibility?.status === "app-too-old";
+  const updaterV2NeedsCalibrationBackup = updateModeDetected
+    && compatibility?.updaterProtocol === 0x0002;
+  const calibrationMigrationBlocked = updaterV2NeedsCalibrationBackup
+    && calibrationRecoveryQ.data == null;
   const canFlash = connected
     && !compatibilityBlocksFlash
+    && !calibrationMigrationBlocked
     && !!firmwareBytes
     && fileVersion !== null
     && fileError === null
@@ -664,6 +762,7 @@ export default function Firmware() {
     && flashState !== "flashing"
     && firmwareUpdateState !== "flashing";
   const latestFirmware = firmwareUpdateQ.data;
+  const firmwareReleaseBlocked = latestFirmware?.blockedReason ?? null;
   const firmwareReleaseBusy = firmwareUpdateState === "downloading" || firmwareUpdateState === "flashing";
 
   return (
@@ -707,14 +806,39 @@ export default function Firmware() {
           )}
         </div>
 
+        {updaterV2NeedsCalibrationBackup && (
+          <div
+            className={cn(
+              "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed",
+              calibrationMigrationBlocked
+                ? "border-destructive/30 bg-destructive/10 text-destructive"
+                : "border-warning/30 bg-warning/10 text-warning",
+            )}
+            role={calibrationMigrationBlocked ? "alert" : "status"}
+          >
+            <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>
+              {calibrationRecoveryQ.isLoading
+                ? "Checking for the required pre-migration calibration backup…"
+                : calibrationRecoveryQ.error
+                  ? `Calibration recovery storage could not be read: ${calibrationRecoveryQ.error instanceof Error ? calibrationRecoveryQ.error.message : String(calibrationRecoveryQ.error)}. Migration is blocked.`
+                  : calibrationMigrationBlocked
+                    ? "Updater v2 migration is blocked because no complete 82-key calibration backup exists. Return the keyboard to runtime mode, reconnect it, then start the update here so zero and maximum values can be saved first."
+                    : "The complete per-key calibration backup is safe. Migration can continue and the app will restore and verify it after runtime reconnects."}
+            </span>
+          </div>
+        )}
+
         {/* -- Online firmware update -------------------------------- */}
         {isTauri() && (
           <SectionCard
-            tone={latestFirmware?.updateAvailable ? "accent" : "default"}
+            tone={firmwareReleaseBlocked ? "danger" : latestFirmware?.updateAvailable ? "accent" : "default"}
             title="Online firmware update"
             icon={<IconCloudDownload />}
             description={
-              latestFirmware?.updateAvailable
+              firmwareReleaseBlocked
+                ? `Release ${latestFirmware?.tag ?? latestFirmware?.version ?? "latest"} is incomplete for this keyboard.`
+                : latestFirmware?.updateAvailable
                 ? `Release ${latestFirmware.tag ?? latestFirmware.version} is available.`
                 : firmwareUpdateQ.isLoading
                   ? "Checking GitHub releases…"
@@ -734,7 +858,37 @@ export default function Firmware() {
               </Button>
             }
           >
-            {latestFirmware?.updateAvailable ? (
+            {firmwareReleaseBlocked ? (
+              <div className="flex flex-col gap-3" role="alert">
+                <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+                  <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <span>{firmwareReleaseBlocked}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {compatibility?.updaterProtocol == null && status === "connected" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate("/device")}
+                    >
+                      Verify updater protocol
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={firmwareUpdateQ.isFetching}
+                    onClick={() => void firmwareUpdateQ.refetch()}
+                  >
+                    <IconRefresh className="size-4" />
+                    Check corrected release
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Do not select the normal application manually on updater v2.
+                  </span>
+                </div>
+              </div>
+            ) : latestFirmware?.updateAvailable ? (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {latestFirmware.version && (
@@ -744,7 +898,7 @@ export default function Firmware() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
-                    disabled={!connected || compatibilityBlocksFlash || firmwareReleaseBusy || flashState === "flashing"}
+                    disabled={!connected || compatibilityBlocksFlash || calibrationMigrationBlocked || firmwareReleaseBusy || flashState === "flashing"}
                     onClick={() => void handleFlashLatestFirmware()}
                   >
                     <IconDownload className="size-4" />
