@@ -3,6 +3,7 @@
 #include "analog/filter.h"
 #include "analog/lut.h"
 #include "analog/calibration.h"
+#include "analog/rest_estimator.h"
 #include "adc_capture.h"
 #include "diagnostics.h"
 #include "settings.h"
@@ -17,6 +18,10 @@ static AnalogConfig_t analog_config;
 static uint16_t adc_buffer[ADC_BUFFER_LENGTH] __attribute__((aligned(ADC_BUFFER_LENGTH * 2)));
 
 static uint16_t raw_values[NUM_ANALOG_INPUTS];
+
+/* Immutable logical-key view of the last complete scan.  Diagnostic and
+ * calibration readers must not observe rows from two different DMA scans. */
+static uint16_t logical_raw_values[NUM_KEYS];
 
 static uint16_t filtered_values[NUM_KEYS];
 
@@ -37,6 +42,7 @@ static volatile bool scan_fault_pending = false;
 #define ANALOG_TRAVEL_EXTRAPOLATION_MAX_UM (4u * SETTINGS_LOGICAL_TRAVEL_UM)
 
 static analog_task_monitor_t analog_task_monitor;
+static analog_rest_estimator_t analog_rest_estimator;
 static uint8_t analog_profile_counter = 0u;
 
 static inline bool analog_is_valid_physical_index(uint8_t index) {
@@ -103,11 +109,14 @@ void analog_init(AnalogConfig_t* config) {
 
     // Initialize filtered values to 0
     for (uint8_t i = 0; i < NUM_KEYS; i++) {
+        logical_raw_values[i] = 0;
         filtered_values[i] = 0;
         calibrated_values[i] = 0;
         distance_values[i] = 0;
         normalized_values[i] = 0;
     }
+
+    analog_rest_estimator_init(&analog_rest_estimator);
 
     analog_task_monitor.raw_us = 0;
     analog_task_monitor.filter_us = 0;
@@ -170,6 +179,8 @@ void analog_task() {
         if (raw_value != 0) {
             nonzero_keys++;
         }
+
+        logical_raw_values[key] = raw_value;
 
         if (collect_profile) {
             uint32_t step_start_cycles = DWT->CYCCNT;
@@ -238,7 +249,10 @@ void analog_task() {
         filter_set_initialized(true);
     }
 
-    adc_capture_process_scan(filtered_values, NUM_KEYS, HAL_GetTick());
+    uint32_t now_ms = HAL_GetTick();
+    analog_rest_estimator_observe(&analog_rest_estimator,
+                                  logical_raw_values, NUM_KEYS, now_ms);
+    adc_capture_process_scan(filtered_values, NUM_KEYS, now_ms);
 }
 
 /*
@@ -250,15 +264,16 @@ uint16_t analog_read_raw_value(uint8_t key) {
         return 0;
     }
 
-    // Get the physical key index from the logical key
-    uint8_t physical_key_index = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX[key];
+    return logical_raw_values[key];
+}
 
-    if (!analog_is_valid_physical_index(physical_key_index)) {
-        return 0;
-    }
-
-    // Return the raw value for the corresponding physical key index
-    return raw_values[physical_key_index];
+bool analog_get_stable_rest_values(uint32_t now_ms, uint16_t reference_zero,
+                                   uint16_t max_reference_delta,
+                                   int16_t *values_out, uint8_t key_count) {
+    return analog_rest_estimator_snapshot(&analog_rest_estimator, now_ms,
+                                          reference_zero,
+                                          max_reference_delta, values_out,
+                                          key_count);
 }
 
 /*

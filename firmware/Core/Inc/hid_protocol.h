@@ -71,7 +71,7 @@ typedef enum {
   CMD_SET_GAMEPAD_SETTINGS = 0x45,
   CMD_GET_CALIBRATION = 0x46,
   CMD_SET_CALIBRATION = 0x47,
-  CMD_AUTO_CALIBRATE = 0x48, // Auto-calibrate a key (read current ADC as zero)
+  CMD_AUTO_CALIBRATE = 0x48, // Auto-zero from a stable 2.5 s rest estimate
   CMD_GET_KEY_CURVE = 0x49,  // Get per-key analog curve
   CMD_SET_KEY_CURVE = 0x4A,  // Set per-key analog curve
   CMD_GET_KEY_GAMEPAD_MAP = 0x4B, // Get per-key gamepad mapping

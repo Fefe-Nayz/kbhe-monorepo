@@ -58,6 +58,11 @@ int16_t analog_read_travel_distance_value(uint8_t key);
 
 uint8_t analog_read_normalized_value(uint8_t key);
 
+/** Return a fresh, stable 2.5 s all-key rest estimate for explicit auto-zero. */
+bool analog_get_stable_rest_values(uint32_t now_ms, uint16_t reference_zero,
+                                   uint16_t max_reference_delta,
+                                   int16_t* values_out, uint8_t key_count);
+
 uint16_t* analog_get_adc_buffer_ptr(void);
 
 void analog_get_task_monitor(analog_task_monitor_t* monitor);

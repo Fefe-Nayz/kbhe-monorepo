@@ -75,7 +75,8 @@ Le clavier expose une interface RAW HID qui sert de canal de controle entre le f
 ### 4. Calibration et precision capteur
 
 - Calibration manuelle des valeurs zero/max par touche.
-- Auto-calibration globale ou par touche.
+- Auto-calibration globale ou par touche, acceptee uniquement apres 2,5 s de
+  repos stable; elle preserve les maxima existants.
 - Calibration guidee (sequence pilotee, suivi d'etat, progression, abort).
 - Support des courbes analogiques par touche (modele de reponse).
 - Outils PC pour construire et valider les LUT a partir de mesures reelles.

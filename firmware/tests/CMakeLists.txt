@@ -38,6 +38,13 @@ target_include_directories(adc_capture_test BEFORE PRIVATE
 )
 add_test(NAME adc_capture_test COMMAND adc_capture_test)
 
+add_executable(analog_rest_estimator_test
+  analog_rest_estimator_test.c
+  ../Core/Src/analog/rest_estimator.c
+)
+target_include_directories(analog_rest_estimator_test PRIVATE "${KBHE_CORE_INC}")
+add_test(NAME analog_rest_estimator_test COMMAND analog_rest_estimator_test)
+
 add_executable(raw_hid_test
   raw_hid_test.c
   ../Core/Src/hid/raw_hid.c

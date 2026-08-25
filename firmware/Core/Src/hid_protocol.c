@@ -31,6 +31,8 @@
 //--------------------------------------------------------------------+
 
 #define HID_ALPHA_MASK_MAX_BYTES ((NUM_KEYS + 7u) / 8u)
+#define HID_AUTO_ZERO_QUIET_MS 2500u
+#define HID_AUTO_ZERO_REFERENCE_DELTA_ADC 256u
 
 static inline bool is_valid_adc_calibration_value(int16_t value) {
   return value >= 0 && value <= 4095;
@@ -1502,19 +1504,32 @@ static void cmd_auto_calibrate(const uint8_t *in, uint8_t *out) {
 
   uint8_t key_index = req->key_index;
   settings_calibration_t calibration = *settings_get_calibration();
+  int16_t stable_zeros[NUM_KEYS];
+  uint32_t now_ms = HAL_GetTick();
   bool success = false;
+
+  if (key_index != 0xFFu && key_index >= NUM_KEYS) {
+    resp->status = HID_RESP_INVALID_PARAM;
+    return;
+  }
+
+  /* A single instantaneous sample can turn noise or a touched key into a
+   * persistent dead zone.  Only accept an explicit auto-zero after both the
+   * trigger and the independent raw estimator saw 2.5 s of quiet input. */
+  if (!trigger_is_input_idle(now_ms, HID_AUTO_ZERO_QUIET_MS) ||
+      !analog_get_stable_rest_values(
+          now_ms, (uint16_t)calibration.lut_zero_value,
+          HID_AUTO_ZERO_REFERENCE_DELTA_ADC, stable_zeros, NUM_KEYS)) {
+    resp->status = HID_RESP_ERROR;
+    return;
+  }
 
   if (key_index == 0xFF) {
     for (uint8_t i = 0u; i < NUM_KEYS; i++) {
-      calibration.key_zero_values[i] =
-          (int16_t)analog_read_raw_value(i);
+      calibration.key_zero_values[i] = stable_zeros[i];
     }
   } else if (key_index < NUM_KEYS) {
-    calibration.key_zero_values[key_index] =
-        (int16_t)analog_read_raw_value(key_index);
-  } else {
-    resp->status = HID_RESP_INVALID_PARAM;
-    return;
+    calibration.key_zero_values[key_index] = stable_zeros[key_index];
   }
 
   /* Validate and publish the complete calibration once.  A bad sensor value
