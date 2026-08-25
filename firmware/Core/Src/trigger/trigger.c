@@ -11,6 +11,7 @@
 #include "led_matrix.h"
 #include "layout/keycodes.h"
 #include "trigger/socd.h"
+#include "trigger/thresholds.h"
 #include "trigger/transition_filter.h"
 #include "layout/layout.h"
 #include <string.h>
@@ -105,17 +106,6 @@ static bool trigger_transition_guard_is_stable(uint8_t key,
         &key_transition_guards[key], (uint8_t)desired_state,
         trigger_chatter_guard_enabled != 0u,
         trigger_chatter_guard_duration_ms, now_ms);
-}
-
-static inline bool is_below_actuation_point(int16_t distance, uint16_t actuation_point) {
-    return distance >= actuation_point;
-}
-
-static inline bool is_above_release_point(int16_t distance, uint16_t release_point) {
-    /* Actuation is inclusive on the downward edge; release is inclusive on
-     * the upward edge. In particular, a valid 0.0 mm release point must be
-     * reachable at the calibrated rest position. */
-    return distance > (int16_t)release_point;
 }
 
 static inline void reset_rapid_trigger_extremums(uint8_t key, int16_t current_distance) {
@@ -757,14 +747,16 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
     if (settings->behavior_mode == KEY_BEHAVIOR_DYNAMIC ||
         !settings->is_rapid_trigger_enabled) {
         if (key_states[key] == RELEASED) {
-            if (is_below_actuation_point(current_distance, actuation_point)) {
+            if (trigger_threshold_should_press(current_distance,
+                                               actuation_point)) {
                 (void)trigger_request_state(key, PRESSED, current_distance,
                                             now_ms);
             } else {
                 trigger_transition_guard_cancel(key);
             }
         } else {
-            if (!is_above_release_point(current_distance, release_point)) {
+            if (trigger_threshold_should_release(
+                    current_distance, actuation_point, release_point)) {
                 (void)trigger_request_state(key, RELEASED, current_distance,
                                             now_ms);
             } else {
@@ -773,13 +765,15 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
         }
     } else if (!settings->continuous_rapid_trigger) {
         if (key_states[key] == PRESSED &&
-            !is_above_release_point(current_distance, release_point)) {
+            trigger_threshold_should_release(
+                current_distance, actuation_point, release_point)) {
             if (trigger_request_state(key, RELEASED, current_distance, now_ms)) {
                 reset_rapid_trigger_extremums(key, current_distance);
                 rt_data->last_distance = current_distance;
             }
         } else if (key_states[key] == RELEASED &&
-                   !is_below_actuation_point(current_distance, actuation_point)) {
+                   !trigger_threshold_should_press(current_distance,
+                                                   actuation_point)) {
             trigger_transition_guard_cancel(key);
             rt_data->last_distance = current_distance;
             if (current_distance < rt_data->min_top_distance) {
@@ -803,7 +797,8 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
         }
 
         if (!rt_data->continuous_armed) {
-            if (!is_below_actuation_point(current_distance, actuation_point)) {
+            if (!trigger_threshold_should_press(current_distance,
+                                                actuation_point)) {
                 rt_data->last_distance = current_distance;
                 if (current_distance < rt_data->min_top_distance) {
                     rt_data->min_top_distance = current_distance;
@@ -815,7 +810,8 @@ static inline void handle_trigger(uint8_t key, uint32_t now_ms) {
         }
 
         if (key_states[key] == PRESSED &&
-            !is_above_release_point(current_distance, release_point)) {
+            trigger_threshold_should_release(
+                current_distance, actuation_point, release_point)) {
             if (trigger_request_state(key, RELEASED, current_distance, now_ms)) {
                 reset_rapid_trigger_extremums(key, current_distance);
                 rt_data->last_distance = current_distance;
@@ -904,16 +900,8 @@ void trigger_apply_key_settings(uint8_t key, const settings_key_t *settings) {
         settings_key_is_continuous_rapid_trigger_enabled(settings);
     runtime->actuation_point = mm_tenths_to_um(settings->actuation_point_mm);
     runtime->release_point = mm_tenths_to_um(settings->release_point_mm);
-    if (runtime->release_point +
-            (SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS * 100u) >
-        runtime->actuation_point) {
-        runtime->release_point =
-            runtime->actuation_point >
-                    (SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS * 100u)
-                ? (uint16_t)(runtime->actuation_point -
-                             (SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS * 100u))
-                : 0u;
-    }
+    runtime->release_point = trigger_threshold_sanitize_release_um(
+        runtime->actuation_point, runtime->release_point);
     runtime->rapid_trigger_press_sensitivity =
         mm_hundredths_to_um(
             settings->rapid_trigger_press <
@@ -1047,9 +1035,7 @@ void trigger_init() {
     for (int i = 0; i < NUM_KEYS; i++) {
         key_trigger_settings[i].primary_keycode = KC_NO;
         key_trigger_settings[i].actuation_point = DEFAULT_ACTUATION_POINT;
-        key_trigger_settings[i].release_point =
-            DEFAULT_ACTUATION_POINT -
-            (SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS * 100u);
+        key_trigger_settings[i].release_point = DEFAULT_RELEASE_POINT;
         key_trigger_settings[i].is_rapid_trigger_enabled = false;
         key_trigger_settings[i].continuous_rapid_trigger = false;
         key_trigger_settings[i].rapid_trigger_press_sensitivity = DEFAULT_RAPID_TRIGGER_SENSITIVITY;

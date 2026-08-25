@@ -8,6 +8,7 @@
 
 // Actuation point in µm
 #define DEFAULT_ACTUATION_POINT 1200 // 1.2mm
+#define DEFAULT_RELEASE_POINT 1100   // 1.1mm
 
 // Rapid trigger sensitivity in µm (distance from actuation point to trigger)
 #define DEFAULT_RAPID_TRIGGER_SENSITIVITY 200 // 0.2mm

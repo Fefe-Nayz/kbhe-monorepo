@@ -141,6 +141,10 @@ add_executable(transition_filter_test transition_filter_test.c)
 target_include_directories(transition_filter_test PRIVATE "${KBHE_CORE_INC}")
 add_test(NAME transition_filter_test COMMAND transition_filter_test)
 
+add_executable(trigger_threshold_test trigger_threshold_test.c)
+target_include_directories(trigger_threshold_test PRIVATE "${KBHE_CORE_INC}")
+add_test(NAME trigger_threshold_test COMMAND trigger_threshold_test)
+
 add_executable(filter_test
   filter_test.c
   ../Core/Src/analog/filter.c

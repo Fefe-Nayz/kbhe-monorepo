@@ -16,6 +16,7 @@
 #include "layout/layout.h"
 #include "led_matrix.h"
 #include "trigger/socd.h"
+#include "trigger/thresholds.h"
 #include "trigger/trigger.h"
 #include "hid/gamepad_hid.h"
 #include "hid/keyboard_hid.h"
@@ -1628,15 +1629,8 @@ static void settings_sanitize_key_config(uint8_t key_index, settings_key_t *key)
         (uint8_t)(SETTINGS_LOGICAL_TRAVEL_UM / 100u);
   }
 
-  if ((uint16_t)key->release_point_mm +
-          SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS >
-      key->actuation_point_mm) {
-    key->release_point_mm =
-        key->actuation_point_mm > SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS
-            ? (uint8_t)(key->actuation_point_mm -
-                        SETTINGS_TRIGGER_MIN_HYSTERESIS_TENTHS)
-            : 0u;
-  }
+  key->release_point_mm = trigger_threshold_sanitize_release_tenths(
+      key->actuation_point_mm, key->release_point_mm);
 
   if (key->rapid_trigger_press < SETTINGS_RAPID_TRIGGER_MIN_HUNDREDTHS) {
     key->rapid_trigger_press = SETTINGS_RAPID_TRIGGER_MIN_HUNDREDTHS;

@@ -91,6 +91,25 @@ describe("KBHEDevice runtime identity compatibility", () => {
 });
 
 describe("KBHEDevice bulk key parser", () => {
+  test("encodes equal actuation and release points without adding hysteresis", async () => {
+    let payload: number[] = [];
+    const transport = {
+      sendCommand: async (command: number, data: ArrayLike<number>) => {
+        expect(command).toBe(Command.SET_KEY_SETTINGS);
+        payload = Array.from(data);
+        return Uint8Array.of(command, Status.OK);
+      },
+    } as KbheTransport;
+    const device = new KBHEDevice(new KbheCommander(transport), transport);
+
+    expect(await device.setKeySettingsExtended(7, {
+      actuation_point_mm: 1.2,
+      release_point_mm: 1.2,
+    })).toBeTrue();
+    expect(payload[6]).toBe(12);
+    expect(payload[7]).toBe(12);
+  });
+
   test("decodes SOCD Neutral and disable-keyboard-on-gamepad flags", async () => {
     const transport = {
       flushInput: async () => 0,
