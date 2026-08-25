@@ -145,6 +145,27 @@ publication are separate on purpose:
 .\tools\release\run-release.ps1 -Phase publish -Target both -BumpPart patch
 ```
 
+On Windows, `-UseWsl` keeps every build and test in Linux while Git and GitHub
+authentication remain on the host. This avoids spawning native compiler
+consoles and also makes the local toolchain match CI more closely:
+
+```powershell
+# Optional when Bun/Cargo are not on WSL's non-interactive PATH.
+$env:KBHE_WSL_BUN = "/home/<wsl-user>/.bun/bin/bun"
+$env:KBHE_WSL_CARGO = "/home/<wsl-user>/.cargo/bin/cargo"
+$env:KBHE_WSL_RUSTUP_HOME = "/home/<wsl-user>/.rustup"
+$env:KBHE_WSL_CARGO_HOME = "/home/<wsl-user>/.cargo"
+
+.\tools\release\run-release.ps1 -Phase prepare -Target both -BumpPart patch `
+  -UseWsl -WslDistribution Ubuntu
+.\tools\release\run-release.ps1 -Phase publish -Target both -BumpPart patch `
+  -UseWsl -WslDistribution Ubuntu
+```
+
+With this option, Bun, Cargo, CMake, CTest, Ninja, Python and both firmware
+compilers run inside the selected WSL distribution. The same validation and
+release gates remain mandatory; this is an execution backend, not a skip flag.
+
 `-Phase all` performs both phases in one invocation but still stops for the CI
 and environment approval gates. `-Yes` skips local confirmations; it cannot and
 must not bypass GitHub environment reviewers. The helper refuses a dirty tree,

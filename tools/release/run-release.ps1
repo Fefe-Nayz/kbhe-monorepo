@@ -11,11 +11,74 @@ param(
 
     [string]$ReleaseNotes,
 
+    [switch]$UseWsl,
+
+    [string]$WslDistribution = "Ubuntu",
+
     [switch]$Yes
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+$script:WslBuildCommands = @("bun", "cargo", "cmake", "ctest", "python")
+
+function Resolve-WslBuildCommand {
+    param([string]$CommandName)
+
+    switch ($CommandName) {
+        "bun" {
+            if (-not [string]::IsNullOrWhiteSpace($env:KBHE_WSL_BUN)) {
+                return $env:KBHE_WSL_BUN
+            }
+        }
+        "cargo" {
+            if (-not [string]::IsNullOrWhiteSpace($env:KBHE_WSL_CARGO)) {
+                return $env:KBHE_WSL_CARGO
+            }
+        }
+        "python" { return "/usr/bin/python3" }
+    }
+    return $CommandName
+}
+
+function Get-WslEnvironmentArguments {
+    $arguments = [Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($env:KBHE_WSL_RUSTUP_HOME)) {
+        $arguments.Add("RUSTUP_HOME=$($env:KBHE_WSL_RUSTUP_HOME)")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:KBHE_WSL_CARGO_HOME)) {
+        $arguments.Add("CARGO_HOME=$($env:KBHE_WSL_CARGO_HOME)")
+    }
+    return @($arguments)
+}
+
+function Invoke-WslBuildCommand {
+    param(
+        [string]$WorkingDirectory,
+        [string]$Executable,
+        [string[]]$Arguments = @()
+    )
+
+    $resolved = Resolve-WslBuildCommand -CommandName $Executable
+    $wslArguments = [Collections.Generic.List[string]]::new()
+    foreach ($argument in @("-d", $WslDistribution, "--cd", $WorkingDirectory, "--")) {
+        $wslArguments.Add($argument)
+    }
+    $environmentArguments = @(Get-WslEnvironmentArguments)
+    if ($environmentArguments.Count -gt 0) {
+        $wslArguments.Add("/usr/bin/env")
+        foreach ($argument in $environmentArguments) {
+            $wslArguments.Add($argument)
+        }
+    }
+    $wslArguments.Add($resolved)
+    foreach ($argument in $Arguments) {
+        $wslArguments.Add($argument)
+    }
+
+    & wsl.exe @wslArguments
+}
 
 function Write-Step {
     param([string]$Message)
@@ -25,6 +88,15 @@ function Write-Step {
 
 function Assert-CommandAvailable {
     param([string]$CommandName)
+
+    if ($UseWsl -and $CommandName -in $script:WslBuildCommands) {
+        Invoke-WslBuildCommand -WorkingDirectory $repoRoot `
+            -Executable $CommandName -Arguments @("--version") *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Required WSL command '$CommandName' is not available in distribution '$WslDistribution'."
+        }
+        return
+    }
     if (-not (Get-Command $CommandName -ErrorAction SilentlyContinue)) {
         throw "Required command '$CommandName' is not available in PATH."
     }
@@ -41,7 +113,13 @@ function Invoke-External {
     Write-Step $Name
     Push-Location $WorkingDirectory
     try {
-        & $Executable @Arguments
+        if ($UseWsl -and $Executable -in $script:WslBuildCommands) {
+            Invoke-WslBuildCommand -WorkingDirectory $WorkingDirectory `
+                -Executable $Executable -Arguments $Arguments
+        }
+        else {
+            & $Executable @Arguments
+        }
         if ($LASTEXITCODE -ne 0) {
             throw "Command failed with exit code $($LASTEXITCODE): $Executable $($Arguments -join ' ')"
         }
