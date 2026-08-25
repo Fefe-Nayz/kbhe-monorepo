@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import sys
 import types
 import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parent
+REPO_ROOT = ROOT.parents[1]
 sys.path.insert(0, str(ROOT))
 # Parsing tests do not open HID. Keep CI independent from the optional hidapi
 # wheel used by the interactive host tool.
@@ -30,6 +32,52 @@ class StubDevice(KBHEDevice):
 
 
 class DeviceProtocolTest(unittest.TestCase):
+    def test_command_ids_match_firmware_and_configurator(self) -> None:
+        hid_header = (REPO_ROOT / "firmware/Core/Inc/hid_protocol.h").read_text(
+            encoding="utf-8"
+        )
+        action_header = (REPO_ROOT / "firmware/Core/Inc/action_protocol.h").read_text(
+            encoding="utf-8"
+        )
+        typescript = (
+            REPO_ROOT / "apps/configurator/src/lib/kbhe/protocol.ts"
+        ).read_text(encoding="utf-8")
+
+        c_commands = {
+            name: int(value, 16)
+            for name, value in re.findall(
+                r"\bCMD_([A-Z][A-Z0-9_]*)\s*=\s*(0x[0-9A-Fa-f]+)",
+                hid_header,
+            )
+            if name != "UNKNOWN"
+        }
+        c_commands.update(
+            {
+                name: int(value, 16)
+                for name, value in re.findall(
+                    r"^#define\s+CMD_([A-Z][A-Z0-9_]*)\s+(0x[0-9A-Fa-f]+)",
+                    action_header,
+                    flags=re.MULTILINE,
+                )
+            }
+        )
+
+        command_enum = typescript.split("export enum Command {", 1)[1].split("}", 1)[0]
+        ts_commands = {
+            name: int(value, 16)
+            for name, value in re.findall(
+                r"^\s*([A-Z][A-Z0-9_]*)\s*=\s*(0x[0-9A-Fa-f]+)",
+                command_enum,
+                flags=re.MULTILINE,
+            )
+        }
+        python_commands = {
+            name: int(command) for name, command in Command.__members__.items()
+        }
+
+        self.assertEqual(ts_commands, c_commands)
+        self.assertEqual(python_commands, c_commands)
+
     def test_semver_identity_uses_patch_byte_before_serial(self) -> None:
         version = bytearray(64)
         version[:5] = bytes((Command.GET_FIRMWARE_VERSION, 0, 2, 0, 8))
