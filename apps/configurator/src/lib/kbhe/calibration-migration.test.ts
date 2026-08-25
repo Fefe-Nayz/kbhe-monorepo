@@ -322,6 +322,44 @@ describe("complete updater migration recovery", () => {
     expect(await getUpdaterMigrationBackup(serial, store)).toBeNull();
   });
 
+  test("matches the firmware base62 device id to the USB UID serial", async () => {
+    const usbSerial = "004800363133511631393834";
+    const firmwareDeviceId = "75HE-NF-0JoMpVQ5sIMRQQrIM";
+    const store = new MemoryStore();
+    const device = new MemoryDevice(
+      calibration(),
+      0b0001,
+      0,
+      0,
+      ["Default", null, null, null],
+    );
+    const profiles = new MemoryProfileApi();
+    profiles.snapshots.set(0, profileSnapshot(0, firmwareDeviceId));
+
+    const backup = await captureUpdaterMigrationBackup(usbSerial, device, store, profiles);
+
+    expect(backup.serialNumber).toBe(usbSerial);
+    expect(backup.profiles.usedMask).toBe(0b0001);
+    expect(backup.profiles.snapshots[0]?.deviceId).toBe(firmwareDeviceId);
+  });
+
+  test("rejects a profile snapshot from a different physical keyboard", async () => {
+    const usbSerial = "004800363133511631393834";
+    const store = new MemoryStore();
+    const device = new MemoryDevice(
+      calibration(),
+      0b0001,
+      0,
+      0,
+      ["Default", null, null, null],
+    );
+    const profiles = new MemoryProfileApi();
+    profiles.snapshots.set(0, profileSnapshot(0, "75HE-NF-00000000000000000"));
+
+    await expect(captureUpdaterMigrationBackup(usbSerial, device, store, profiles))
+      .rejects.toThrow("on-device profile 1 could not be captured completely");
+  });
+
   test("preserves every legacy 2.0.4 field when action programs are unsupported", async () => {
     const serial = "KBHE-LEGACY-ACTIONS";
     const store = new MemoryStore();

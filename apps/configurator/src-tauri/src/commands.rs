@@ -6,8 +6,8 @@ use crate::updater_compat::{
     bootloader_refresh_required, inspect_firmware_artifact, negotiate_flash_protocol,
     parse_bootloader_info, parse_updater_hello, updater_cleanup_is_safe,
     verify_refreshed_bootloader, BootloaderInfo, FirmwareArtifact, FlashProtocol, UpdaterHello,
-    UPDATER_FLAG_APP_VALID, UPDATER_FLAG_SIGNATURE_REQUIRED, UPDATER_PROTOCOL_V2,
-    UPDATER_PROTOCOL_V3, UPDATER_V2_APP_MAX_IMAGE_SIZE,
+    UPDATER_FLAG_APP_VALID, UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3,
+    UPDATER_V2_APP_MAX_IMAGE_SIZE,
 };
 use hidapi::{DeviceInfo, HidApi, HidDevice};
 use semver::Version as SemverVersion;

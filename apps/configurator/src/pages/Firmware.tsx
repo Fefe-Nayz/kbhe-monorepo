@@ -10,6 +10,7 @@ import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import { kbheFirmware, resolveFirmwareVersion, type FirmwareResolveResult } from "@/lib/kbhe/firmware";
 import {
+  canUpdaterIdentificationUnlockRelease,
   checkFirmwareUpdate,
   downloadFirmwareRelease,
 } from "@/lib/kbhe/releases";
@@ -1064,7 +1065,10 @@ export default function Firmware() {
                   <span>{firmwareReleaseBlocked}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  {compatibility?.updaterProtocol == null && status === "connected" && (
+                  {status === "connected" && canUpdaterIdentificationUnlockRelease(
+                    latestFirmware,
+                    compatibility?.updaterProtocol,
+                  ) && (
                     <Button
                       variant="outline"
                       size="sm"

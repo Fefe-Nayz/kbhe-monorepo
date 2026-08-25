@@ -116,6 +116,62 @@ const firmwareProfileApi: FirmwareProfileMigrationApi = {
   ),
 };
 
+const FIRMWARE_DEVICE_SERIAL_PREFIX = "75HE-NF-";
+const FIRMWARE_DEVICE_UID_B62_CHARS = 17;
+const BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/**
+ * The STM32 UID has two intentional USB representations:
+ *
+ * - the USB descriptor exposes three 32-bit words as 24 hexadecimal digits;
+ * - GET_DEVICE_INFO exposes the same words in reverse order as fixed-width
+ *   base62 with the `75HE-NF-` prefix.
+ *
+ * Migration tracks a keyboard with the stable USB descriptor because that is
+ * available in both runtime and updater mode. Profile snapshots are captured
+ * through GET_DEVICE_INFO, so convert the descriptor form before comparing
+ * identities instead of requiring the two wire formats to be textually equal.
+ */
+function firmwareDeviceSerialFromUsbSerial(serialNumber: string): string | null {
+  const normalized = serialNumber.trim();
+  if (!/^[0-9a-f]{24}$/i.test(normalized)) return null;
+
+  const words = normalized.match(/.{8}/g);
+  if (!words || words.length !== 3) return null;
+
+  // The firmware builds little-endian bytes for UIDw0..UIDw2 and then reverses
+  // the complete 12-byte array before repeated base62 division. Starting from
+  // the USB descriptor therefore means reading UIDw2..UIDw0 in display order.
+  const work = words.reverse().flatMap((word) => (
+    word.match(/../g)?.map((byte) => Number.parseInt(byte, 16)) ?? []
+  ));
+  if (work.length !== 12) return null;
+
+  const encoded = Array<string>(FIRMWARE_DEVICE_UID_B62_CHARS).fill("0");
+  for (let outputIndex = encoded.length - 1; outputIndex >= 0; outputIndex -= 1) {
+    let remainder = 0;
+    for (let byteIndex = 0; byteIndex < work.length; byteIndex += 1) {
+      const accumulator = remainder * 256 + work[byteIndex]!;
+      work[byteIndex] = Math.floor(accumulator / 62);
+      remainder = accumulator % 62;
+    }
+    encoded[outputIndex] = BASE62_ALPHABET[remainder]!;
+  }
+
+  return `${FIRMWARE_DEVICE_SERIAL_PREFIX}${encoded.join("")}`;
+}
+
+function snapshotBelongsToUsbDevice(
+  snapshotDeviceId: string | null | undefined,
+  usbSerialNumber: string,
+): boolean {
+  const snapshotId = snapshotDeviceId?.trim();
+  const usbSerial = usbSerialNumber.trim();
+  if (!snapshotId || !usbSerial) return false;
+  if (snapshotId === usbSerial) return true;
+  return snapshotId === firmwareDeviceSerialFromUsbSerial(usbSerial);
+}
+
 function normalizedSerialNumber(serialNumber: string): string {
   const normalized = serialNumber.trim();
   if (!normalized) {
@@ -225,7 +281,7 @@ function normalizeCompleteProfileSnapshot(
     !snapshot
     || snapshot.schemaVersion !== 2
     || snapshot.sourceProfileIndex !== profileIndex
-    || snapshot.deviceId !== serialNumber
+    || !snapshotBelongsToUsbDevice(snapshot.deviceId, serialNumber)
     || snapshot.keySettings.length !== KEY_COUNT * LAYER_COUNT
     || snapshot.keyGamepadMaps == null
     || snapshot.gamepadSettings == null

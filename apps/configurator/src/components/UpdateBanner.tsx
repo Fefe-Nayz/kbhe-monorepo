@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isTauri } from "@tauri-apps/api/core";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { checkAppUpdate, checkFirmwareUpdate } from "@/lib/kbhe/releases";
+import {
+  canUpdaterIdentificationUnlockRelease,
+  checkAppUpdate,
+  checkFirmwareUpdate,
+} from "@/lib/kbhe/releases";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import {
@@ -209,7 +213,10 @@ export function UpdateBanner() {
           </Button>
         )}
 
-        {firmwareBlocked && updaterProtocol == null && firmwareVersion && (
+        {firmwareVersion && canUpdaterIdentificationUnlockRelease(
+          firmwareBlocked,
+          updaterProtocol,
+        ) && (
           <Button
             variant="outline"
             size="sm"

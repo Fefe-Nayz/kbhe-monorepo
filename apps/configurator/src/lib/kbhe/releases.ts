@@ -17,6 +17,24 @@ export interface ReleaseUpdateInfo {
   assetSize: number | null;
 }
 
+type UpdaterRecoveryAvailability = Pick<
+  ReleaseUpdateInfo,
+  "blockedReason" | "migrationAvailable" | "bootloaderRefreshAvailable"
+>;
+
+/**
+ * Identifying an unknown resident updater is useful only when exactly one of
+ * the two updater-specific recovery paths exists in the blocked release.
+ */
+export function canUpdaterIdentificationUnlockRelease(
+  update: UpdaterRecoveryAvailability | null | undefined,
+  updaterProtocol: number | null | undefined,
+): boolean {
+  return updaterProtocol == null
+    && update?.blockedReason != null
+    && update.migrationAvailable !== update.bootloaderRefreshAvailable;
+}
+
 export interface DownloadedFirmware {
   path: string;
   signaturePath: string;

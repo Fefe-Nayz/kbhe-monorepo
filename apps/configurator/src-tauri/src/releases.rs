@@ -389,6 +389,10 @@ fn firmware_update_info(
             "Firmware {version} is not offered because release {} lacks the signed kbhe-updater-v3-refresh inner-image pair required to deliver resident updater fixes safely.",
             release.tag_name
         ),
+        _ if !migration_available && !bootloader_refresh_available => format!(
+            "Firmware {version} cannot be installed with any supported updater protocol because release {} contains neither exact recovery role: the signed v2 capsule nor the signed v3 refresh image. Identifying the updater cannot make this release installable; wait for a corrected signed release.",
+            release.tag_name
+        ),
         _ => format!(
             "Firmware {version} is not offered while the persistent updater is unknown because release {} does not contain both exact recovery roles: the signed v2 capsule and signed v3 refresh image. Enter bootloader to identify it, or wait for a corrected release.",
             release.tag_name
@@ -1017,7 +1021,17 @@ mod tests {
             .blocked_reason
             .as_deref()
             .unwrap()
+            .contains("cannot be installed with any supported updater protocol"));
+        assert!(!unknown_updater
+            .blocked_reason
+            .as_deref()
+            .unwrap()
             .contains("Enter bootloader"));
+        assert!(unknown_updater
+            .blocked_reason
+            .as_deref()
+            .unwrap()
+            .contains("corrected signed release"));
 
         let v3_without_refresh = firmware_update_info(
             Some((
@@ -1039,6 +1053,24 @@ mod tests {
             asset("kbhe-updater-v2-to-v3.bin", MAX_MIGRATION_PACKAGE_BYTES),
             asset("kbhe-updater-v2-to-v3.bin.sig", ED25519_SIGNATURE_BYTES),
         ];
+        let unknown_with_one_viable_path = firmware_update_info(
+            Some((
+                firmware_release("2.0.9", complete_assets.clone()),
+                Version::parse("2.0.9").unwrap(),
+                app.clone(),
+            )),
+            None,
+            &Version::parse("0.1.18").unwrap(),
+        );
+        assert!(!unknown_with_one_viable_path.update_available);
+        assert!(unknown_with_one_viable_path.migration_available);
+        assert!(!unknown_with_one_viable_path.bootloader_refresh_available);
+        assert!(unknown_with_one_viable_path
+            .blocked_reason
+            .as_deref()
+            .unwrap()
+            .contains("Enter bootloader"));
+
         let v2_ready = firmware_update_info(
             Some((
                 firmware_release("2.0.9", complete_assets),
