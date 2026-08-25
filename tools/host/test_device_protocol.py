@@ -18,7 +18,13 @@ sys.path.insert(0, str(ROOT))
 sys.modules.setdefault("hid", types.SimpleNamespace())
 
 from kbhe_tool.device import KBHEDevice  # noqa: E402
-from kbhe_tool.protocol import Command  # noqa: E402
+from kbhe_tool.protocol import (  # noqa: E402
+    Command,
+    FILTER_DEFAULT_ALPHA_MAX_DENOM,
+    FILTER_DEFAULT_ALPHA_MIN_DENOM,
+    FILTER_DEFAULT_ENABLED,
+    FILTER_DEFAULT_NOISE_BAND,
+)
 
 
 class StubDevice(KBHEDevice):
@@ -32,6 +38,49 @@ class StubDevice(KBHEDevice):
 
 
 class DeviceProtocolTest(unittest.TestCase):
+    def test_filter_defaults_match_firmware_and_configurator(self) -> None:
+        filter_header = (
+            REPO_ROOT / "firmware/Core/Inc/analog/filter.h"
+        ).read_text(encoding="utf-8")
+        typescript = (
+            REPO_ROOT / "apps/configurator/src/lib/kbhe/protocol.ts"
+        ).read_text(encoding="utf-8")
+        expected_names = (
+            "FILTER_DEFAULT_ENABLED",
+            "FILTER_DEFAULT_NOISE_BAND",
+            "FILTER_DEFAULT_ALPHA_MIN_DENOM",
+            "FILTER_DEFAULT_ALPHA_MAX_DENOM",
+        )
+        c_defaults = {
+            name: int(value)
+            for name, value in re.findall(
+                r"^#define\s+(FILTER_DEFAULT_[A-Z_]+)\s+(\d+)[Uu]?",
+                filter_header,
+                flags=re.MULTILINE,
+            )
+            if name in expected_names
+        }
+        ts_defaults = {
+            name: (
+                1 if value == "true" else 0 if value == "false" else int(value)
+            )
+            for name, value in re.findall(
+                r"^export const (FILTER_DEFAULT_[A-Z_]+) = (true|false|\d+);",
+                typescript,
+                flags=re.MULTILINE,
+            )
+            if name in expected_names
+        }
+        python_defaults = {
+            "FILTER_DEFAULT_ENABLED": int(FILTER_DEFAULT_ENABLED),
+            "FILTER_DEFAULT_NOISE_BAND": FILTER_DEFAULT_NOISE_BAND,
+            "FILTER_DEFAULT_ALPHA_MIN_DENOM": FILTER_DEFAULT_ALPHA_MIN_DENOM,
+            "FILTER_DEFAULT_ALPHA_MAX_DENOM": FILTER_DEFAULT_ALPHA_MAX_DENOM,
+        }
+
+        self.assertEqual(c_defaults, python_defaults)
+        self.assertEqual(ts_defaults, python_defaults)
+
     def test_command_ids_match_firmware_and_configurator(self) -> None:
         hid_header = (REPO_ROOT / "firmware/Core/Inc/hid_protocol.h").read_text(
             encoding="utf-8"

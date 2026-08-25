@@ -28,9 +28,9 @@ export const SETTINGS_PROFILE_NAME_LENGTH = 16;
 /** Canonical on-device settings + actions document schema. */
 export const PROFILE_DOCUMENT_SCHEMA_VERSION = 3;
 export const FILTER_DEFAULT_ENABLED = true;
-export const FILTER_DEFAULT_NOISE_BAND = 30;
-export const FILTER_DEFAULT_ALPHA_MIN_DENOM = 32;
-export const FILTER_DEFAULT_ALPHA_MAX_DENOM = 4;
+export const FILTER_DEFAULT_NOISE_BAND = 8;
+export const FILTER_DEFAULT_ALPHA_MIN_DENOM = 1;
+export const FILTER_DEFAULT_ALPHA_MAX_DENOM = 8;
 export const GAMEPAD_CURVE_POINT_COUNT = 4;
 export const GAMEPAD_CURVE_MAX_DISTANCE_MM = 4.0;
 export const LAYER_COUNT = 4;

@@ -632,9 +632,9 @@ typedef struct __attribute__((packed)) {
 
   // ADC EMA Filter settings
   uint8_t filter_enabled;    // Enable/disable ADC EMA filtering
-  uint8_t filter_noise_band; // Noise band in ADC counts (default 30)
-  uint8_t filter_alpha_min;  // Alpha min denominator (1/N, default 32)
-  uint8_t filter_alpha_max;  // Alpha max denominator (1/N, default 4)
+  uint8_t filter_noise_band; // Noise band in ADC counts (default 8)
+  uint8_t filter_alpha_min;  // Fast-motion denominator (1/N, default 1)
+  uint8_t filter_alpha_max;  // Near-rest denominator (1/N, default 8)
   uint8_t advanced_tick_rate; // Delay in scan ticks between advanced actions
 
   // Global non-profile metadata
