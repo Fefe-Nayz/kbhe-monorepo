@@ -298,6 +298,30 @@ static void test_6kro_overflow_finishes_with_desired_resync(void) {
       &captured_reports[captured_report_count - 1u]));
 }
 
+static void test_6kro_route_change_preserves_queued_tap(void) {
+  uint16_t start = captured_report_count;
+  test_ready[HID_ITF_KEYBOARD] = false;
+
+  keyboard_hid_key_press(HID_KEY_H);
+  keyboard_hid_task();
+  keyboard_hid_key_release(HID_KEY_H);
+  keyboard_hid_task();
+
+  /* A 6KRO -> NKRO route change must append its neutral state without
+   * deleting the press/release snapshots which have not reached USB yet. */
+  assert(keyboard_hid_release_all_preserve_pending());
+  assert(captured_report_count == start);
+
+  test_ready[HID_ITF_KEYBOARD] = true;
+  keyboard_hid_task();
+  assert(captured_report_count == (uint16_t)(start + 1u));
+  assert(report_6kro_contains(&captured_reports[start], HID_KEY_H));
+  complete_report(HID_ITF_KEYBOARD);
+  assert(captured_report_count == (uint16_t)(start + 2u));
+  assert(report_6kro_is_neutral(&captured_reports[start + 1u]));
+  complete_report(HID_ITF_KEYBOARD);
+}
+
 static void test_6kro_unmount_resyncs_only_desired(void) {
   uint16_t start = 0u;
   test_ready[HID_ITF_KEYBOARD] = false;
@@ -460,8 +484,9 @@ static void test_nkro_unmount_resyncs_only_desired(void) {
   complete_report(HID_ITF_NKRO);
 }
 
-static void test_nkro_fallback_drops_failed_non_neutral_head(void) {
+static void test_nkro_fallback_preserves_queued_tap(void) {
   uint16_t start = captured_report_count;
+  uint32_t failed_before = keyboard_nkro_hid_get_transfer_failed_count();
   test_ready[HID_ITF_NKRO] = true;
   test_tick_ms += NKRO_ACTIVE_STALL_TIMEOUT_MS + 1u;
 
@@ -470,14 +495,35 @@ static void test_nkro_fallback_drops_failed_non_neutral_head(void) {
   assert(captured_report_count == (uint16_t)(start + 1u));
   assert(report_nkro_contains(&captured_reports[start], HID_KEY_G));
 
+  /* Queue a complete tap while the first report is in flight. */
+  keyboard_nkro_hid_key_release(HID_KEY_G);
+  keyboard_nkro_hid_task();
+  keyboard_nkro_hid_key_press(HID_KEY_H);
+  keyboard_nkro_hid_task();
+  keyboard_nkro_hid_key_release(HID_KEY_H);
+  keyboard_nkro_hid_task();
+
   test_tick_ms += NKRO_ACTIVE_STALL_TIMEOUT_MS + 1u;
   keyboard_nkro_hid_task();
   assert(keyboard_nkro_hid_is_runtime_fallback_active());
-  keyboard_nkro_hid_release_all();
+  keyboard_nkro_hid_release_all_preserve_pending();
 
+  /* A failed in-flight report was never observed by the host and must be
+   * retried. All earlier snapshots then drain even though routing is on 6KRO. */
   fail_report(HID_ITF_NKRO);
   assert(captured_report_count == (uint16_t)(start + 2u));
-  assert(report_nkro_is_neutral(&captured_reports[start + 1u]));
+  assert(report_nkro_contains(&captured_reports[start + 1u], HID_KEY_G));
+  assert(keyboard_nkro_hid_get_transfer_failed_count() == failed_before + 1u);
+
+  complete_report(HID_ITF_NKRO);
+  assert(captured_report_count == (uint16_t)(start + 3u));
+  assert(report_nkro_is_neutral(&captured_reports[start + 2u]));
+  complete_report(HID_ITF_NKRO);
+  assert(captured_report_count == (uint16_t)(start + 4u));
+  assert(report_nkro_contains(&captured_reports[start + 3u], HID_KEY_H));
+  complete_report(HID_ITF_NKRO);
+  assert(captured_report_count == (uint16_t)(start + 5u));
+  assert(report_nkro_is_neutral(&captured_reports[start + 4u]));
   complete_report(HID_ITF_NKRO);
 }
 
@@ -531,6 +577,7 @@ int main(void) {
   test_6kro_submit_failure_retry();
   test_6kro_transfer_failure_retry();
   test_6kro_overflow_finishes_with_desired_resync();
+  test_6kro_route_change_preserves_queued_tap();
   test_6kro_unmount_resyncs_only_desired();
   test_nkro_busy_press_release();
   test_nkro_batches_same_scan_mutations();
@@ -538,7 +585,7 @@ int main(void) {
   test_nkro_transfer_failure_retry();
   test_nkro_overflow_finishes_with_desired_resync();
   test_nkro_unmount_resyncs_only_desired();
-  test_nkro_fallback_drops_failed_non_neutral_head();
+  test_nkro_fallback_preserves_queued_tap();
   test_non_keyboard_lifecycle_callbacks_are_dispatched();
   return 0;
 }

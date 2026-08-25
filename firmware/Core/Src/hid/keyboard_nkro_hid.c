@@ -105,12 +105,6 @@ static inline bool get_key_bit(uint8_t keycode) {
   return false;
 }
 
-static bool
-keyboard_nkro_hid_report_is_neutral(const nkro_keyboard_report_t *report) {
-  static const nkro_keyboard_report_t neutral = {0};
-  return report != NULL && memcmp(report, &neutral, sizeof(neutral)) == 0;
-}
-
 static uint16_t keyboard_nkro_hid_queue_next(uint16_t index) {
   index++;
   return index >= NKRO_HID_REPORT_QUEUE_CAPACITY ? 0u : index;
@@ -205,9 +199,11 @@ static bool keyboard_nkro_hid_pump_queue(void) {
   }
 
   report = &report_queue[report_queue_head];
+  /* A fallback stops routing new keys to NKRO, but snapshots accepted before
+   * the route change still describe real key edges. If the endpoint recovers,
+   * drain them in order through the final neutral report. */
   if (runtime_state != NKRO_RUNTIME_ACTIVE &&
-      !(runtime_state == NKRO_RUNTIME_FALLBACK &&
-        keyboard_nkro_hid_report_is_neutral(report))) {
+      runtime_state != NKRO_RUNTIME_FALLBACK) {
     return false;
   }
 
@@ -316,13 +312,23 @@ void keyboard_nkro_hid_task(void) {
   keyboard_nkro_hid_send_report_if_changed();
 }
 
-void keyboard_nkro_hid_release_all(void) {
+static void keyboard_nkro_hid_release_all_internal(bool preserve_pending) {
   memset(&nkro_report, 0, sizeof(nkro_report));
   memset(key_reference_counts, 0, sizeof(key_reference_counts));
   desired_report_dirty = false;
-  keyboard_nkro_hid_discard_pending_reports();
+  if (!preserve_pending) {
+    keyboard_nkro_hid_discard_pending_reports();
+  }
   (void)keyboard_nkro_hid_queue_desired_report();
   (void)keyboard_nkro_hid_pump_queue();
+}
+
+void keyboard_nkro_hid_release_all(void) {
+  keyboard_nkro_hid_release_all_internal(false);
+}
+
+void keyboard_nkro_hid_release_all_preserve_pending(void) {
+  keyboard_nkro_hid_release_all_internal(true);
 }
 
 void keyboard_nkro_hid_on_umount(void) {
@@ -354,16 +360,8 @@ void keyboard_nkro_hid_on_report_failed(void) {
 
   report_in_flight = false;
   report_transfer_failed_count++;
-  /* Once routing has fallen back to 6KRO, an old non-neutral NKRO report must
-   * never be retried ahead of the queued neutral resync. The failed transfer
-   * was not observed by the host, so it is safe to discard here. */
-  if (runtime_state == NKRO_RUNTIME_FALLBACK &&
-      !keyboard_nkro_hid_queue_is_empty() &&
-      !keyboard_nkro_hid_report_is_neutral(
-          &report_queue[report_queue_head])) {
-    report_queue_head = keyboard_nkro_hid_queue_next(report_queue_head);
-    keyboard_nkro_hid_try_queue_resync();
-  }
+  /* A failed transfer was not observed by the host. Keep the immutable head
+   * snapshot and retry it, including after routing has fallen back to 6KRO. */
   (void)keyboard_nkro_hid_pump_queue();
 }
 

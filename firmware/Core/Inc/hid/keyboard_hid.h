@@ -125,6 +125,17 @@ bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode);
 bool keyboard_hid_release_all(void);
 
 /**
+ * @brief Release all keys without discarding reports already queued for USB
+ *
+ * Used when moving live key routing to another keyboard interface: historical
+ * press/release snapshots must reach the host before this interface's final
+ * neutral report, otherwise a short tap can disappear during the transition.
+ *
+ * @return true if the final neutral report was queued successfully
+ */
+bool keyboard_hid_release_all_preserve_pending(void);
+
+/**
  * @brief Clear the internal pressed-key bookkeeping without sending a new
  *        report. Useful when a higher-level mode takes exclusive input control.
  */

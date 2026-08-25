@@ -86,6 +86,14 @@ void keyboard_nkro_hid_task(void);
  */
 void keyboard_nkro_hid_release_all(void);
 
+/**
+ * @brief Clear desired NKRO state while preserving reports already queued
+ *
+ * Route changes use this to drain historical snapshots followed by a neutral
+ * report, so a tap queued just before NKRO fallback is not lost.
+ */
+void keyboard_nkro_hid_release_all_preserve_pending(void);
+
 /** USB lifecycle hooks used by the shared TinyUSB callback dispatcher. */
 void keyboard_nkro_hid_on_umount(void);
 void keyboard_nkro_hid_on_report_complete(void);

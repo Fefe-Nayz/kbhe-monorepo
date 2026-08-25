@@ -164,11 +164,13 @@ static void layout_sync_keyboard_route(void) {
   }
 
   /* Reconcile the complete desired keyboard state across the two interfaces.
-   * This is required when NKRO stalls while keys are held: merely changing a
-   * route flag would send later releases to the wrong interface. */
-  (void)keyboard_hid_release_all();
-  keyboard_hid_reset_state();
-  keyboard_nkro_hid_release_all();
+   * Preserve the outgoing interface's historical snapshots through its final
+   * neutral report. Discarding that queue loses a short tap if NKRO becomes
+   * ready or falls back while USB is still draining an earlier report. The
+   * other interface can still be draining valid history from an earlier route
+   * change, so preserve both queues before rebuilding the held bindings. */
+  (void)keyboard_hid_release_all_preserve_pending();
+  keyboard_nkro_hid_release_all_preserve_pending();
   keyboard_route_use_nkro = use_nkro;
 
   for (uint8_t source = 0u; source < LAYOUT_ACTION_SOURCE_COUNT; source++) {

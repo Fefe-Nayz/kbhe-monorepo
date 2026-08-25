@@ -213,7 +213,7 @@ bool keyboard_hid_press_key(uint8_t modifier, uint8_t keycode) {
   return keyboard_hid_send_report(modifier, keycodes);
 }
 
-bool keyboard_hid_release_all(void) {
+static bool keyboard_hid_release_all_internal(bool preserve_pending) {
   bool queued = false;
 
   desired_modifier = 0u;
@@ -221,10 +221,20 @@ bool keyboard_hid_release_all(void) {
   memset(pressed_keys, 0, sizeof(pressed_keys));
   memset(key_reference_counts, 0, sizeof(key_reference_counts));
   num_pressed_keys = 0u;
-  keyboard_hid_discard_pending_reports();
+  if (!preserve_pending) {
+    keyboard_hid_discard_pending_reports();
+  }
   queued = keyboard_hid_queue_desired_report();
   (void)keyboard_hid_pump_queue();
   return queued;
+}
+
+bool keyboard_hid_release_all(void) {
+  return keyboard_hid_release_all_internal(false);
+}
+
+bool keyboard_hid_release_all_preserve_pending(void) {
+  return keyboard_hid_release_all_internal(true);
 }
 
 void keyboard_hid_reset_state(void) {
