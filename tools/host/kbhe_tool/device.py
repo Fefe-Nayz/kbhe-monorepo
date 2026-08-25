@@ -296,27 +296,25 @@ class KBHEDevice:
     def get_firmware_version(self):
         """Get firmware version."""
         resp = self.send_command(Command.GET_FIRMWARE_VERSION)
-        if resp and len(resp) >= 4:
-            version = resp[2] | (resp[3] << 8)
-            major = (version >> 8) & 0xFF
-            minor = version & 0xFF
-            return f"{major}.{minor}"
+        if resp and len(resp) >= 5 and resp[1] == Status.OK:
+            return f"{int(resp[2])}.{int(resp[3])}.{int(resp[4])}"
         return None
 
     def get_device_info(self):
         """Get firmware version, serial number, and keyboard name."""
         resp = self.send_command(Command.GET_DEVICE_INFO)
         if resp and len(resp) >= 64 and resp[1] == Status.OK:
-            version = resp[2] | (resp[3] << 8)
-            major = (version >> 8) & 0xFF
-            minor = version & 0xFF
-            serial_start = 4
+            major = int(resp[2])
+            minor = int(resp[3])
+            patch = int(resp[4])
+            version = (major << 16) | (minor << 8) | patch
+            serial_start = 5
             serial_end = serial_start + DEVICE_SERIAL_LENGTH
             keyboard_end = serial_end + KEYBOARD_NAME_LENGTH
             serial = self._decode_c_string(resp[serial_start:serial_end])
             keyboard_name = self._decode_c_string(resp[serial_end:keyboard_end])
             return {
-                "firmware_version": f"{major}.{minor}",
+                "firmware_version": f"{major}.{minor}.{patch}",
                 "firmware_version_raw": int(version),
                 "serial_number": serial,
                 "keyboard_name": keyboard_name,

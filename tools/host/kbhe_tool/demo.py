@@ -160,7 +160,7 @@ class DemoDevice:
     def get_device_info(self):
         return {
             "firmware_version": self._firmware_version,
-            "firmware_version_raw": 0x0204,
+            "firmware_version_raw": 0x020004,
             "serial_number": self._serial_number,
             "keyboard_name": self._keyboard_name,
         }
