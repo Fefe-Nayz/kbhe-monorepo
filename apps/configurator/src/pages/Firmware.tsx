@@ -507,6 +507,8 @@ export default function Firmware() {
     resetLog = true,
     migrationPath: string | null = null,
     migrationSignaturePath: string | null = null,
+    bootloaderRefreshPath: string | null = null,
+    bootloaderRefreshSignaturePath: string | null = null,
   ): Promise<FlashResult> => {
     if (flashInFlightRef.current) {
       return { ok: false, error: "A firmware update is already in progress" };
@@ -628,6 +630,9 @@ export default function Firmware() {
           legacyMigration: "Installing the signed updater v2-to-v3 migrator…",
           migration: "Migrator is installing and verifying updater v3…",
           migrationReady: "Updater v3 is ready for the final signed firmware…",
+          bootloaderCheck: "Checking the resident updater version…",
+          bootloaderRefresh: "Installing the signed updater v3 refresh…",
+          bootloaderCurrent: "Resident updater is already current; skipping refresh…",
           finish: "Verifying firmware…",
           boot: "Rebooting device…",
         };
@@ -661,6 +666,8 @@ export default function Firmware() {
             firmwareSignaturePath: detachedSignaturePath,
             migrationFirmwarePath: migrationPath,
             migrationFirmwareSignaturePath: migrationSignaturePath,
+            bootloaderRefreshPath,
+            bootloaderRefreshSignaturePath,
             firmwareVersion: resolvedVersion,
             expectedSerialNumber,
             timeoutMs: timeoutSec * 1000,
@@ -749,6 +756,8 @@ export default function Firmware() {
         false,
         downloaded.migrationPath,
         downloaded.migrationSignaturePath,
+        downloaded.bootloaderRefreshPath,
+        downloaded.bootloaderRefreshSignaturePath,
       );
       if (!flashResult.ok) {
         throw new Error(flashResult.error);

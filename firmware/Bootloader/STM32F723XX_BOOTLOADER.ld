@@ -57,6 +57,13 @@ SECTIONS
     . = ALIGN(4);
   } >FLASH
 
+  .kbhe_bl_version :
+  {
+    . = ALIGN(4);
+    KEEP(*(.kbhe_bl_version))
+    . = ALIGN(4);
+  } >FLASH
+
   .ARM.extab (READONLY) :
   {
     . = ALIGN(4);

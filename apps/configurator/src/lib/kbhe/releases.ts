@@ -6,6 +6,7 @@ export interface ReleaseUpdateInfo {
   blockedReason: string | null;
   migrationRequired: boolean;
   migrationAvailable: boolean;
+  bootloaderRefreshAvailable: boolean;
   version: string | null;
   tag: string | null;
   name: string | null;
@@ -28,6 +29,8 @@ export interface DownloadedFirmware {
   };
   migrationPath: string | null;
   migrationSignaturePath: string | null;
+  bootloaderRefreshPath: string | null;
+  bootloaderRefreshSignaturePath: string | null;
 }
 
 export async function checkAppUpdate(): Promise<ReleaseUpdateInfo> {

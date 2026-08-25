@@ -17,6 +17,7 @@ const FIRMWARE_TAG_PREFIX: &str = "firmware-v";
 const MAX_APP_INSTALLER_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_FIRMWARE_BYTES: u64 = 0x0002_FF00;
 const MAX_MIGRATION_PACKAGE_BYTES: u64 = 0x0002_FF54;
+const MAX_BOOTLOADER_REFRESH_BYTES: u64 = MAX_FIRMWARE_BYTES;
 const ED25519_SIGNATURE_BYTES: u64 = 64;
 static APP_INSTALLER_LAUNCHED: AtomicBool = AtomicBool::new(false);
 
@@ -76,6 +77,7 @@ pub struct ReleaseUpdateInfo {
     blocked_reason: Option<String>,
     migration_required: bool,
     migration_available: bool,
+    bootloader_refresh_available: bool,
     version: Option<String>,
     tag: Option<String>,
     name: Option<String>,
@@ -96,6 +98,8 @@ pub struct DownloadedFirmware {
     firmware_version: DownloadedFirmwareVersion,
     migration_path: Option<String>,
     migration_signature_path: Option<String>,
+    bootloader_refresh_path: Option<String>,
+    bootloader_refresh_signature_path: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -224,8 +228,28 @@ fn migration_asset_pair(assets: &[GithubAsset]) -> Option<(GithubAsset, GithubAs
     Some((migration, signature))
 }
 
+fn bootloader_refresh_asset(assets: &[GithubAsset]) -> Option<GithubAsset> {
+    assets
+        .iter()
+        .find(|asset| asset.name == "kbhe-updater-v3-refresh.bin")
+        .cloned()
+}
+
+fn bootloader_refresh_asset_pair(assets: &[GithubAsset]) -> Option<(GithubAsset, GithubAsset)> {
+    let refresh = bootloader_refresh_asset(assets)?;
+    if refresh.size == 0 || refresh.size > MAX_BOOTLOADER_REFRESH_BYTES {
+        return None;
+    }
+    let signature = signature_asset(assets, &refresh)?;
+    Some((refresh, signature))
+}
+
 fn requires_migration_assets(updater_protocol: Option<u16>) -> bool {
     updater_protocol != Some(UPDATER_PROTOCOL_V3)
+}
+
+fn requires_bootloader_refresh_assets(updater_protocol: Option<u16>) -> bool {
+    updater_protocol != Some(UPDATER_PROTOCOL_V2)
 }
 
 fn signature_asset(assets: &[GithubAsset], signed_asset: &GithubAsset) -> Option<GithubAsset> {
@@ -277,6 +301,7 @@ fn update_info(result: Option<(GithubRelease, Version, GithubAsset)>) -> Release
             blocked_reason: None,
             migration_required: false,
             migration_available: false,
+            bootloader_refresh_available: false,
             version: Some(version.to_string()),
             tag: Some(release.tag_name),
             name: release.name,
@@ -292,6 +317,7 @@ fn update_info(result: Option<(GithubRelease, Version, GithubAsset)>) -> Release
             blocked_reason: None,
             migration_required: false,
             migration_available: false,
+            bootloader_refresh_available: false,
             version: None,
             tag: None,
             name: None,
@@ -314,23 +340,31 @@ fn firmware_update_info(
 
     let migration_required = requires_migration_assets(updater_protocol);
     let migration_available = migration_asset_pair(&release.assets).is_some();
-    let blocked_reason =
-        (migration_required && !migration_available).then(|| match updater_protocol {
-            Some(UPDATER_PROTOCOL_V2) => format!(
-                "Firmware {version} cannot be installed on this updater-v2 keyboard because release {} does not contain both kbhe-updater-v2-to-v3.bin and its valid 64-byte detached signature. Wait for a corrected signed release, or use the documented ROM-DFU factory recovery.",
-                release.tag_name
-            ),
-            _ => format!(
-                "Firmware {version} is not offered while the keyboard's persistent updater protocol is unknown because release {} lacks the signed v2-to-v3 migration pair. Use Device → Enter bootloader to verify updater v3, or wait for a corrected signed release.",
-                release.tag_name
-            ),
-        });
+    let bootloader_refresh_available = bootloader_refresh_asset_pair(&release.assets).is_some();
+    let missing_migration = migration_required && !migration_available;
+    let missing_refresh =
+        requires_bootloader_refresh_assets(updater_protocol) && !bootloader_refresh_available;
+    let blocked_reason = (missing_migration || missing_refresh).then(|| match updater_protocol {
+        Some(UPDATER_PROTOCOL_V2) => format!(
+            "Firmware {version} cannot be installed on this updater-v2 keyboard because release {} lacks the exact signed kbhe-updater-v2-to-v3 capsule pair. Wait for a corrected signed release, or use the documented ROM-DFU factory recovery.",
+            release.tag_name
+        ),
+        Some(UPDATER_PROTOCOL_V3) => format!(
+            "Firmware {version} is not offered because release {} lacks the signed kbhe-updater-v3-refresh inner-image pair required to deliver resident updater fixes safely.",
+            release.tag_name
+        ),
+        _ => format!(
+            "Firmware {version} is not offered while the persistent updater is unknown because release {} does not contain both exact recovery roles: the signed v2 capsule and signed v3 refresh image. Enter bootloader to identify it, or wait for a corrected release.",
+            release.tag_name
+        ),
+    });
 
     ReleaseUpdateInfo {
         update_available: blocked_reason.is_none(),
         blocked_reason,
         migration_required,
         migration_available,
+        bootloader_refresh_available,
         version: Some(version.to_string()),
         tag: Some(release.tag_name),
         name: release.name,
@@ -552,9 +586,17 @@ pub async fn kbhe_download_firmware_release(
         let firmware_signature_asset = signature_asset(&release.assets, &asset)
             .ok_or_else(|| format!("release {tag} has no valid kbhe-app.bin.sig asset"))?;
         let migration_pair = migration_asset_pair(&release.assets);
+        let bootloader_refresh_pair = bootloader_refresh_asset_pair(&release.assets);
         if requires_migration_assets(updater_protocol) && migration_pair.is_none() {
             return Err(format!(
                 "UPDATER_MIGRATION_ASSETS_MISSING: release {tag} cannot be installed until updater v3 is confirmed because it does not contain both kbhe-updater-v2-to-v3.bin and its valid 64-byte detached signature. Enter the KBHE bootloader to verify updater v3, wait for a corrected signed release, or use the documented ROM-DFU factory recovery."
+            ));
+        }
+        if requires_bootloader_refresh_assets(updater_protocol)
+            && bootloader_refresh_pair.is_none()
+        {
+            return Err(format!(
+                "UPDATER_REFRESH_ASSETS_MISSING: release {tag} cannot safely deliver resident updater fixes because it lacks kbhe-updater-v3-refresh.bin and its valid 64-byte detached signature."
             ));
         }
         let directory = secure_download_directory("firmware")?;
@@ -593,7 +635,8 @@ pub async fn kbhe_download_firmware_release(
                     match inspect_firmware_artifact(&migration, version_bytes, &migration_signature)
                     {
                         Ok(FirmwareArtifact::V2ToV3Migration(_)) => {}
-                        Ok(FirmwareArtifact::Application) => {
+                        Ok(FirmwareArtifact::Application)
+                        | Ok(FirmwareArtifact::V3BootloaderRefresh(_)) => {
                             let _ = std::fs::remove_file(&migration_path);
                             let _ = std::fs::remove_file(&migration_signature_path);
                             return Err(
@@ -616,6 +659,51 @@ pub async fn kbhe_download_firmware_release(
                 }
                 None => (None, None),
             };
+        let (bootloader_refresh_path, bootloader_refresh_signature_path) =
+            match bootloader_refresh_pair {
+                Some((refresh_asset, refresh_signature_asset)) => {
+                    let refresh_path = download_asset(
+                        &refresh_asset,
+                        &directory,
+                        MAX_BOOTLOADER_REFRESH_BYTES,
+                    )?;
+                    let refresh_signature_path = download_asset(
+                        &refresh_signature_asset,
+                        &directory,
+                        ED25519_SIGNATURE_BYTES,
+                    )?;
+                    let refresh = std::fs::read(&refresh_path).map_err(|error| {
+                        format!("failed to read downloaded updater refresh: {error}")
+                    })?;
+                    let refresh_signature =
+                        std::fs::read(&refresh_signature_path).map_err(|error| {
+                            format!("failed to read updater refresh signature: {error}")
+                        })?;
+                    match inspect_firmware_artifact(&refresh, version_bytes, &refresh_signature) {
+                        Ok(FirmwareArtifact::V3BootloaderRefresh(_)) => {}
+                        Ok(_) => {
+                            let _ = std::fs::remove_file(&refresh_path);
+                            let _ = std::fs::remove_file(&refresh_signature_path);
+                            return Err(
+                                "downloaded updater refresh is not the signed inner-image layout"
+                                    .to_string(),
+                            );
+                        }
+                        Err(error) => {
+                            let _ = std::fs::remove_file(&refresh_path);
+                            let _ = std::fs::remove_file(&refresh_signature_path);
+                            return Err(format!(
+                                "downloaded updater refresh is not authentic: {error}"
+                            ));
+                        }
+                    }
+                    (
+                        Some(refresh_path.to_string_lossy().into_owned()),
+                        Some(refresh_signature_path.to_string_lossy().into_owned()),
+                    )
+                }
+                None => (None, None),
+            };
         Ok(DownloadedFirmware {
             path: path.to_string_lossy().into_owned(),
             signature_path: signature_path.to_string_lossy().into_owned(),
@@ -628,6 +716,8 @@ pub async fn kbhe_download_firmware_release(
             },
             migration_path,
             migration_signature_path,
+            bootloader_refresh_path,
+            bootloader_refresh_signature_path,
         })
     })
     .await
@@ -725,10 +815,10 @@ pub async fn kbhe_download_and_run_app_installer(tag: String) -> Result<String, 
 #[cfg(test)]
 mod tests {
     use super::{
-        firmware_asset, firmware_update_info, migration_asset, migration_asset_pair,
-        parse_prefixed_version, signature_asset, GithubAsset, GithubRelease, APP_TAG_PREFIX,
-        ED25519_SIGNATURE_BYTES, FIRMWARE_TAG_PREFIX, MAX_MIGRATION_PACKAGE_BYTES,
-        UPDATER_PROTOCOL_V2,
+        bootloader_refresh_asset, bootloader_refresh_asset_pair, firmware_asset,
+        firmware_update_info, migration_asset, migration_asset_pair, parse_prefixed_version,
+        signature_asset, GithubAsset, GithubRelease, APP_TAG_PREFIX, ED25519_SIGNATURE_BYTES,
+        FIRMWARE_TAG_PREFIX, MAX_MIGRATION_PACKAGE_BYTES, UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3,
     };
     use semver::Version;
 
@@ -762,11 +852,15 @@ mod tests {
             asset("kbhe-app.bin.sig", ED25519_SIGNATURE_BYTES),
             asset("kbhe-updater-v2-to-v3.bin", 200),
             asset("kbhe-updater-v2-to-v3.bin.sig", ED25519_SIGNATURE_BYTES),
+            asset("kbhe-updater-v3-refresh.bin", 150),
+            asset("kbhe-updater-v3-refresh.bin.sig", ED25519_SIGNATURE_BYTES),
         ];
         let app = firmware_asset(&assets).unwrap();
         let migration = migration_asset(&assets).unwrap();
+        let refresh = bootloader_refresh_asset(&assets).unwrap();
         assert_eq!(app.name, "kbhe-app.bin");
         assert_eq!(migration.name, "kbhe-updater-v2-to-v3.bin");
+        assert_eq!(refresh.name, "kbhe-updater-v3-refresh.bin");
         assert_eq!(
             signature_asset(&assets, &app).unwrap().name,
             "kbhe-app.bin.sig"
@@ -774,6 +868,10 @@ mod tests {
         assert_eq!(
             signature_asset(&assets, &migration).unwrap().name,
             "kbhe-updater-v2-to-v3.bin.sig"
+        );
+        assert_eq!(
+            signature_asset(&assets, &refresh).unwrap().name,
+            "kbhe-updater-v3-refresh.bin.sig"
         );
     }
 
@@ -829,7 +927,7 @@ mod tests {
             .unwrap()
             .contains("Enter bootloader"));
 
-        let v3 = firmware_update_info(
+        let v3_without_refresh = firmware_update_info(
             Some((
                 firmware_release(base_assets),
                 Version::parse("2.0.9").unwrap(),
@@ -837,9 +935,10 @@ mod tests {
             )),
             Some(0x0003),
         );
-        assert!(v3.update_available);
-        assert!(!v3.migration_required);
-        assert!(!v3.migration_available);
+        assert!(!v3_without_refresh.update_available);
+        assert!(!v3_without_refresh.migration_required);
+        assert!(!v3_without_refresh.migration_available);
+        assert!(!v3_without_refresh.bootloader_refresh_available);
 
         let complete_assets = vec![
             app.clone(),
@@ -851,7 +950,7 @@ mod tests {
             Some((
                 firmware_release(complete_assets),
                 Version::parse("2.0.9").unwrap(),
-                app,
+                app.clone(),
             )),
             Some(UPDATER_PROTOCOL_V2),
         );
@@ -859,6 +958,25 @@ mod tests {
         assert!(v2_ready.migration_required);
         assert!(v2_ready.migration_available);
         assert!(v2_ready.blocked_reason.is_none());
+
+        let refresh_assets = vec![
+            app.clone(),
+            asset("kbhe-app.bin.sig", ED25519_SIGNATURE_BYTES),
+            asset("kbhe-updater-v3-refresh.bin", 150),
+            asset("kbhe-updater-v3-refresh.bin.sig", ED25519_SIGNATURE_BYTES),
+        ];
+        assert!(bootloader_refresh_asset_pair(&refresh_assets).is_some());
+        let v3_ready = firmware_update_info(
+            Some((
+                firmware_release(refresh_assets),
+                Version::parse("2.0.9").unwrap(),
+                app,
+            )),
+            Some(UPDATER_PROTOCOL_V3),
+        );
+        assert!(v3_ready.update_available);
+        assert!(v3_ready.bootloader_refresh_available);
+        assert!(v3_ready.blocked_reason.is_none());
     }
 
     #[test]

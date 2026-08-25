@@ -2,6 +2,8 @@
 
 #include "monocypher-ed25519.h"
 #include "stm32f7xx_hal.h"
+#include "updater_bootloader_version.h"
+#include "updater_migration.h"
 #include "updater_shared.h"
 #include "updater_validation.h"
 #include "updater_version_floor.h"
@@ -30,6 +32,9 @@ _Static_assert(sizeof(updater_signature_manifest_t) ==
                "firmware signature manifest layout changed");
 _Static_assert(sizeof(updater_auth_blob_t) == UPDATER_AUTH_BLOB_SIZE,
                "firmware authorization blob layout changed");
+_Static_assert(sizeof(updater_bootloader_info_payload_t) ==
+                   UPDATER_BOOTLOADER_INFO_SIZE,
+               "bootloader info payload layout changed");
 
 static updater_session_t s_session;
 static uint8_t s_last_request[UPDATER_PACKET_SIZE];
@@ -37,6 +42,10 @@ static uint8_t s_last_response[UPDATER_PACKET_SIZE];
 static bool s_last_exchange_valid = false;
 static volatile bool s_pending_jump_after_response = false;
 static volatile bool s_jump_to_app = false;
+static const uint8_t s_bootloader_info_magic[8] =
+    UPDATER_BOOTLOADER_INFO_MAGIC_BYTES;
+static const uint8_t s_bootloader_target_id[16] =
+    UPDATER_MIGRATION_TARGET_ID_BYTES;
 
 #if defined(UPDATER_HOST_TEST)
 extern const void *updater_host_flash_address(uint32_t address, uint32_t len);
@@ -177,6 +186,23 @@ static void handle_hello(const updater_packet_t *request,
 
   memcpy(response->payload, &hello, sizeof(hello));
   response->length = sizeof(hello);
+}
+
+static void handle_bootloader_info(const updater_packet_t *request,
+                                   updater_packet_t *response) {
+  updater_bootloader_info_payload_t info = {0};
+
+  (void)request;
+  memcpy(info.magic, s_bootloader_info_magic, sizeof(info.magic));
+  info.schema = UPDATER_BOOTLOADER_INFO_SCHEMA;
+  info.record_size = sizeof(info);
+  info.version_major = UPDATER_BOOTLOADER_VERSION_MAJOR;
+  info.version_minor = UPDATER_BOOTLOADER_VERSION_MINOR;
+  info.version_patch = UPDATER_BOOTLOADER_VERSION_PATCH;
+  memcpy(info.target_id, s_bootloader_target_id, sizeof(info.target_id));
+
+  memcpy(response->payload, &info, sizeof(info));
+  response->length = sizeof(info);
 }
 
 static void handle_begin(const updater_packet_t *request,
@@ -569,6 +595,14 @@ bool updater_bootloader_process_packet(const uint8_t *request,
 
   case UPDATER_CMD_AUTH:
     handle_auth(req, resp);
+    break;
+
+  case UPDATER_CMD_BOOTLOADER_INFO:
+    if (req->length == 0u) {
+      handle_bootloader_info(req, resp);
+    } else {
+      resp->status = UPDATER_STATUS_INVALID_PARAMETER;
+    }
     break;
 
   default:

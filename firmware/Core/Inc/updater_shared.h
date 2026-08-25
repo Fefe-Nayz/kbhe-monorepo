@@ -42,6 +42,12 @@ extern "C" {
 #define UPDATER_AUTH_BLOB_SIZE                                                \
   (UPDATER_SIGNATURE_MANIFEST_SIZE + UPDATER_SIGNATURE_SIZE)
 
+#define UPDATER_BOOTLOADER_INFO_MAGIC_BYTES                                  \
+  {'K', 'B', 'H', 'E', 'B', 'L', '3', 0}
+#define UPDATER_BOOTLOADER_INFO_SCHEMA 1u
+#define UPDATER_BOOTLOADER_INFO_SIZE 32u
+#define UPDATER_BOOTLOADER_VERSION_RECORD_MAGIC 0x4B424C56u /* "KBLV" */
+
 typedef enum {
   BOOT_REQUEST_ACTION_NONE = 0,
   BOOT_REQUEST_ACTION_ENTER_UPDATER = 1,
@@ -60,6 +66,9 @@ typedef enum {
   UPDATER_CMD_ABORT = 0x05,
   UPDATER_CMD_BOOT = 0x06,
   UPDATER_CMD_AUTH = 0x07,
+  /* Optional v3 extension. Keeping HELLO byte-for-byte stable preserves
+   * compatibility with configurators released before updater refreshes. */
+  UPDATER_CMD_BOOTLOADER_INFO = 0x08,
 } updater_command_t;
 
 typedef enum {
@@ -142,6 +151,17 @@ typedef struct __attribute__((packed)) {
 } updater_hello_payload_t;
 
 typedef struct __attribute__((packed)) {
+  uint8_t magic[8];
+  uint16_t schema;
+  uint16_t record_size;
+  uint8_t version_major;
+  uint8_t version_minor;
+  uint8_t version_patch;
+  uint8_t reserved;
+  uint8_t target_id[16];
+} updater_bootloader_info_payload_t;
+
+typedef struct __attribute__((packed)) {
   uint32_t next_offset;
   uint32_t accepted_length;
   uint32_t flags;
@@ -159,6 +179,25 @@ typedef struct {
   uint8_t minor;
   uint8_t patch;
 } updater_fw_version_t;
+
+typedef struct __attribute__((packed)) {
+  uint32_t magic;
+  uint32_t version_packed;
+  uint32_t version_xor;
+} updater_bootloader_version_record_t;
+
+typedef enum {
+  UPDATER_BOOTLOADER_VERSION_NOT_FOUND = 0,
+  UPDATER_BOOTLOADER_VERSION_VALID,
+  UPDATER_BOOTLOADER_VERSION_AMBIGUOUS,
+} updater_bootloader_version_scan_t;
+
+/* Find one unambiguous, redundancy-checked KBLV value in a bootloader image.
+ * Duplicate records with the same value are harmless; conflicting records
+ * fail closed. A torn/legacy image with no valid record returns NOT_FOUND. */
+updater_bootloader_version_scan_t updater_bootloader_version_scan(
+    const void *image, uint32_t image_size,
+    updater_fw_version_t *version_out);
 
 uint32_t updater_crc32_compute(const void *data, uint32_t len);
 void updater_signature_manifest_prepare(

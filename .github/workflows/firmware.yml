@@ -144,6 +144,56 @@ jobs:
           name: kbhe-firmware-${{ github.sha }}
           path: dist
 
+      - name: Enforce resident bootloader version lineage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous_tag=""
+          while IFS= read -r candidate; do
+            if [ "$candidate" = "$GITHUB_REF_NAME" ] ||
+               [[ ! "$candidate" =~ ^firmware-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+              continue
+            fi
+            if release_json="$(gh release view "$candidate" --json isDraft,isPrerelease 2>/dev/null)" &&
+               jq -e '.isDraft == false and .isPrerelease == false' <<<"$release_json" >/dev/null; then
+              previous_tag="$candidate"
+              break
+            fi
+          done < <(git tag --list 'firmware-v*' --sort=-v:refname)
+          if [ -z "$previous_tag" ]; then
+            echo "No previous published firmware release; bootloader lineage starts here."
+            exit 0
+          fi
+
+          lineage_dir="$(mktemp -d "$RUNNER_TEMP/kbhe-bootloader-lineage.XXXXXX")"
+          case "$lineage_dir" in
+            "$RUNNER_TEMP"/kbhe-bootloader-lineage.*) ;;
+            *)
+              echo "Bootloader lineage directory escaped RUNNER_TEMP" >&2
+              exit 1
+              ;;
+          esac
+          cleanup_lineage_dir() {
+            find "$lineage_dir" -mindepth 1 -maxdepth 1 -type f -delete
+            rmdir "$lineage_dir"
+          }
+          trap cleanup_lineage_dir EXIT
+          gh release download "$previous_tag" \
+            --dir "$lineage_dir" \
+            --pattern 'kbhe-bootloader.bin' \
+            --pattern 'kbhe-bootloader.bin.sig'
+          previous_version="${previous_tag#firmware-v}"
+          python tools/release/sign_release_asset.py artifact \
+            --input "$lineage_dir/kbhe-bootloader.bin" \
+            --signature "$lineage_dir/kbhe-bootloader.bin.sig" \
+            --version "$previous_version" \
+            --target kbhe-75he-stm32f723vet6 \
+            --role kbhe-bootloader.bin \
+            --verify-public firmware/keys/firmware-ed25519-public.pem
+          python tools/release/build_updater_migration_package.py inspect-lineage \
+            --current dist/kbhe-bootloader.bin \
+            --previous "$lineage_dir/kbhe-bootloader.bin"
+
       - name: Sign firmware and factory-programming artifacts
         env:
           SIGNING_KEY_B64: ${{ secrets.KBHE_FIRMWARE_RELEASE_SIGNING_KEY_B64 }}
@@ -175,7 +225,7 @@ jobs:
             --version "$version" \
             --verify-public firmware/keys/firmware-ed25519-public.pem
 
-          migration_inner="$RUNNER_TEMP/kbhe-updater-v2-to-v3-inner.bin"
+          migration_inner="dist/kbhe-updater-v3-refresh.bin"
           python tools/release/build_updater_migration_package.py prepare \
             --migrator dist/kbhe-updater-migrator.bin \
             --bootloader dist/kbhe-bootloader.bin \
@@ -183,12 +233,21 @@ jobs:
           python tools/release/sign_release_asset.py firmware \
             --key "$key_path" \
             --input "$migration_inner" \
-            --output dist/kbhe-updater-v2-to-v3.bin.sig \
+            --output dist/kbhe-updater-v3-refresh.bin.sig \
             --version "$version" \
             --verify-public firmware/keys/firmware-ed25519-public.pem
+          python tools/release/build_updater_migration_package.py inspect-image \
+            --input "$migration_inner" \
+            --signature dist/kbhe-updater-v3-refresh.bin.sig \
+            --version "$version" \
+            --verify-public firmware/keys/firmware-ed25519-public.pem
+          # The v2 capsule trailer embeds the signature of this exact inner
+          # image, so its detached sibling is intentionally byte-identical.
+          cp dist/kbhe-updater-v3-refresh.bin.sig \
+            dist/kbhe-updater-v2-to-v3.bin.sig
           python tools/release/build_updater_migration_package.py assemble \
             --image "$migration_inner" \
-            --signature dist/kbhe-updater-v2-to-v3.bin.sig \
+            --signature dist/kbhe-updater-v3-refresh.bin.sig \
             --version "$version" \
             --verify-public firmware/keys/firmware-ed25519-public.pem \
             --output dist/kbhe-updater-v2-to-v3.bin
@@ -198,6 +257,7 @@ jobs:
             --version "$version" \
             --verify-public firmware/keys/firmware-ed25519-public.pem
           jq '.legacyUpdaterMigration = "kbhe-updater-v2-to-v3.bin" |
+              .updaterV3Refresh = "kbhe-updater-v3-refresh.bin" |
               del(.migrationExecutable)' \
             dist/firmware-manifest.json > "$RUNNER_TEMP/firmware-manifest.json"
           mv "$RUNNER_TEMP/firmware-manifest.json" dist/firmware-manifest.json
@@ -229,15 +289,16 @@ jobs:
               --target kbhe-75he-stm32f723vet6 \
               --role "$name" \
               --verify-public firmware/keys/firmware-ed25519-public.pem
-          # kbhe-updater-v2-to-v3.bin.sig deliberately authenticates the exact
-          # inner migrator image copied into the v3 trailer. Updater v2 cannot
-          # verify signatures; the native host verifies this inner signature
-          # plus the canonical outer capsule before BEGIN. Never replace it
-          # with a generic signature over the assembled outer package.
+          # Both updater migration/refresh .sig files deliberately authenticate
+          # the exact inner migrator image. Updater v2 cannot verify signatures;
+          # the native host verifies this inner signature plus the canonical
+          # outer capsule before BEGIN. Never replace either with a generic
+          # signature over a differently scoped artifact.
           done < <(find dist -maxdepth 1 -type f \
             ! -name '*.sig' \
             ! -name 'kbhe-app.bin' \
             ! -name 'kbhe-updater-v2-to-v3.bin' \
+            ! -name 'kbhe-updater-v3-refresh.bin' \
             -print0)
 
       - name: Create authenticated draft release

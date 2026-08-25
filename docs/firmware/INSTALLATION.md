@@ -66,17 +66,23 @@ option-byte locking is a separate manufacturing decision.
 The configurator downloads `kbhe-app.bin` and its exact
 `kbhe-app.bin.sig`, verifies the signature locally, then sends AUTH before the
 bootloader is permitted to erase sectors 4–5. Stable releases also carry a
-locally verified `kbhe-updater-v2-to-v3.bin` capsule. When HELLO reports v2,
-one native update command installs that capsule, waits for v3 to re-enumerate,
-then authenticates and installs the normal application before returning to
-runtime mode. The bootloader re-verifies the signature before BEGIN, after
+locally verified `kbhe-updater-v2-to-v3.bin` capsule and the distinct
+`kbhe-updater-v3-refresh.bin` inner image. When HELLO reports v2, one native
+update command installs the complete capsule, waits for v3 to re-enumerate,
+verifies its bootloader identity, then authenticates and installs the normal
+application. When HELLO reports v3, the configurator queries the optional
+resident bootloader identity. Older v3 implementations that do not know that
+command are refreshed once; an equal or newer matching bootloader is skipped.
+The bootloader re-verifies each firmware signature before BEGIN, after
 programming, and on every boot.
 
 The configurator negotiates updater v2 and v3 explicitly. A normal application
 is never sent to updater v2 because the legacy validity trailer and the current
-sector-6 profile bank conflict. A release without the validated migration pair
-fails with `UPDATER_MIGRATION_REQUIRED` before sending the normal application;
-the physical factory flow above remains the recovery path. See
+sector-6 profile bank conflict. A release without the support pair required by
+the negotiated updater fails before sending the normal application. A normal
+release update therefore refreshes legacy v3 bootloaders without
+STM32CubeProgrammer; the physical factory flow above remains the recovery path
+for an interrupted option-byte commit or corrupt boot state. See
 [Updater compatibility and v2-to-v3 migration](UPDATER_COMPATIBILITY.md).
 
 Firmware versions are monotonic through the normal USB updater. Before erasing

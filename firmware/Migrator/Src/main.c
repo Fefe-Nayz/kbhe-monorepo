@@ -1,6 +1,7 @@
 #include "firmware_version.h"
 #include "monocypher-ed25519.h"
 #include "stm32f7xx_hal.h"
+#include "updater_bootloader_version.h"
 #include "updater_migration.h"
 #include "updater_migrator_plan.h"
 #include "updater_shared.h"
@@ -34,6 +35,17 @@ static bool version_equal(updater_fw_version_t left,
                           updater_fw_version_t right) {
   return left.major == right.major && left.minor == right.minor &&
          left.patch == right.patch;
+}
+
+static bool version_is_older(updater_fw_version_t candidate,
+                             updater_fw_version_t installed) {
+  if (candidate.major != installed.major) {
+    return candidate.major < installed.major;
+  }
+  if (candidate.minor != installed.minor) {
+    return candidate.minor < installed.minor;
+  }
+  return candidate.patch < installed.patch;
 }
 
 static void refresh_flash_cache(uint32_t address, uint32_t length) {
@@ -133,8 +145,9 @@ static bool migration_package_read(
   const uint8_t *descriptor_address;
   const uint8_t *bootloader;
   uint8_t bootloader_sha512[64];
+  updater_fw_version_t bootloader_version;
   uint32_t bootloader_end;
-  static const uint8_t zeroes[8] = {0};
+  static const uint8_t zeroes[4] = {0};
 
   if (trailer_out == NULL || descriptor_out == NULL ||
       bootloader_out == NULL || !updater_read_trailer(&trailer) ||
@@ -154,6 +167,13 @@ static bool migration_package_read(
       descriptor.flags != UPDATER_MIGRATION_REQUIRED_FLAGS ||
       descriptor.image_size != trailer.image_size ||
       memcmp(descriptor.target_id, s_target_id, sizeof(s_target_id)) != 0 ||
+      descriptor.bootloader_version_major !=
+          UPDATER_BOOTLOADER_VERSION_MAJOR ||
+      descriptor.bootloader_version_minor !=
+          UPDATER_BOOTLOADER_VERSION_MINOR ||
+      descriptor.bootloader_version_patch !=
+          UPDATER_BOOTLOADER_VERSION_PATCH ||
+      descriptor.reserved0 != 0u ||
       memcmp(descriptor.reserved, zeroes, sizeof(zeroes)) != 0 ||
       descriptor.descriptor_crc32 !=
           updater_crc32_compute(&descriptor,
@@ -189,6 +209,14 @@ static bool migration_package_read(
     return false;
   }
   crypto_wipe(bootloader_sha512, sizeof(bootloader_sha512));
+  if (updater_bootloader_version_scan(
+          bootloader, descriptor.bootloader_size,
+          &bootloader_version) != UPDATER_BOOTLOADER_VERSION_VALID ||
+      bootloader_version.major != descriptor.bootloader_version_major ||
+      bootloader_version.minor != descriptor.bootloader_version_minor ||
+      bootloader_version.patch != descriptor.bootloader_version_patch) {
+    return false;
+  }
 
   *trailer_out = trailer;
   *descriptor_out = descriptor;
@@ -307,6 +335,9 @@ int main(void) {
   updater_migration_descriptor_t descriptor;
   const uint8_t *bootloader = NULL;
   updater_fw_version_t version;
+  updater_fw_version_t candidate_bootloader_version;
+  updater_fw_version_t resident_bootloader_version;
+  updater_bootloader_version_scan_t resident_version_state;
   uint32_t bootaddr;
   bool installed;
   bool floor_ready;
@@ -323,6 +354,21 @@ int main(void) {
   if (version.major != FIRMWARE_VERSION_MAJOR ||
       version.minor != FIRMWARE_VERSION_MINOR ||
       version.patch != FIRMWARE_VERSION_PATCH) {
+    migration_fatal();
+  }
+  candidate_bootloader_version.major = descriptor.bootloader_version_major;
+  candidate_bootloader_version.minor = descriptor.bootloader_version_minor;
+  candidate_bootloader_version.patch = descriptor.bootloader_version_patch;
+  resident_version_state = updater_bootloader_version_scan(
+      (const void *)(uintptr_t)UPDATER_BOOTLOADER_BASE,
+      UPDATER_BOOTLOADER_CODE_SIZE, &resident_bootloader_version);
+  /* Legacy or torn residents have no valid KBLV and remain recoverable. A
+   * coherent resident, however, may never be replaced by an older signed
+   * updater even when a non-official host replays the refresh image. */
+  if (resident_version_state == UPDATER_BOOTLOADER_VERSION_AMBIGUOUS ||
+      (resident_version_state == UPDATER_BOOTLOADER_VERSION_VALID &&
+       version_is_older(candidate_bootloader_version,
+                        resident_bootloader_version))) {
     migration_fatal();
   }
 

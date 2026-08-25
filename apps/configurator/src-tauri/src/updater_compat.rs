@@ -18,8 +18,12 @@ pub(crate) const MIGRATION_DESCRIPTOR_SIZE: usize = 128;
 pub(crate) const MIGRATION_TARGET_ID: &[u8; 16] = b"KBHE75HEF723VET6";
 pub(crate) const MIGRATION_FLAG_BOOTADDR_RESUMABLE: u32 = 1 << 0;
 pub(crate) const MIGRATION_FLAG_V3_TRAILER_PRESEEDED: u32 = 1 << 1;
-pub(crate) const MIGRATION_REQUIRED_FLAGS: u32 =
-    MIGRATION_FLAG_BOOTADDR_RESUMABLE | MIGRATION_FLAG_V3_TRAILER_PRESEEDED;
+pub(crate) const MIGRATION_FLAG_V3_REFRESH_ALLOWED: u32 = 1 << 2;
+pub(crate) const MIGRATION_REQUIRED_FLAGS: u32 = MIGRATION_FLAG_BOOTADDR_RESUMABLE
+    | MIGRATION_FLAG_V3_TRAILER_PRESEEDED
+    | MIGRATION_FLAG_V3_REFRESH_ALLOWED;
+pub(crate) const BOOTLOADER_INFO_MAGIC: &[u8; 8] = b"KBHEBL3\0";
+pub(crate) const BOOTLOADER_INFO_SIZE: usize = 32;
 
 const UPDATER_TRAILER_MAGIC: u32 = 0x5544_5452;
 const UPDATER_V3_TRAILER_OFFSET: usize = UPDATER_V3_APP_MAX_IMAGE_SIZE as usize;
@@ -30,6 +34,9 @@ const UPDATER_BOOTLOADER_MAX_SIZE: usize = 0x0000_C000;
 const MIGRATOR_EXECUTABLE_MAX_SIZE: usize = 0x0001_0000;
 const UPDATER_RAM_BASE: u32 = 0x2000_0000;
 const UPDATER_RAM_END: u32 = 0x2003_FF00;
+const MIGRATION_DESCRIPTOR_SCHEMA: u16 = 2;
+const BOOTLOADER_INFO_SCHEMA: u16 = 1;
+const BOOTLOADER_VERSION_RECORD_MAGIC: u32 = 0x4B42_4C56;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct UpdaterHello {
@@ -41,19 +48,26 @@ pub(crate) struct UpdaterHello {
     pub installed_version: [u8; 3],
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BootloaderInfo {
+    pub version: [u8; 3],
+    pub target_id: [u8; 16],
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct MigrationPackage {
+pub(crate) struct MigrationArtifact {
     pub signed_image_size: usize,
     pub bootloader_offset: usize,
     pub bootloader_size: usize,
-    pub version: [u8; 3],
-    pub signature: [u8; 64],
+    pub release_version: [u8; 3],
+    pub bootloader_version: [u8; 3],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FirmwareArtifact {
     Application,
-    V2ToV3Migration(MigrationPackage),
+    V2ToV3Migration(MigrationArtifact),
+    V3BootloaderRefresh(MigrationArtifact),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,7 +153,198 @@ pub(crate) fn parse_updater_hello(payload: &[u8]) -> Result<UpdaterHello, String
     })
 }
 
-fn parse_migration_package(firmware: &[u8]) -> Result<Option<MigrationPackage>, String> {
+pub(crate) fn parse_bootloader_info(payload: &[u8]) -> Result<BootloaderInfo, String> {
+    if payload.len() != BOOTLOADER_INFO_SIZE {
+        return Err(format!(
+            "UPDATER_BOOTLOADER_INFO_INVALID: INFO returned {} bytes; expected {BOOTLOADER_INFO_SIZE}",
+            payload.len()
+        ));
+    }
+    if payload.get(..8) != Some(BOOTLOADER_INFO_MAGIC.as_slice())
+        || read_u16(payload, 8)? != BOOTLOADER_INFO_SCHEMA
+        || read_u16(payload, 10)? as usize != BOOTLOADER_INFO_SIZE
+    {
+        return Err(
+            "UPDATER_BOOTLOADER_INFO_INVALID: unsupported bootloader identity record".to_string(),
+        );
+    }
+    let version = [payload[12], payload[13], payload[14]];
+    if version == [0, 0, 0] || payload[15] != 0 {
+        return Err(
+            "UPDATER_BOOTLOADER_INFO_INVALID: version is zero or reserved byte is non-zero"
+                .to_string(),
+        );
+    }
+    let mut target_id = [0u8; 16];
+    target_id.copy_from_slice(&payload[16..32]);
+    Ok(BootloaderInfo { version, target_id })
+}
+
+fn embedded_bootloader_version(bootloader: &[u8]) -> Result<[u8; 3], String> {
+    let marker = BOOTLOADER_VERSION_RECORD_MAGIC.to_le_bytes();
+    let mut discovered = None;
+    if bootloader.len() >= 12 {
+        for offset in 0..=bootloader.len() - 12 {
+            if bootloader[offset..offset + 4] != marker {
+                continue;
+            }
+            let packed = read_u32(bootloader, offset + 4)?;
+            let inverse = read_u32(bootloader, offset + 8)?;
+            if packed ^ inverse != u32::MAX || packed > 0x00FF_FFFF {
+                continue;
+            }
+            let version = [
+                ((packed >> 16) & 0xFF) as u8,
+                ((packed >> 8) & 0xFF) as u8,
+                (packed & 0xFF) as u8,
+            ];
+            if discovered.is_some_and(|existing| existing != version) {
+                return Err(
+                    "UPDATER_MIGRATION_IMAGE_INVALID: embedded bootloader has ambiguous KBLV metadata"
+                        .to_string(),
+                );
+            }
+            discovered = Some(version);
+        }
+    }
+    discovered.ok_or_else(|| {
+        "UPDATER_MIGRATION_IMAGE_INVALID: embedded bootloader has no valid KBLV metadata"
+            .to_string()
+    })
+}
+
+fn parse_migration_image(
+    image: &[u8],
+    release_version: [u8; 3],
+) -> Result<Option<MigrationArtifact>, String> {
+    if image.len() < MIGRATION_DESCRIPTOR_SIZE {
+        return Ok(None);
+    }
+    let descriptor_offset = image.len() - MIGRATION_DESCRIPTOR_SIZE;
+    let descriptor = &image[descriptor_offset..];
+    if descriptor.get(..8) != Some(MIGRATION_DESCRIPTOR_MAGIC.as_slice()) {
+        return Ok(None);
+    }
+    if read_u16(descriptor, 8)? != MIGRATION_DESCRIPTOR_SCHEMA
+        || read_u16(descriptor, 10)? as usize != MIGRATION_DESCRIPTOR_SIZE
+    {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: unsupported migration descriptor schema".to_string(),
+        );
+    }
+    if read_u16(descriptor, 12)? != UPDATER_PROTOCOL_V2
+        || read_u16(descriptor, 14)? != UPDATER_PROTOCOL_V3
+    {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: descriptor is not for the exact updater v2/v3 bridge"
+                .to_string(),
+        );
+    }
+    if read_u32(descriptor, 16)? != MIGRATION_REQUIRED_FLAGS {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: migration flags are not the exact supported recovery contract"
+                .to_string(),
+        );
+    }
+    if read_u32(descriptor, 32)? as usize != image.len() {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: descriptor image size does not match the signed image"
+                .to_string(),
+        );
+    }
+    if descriptor.get(36..52) != Some(MIGRATION_TARGET_ID.as_slice()) {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: image targets different keyboard hardware"
+                .to_string(),
+        );
+    }
+    if read_u32(descriptor, 124)? != crc32(&descriptor[..124]) {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: migration descriptor CRC is invalid".to_string(),
+        );
+    }
+    let bootloader_version = [descriptor[116], descriptor[117], descriptor[118]];
+    if bootloader_version == [0, 0, 0]
+        || descriptor[119] != 0
+        || descriptor[120..124].iter().any(|byte| *byte != 0)
+    {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: bootloader version is zero or descriptor reserved bytes are non-zero"
+                .to_string(),
+        );
+    }
+
+    let bootloader_offset = read_u32(descriptor, 20)? as usize;
+    let bootloader_size = read_u32(descriptor, 24)? as usize;
+    let bootloader_end = bootloader_offset
+        .checked_add(bootloader_size)
+        .ok_or_else(|| "UPDATER_MIGRATION_IMAGE_INVALID: bootloader range overflows".to_string())?;
+    if bootloader_offset < 8
+        || bootloader_offset > MIGRATOR_EXECUTABLE_MAX_SIZE
+        || bootloader_offset & 3 != 0
+        || bootloader_size == 0
+        || bootloader_size > UPDATER_BOOTLOADER_MAX_SIZE
+        || bootloader_end > descriptor_offset
+    {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: embedded bootloader range is invalid".to_string(),
+        );
+    }
+    let bootloader = &image[bootloader_offset..bootloader_end];
+    if read_u32(descriptor, 28)? != crc32(bootloader) {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: embedded bootloader CRC does not match".to_string(),
+        );
+    }
+    let digest = Sha512::digest(bootloader);
+    if descriptor.get(52..116) != Some(digest.as_slice()) {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: embedded bootloader SHA-512 does not match"
+                .to_string(),
+        );
+    }
+    if embedded_bootloader_version(bootloader)? != bootloader_version {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: embedded bootloader KBLV version does not match the signed descriptor"
+                .to_string(),
+        );
+    }
+    if !vector_is_valid(
+        image,
+        UPDATER_APP_BASE,
+        UPDATER_APP_BASE + UPDATER_V3_APP_MAX_IMAGE_SIZE,
+    ) {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: migrator vector table is invalid".to_string(),
+        );
+    }
+    if !vector_is_valid(
+        bootloader,
+        UPDATER_BOOTLOADER_BASE,
+        UPDATER_BOOTLOADER_BASE + UPDATER_BOOTLOADER_MAX_SIZE as u32,
+    ) {
+        return Err(
+            "UPDATER_MIGRATION_IMAGE_INVALID: embedded bootloader vector table is invalid"
+                .to_string(),
+        );
+    }
+
+    Ok(Some(MigrationArtifact {
+        signed_image_size: image.len(),
+        bootloader_offset,
+        bootloader_size,
+        release_version,
+        bootloader_version,
+    }))
+}
+
+#[derive(Debug)]
+struct ParsedMigrationPackage {
+    artifact: MigrationArtifact,
+    signature: [u8; 64],
+}
+
+fn parse_migration_package(firmware: &[u8]) -> Result<Option<ParsedMigrationPackage>, String> {
     if firmware.len() != MIGRATION_PACKAGE_SIZE {
         return Ok(None);
     }
@@ -184,119 +389,16 @@ fn parse_migration_package(firmware: &[u8]) -> Result<Option<MigrationPackage>, 
         );
     }
 
-    let descriptor_offset = signed_image_size - MIGRATION_DESCRIPTOR_SIZE;
-    let descriptor = &firmware[descriptor_offset..signed_image_size];
-    if descriptor.get(..8) != Some(MIGRATION_DESCRIPTOR_MAGIC.as_slice()) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: the signed migration descriptor is missing"
-                .to_string(),
-        );
-    }
-    if read_u16(descriptor, 8)? != 1
-        || read_u16(descriptor, 10)? as usize != MIGRATION_DESCRIPTOR_SIZE
-    {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: unsupported migration descriptor schema"
-                .to_string(),
-        );
-    }
-    if read_u16(descriptor, 12)? != UPDATER_PROTOCOL_V2
-        || read_u16(descriptor, 14)? != UPDATER_PROTOCOL_V3
-    {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: package is not an updater v2-to-v3 migration"
-                .to_string(),
-        );
-    }
-    let flags = read_u32(descriptor, 16)?;
-    if flags != MIGRATION_REQUIRED_FLAGS {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: package migration flags are not the exact supported recovery contract"
-                .to_string(),
-        );
-    }
-    if descriptor.get(36..52) != Some(MIGRATION_TARGET_ID.as_slice()) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: package targets different keyboard hardware"
-                .to_string(),
-        );
-    }
-    if read_u32(descriptor, 32)? as usize != signed_image_size {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: descriptor image size does not match the signed trailer"
-                .to_string(),
-        );
-    }
-    if read_u32(descriptor, 124)? != crc32(&descriptor[..124]) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: migration descriptor CRC is invalid".to_string(),
-        );
-    }
-
-    let bootloader_offset = read_u32(descriptor, 20)? as usize;
-    let bootloader_size = read_u32(descriptor, 24)? as usize;
-    let bootloader_end = bootloader_offset
-        .checked_add(bootloader_size)
+    let release_version = [trailer[12], trailer[13], trailer[14]];
+    let artifact = parse_migration_image(&firmware[..signed_image_size], release_version)?
         .ok_or_else(|| {
-            "UPDATER_MIGRATION_PACKAGE_INVALID: bootloader range overflows".to_string()
+            "UPDATER_MIGRATION_PACKAGE_INVALID: the signed migration descriptor is missing"
+                .to_string()
         })?;
-    if bootloader_offset < 8
-        || bootloader_offset > MIGRATOR_EXECUTABLE_MAX_SIZE
-        || bootloader_offset & 3 != 0
-        || bootloader_size == 0
-        || bootloader_size > UPDATER_BOOTLOADER_MAX_SIZE
-        || bootloader_end > descriptor_offset
-    {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: embedded bootloader range is invalid".to_string(),
-        );
-    }
-    let bootloader = &firmware[bootloader_offset..bootloader_end];
-    if read_u32(descriptor, 28)? != crc32(bootloader) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: embedded bootloader CRC does not match".to_string(),
-        );
-    }
-    let digest = Sha512::digest(bootloader);
-    if descriptor.get(52..116) != Some(digest.as_slice()) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: embedded bootloader SHA-512 does not match"
-                .to_string(),
-        );
-    }
-    if descriptor[116..124].iter().any(|byte| *byte != 0) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: migration descriptor reserved bytes are non-zero"
-                .to_string(),
-        );
-    }
-    if !vector_is_valid(
-        &firmware[..signed_image_size],
-        UPDATER_APP_BASE,
-        UPDATER_APP_BASE + UPDATER_V3_APP_MAX_IMAGE_SIZE,
-    ) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: migrator vector table is invalid".to_string(),
-        );
-    }
-    if !vector_is_valid(
-        bootloader,
-        UPDATER_BOOTLOADER_BASE,
-        UPDATER_BOOTLOADER_BASE + UPDATER_BOOTLOADER_MAX_SIZE as u32,
-    ) {
-        return Err(
-            "UPDATER_MIGRATION_PACKAGE_INVALID: embedded bootloader vector table is invalid"
-                .to_string(),
-        );
-    }
-
     let mut signature = [0u8; 64];
     signature.copy_from_slice(&trailer[16..80]);
-    Ok(Some(MigrationPackage {
-        signed_image_size,
-        bootloader_offset,
-        bootloader_size,
-        version: [trailer[12], trailer[13], trailer[14]],
+    Ok(Some(ParsedMigrationPackage {
+        artifact,
         signature,
     }))
 }
@@ -307,12 +409,12 @@ pub(crate) fn inspect_firmware_artifact(
     signature: &[u8],
 ) -> Result<FirmwareArtifact, String> {
     if let Some(package) = parse_migration_package(firmware)? {
-        if package.version != version {
+        if package.artifact.release_version != version {
             return Err(format!(
                 "UPDATER_MIGRATION_PACKAGE_INVALID: trailer version {}.{}.{} does not match selected version {}.{}.{}",
-                package.version[0],
-                package.version[1],
-                package.version[2],
+                package.artifact.release_version[0],
+                package.artifact.release_version[1],
+                package.artifact.release_version[2],
                 version[0],
                 version[1],
                 version[2],
@@ -325,7 +427,7 @@ pub(crate) fn inspect_firmware_artifact(
             );
         }
         verify_firmware_asset(
-            &firmware[..package.signed_image_size],
+            &firmware[..package.artifact.signed_image_size],
             version,
             signature,
         )
@@ -334,7 +436,7 @@ pub(crate) fn inspect_firmware_artifact(
                 "UPDATER_MIGRATION_PACKAGE_INVALID: signed migrator authenticity check failed: {error}"
             )
         })?;
-        return Ok(FirmwareArtifact::V2ToV3Migration(package));
+        return Ok(FirmwareArtifact::V2ToV3Migration(package.artifact));
     }
 
     if firmware.len() > UPDATER_V3_APP_MAX_IMAGE_SIZE as usize {
@@ -344,9 +446,61 @@ pub(crate) fn inspect_firmware_artifact(
             UPDATER_V3_APP_MAX_IMAGE_SIZE,
         ));
     }
+    if let Some(refresh) = parse_migration_image(firmware, version)? {
+        verify_firmware_asset(firmware, version, signature).map_err(|error| {
+            format!(
+                "UPDATER_BOOTLOADER_REFRESH_INVALID: signed refresh authenticity check failed: {error}"
+            )
+        })?;
+        return Ok(FirmwareArtifact::V3BootloaderRefresh(refresh));
+    }
     verify_firmware_asset(firmware, version, signature)
         .map_err(|error| format!("firmware authenticity check failed before flashing: {error}"))?;
     Ok(FirmwareArtifact::Application)
+}
+
+pub(crate) fn bootloader_refresh_required(
+    installed: Option<BootloaderInfo>,
+    refresh: &MigrationArtifact,
+) -> Result<bool, String> {
+    let Some(installed) = installed else {
+        /* Deployed v3 bootloaders predate the optional INFO command. They need
+         * one authenticated refresh before future releases can skip it. */
+        return Ok(true);
+    };
+    if installed.target_id != *MIGRATION_TARGET_ID {
+        return Err(
+            "UPDATER_BOOTLOADER_TARGET_MISMATCH: resident updater targets different hardware"
+                .to_string(),
+        );
+    }
+    Ok(installed.version < refresh.bootloader_version)
+}
+
+pub(crate) fn verify_refreshed_bootloader(
+    installed: Option<BootloaderInfo>,
+    refresh: &MigrationArtifact,
+) -> Result<(), String> {
+    let installed = installed.ok_or_else(|| {
+        "UPDATER_BOOTLOADER_REFRESH_INCOMPLETE: refreshed updater does not expose its authenticated target/version identity"
+            .to_string()
+    })?;
+    if installed.target_id != *MIGRATION_TARGET_ID
+        || installed.version != refresh.bootloader_version
+    {
+        return Err(format!(
+            "UPDATER_BOOTLOADER_REFRESH_INCOMPLETE: expected target {} version {}.{}.{}, observed target {} version {}.{}.{}",
+            String::from_utf8_lossy(MIGRATION_TARGET_ID),
+            refresh.bootloader_version[0],
+            refresh.bootloader_version[1],
+            refresh.bootloader_version[2],
+            String::from_utf8_lossy(&installed.target_id),
+            installed.version[0],
+            installed.version[1],
+            installed.version[2],
+        ));
+    }
+    Ok(())
 }
 
 fn validate_updater_contract(hello: UpdaterHello) -> Result<FlashProtocol, String> {
@@ -419,7 +573,7 @@ pub(crate) fn negotiate_flash_protocol(
         FlashProtocol::SignedV3 => {
             if matches!(artifact, FirmwareArtifact::V2ToV3Migration(_)) {
                 return Err(
-                    "UPDATER_ARTIFACT_MISMATCH: this keyboard already has updater protocol v3; select the normal signed kbhe-app.bin image"
+                    "UPDATER_ARTIFACT_MISMATCH: protocol v3 cannot flash the outer v2 migration capsule"
                         .to_string(),
                 );
             }
@@ -432,12 +586,12 @@ pub(crate) fn negotiate_flash_protocol(
                 );
             };
             let installed_is_known = hello.installed_version != [0, 0, 0];
-            if installed_is_known && package.version < hello.installed_version {
+            if installed_is_known && package.release_version < hello.installed_version {
                 return Err(format!(
                     "UPDATER_ROLLBACK_REJECTED: migration version {}.{}.{} is older than the legacy updater's authenticated application {}.{}.{}",
-                    package.version[0],
-                    package.version[1],
-                    package.version[2],
+                    package.release_version[0],
+                    package.release_version[1],
+                    package.release_version[2],
                     hello.installed_version[0],
                     hello.installed_version[1],
                     hello.installed_version[2],
@@ -475,10 +629,25 @@ mod tests {
             BOOTLOADER_OFFSET + 4,
             UPDATER_BOOTLOADER_BASE + 9,
         );
+        put_u32(
+            &mut package,
+            BOOTLOADER_OFFSET + 16,
+            BOOTLOADER_VERSION_RECORD_MAGIC,
+        );
+        put_u32(&mut package, BOOTLOADER_OFFSET + 20, 1 << 16);
+        put_u32(
+            &mut package,
+            BOOTLOADER_OFFSET + 24,
+            (1u32 << 16) ^ u32::MAX,
+        );
 
         package[descriptor_offset..descriptor_offset + 8]
             .copy_from_slice(MIGRATION_DESCRIPTOR_MAGIC);
-        put_u16(&mut package, descriptor_offset + 8, 1);
+        put_u16(
+            &mut package,
+            descriptor_offset + 8,
+            MIGRATION_DESCRIPTOR_SCHEMA,
+        );
         put_u16(
             &mut package,
             descriptor_offset + 10,
@@ -507,7 +676,8 @@ mod tests {
             Sha512::digest(&package[BOOTLOADER_OFFSET..BOOTLOADER_OFFSET + BOOTLOADER_SIZE]);
         package[descriptor_offset + 52..descriptor_offset + 116]
             .copy_from_slice(&bootloader_digest);
-        package[descriptor_offset + 116..descriptor_offset + 124].fill(0);
+        package[descriptor_offset + 116..descriptor_offset + 119].copy_from_slice(&[1, 0, 0]);
+        package[descriptor_offset + 119..descriptor_offset + 124].fill(0);
         let descriptor_crc = crc32(&package[descriptor_offset..descriptor_offset + 124]);
         put_u32(&mut package, descriptor_offset + 124, descriptor_crc);
 
@@ -535,13 +705,20 @@ mod tests {
     }
 
     fn migration() -> FirmwareArtifact {
-        FirmwareArtifact::V2ToV3Migration(MigrationPackage {
+        FirmwareArtifact::V2ToV3Migration(MigrationArtifact {
             signed_image_size: 1024,
             bootloader_offset: 256,
             bootloader_size: 128,
-            version: [2, 0, 9],
-            signature: [0xA5; 64],
+            release_version: [2, 0, 9],
+            bootloader_version: [1, 0, 0],
         })
+    }
+
+    fn refresh() -> FirmwareArtifact {
+        let FirmwareArtifact::V2ToV3Migration(artifact) = migration() else {
+            unreachable!();
+        };
+        FirmwareArtifact::V3BootloaderRefresh(artifact)
     }
 
     #[test]
@@ -570,13 +747,34 @@ mod tests {
     }
 
     #[test]
+    fn optional_bootloader_info_is_strict_and_target_bound() {
+        let mut payload = [0u8; BOOTLOADER_INFO_SIZE];
+        payload[..8].copy_from_slice(BOOTLOADER_INFO_MAGIC);
+        put_u16(&mut payload, 8, BOOTLOADER_INFO_SCHEMA);
+        put_u16(&mut payload, 10, BOOTLOADER_INFO_SIZE as u16);
+        payload[12..15].copy_from_slice(&[1, 0, 0]);
+        payload[16..32].copy_from_slice(MIGRATION_TARGET_ID);
+        let parsed = parse_bootloader_info(&payload).unwrap();
+        assert_eq!(parsed.version, [1, 0, 0]);
+        assert_eq!(parsed.target_id, *MIGRATION_TARGET_ID);
+
+        payload[15] = 1;
+        assert!(parse_bootloader_info(&payload).is_err());
+        payload[15] = 0;
+        payload[8] = 2;
+        assert!(parse_bootloader_info(&payload).is_err());
+        assert!(parse_bootloader_info(&payload[..31]).is_err());
+    }
+
+    #[test]
     fn migration_package_parser_accepts_only_the_canonical_structure() {
         let package = structural_migration_package();
         let migration = parse_migration_package(&package).unwrap().unwrap();
-        assert_eq!(migration.signed_image_size, 512);
-        assert_eq!(migration.bootloader_offset, 64);
-        assert_eq!(migration.bootloader_size, 64);
-        assert_eq!(migration.version, [2, 0, 9]);
+        assert_eq!(migration.artifact.signed_image_size, 512);
+        assert_eq!(migration.artifact.bootloader_offset, 64);
+        assert_eq!(migration.artifact.bootloader_size, 64);
+        assert_eq!(migration.artifact.release_version, [2, 0, 9]);
+        assert_eq!(migration.artifact.bootloader_version, [1, 0, 0]);
         assert_eq!(migration.signature, [0xA5; 64]);
 
         let mut unknown_flags = package.clone();
@@ -600,10 +798,23 @@ mod tests {
         assert!(parse_migration_package(&unknown_flags)
             .unwrap_err()
             .contains("exact supported recovery contract"));
+
+        let mut wrong_bootloader_version = package[..512].to_vec();
+        wrong_bootloader_version[descriptor_offset + 118] = 1;
+        let descriptor_crc =
+            crc32(&wrong_bootloader_version[descriptor_offset..descriptor_offset + 124]);
+        put_u32(
+            &mut wrong_bootloader_version,
+            descriptor_offset + 124,
+            descriptor_crc,
+        );
+        assert!(parse_migration_image(&wrong_bootloader_version, [2, 0, 9])
+            .unwrap_err()
+            .contains("KBLV version does not match"));
     }
 
     #[test]
-    fn v3_accepts_only_normal_signed_application_flow() {
+    fn v3_accepts_app_or_inner_refresh_but_never_the_outer_v2_capsule() {
         let protocol = negotiate_flash_protocol(
             hello(
                 UPDATER_PROTOCOL_V3,
@@ -616,6 +827,19 @@ mod tests {
         assert_eq!(protocol, FlashProtocol::SignedV3);
         assert!(protocol.requires_auth());
 
+        assert_eq!(
+            negotiate_flash_protocol(
+                hello(
+                    UPDATER_PROTOCOL_V3,
+                    UPDATER_FLAG_SIGNATURE_REQUIRED,
+                    UPDATER_V3_APP_MAX_IMAGE_SIZE,
+                ),
+                &refresh(),
+            )
+            .unwrap(),
+            FlashProtocol::SignedV3
+        );
+
         let error = negotiate_flash_protocol(
             hello(
                 UPDATER_PROTOCOL_V3,
@@ -626,6 +850,48 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("UPDATER_ARTIFACT_MISMATCH"));
+    }
+
+    #[test]
+    fn refresh_is_required_only_for_unknown_or_older_matching_bootloaders() {
+        let FirmwareArtifact::V3BootloaderRefresh(refresh) = refresh() else {
+            unreachable!();
+        };
+        assert!(bootloader_refresh_required(None, &refresh).unwrap());
+        assert!(bootloader_refresh_required(
+            Some(BootloaderInfo {
+                version: [0, 9, 9],
+                target_id: *MIGRATION_TARGET_ID,
+            }),
+            &refresh,
+        )
+        .unwrap());
+        for version in [[1, 0, 0], [1, 0, 1]] {
+            assert!(!bootloader_refresh_required(
+                Some(BootloaderInfo {
+                    version,
+                    target_id: *MIGRATION_TARGET_ID,
+                }),
+                &refresh,
+            )
+            .unwrap());
+        }
+        let wrong_target = BootloaderInfo {
+            version: [1, 0, 0],
+            target_id: [0xA5; 16],
+        };
+        assert!(bootloader_refresh_required(Some(wrong_target), &refresh)
+            .unwrap_err()
+            .contains("TARGET_MISMATCH"));
+        assert!(verify_refreshed_bootloader(None, &refresh).is_err());
+        verify_refreshed_bootloader(
+            Some(BootloaderInfo {
+                version: [1, 0, 0],
+                target_id: *MIGRATION_TARGET_ID,
+            }),
+            &refresh,
+        )
+        .unwrap();
     }
 
     #[test]

@@ -1,4 +1,5 @@
 #include "updater_bootloader.h"
+#include "updater_bootloader_version.h"
 #include "firmware_public_key.h"
 #include "monocypher-ed25519.h"
 #include "updater_migration.h"
@@ -420,6 +421,9 @@ static void build_migration_test_image(
   memcpy(descriptor.target_id, target_id, sizeof(descriptor.target_id));
   crypto_sha512(descriptor.bootloader_sha512, image + bootloader_offset,
                 bootloader_size);
+  descriptor.bootloader_version_major = UPDATER_BOOTLOADER_VERSION_MAJOR;
+  descriptor.bootloader_version_minor = UPDATER_BOOTLOADER_VERSION_MINOR;
+  descriptor.bootloader_version_patch = UPDATER_BOOTLOADER_VERSION_PATCH;
   descriptor.descriptor_crc32 = updater_crc32_compute(
       &descriptor,
       offsetof(updater_migration_descriptor_t, descriptor_crc32));
@@ -518,6 +522,70 @@ static void test_real_manifest_encoder(const signing_fixture_t *fixture) {
   tampered.context[0] ^= 1u;
   CHECK(!updater_signature_manifest_is_sane(&tampered));
   CHECK(!updater_signature_manifest_verify(&tampered, fixture->signature));
+}
+
+static void test_bootloader_info_extension(void) {
+  updater_packet_t request;
+  updater_packet_t response;
+  updater_bootloader_info_payload_t info;
+  const uint8_t expected_magic[8] = UPDATER_BOOTLOADER_INFO_MAGIC_BYTES;
+  const uint8_t expected_target[16] = UPDATER_MIGRATION_TARGET_ID_BYTES;
+
+  simulated_power_on(true);
+  request = make_request(UPDATER_CMD_BOOTLOADER_INFO, 0u, NULL, 0u);
+  response = exchange(&request);
+  CHECK(response.status == UPDATER_STATUS_OK);
+  CHECK(response.length == sizeof(info));
+  memcpy(&info, response.payload, sizeof(info));
+  CHECK(memcmp(info.magic, expected_magic, sizeof(info.magic)) == 0);
+  CHECK(info.schema == UPDATER_BOOTLOADER_INFO_SCHEMA);
+  CHECK(info.record_size == sizeof(info));
+  CHECK(info.version_major == UPDATER_BOOTLOADER_VERSION_MAJOR);
+  CHECK(info.version_minor == UPDATER_BOOTLOADER_VERSION_MINOR);
+  CHECK(info.version_patch == UPDATER_BOOTLOADER_VERSION_PATCH);
+  CHECK(info.reserved == 0u);
+  CHECK(memcmp(info.target_id, expected_target, sizeof(info.target_id)) == 0);
+
+  request = make_request(UPDATER_CMD_BOOTLOADER_INFO, 0u, expected_magic, 1u);
+  response = exchange(&request);
+  CHECK(response.status == UPDATER_STATUS_INVALID_PARAMETER);
+}
+
+static void test_bootloader_version_scanner(void) {
+  uint8_t image[64];
+  updater_fw_version_t version = {0};
+  updater_bootloader_version_record_t record = {
+      .magic = UPDATER_BOOTLOADER_VERSION_RECORD_MAGIC,
+      .version_packed = UPDATER_BOOTLOADER_VERSION_PACKED,
+      .version_xor = UPDATER_BOOTLOADER_VERSION_PACKED ^ UINT32_MAX,
+  };
+
+  memset(image, 0xFF, sizeof(image));
+  CHECK(updater_bootloader_version_scan(image, sizeof(image), &version) ==
+        UPDATER_BOOTLOADER_VERSION_NOT_FOUND);
+
+  record.version_xor ^= 1u;
+  memcpy(image + 3u, &record, sizeof(record));
+  CHECK(updater_bootloader_version_scan(image, sizeof(image), &version) ==
+        UPDATER_BOOTLOADER_VERSION_NOT_FOUND);
+
+  record.version_xor ^= 1u;
+  memcpy(image + 3u, &record, sizeof(record));
+  CHECK(updater_bootloader_version_scan(image, sizeof(image), &version) ==
+        UPDATER_BOOTLOADER_VERSION_VALID);
+  CHECK(version.major == UPDATER_BOOTLOADER_VERSION_MAJOR);
+  CHECK(version.minor == UPDATER_BOOTLOADER_VERSION_MINOR);
+  CHECK(version.patch == UPDATER_BOOTLOADER_VERSION_PATCH);
+
+  memcpy(image + 24u, &record, sizeof(record));
+  CHECK(updater_bootloader_version_scan(image, sizeof(image), &version) ==
+        UPDATER_BOOTLOADER_VERSION_VALID);
+
+  record.version_packed++;
+  record.version_xor = record.version_packed ^ UINT32_MAX;
+  memcpy(image + 45u, &record, sizeof(record));
+  CHECK(updater_bootloader_version_scan(image, sizeof(image), &version) ==
+        UPDATER_BOOTLOADER_VERSION_AMBIGUOUS);
 }
 
 static void test_authentication_gate_and_malformed_packets(
@@ -870,6 +938,8 @@ int main(void) {
 
   CHECK(sizeof(test_auth_blob_t) == UPDATER_AUTH_BLOB_SIZE);
   CHECK(fixture.manifest.image_size == sizeof(fixture.image));
+  test_bootloader_version_scanner();
+  test_bootloader_info_extension();
   test_real_manifest_encoder(&fixture);
   test_authentication_gate_and_malformed_packets(&fixture);
   test_power_cut_recovery_and_complete_update(&fixture);

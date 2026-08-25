@@ -322,6 +322,14 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
 
    Commit the change to `main` before tagging.
 
+   If any resident bootloader source or behavior changed, also bump the
+   independent `UPDATER_BOOTLOADER_VERSION_*` constants in
+   `firmware/Bootloader/Inc/updater_bootloader_version.h`. Reusing a KBLV for a
+   different bootloader binary would make already-current devices skip the new
+   payload. Never decrease KBLV. The tag workflow downloads and authenticates
+   the previous published `kbhe-bootloader.bin`, then rejects a decreasing KBLV
+   or different binary with the same KBLV before release signing.
+
 2. **Reproduce the CI build locally**:
 
    ```powershell
@@ -342,6 +350,13 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
    `firmware`, approve the `firmware-release` environment job, and require a
    successful private/public key derivation plus signing round trip.
 
+   For a release that changes the resident bootloader, publish the compatible
+   configurator first. Deployed v3 updaters accept the migrator only under a
+   strictly newer firmware release version; if application `X` was already
+   installed by an older configurator without refresh, issue `X+1` rather than
+   trying to weaken anti-rollback or reuse `X`. Older configurators also do not
+   understand the exact schema-2 refresh/capsule roles.
+
 5. **Tag and push** (use semver `X.Y.Z` matching the source constants from
    step 1):
 
@@ -352,8 +367,12 @@ must match** (e.g. `firmware-v2.0.1` ↔ `MAJOR=2 MINOR=0 PATCH=1`).
 
 6. CI creates and remotely verifies a **draft** release at
    `https://github.com/<owner>/<repo>/releases/tag/firmware-vX.Y.Z` with
-   `kbhe-app.bin` plus `kbhe-app.bin.sig`. The signature binds the exact image
-   length, CRC32, SHA-512 digest and firmware version from the tag. Every other
+   `kbhe-app.bin` plus `kbhe-app.bin.sig`, the complete
+   `kbhe-updater-v2-to-v3.bin` capsule, and the distinct inner
+   `kbhe-updater-v3-refresh.bin` image with their signature siblings. The
+   firmware signatures bind the exact inner image length, CRC32, SHA-512 digest
+   and firmware version from the tag; the v2 package embeds that exact signed
+   image and signature in its canonical layout. Every other
    factory/debug artifact (`kbhe-factory.bin`, bootloader, app-only, HEX, ELF,
    MAP and manifest) also receives a role-bound `.sig` sibling. The signing
    step parses the embedded `KFWV` record and fails if it differs from the tag.
@@ -397,8 +416,9 @@ Firmware publication has an additional destructive-HIL boundary: every remote
 asset is downloaded and SHA-256-compared with the locally authenticated
 artifact, then CI intentionally leaves the release as a draft. On a recovery-
 equipped keyboard, validate the complete legacy `v2 -> signed migrator -> v3 ->
-final application` path, both option-byte changes, repeated resets and the
-documented recovery path. The exact authenticated-draft download, local
+final application` path and the `old v3 -> signed refresh -> current v3 -> final
+application` path, both option-byte changes, the current-version skip, repeated
+resets and the documented recovery path. The exact authenticated-draft download, local
 signature inspection, native sibling-asset flow and required evidence are in
 [Updater compatibility and v2-to-v3 migration](firmware/UPDATER_COMPATIBILITY.md#manual-hil-publication-gate).
 Only after recording that evidence may a release operator publish the

@@ -1,8 +1,9 @@
 use crate::signing::firmware_manifest;
 use crate::updater_compat::{
-    inspect_firmware_artifact, negotiate_flash_protocol, parse_updater_hello,
-    updater_cleanup_is_safe, FirmwareArtifact, FlashProtocol, UpdaterHello, UPDATER_PROTOCOL_V2,
-    UPDATER_PROTOCOL_V3, UPDATER_V2_APP_MAX_IMAGE_SIZE,
+    bootloader_refresh_required, inspect_firmware_artifact, negotiate_flash_protocol,
+    parse_bootloader_info, parse_updater_hello, updater_cleanup_is_safe,
+    verify_refreshed_bootloader, BootloaderInfo, FirmwareArtifact, FlashProtocol, UpdaterHello,
+    UPDATER_PROTOCOL_V2, UPDATER_PROTOCOL_V3, UPDATER_V2_APP_MAX_IMAGE_SIZE,
 };
 use hidapi::{DeviceInfo, HidApi, HidDevice};
 use serde::Serialize;
@@ -1754,7 +1755,9 @@ const UPDATER_CMD_FINISH: u8 = 0x04;
 const UPDATER_CMD_ABORT: u8 = 0x05;
 const UPDATER_CMD_BOOT: u8 = 0x06;
 const UPDATER_CMD_AUTH: u8 = 0x07;
+const UPDATER_CMD_BOOTLOADER_INFO: u8 = 0x08;
 const UPDATER_STATUS_OK: u8 = 0x00;
+const UPDATER_STATUS_INVALID_COMMAND: u8 = 0x02;
 const APP_CMD_ENTER_BOOTLOADER: u8 = 0x02;
 const DATA_CHUNK_SIZE: usize = 56;
 const FIRMWARE_SIGNATURE_SIZE: usize = 64;
@@ -1981,6 +1984,8 @@ pub async fn kbhe_flash_firmware(
     firmware_signature_path: String,
     migration_firmware_path: Option<String>,
     migration_firmware_signature_path: Option<String>,
+    bootloader_refresh_path: Option<String>,
+    bootloader_refresh_signature_path: Option<String>,
     firmware_version: FirmwareVersion,
     expected_serial_number: String,
     timeout_ms: u64,
@@ -2019,6 +2024,8 @@ pub async fn kbhe_flash_firmware(
             firmware_signature_path,
             migration_firmware_path,
             migration_firmware_signature_path,
+            bootloader_refresh_path,
+            bootloader_refresh_signature_path,
             firmware_version,
             expected_serial_number,
             timeout_ms,
@@ -2224,11 +2231,48 @@ fn discover_sibling_migration_assets(
     )))
 }
 
+fn discover_sibling_bootloader_refresh_assets(
+    firmware_path: &str,
+) -> Result<Option<(String, String)>, String> {
+    let firmware_path = Path::new(firmware_path);
+    if firmware_path.file_name().and_then(|name| name.to_str()) != Some("kbhe-app.bin") {
+        return Ok(None);
+    }
+    let Some(parent) = firmware_path.parent() else {
+        return Ok(None);
+    };
+    let refresh = parent.join("kbhe-updater-v3-refresh.bin");
+    let refresh_signature = parent.join("kbhe-updater-v3-refresh.bin.sig");
+    let refresh_present = refresh.is_file();
+    let signature_present = refresh_signature.is_file();
+    if refresh_present != signature_present {
+        return Err(
+            "automatic updater refresh found only one of kbhe-updater-v3-refresh.bin and its detached signature"
+                .to_string(),
+        );
+    }
+    if !refresh_present {
+        return Ok(None);
+    }
+    Ok(Some((
+        refresh
+            .to_str()
+            .ok_or_else(|| "updater refresh path is not valid Unicode".to_string())?
+            .to_string(),
+        refresh_signature
+            .to_str()
+            .ok_or_else(|| "updater refresh signature path is not valid Unicode".to_string())?
+            .to_string(),
+    )))
+}
+
 fn kbhe_flash_firmware_blocking(
     firmware_path: String,
     firmware_signature_path: String,
     migration_firmware_path: Option<String>,
     migration_firmware_signature_path: Option<String>,
+    bootloader_refresh_path: Option<String>,
+    bootloader_refresh_signature_path: Option<String>,
     firmware_version: FirmwareVersion,
     expected_serial_number: String,
     timeout_ms: u64,
@@ -2276,9 +2320,50 @@ fn kbhe_flash_firmware_blocking(
             )
         }
     };
-    if migration.is_some() && !matches!(primary.artifact, FirmwareArtifact::Application) {
+    let (bootloader_refresh_path, bootloader_refresh_signature_path) =
+        match (bootloader_refresh_path, bootloader_refresh_signature_path) {
+            (None, None) => match discover_sibling_bootloader_refresh_assets(&firmware_path)? {
+                Some((path, signature_path)) => (Some(path), Some(signature_path)),
+                None => (None, None),
+            },
+            pair => pair,
+        };
+    let bootloader_refresh = match (
+        bootloader_refresh_path.as_deref(),
+        bootloader_refresh_signature_path.as_deref(),
+    ) {
+        (None, None) => None,
+        (Some(path), Some(signature_path)) => {
+            let candidate = prepare_flash_artifact(
+                path,
+                signature_path,
+                firmware_version,
+                "updater v3 refresh image",
+            )?;
+            if !matches!(candidate.artifact, FirmwareArtifact::V3BootloaderRefresh(_)) {
+                return Err(
+                    "UPDATER_ARTIFACT_MISMATCH: automatic v3 refresh input is not the signed kbhe-updater-v3-refresh inner image"
+                        .to_string(),
+                );
+            }
+            Some(candidate)
+        }
+        _ => return Err(
+            "automatic updater v3 refresh requires both the inner image and its detached signature"
+                .to_string(),
+        ),
+    };
+    if matches!(primary.artifact, FirmwareArtifact::V3BootloaderRefresh(_)) {
         return Err(
-            "UPDATER_ARTIFACT_MISMATCH: automatic migration requires the normal signed application as the final image"
+            "UPDATER_ARTIFACT_MISMATCH: kbhe-updater-v3-refresh.bin is a support image, not final firmware; select the matching signed kbhe-app.bin"
+                .to_string(),
+        );
+    }
+    if (migration.is_some() || bootloader_refresh.is_some())
+        && !matches!(primary.artifact, FirmwareArtifact::Application)
+    {
+        return Err(
+            "UPDATER_ARTIFACT_MISMATCH: automatic updater migration/refresh requires the normal signed application as the final image"
                 .to_string(),
         );
     }
@@ -2351,6 +2436,9 @@ fn kbhe_flash_firmware_blocking(
 
     if initial_hello.protocol_version == UPDATER_PROTOCOL_V2 && migration.is_some() {
         let migration = migration.as_ref().expect("migration was checked");
+        let FirmwareArtifact::V2ToV3Migration(migration_metadata) = &migration.artifact else {
+            unreachable!("migration artifact was checked during preparation");
+        };
         let protocol = negotiate_flash_protocol_with_cleanup(
             &device,
             initial_hello,
@@ -2387,6 +2475,11 @@ fn kbhe_flash_firmware_blocking(
                 "UPDATER_MIGRATION_INCOMPLETE: updater v3 for keyboard serial {expected_serial_number} did not become ready after the migrator ran: {error}. Keep the keyboard connected and use the documented ROM-DFU recovery if it no longer enumerates."
             )
         })?;
+        let installed_bootloader =
+            read_updater_bootloader_info(&v3_device, timeout_ms.min(1_000), retries.min(2))
+                .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
+        verify_refreshed_bootloader(installed_bootloader, migration_metadata)
+            .map_err(|error| format!("UPDATER_MIGRATION_INCOMPLETE: {error}"))?;
         let protocol = negotiate_flash_protocol_with_cleanup(
             &v3_device,
             v3_hello,
@@ -2403,6 +2496,111 @@ fn kbhe_flash_firmware_blocking(
             return Err(error);
         }
         drop(v3_device);
+    } else if initial_hello.protocol_version == UPDATER_PROTOCOL_V3 && bootloader_refresh.is_some()
+    {
+        let refresh = bootloader_refresh
+            .as_ref()
+            .expect("bootloader refresh was checked");
+        let FirmwareArtifact::V3BootloaderRefresh(refresh_metadata) = &refresh.artifact else {
+            unreachable!("refresh artifact was checked during preparation");
+        };
+        /* Validate the final application contract before deciding whether the
+         * optional resident-updater stage is needed. */
+        negotiate_flash_protocol_with_cleanup(
+            &device,
+            initial_hello,
+            &primary.artifact,
+            retries,
+            timeout_ms,
+        )?;
+        emit_flash_progress(&app, "bootloaderCheck", 0, primary.total);
+        let installed_bootloader =
+            read_updater_bootloader_info(&device, timeout_ms.min(1_000), retries.min(2))?;
+        if bootloader_refresh_required(installed_bootloader, refresh_metadata)? {
+            emit_flash_progress(&app, "bootloaderRefresh", 0, refresh.total);
+            let protocol = negotiate_flash_protocol_with_cleanup(
+                &device,
+                initial_hello,
+                &refresh.artifact,
+                retries,
+                timeout_ms,
+            )?;
+            if let Err(error) = flash_after_hello(
+                &device,
+                initial_hello,
+                protocol,
+                refresh,
+                &app,
+                timeout_ms,
+                retries,
+            ) {
+                cleanup_updater_session(&device, retries, timeout_ms);
+                return Err(error);
+            }
+            drop(device);
+
+            let (refreshed_device, refreshed_hello) = wait_for_updater_protocol(
+                &expected_serial_number,
+                UPDATER_PROTOCOL_V3,
+                90_000,
+                &app,
+                primary.total,
+                timeout_ms,
+                retries,
+            )
+            .map_err(|error| format!(
+                "UPDATER_BOOTLOADER_REFRESH_INCOMPLETE: updater v3 for keyboard serial {expected_serial_number} did not become ready after the signed refresh: {error}. Keep the keyboard connected; the migrator resumes across power cuts."
+            ))?;
+            let installed_bootloader = read_updater_bootloader_info(
+                &refreshed_device,
+                timeout_ms.min(1_000),
+                retries.min(2),
+            )?;
+            verify_refreshed_bootloader(installed_bootloader, refresh_metadata)?;
+            let protocol = negotiate_flash_protocol_with_cleanup(
+                &refreshed_device,
+                refreshed_hello,
+                &primary.artifact,
+                retries,
+                timeout_ms,
+            )?;
+            emit_flash_progress(&app, "migrationReady", primary.total, primary.total);
+            if let Err(error) = flash_after_hello(
+                &refreshed_device,
+                refreshed_hello,
+                protocol,
+                &primary,
+                &app,
+                timeout_ms,
+                retries,
+            ) {
+                cleanup_updater_session(&refreshed_device, retries, timeout_ms);
+                return Err(error);
+            }
+            drop(refreshed_device);
+        } else {
+            emit_flash_progress(&app, "bootloaderCurrent", 0, primary.total);
+            let protocol = negotiate_flash_protocol_with_cleanup(
+                &device,
+                initial_hello,
+                &primary.artifact,
+                retries,
+                timeout_ms,
+            )?;
+            if let Err(error) = flash_after_hello(
+                &device,
+                initial_hello,
+                protocol,
+                &primary,
+                &app,
+                timeout_ms,
+                retries,
+            ) {
+                cleanup_updater_session(&device, retries, timeout_ms);
+                return Err(error);
+            }
+            drop(device);
+        }
     } else {
         let protocol = negotiate_flash_protocol_with_cleanup(
             &device,
@@ -2513,6 +2711,29 @@ fn read_updater_hello(
     }
     emit_flash_progress(app, "compatibility", 0, total);
     parse_updater_hello(&hello.payload)
+}
+
+fn read_updater_bootloader_info(
+    device: &HidDevice,
+    timeout_ms: u64,
+    retries: u32,
+) -> Result<Option<BootloaderInfo>, String> {
+    let response = updater_transact(
+        device,
+        UPDATER_CMD_BOOTLOADER_INFO,
+        0xB0,
+        0,
+        &[],
+        retries,
+        timeout_ms,
+    )?;
+    if response.status == UPDATER_STATUS_INVALID_COMMAND && response.payload.is_empty() {
+        return Ok(None);
+    }
+    if response.status != UPDATER_STATUS_OK {
+        return Err(updater_status_error("BOOTLOADER_INFO", response.status));
+    }
+    parse_bootloader_info(&response.payload).map(Some)
 }
 
 fn wait_for_updater_protocol(

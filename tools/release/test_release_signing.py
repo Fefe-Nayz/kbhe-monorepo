@@ -28,6 +28,7 @@ from build_factory_image import (
 )
 from build_updater_migration_package import (
     APP_BASE as MIGRATOR_APP_BASE,
+    BOOTLOADER_VERSION_RECORD_MAGIC,
     FLASH_BASE as MIGRATION_FLASH_BASE,
     MIGRATION_DESCRIPTOR_SIZE,
     MIGRATION_PACKAGE_SIZE,
@@ -35,7 +36,9 @@ from build_updater_migration_package import (
     build_migration_image,
     build_migration_package,
     inspect_migration_package,
+    parse_bootloader_version,
     parse_migration_descriptor,
+    validate_bootloader_lineage,
 )
 from sign_release_asset import (
     app_manifest,
@@ -281,13 +284,55 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
                 bytes(20),
             )
         )
-        bootloader = (
-            struct.pack("<II", 0x2003FF00, MIGRATION_FLASH_BASE + 9) + bytes(56)
+        bootloader_version = (1, 0, 0)
+        bootloader_version_word = 1 << 16
+        bootloader = b"".join(
+            (
+                struct.pack("<II", 0x2003FF00, MIGRATION_FLASH_BASE + 9),
+                bytes(24),
+                struct.pack(
+                    "<III",
+                    BOOTLOADER_VERSION_RECORD_MAGIC,
+                    bootloader_version_word,
+                    bootloader_version_word ^ 0xFFFFFFFF,
+                ),
+                bytes(20),
+            )
         )
+        self.assertEqual(parse_bootloader_version(bootloader), bootloader_version)
+        self.assertEqual(
+            validate_bootloader_lineage(bootloader, bytes(len(bootloader))),
+            (bootloader_version, None),
+        )
+        self.assertEqual(
+            validate_bootloader_lineage(bootloader, bootloader),
+            (bootloader_version, bootloader_version),
+        )
+        changed_without_bump = bytearray(bootloader)
+        changed_without_bump[-1] ^= 1
+        with self.assertRaisesRegex(ValueError, "without a KBLV bump"):
+            validate_bootloader_lineage(bytes(changed_without_bump), bootloader)
+        upgraded_bootloader = bytearray(bootloader)
+        upgraded_word = 2 << 16
+        struct.pack_into(
+            "<III",
+            upgraded_bootloader,
+            32,
+            BOOTLOADER_VERSION_RECORD_MAGIC,
+            upgraded_word,
+            upgraded_word ^ 0xFFFFFFFF,
+        )
+        self.assertEqual(
+            validate_bootloader_lineage(bytes(upgraded_bootloader), bootloader),
+            ((2, 0, 0), bootloader_version),
+        )
+        with self.assertRaisesRegex(ValueError, "decreased"):
+            validate_bootloader_lineage(bootloader, bytes(upgraded_bootloader))
         image = build_migration_image(migrator, bootloader)
         descriptor = parse_migration_descriptor(image)
         self.assertEqual(descriptor["image_size"], len(image))
         self.assertEqual(descriptor["bootloader_size"], len(bootloader))
+        self.assertEqual(descriptor["bootloader_version"], bootloader_version)
         self.assertGreaterEqual(len(image), len(migrator) + len(bootloader) + MIGRATION_DESCRIPTOR_SIZE)
 
         # The golden signature does not sign this synthetic image; package
@@ -333,6 +378,21 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exact supported recovery contract"):
             parse_migration_descriptor(bytes(unknown_flags))
 
+        wrong_bootloader_version = bytearray(image)
+        wrong_bootloader_version[descriptor_offset + 118] = 1
+        struct.pack_into(
+            "<I",
+            wrong_bootloader_version,
+            len(wrong_bootloader_version) - 4,
+            zlib.crc32(
+                wrong_bootloader_version[
+                    descriptor_offset : len(wrong_bootloader_version) - 4
+                ]
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "KBLV version does not match"):
+            parse_migration_descriptor(bytes(wrong_bootloader_version))
+
         for label, offset in (
             ("signed image", 20),
             ("erased padding", len(image)),
@@ -354,11 +414,15 @@ class ReleaseSigningVectorsTest(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("build_updater_migration_package.py inspect", workflow)
+        self.assertIn("build_updater_migration_package.py inspect-image", workflow)
+        self.assertIn("build_updater_migration_package.py inspect-lineage", workflow)
+        self.assertIn("Enforce resident bootloader version lineage", workflow)
         self.assertIn(
-            "kbhe-updater-v2-to-v3.bin.sig deliberately authenticates the exact",
+            "Both updater migration/refresh .sig files deliberately authenticate",
             workflow,
         )
         self.assertIn("! -name 'kbhe-updater-v2-to-v3.bin'", workflow)
+        self.assertIn("! -name 'kbhe-updater-v3-refresh.bin'", workflow)
         self.assertIn("draft: true", workflow)
         self.assertNotIn("--draft=false", workflow)
 

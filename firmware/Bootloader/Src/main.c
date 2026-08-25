@@ -2,11 +2,14 @@
 #include "stm32f7xx_hal.h"
 #include "tusb.h"
 #include "updater_bootloader.h"
+#include "updater_bootloader_version.h"
 #include "updater_shared.h"
 #include "updater_version_floor.h"
 #include "usb_descriptors.h"
 
 static bool s_hal_initialized = false;
+
+UPDATER_DECLARE_BOOTLOADER_VERSION_RECORD(g_kbhe_bootloader_version_record);
 
 static void SystemClock_Config(void);
 static void USB_HS_Init(void);

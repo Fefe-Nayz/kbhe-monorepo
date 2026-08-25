@@ -74,6 +74,50 @@ bool boot_request_take(boot_request_action_t action) {
   return matched;
 }
 
+updater_bootloader_version_scan_t updater_bootloader_version_scan(
+    const void *image, uint32_t image_size,
+    updater_fw_version_t *version_out) {
+  const uint8_t *bytes = (const uint8_t *)image;
+  updater_fw_version_t discovered = {0};
+  bool found = false;
+
+  if (bytes == NULL || version_out == NULL) {
+    return UPDATER_BOOTLOADER_VERSION_AMBIGUOUS;
+  }
+  if (image_size < sizeof(updater_bootloader_version_record_t)) {
+    return UPDATER_BOOTLOADER_VERSION_NOT_FOUND;
+  }
+  for (uint32_t offset = 0u;
+       offset <= image_size - sizeof(updater_bootloader_version_record_t);
+       offset++) {
+    updater_bootloader_version_record_t record;
+    updater_fw_version_t candidate;
+    memcpy(&record, bytes + offset, sizeof(record));
+    if (record.magic != UPDATER_BOOTLOADER_VERSION_RECORD_MAGIC ||
+        (record.version_packed ^ record.version_xor) != UINT32_MAX ||
+        record.version_packed > 0x00FFFFFFu ||
+        record.version_packed == 0u) {
+      continue;
+    }
+    candidate.major = (uint8_t)(record.version_packed >> 16);
+    candidate.minor = (uint8_t)(record.version_packed >> 8);
+    candidate.patch = (uint8_t)record.version_packed;
+    if (found &&
+        (candidate.major != discovered.major ||
+         candidate.minor != discovered.minor ||
+         candidate.patch != discovered.patch)) {
+      return UPDATER_BOOTLOADER_VERSION_AMBIGUOUS;
+    }
+    discovered = candidate;
+    found = true;
+  }
+  if (!found) {
+    return UPDATER_BOOTLOADER_VERSION_NOT_FOUND;
+  }
+  *version_out = discovered;
+  return UPDATER_BOOTLOADER_VERSION_VALID;
+}
+
 uint32_t updater_crc32_compute(const void *data, uint32_t len) {
   const uint8_t *buf = (const uint8_t *)data;
   uint32_t crc = 0xFFFFFFFFu;
@@ -256,7 +300,7 @@ bool updater_app_has_valid_migration_descriptor(
   uint32_t initial_sp;
   uint32_t reset_handler;
   uint32_t reset_address;
-  static const uint8_t zeroes[8] = {0};
+  static const uint8_t zeroes[4] = {0};
 
   if (!updater_trailer_is_valid(trailer) ||
       trailer->image_size < sizeof(descriptor)) {
@@ -278,6 +322,10 @@ bool updater_app_has_valid_migration_descriptor(
       descriptor.image_size != trailer->image_size ||
       memcmp(descriptor.target_id, s_migration_target_id,
              sizeof(descriptor.target_id)) != 0 ||
+      (descriptor.bootloader_version_major == 0u &&
+       descriptor.bootloader_version_minor == 0u &&
+       descriptor.bootloader_version_patch == 0u) ||
+      descriptor.reserved0 != 0u ||
       memcmp(descriptor.reserved, zeroes, sizeof(descriptor.reserved)) != 0 ||
       descriptor.descriptor_crc32 !=
           updater_crc32_compute(&descriptor,

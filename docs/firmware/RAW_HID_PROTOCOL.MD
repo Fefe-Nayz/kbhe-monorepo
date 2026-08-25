@@ -1057,7 +1057,25 @@ maximale, l'alignement et le bit `signature obligatoire` avant de poursuivre.
 - `STORAGE_ERROR` (0x0A): impossible de valider durablement le nouveau plancher
   avant effacement; le slot application reste intact
 
-### 4.9 Idempotence
+### 4.9 BOOTLOADER_INFO (0x08)
+
+- Requete: payload vide
+- Reponse payload de 32 octets:
+  - contexte exact `KBHEBL3\0` (8 octets)
+  - schema u16 = 1
+  - taille record u16 = 32
+  - version bootloader majeure, mineure, patch (3 x u8)
+  - reserved u8 = 0
+  - target exact `KBHE75HEF723VET6` (16 octets)
+
+La version du bootloader resident est independante de la version application.
+Le host utilise cette commande optionnelle pour eviter un refresh des secteurs
+0–3 lorsque le bootloader est deja courant. Un updater v3 plus ancien conserve
+le HELLO de 20 octets et repond `INVALID_COMMAND`; le host peut alors installer
+l'image signee `kbhe-updater-v3-refresh.bin`, attendre la re-enumeration, puis
+exiger une reponse BOOTLOADER_INFO exacte avant l'application finale.
+
+### 4.10 Idempotence
 
 Le bootloader memorise la derniere requete complete.
 
@@ -1086,4 +1104,4 @@ Le bootloader memorise la derniere requete complete.
 - Actions/macros/ProfileDocument: 0x90..0x9D
 - Debug: 0xE0..0xE9
 - Echo: 0xFE
-- Updater: 0x01..0x07 sur PID 0x0003
+- Updater: 0x01..0x08 sur PID 0x0003
