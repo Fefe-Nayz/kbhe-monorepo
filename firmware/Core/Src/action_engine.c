@@ -9,6 +9,13 @@
 #define ACTION_TAP_HOLD_MS 8u
 #define ACTION_STEPS_PER_TICK 8u
 
+#if defined(__GNUC__) && !defined(__clang__)
+#define ACTION_ENGINE_COLD_NOINLINE \
+  __attribute__((noinline, optimize("Os")))
+#else
+#define ACTION_ENGINE_COLD_NOINLINE
+#endif
+
 typedef struct {
   bool active;
   bool cancel_requested;
@@ -62,14 +69,16 @@ static bool deadline_reached(uint32_t now_ms, uint32_t deadline_ms) {
   return (int32_t)(now_ms - deadline_ms) >= 0;
 }
 
-static void action_program_set_empty(action_program_t *program) {
+static ACTION_ENGINE_COLD_NOINLINE void
+action_program_set_empty(action_program_t *program) {
   memset(program, 0, sizeof(*program));
   program->version = ACTION_PROGRAM_VERSION;
   program->step_count = 1u;
   program->steps[0].opcode = (uint8_t)ACTION_OP_END;
 }
 
-static void action_profile_set_defaults(action_profile_t *profile) {
+static ACTION_ENGINE_COLD_NOINLINE void
+action_profile_set_defaults(action_profile_t *profile) {
   memset(profile, 0, sizeof(*profile));
   for (uint8_t slot = 0u; slot < ACTION_PROGRAM_COUNT; slot++) {
     action_program_set_empty(&profile->programs[slot]);
@@ -91,7 +100,8 @@ action_program_runtime_shape_is_sane(const action_program_t *program) {
          program->reserved == 0u;
 }
 
-static void action_engine_sync_state_overlays(void) {
+static ACTION_ENGINE_COLD_NOINLINE void
+action_engine_sync_state_overlays(void) {
   action_profile_t *profile = &action_profiles[active_profile_index];
   for (uint8_t overlay = 0u; overlay < LED_STATE_OVERLAY_COUNT; overlay++) {
     const action_overlay_binding_t *binding = &profile->overlays[overlay];
@@ -105,7 +115,8 @@ static void action_engine_sync_state_overlays(void) {
   }
 }
 
-static void action_engine_configure_state_overlays(void) {
+static ACTION_ENGINE_COLD_NOINLINE void
+action_engine_configure_state_overlays(void) {
   const action_profile_t *profile = &action_profiles[active_profile_index];
   for (uint8_t overlay = 0u; overlay < LED_STATE_OVERLAY_COUNT; overlay++) {
     (void)led_matrix_configure_state_overlay(
@@ -151,13 +162,14 @@ static int8_t action_instance_allocate(void) {
   return -1;
 }
 
-static void action_trigger_queue_clear(void) {
+static ACTION_ENGINE_COLD_NOINLINE void action_trigger_queue_clear(void) {
   pending_trigger_head = 0u;
   pending_trigger_tail = 0u;
   pending_trigger_count = 0u;
 }
 
-static void action_engine_advance_program_trigger_generation(
+static ACTION_ENGINE_COLD_NOINLINE void
+action_engine_advance_program_trigger_generation(
     uint8_t program_index) {
   program_trigger_references[program_index] = 0u;
   program_trigger_generations[program_index]++;
@@ -166,7 +178,8 @@ static void action_engine_advance_program_trigger_generation(
   }
 }
 
-static void action_engine_advance_all_trigger_generations(void) {
+static ACTION_ENGINE_COLD_NOINLINE void
+action_engine_advance_all_trigger_generations(void) {
   for (uint8_t i = 0u; i < ACTION_PROGRAM_COUNT; i++) {
     action_engine_advance_program_trigger_generation(i);
   }
@@ -442,7 +455,7 @@ static bool action_instance_execute_step(action_instance_t *instance,
   }
 }
 
-void action_engine_init(void) {
+ACTION_ENGINE_COLD_NOINLINE void action_engine_init(void) {
   memset(action_instances, 0, sizeof(action_instances));
   action_trigger_queue_clear();
   memset(program_trigger_references, 0,
@@ -516,7 +529,7 @@ void action_engine_tick(uint32_t now_ms) {
   action_trigger_queue_drain();
 }
 
-void action_engine_cancel_all(void) {
+ACTION_ENGINE_COLD_NOINLINE void action_engine_cancel_all(void) {
   for (uint8_t i = 0u; i < ACTION_ENGINE_MAX_INSTANCES; i++) {
     if (action_instances[i].active) {
       action_instance_finish(&action_instances[i]);
@@ -527,7 +540,8 @@ void action_engine_cancel_all(void) {
   action_tick_cursor = 0u;
 }
 
-bool action_engine_activate_profile(uint8_t profile_index) {
+ACTION_ENGINE_COLD_NOINLINE bool
+action_engine_activate_profile(uint8_t profile_index) {
   if (profile_index >= ACTION_PROFILE_COUNT) {
     return false;
   }
@@ -603,7 +617,8 @@ bool action_engine_trigger_program_tracked(uint8_t program_index,
   return true;
 }
 
-static void action_trigger_queue_remove_program(uint8_t program_index) {
+static ACTION_ENGINE_COLD_NOINLINE void
+action_trigger_queue_remove_program(uint8_t program_index) {
   uint8_t retained[ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY] = {0};
   uint8_t retained_count = 0u;
   uint8_t original_count = pending_trigger_count;
@@ -673,6 +688,15 @@ bool action_engine_is_idle(void) {
 uint32_t action_engine_dropped_trigger_count(void) {
   return dropped_trigger_count;
 }
+
+/* Validation, profile publication and persistence helpers are control-plane
+ * operations reached only by boot/profile changes or explicit HID commands.
+ * Keep the per-scan executor above at -O3, while compiling this cold block for
+ * size so configuration features do not consume the realtime image budget. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("Os")
+#endif
 
 action_validation_result_t
 action_engine_validate_program(const action_program_t *program) {
@@ -1210,6 +1234,10 @@ bool action_engine_set_overlay_binding(uint8_t profile_index,
       &profile_update_scratch.overlays[overlay_id]);
 }
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
+
 bool action_engine_get_state(uint8_t state_index) {
   if (state_index >= ACTION_STATE_COUNT) {
     return false;
@@ -1251,3 +1279,5 @@ uint16_t action_engine_state_bits(void) { return runtime_state_bits; }
 uint16_t action_engine_initial_state_bits(void) {
   return action_profiles[active_profile_index].initial_state_bits;
 }
+
+#undef ACTION_ENGINE_COLD_NOINLINE
