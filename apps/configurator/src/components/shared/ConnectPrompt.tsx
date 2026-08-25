@@ -1,4 +1,5 @@
-import { IconPlugConnectedX, IconRefresh } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
+import { IconPlugConnectedX, IconRefresh, IconUpload } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DeviceSessionManager, useDeviceSession } from "@/lib/kbhe/session";
@@ -18,23 +19,35 @@ export function ConnectPrompt({
 }) {
   const status = useDeviceSession((s) => s.status);
   const connecting = status === "connecting";
+  const recoveryOnly = status === "recovery-only";
+  const navigate = useNavigate();
 
   return (
     <EmptyState
       className={className}
       size="lg"
       icon={<IconPlugConnectedX />}
-      title="No keyboard connected"
-      description={`Plug in your KBHE keyboard over USB to ${feature}.`}
+      title={recoveryOnly ? "Configuration unavailable" : "No keyboard connected"}
+      description={recoveryOnly
+        ? `This keyboard is available only for safe recovery, so it cannot ${feature}. Update from the Firmware page.`
+        : `Plug in your KBHE keyboard over USB to ${feature}.`}
       action={
         <Button
           variant="outline"
           size="sm"
           disabled={connecting}
-          onClick={() => void DeviceSessionManager.reconnect()}
+          onClick={() => {
+            if (recoveryOnly) {
+              navigate("/firmware");
+            } else {
+              void DeviceSessionManager.reconnect();
+            }
+          }}
         >
-          <IconRefresh className={connecting ? "animate-spin" : undefined} />
-          {connecting ? "Searching…" : "Retry connection"}
+          {recoveryOnly
+            ? <IconUpload />
+            : <IconRefresh className={connecting ? "animate-spin" : undefined} />}
+          {recoveryOnly ? "Open Firmware" : connecting ? "Searching…" : "Retry connection"}
         </Button>
       }
     />

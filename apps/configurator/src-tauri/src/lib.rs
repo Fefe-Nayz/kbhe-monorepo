@@ -273,6 +273,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::kbhe_list_devices,
+            commands::kbhe_get_updater_info,
             commands::kbhe_list_rgb_bridge_devices,
             commands::kbhe_connect,
             commands::kbhe_disconnect,

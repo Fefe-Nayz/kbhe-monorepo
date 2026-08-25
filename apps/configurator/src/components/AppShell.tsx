@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DeviceBanner, DeviceStatusChip } from "@/components/DeviceBanner";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { CompatibilityBanner } from "@/components/CompatibilityBanner";
 import { ThemeButton } from "@/components/nav-components/themeButton";
 import { ProfileSelect } from "@/components/profile-select";
 import { useDeviceSession, DeviceSessionManager } from "@/lib/kbhe/session";
@@ -192,6 +193,7 @@ export function AppShell() {
         <SidebarInset className="flex min-w-0 flex-col min-h-0 overflow-hidden">
           <AppHeader meta={pageMeta} />
           <DeviceBanner />
+          <CompatibilityBanner />
           <UpdateBanner />
           <main className="flex min-w-0 flex-1 flex-col min-h-0 overflow-hidden">
             <Routes>

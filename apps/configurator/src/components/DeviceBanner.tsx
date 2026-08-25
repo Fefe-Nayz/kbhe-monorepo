@@ -40,6 +40,12 @@ const STATUS_CONFIG = {
     dotClassName: "bg-warning",
     className: "border-warning/30 bg-warning/10 text-warning",
   },
+  "recovery-only": {
+    label: "Recovery",
+    icon: IconAlertTriangle,
+    dotClassName: "bg-warning",
+    className: "border-warning/30 bg-warning/10 text-warning",
+  },
   error: {
     label: "Error",
     icon: IconAlertTriangle,
@@ -80,23 +86,37 @@ export function DeviceBanner() {
   const bootloaderPresenceQ = useQuery({
     queryKey: ["firmware", "bootloaderPresence"],
     queryFn: () => kbheTransport.detectBootloaderPresence(),
-    enabled: isTauri() && status !== "connected" && status !== "updater",
+    enabled: isTauri()
+      && status !== "connected"
+      && status !== "updater"
+      && status !== "recovery-only",
     refetchInterval: 2000,
     staleTime: 1000,
   });
 
-  const bootloaderDetected = status !== "connected" && status !== "updater" && Boolean(bootloaderPresenceQ.data);
+  const bootloaderDetected = status !== "connected"
+    && status !== "updater"
+    && status !== "recovery-only"
+    && Boolean(bootloaderPresenceQ.data);
 
   const rgbBridgePresenceQ = useQuery({
     queryKey: ["libhmk-rgb-bridge", "devices"],
     queryFn: () => libhmkRgbBridge.listDevices(),
-    enabled: isTauri() && status !== "connected" && status !== "updater",
+    enabled: isTauri()
+      && status !== "connected"
+      && status !== "updater"
+      && status !== "recovery-only",
     refetchInterval: 3000,
     staleTime: 1000,
   });
   const rgbBridgeDevice = rgbBridgePresenceQ.data?.[0];
 
-  if (status === "connected" || status === "updater" || bootloaderDetected) return null;
+  if (
+    status === "connected"
+    || status === "updater"
+    || status === "recovery-only"
+    || bootloaderDetected
+  ) return null;
 
   if (rgbBridgeDevice) {
     return (

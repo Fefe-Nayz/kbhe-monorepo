@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   selectKbheSessionDevice,
+  selectKbheRecoveryTarget,
   type KbheDeviceKind,
   type KbheTransportDeviceInfo,
 } from "./transport";
@@ -52,5 +53,28 @@ describe("KBHE session device selection", () => {
     expect(() => selectKbheSessionDevice([runtime, updater], "DUP")).toThrow(
       "ambiguous KBHE target",
     );
+  });
+});
+
+describe("KBHE recovery target selection", () => {
+  test("accepts an updater-only keyboard without a configuration session", () => {
+    const updater = keyboard("updater", "RECOVERY", "updater");
+    expect(selectKbheRecoveryTarget([updater])).toEqual({ state: "ready", device: updater });
+  });
+
+  test("reports an updater with no serial as unsafe instead of guessing its path", () => {
+    const target = selectKbheRecoveryTarget([keyboard("updater", null, "updater")]);
+    expect(target.state).toBe("unsafe");
+    if (target.state === "unsafe") {
+      expect(target.reason).toContain("no stable USB serial number");
+    }
+  });
+
+  test("refuses transient runtime/updater duplicates for the same serial", () => {
+    const target = selectKbheRecoveryTarget([
+      keyboard("runtime", "DUP"),
+      keyboard("updater", "DUP", "updater"),
+    ], "DUP");
+    expect(target.state).toBe("unsafe");
   });
 });

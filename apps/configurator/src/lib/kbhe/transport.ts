@@ -22,6 +22,20 @@ export interface KbheTransportConnectionState {
   kind: KbheDeviceKind | null;
 }
 
+export interface KbheUpdaterInfo {
+  protocolVersion: number;
+  flags: number;
+  appBase: number;
+  appMaxSize: number;
+  writeAlign: number;
+  installedVersion: [number, number, number];
+}
+
+export type KbheRecoveryTarget =
+  | { state: "ready"; device: KbheTransportDeviceInfo }
+  | { state: "none"; device: null }
+  | { state: "unsafe"; device: null; reason: string };
+
 /**
  * Resolve one physical keyboard without relying on HID enumeration order.
  *
@@ -74,6 +88,27 @@ export function selectKbheSessionDevice(
   return candidate;
 }
 
+/**
+ * Resolve the identity used by the native signed flasher without requiring a
+ * working runtime configuration session. The same strict serial/ambiguity
+ * rules apply: recovery is available, but never by guessing a USB path.
+ */
+export function selectKbheRecoveryTarget(
+  devices: readonly KbheTransportDeviceInfo[],
+  expectedSerialNumber?: string | null,
+): KbheRecoveryTarget {
+  try {
+    const device = selectKbheSessionDevice(devices, expectedSerialNumber);
+    return device ? { state: "ready", device } : { state: "none", device: null };
+  } catch (error) {
+    return {
+      state: "unsafe",
+      device: null,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 export function kbheDeviceStorageId(device: KbheTransportDeviceInfo): string {
   const serialNumber = device.serialNumber?.trim();
   if (serialNumber) {
@@ -89,6 +124,10 @@ export class KbheTransport {
 
   async detectBootloaderPresence(): Promise<boolean> {
     return invoke<boolean>("kbhe_detect_bootloader_presence");
+  }
+
+  async getUpdaterInfo(): Promise<KbheUpdaterInfo> {
+    return invoke<KbheUpdaterInfo>("kbhe_get_updater_info");
   }
 
   async connect(

@@ -93,7 +93,7 @@ interface AppSidebarProps {
 function KeyboardMenu() {
   const { status, deviceInfo } = useDeviceSession();
   const runtimeConnected = status === "connected";
-  const connected = status === "connected" || status === "updater";
+  const detected = status === "connected" || status === "updater" || status === "recovery-only";
 
   const identityQ = useQuery({
     queryKey: queryKeys.device.identity(),
@@ -123,7 +123,7 @@ function KeyboardMenu() {
                 <div
                   className={cn(
                     "relative flex aspect-square size-8 items-center justify-center rounded-lg transition-colors",
-                    connected
+                    detected
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "bg-sidebar-accent text-muted-foreground",
                   )}
@@ -132,16 +132,16 @@ function KeyboardMenu() {
                   <span
                     className={cn(
                       "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-sidebar",
-                      connected ? "bg-success" : "bg-muted-foreground/50",
+                      detected ? "bg-success" : "bg-muted-foreground/50",
                     )}
                   />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate font-medium">
-                    {connected ? keyboardName : "KBHE Configurator"}
+                    {detected ? keyboardName : "KBHE Configurator"}
                   </span>
                   <span className="truncate font-mono text-[0.7rem] text-muted-foreground">
-                    {connected ? (serialNumber ?? "SN unavailable") : "No device"}
+                    {detected ? (serialNumber ?? "SN unavailable") : "No device"}
                   </span>
                 </div>
                 <IconChevronDown className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
@@ -149,7 +149,7 @@ function KeyboardMenu() {
             }
           />
           <DropdownMenuContent side="bottom" align="start" className="w-56">
-            {connected ? (
+            {detected ? (
               <DropdownMenuItem onClick={() => void DeviceSessionManager.disconnect()}>
                 <IconPlugConnectedX className="size-4" />
                 Disconnect
@@ -210,7 +210,7 @@ export function AppSidebar({ variant = "inset" }: AppSidebarProps) {
   const firmwareVersion = useDeviceSession((s) => s.firmwareVersion);
   const status = useDeviceSession((s) => s.status);
   const deviceInfo = useDeviceSession((s) => s.deviceInfo);
-  const connected = status === "connected" || status === "updater";
+  const detected = status === "connected" || status === "updater" || status === "recovery-only";
 
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
@@ -278,16 +278,16 @@ export function AppSidebar({ variant = "inset" }: AppSidebarProps) {
             <span
               className={cn(
                 "size-1.5 shrink-0 rounded-full",
-                connected ? "bg-success" : "bg-muted-foreground/50",
+                detected ? "bg-success" : "bg-muted-foreground/50",
               )}
             />
             <span
               className={cn(
                 "truncate font-medium",
-                connected ? "text-foreground" : "text-muted-foreground",
+                detected ? "text-foreground" : "text-muted-foreground",
               )}
             >
-              {connected ? (deviceInfo?.product ?? "Connected") : "No device"}
+              {detected ? (deviceInfo?.product ?? "Connected") : "No device"}
             </span>
           </div>
           <div className="mt-1 flex items-center justify-between gap-2 text-[0.68rem] text-muted-foreground">
@@ -299,7 +299,7 @@ export function AppSidebar({ variant = "inset" }: AppSidebarProps) {
         </div>
 
         <div className="hidden items-center justify-center py-1.5 group-data-[collapsible=icon]:flex">
-          {connected ? (
+          {detected ? (
             <IconPlugConnected className="size-3.5 text-success" />
           ) : (
             <IconPlugConnectedX className="size-3.5 text-muted-foreground" />

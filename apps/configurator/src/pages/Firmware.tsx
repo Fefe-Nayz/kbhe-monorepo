@@ -11,7 +11,7 @@ import {
   checkFirmwareUpdate,
   downloadFirmwareRelease,
 } from "@/lib/kbhe/releases";
-import { kbheTransport } from "@/lib/kbhe/transport";
+import { kbheTransport, selectKbheRecoveryTarget } from "@/lib/kbhe/transport";
 import { formatFirmwareVersion, type FirmwareVersion } from "@/lib/kbhe/protocol";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -50,13 +50,32 @@ function delay(ms: number): Promise<void> {
 }
 
 export default function Firmware() {
-  const { status, firmwareVersion, developerMode } = useDeviceSession();
-  const connected = status === "connected" || status === "updater";
+  const { status, deviceInfo, firmwareVersion, compatibility, developerMode } = useDeviceSession();
+  const sessionDetected = status === "connected"
+    || status === "updater"
+    || status === "recovery-only";
+
+  const recoveryDevicesQ = useQuery({
+    queryKey: ["firmware", "recoveryDevices", deviceInfo?.serialNumber ?? null],
+    queryFn: () => kbheTransport.listDevices(),
+    enabled: isTauri(),
+    refetchInterval: 2000,
+    staleTime: 1000,
+  });
+  const sessionSerialNumber = deviceInfo?.serialNumber?.trim() || null;
+  const recoveryTarget = selectKbheRecoveryTarget(
+    recoveryDevicesQ.data ?? [],
+    sessionSerialNumber,
+  );
+  const recoverySerialNumber = sessionSerialNumber
+    || (recoveryTarget.state === "ready" ? recoveryTarget.device.serialNumber?.trim() : null)
+    || null;
+  const connected = Boolean(recoverySerialNumber);
 
   const bootloaderPresenceQ = useQuery({
     queryKey: ["firmware", "bootloaderPresence"],
     queryFn: () => kbheTransport.detectBootloaderPresence(),
-    enabled: isTauri() && !connected,
+    enabled: isTauri() && !sessionDetected,
     refetchInterval: 2000,
     staleTime: 1000,
   });
@@ -69,9 +88,11 @@ export default function Firmware() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const bootloaderDetected = !connected && Boolean(bootloaderPresenceQ.data);
-  const connectedForStatus = connected || bootloaderDetected;
-  const updateModeDetected = status === "updater" || bootloaderDetected;
+  const bootloaderDetected = !sessionDetected && Boolean(bootloaderPresenceQ.data);
+  const connectedForStatus = sessionDetected || connected || bootloaderDetected;
+  const updateModeDetected = status === "updater"
+    || (status === "recovery-only" && deviceInfo?.kind === "updater")
+    || bootloaderDetected;
 
   const [firmwareBytes, setFirmwareBytes] = useState<Uint8Array | null>(null);
   const [firmwareSignature, setFirmwareSignature] = useState<Uint8Array | null>(null);
@@ -472,7 +493,11 @@ export default function Firmware() {
       try {
         await DeviceSessionManager.connect(flashTargetSerialNumber);
         const sessionStatus = useDeviceSession.getState().status;
-        if (sessionStatus !== "connected" && sessionStatus !== "updater") {
+        if (
+          sessionStatus !== "connected"
+          && sessionStatus !== "updater"
+          && sessionStatus !== "recovery-only"
+        ) {
           throw new Error("The keyboard has not reappeared yet");
         }
         appendLog("Reconnected successfully.");
@@ -484,7 +509,9 @@ export default function Firmware() {
 
     try {
       await delay(0);
-      const expectedSerialNumber = useDeviceSession.getState().deviceInfo?.serialNumber?.trim();
+      const expectedSerialNumber = useDeviceSession.getState().deviceInfo?.serialNumber?.trim()
+        || recoverySerialNumber
+        || undefined;
       if (!expectedSerialNumber) {
         throw new Error("The connected keyboard does not expose a stable USB serial number; refusing an ambiguous flash target.");
       }
@@ -575,7 +602,7 @@ export default function Firmware() {
       await reconnectSession();
       flashInFlightRef.current = false;
     }
-  }, [timeoutSec, retries, appendLog]);
+  }, [timeoutSec, retries, appendLog, recoverySerialNumber]);
 
   const handleFlash = useCallback(async () => {
     if (!firmwareBytes) return;
@@ -627,7 +654,9 @@ export default function Firmware() {
   }, [appendLog, firmwareUpdateQ, runFlash]);
 
   const fileSizeKb = firmwareBytes ? (firmwareBytes.length / 1024).toFixed(1) : null;
+  const compatibilityBlocksFlash = compatibility?.status === "app-too-old";
   const canFlash = connected
+    && !compatibilityBlocksFlash
     && !!firmwareBytes
     && fileVersion !== null
     && fileError === null
@@ -715,15 +744,19 @@ export default function Firmware() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
-                    disabled={!connected || firmwareReleaseBusy || flashState === "flashing"}
+                    disabled={!connected || compatibilityBlocksFlash || firmwareReleaseBusy || flashState === "flashing"}
                     onClick={() => void handleFlashLatestFirmware()}
                   >
                     <IconDownload className="size-4" />
                     {firmwareReleaseBusy ? "Updating…" : "Download and flash"}
                   </Button>
-                  {!connected && (
+                  {(!connected || compatibilityBlocksFlash) && (
                     <span className="text-xs text-muted-foreground">
-                      Connect the keyboard before flashing.
+                      {compatibilityBlocksFlash
+                        ? "Update the configurator before flashing this newer device."
+                        : recoveryTarget.state === "unsafe"
+                          ? recoveryTarget.reason
+                          : "Connect a keyboard with a stable USB serial before flashing."}
                     </span>
                   )}
                 </div>

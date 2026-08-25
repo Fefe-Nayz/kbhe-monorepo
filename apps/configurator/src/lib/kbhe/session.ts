@@ -8,13 +8,21 @@
  */
 
 import { create } from "zustand";
+import { getVersion } from "@tauri-apps/api/app";
 import { kbheDevice } from "./device";
 import { kbheCommander } from "./commander";
 import {
   kbheDeviceStorageId,
+  kbheTransport,
   selectKbheSessionDevice,
   type KbheTransportDeviceInfo,
 } from "./transport";
+import {
+  COMPATIBILITY_INTRODUCED_APP_VERSION,
+  evaluateDeviceCompatibility,
+  runtimeSessionStatus,
+  type DeviceCompatibility,
+} from "./compatibility";
 import { startVolumeService, stopVolumeService } from "./volume-service";
 import { SETTINGS_PROFILE_COUNT } from "./protocol";
 import { setKbheQueryScope } from "@/lib/query/keys";
@@ -28,12 +36,14 @@ export type DeviceSessionStatus =
   | "connecting"
   | "connected"
   | "updater"
+  | "recovery-only"
   | "error";
 
 export interface DeviceSessionState {
   status: DeviceSessionStatus;
   deviceInfo: KbheTransportDeviceInfo | null;
   firmwareVersion: string | null;
+  compatibility: DeviceCompatibility | null;
   error: string | null;
   developerMode: boolean;
   activeProfileIndex: number | null;
@@ -46,6 +56,7 @@ export interface DeviceSessionState {
   _setStatus: (status: DeviceSessionStatus) => void;
   _setDeviceInfo: (info: KbheTransportDeviceInfo | null) => void;
   _setFirmwareVersion: (v: string | null) => void;
+  _setCompatibility: (compatibility: DeviceCompatibility | null) => void;
   _setError: (e: string | null) => void;
   _setRuntimeProfileState: (next: Partial<Pick<
     DeviceSessionState,
@@ -61,6 +72,7 @@ export const useDeviceSession = create<DeviceSessionState>()((set) => ({
   status: "disconnected",
   deviceInfo: null,
   firmwareVersion: null,
+  compatibility: null,
   error: null,
   developerMode: localStorage.getItem(DEV_MODE_KEY) === "true",
   activeProfileIndex: null,
@@ -73,6 +85,7 @@ export const useDeviceSession = create<DeviceSessionState>()((set) => ({
   _setStatus: (status) => set({ status }),
   _setDeviceInfo: (deviceInfo) => set({ deviceInfo }),
   _setFirmwareVersion: (firmwareVersion) => set({ firmwareVersion }),
+  _setCompatibility: (compatibility) => set({ compatibility }),
   _setError: (error) => set({ error }),
   _setRuntimeProfileState: (next) => set(next),
   _clearRuntimeProfileState: () => set({
@@ -96,6 +109,7 @@ let initialized = false;
 let generation = 0;
 let presenceFailures = 0;
 let preferredSerialNumber: string | null = null;
+let appVersionPromise: Promise<string> | null = null;
 
 const CONNECTED_PRESENCE_POLL_MS = 3000;
 const CONNECTED_PRESENCE_POLL_HIDDEN_MS = 6000;
@@ -108,7 +122,7 @@ function isDocumentVisible(): boolean {
 }
 
 function presencePollDelay(status: DeviceSessionStatus): number {
-  if (status === "updater") {
+  if (status === "updater" || status === "recovery-only") {
     return isDocumentVisible()
       ? UPDATER_PRESENCE_POLL_MS
       : UPDATER_PRESENCE_POLL_HIDDEN_MS;
@@ -117,6 +131,11 @@ function presencePollDelay(status: DeviceSessionStatus): number {
   return isDocumentVisible()
     ? CONNECTED_PRESENCE_POLL_MS
     : CONNECTED_PRESENCE_POLL_HIDDEN_MS;
+}
+
+function currentAppVersion(): Promise<string> {
+  appVersionPromise ??= getVersion().catch(() => COMPATIBILITY_INTRODUCED_APP_VERSION);
+  return appVersionPromise;
 }
 
 function clearReconnectTimer() {
@@ -139,12 +158,14 @@ function resetDisconnectedState() {
     _setStatus,
     _setDeviceInfo,
     _setFirmwareVersion,
+    _setCompatibility,
     _setError,
     _clearRuntimeProfileState,
   } = useDeviceSession.getState();
   _setStatus("disconnected");
   _setDeviceInfo(null);
   _setFirmwareVersion(null);
+  _setCompatibility(null);
   _setError(null);
   _clearRuntimeProfileState();
   setKbheQueryScope(null, null);
@@ -238,7 +259,13 @@ export const DeviceSessionManager = {
 
     const currentGeneration = ++generation;
     connectPromise = (async () => {
-      const { _setStatus, _setDeviceInfo, _setFirmwareVersion, _setError } = useDeviceSession.getState();
+      const {
+        _setStatus,
+        _setDeviceInfo,
+        _setFirmwareVersion,
+        _setCompatibility,
+        _setError,
+      } = useDeviceSession.getState();
       clearReconnectTimer();
       _setStatus("connecting");
       _setError(null);
@@ -282,14 +309,27 @@ export const DeviceSessionManager = {
 
         if (device.kind === "updater") {
           _setFirmwareVersion(null);
-          _setStatus("updater");
+          let updaterProtocol: number | null = null;
+          try {
+            updaterProtocol = (await kbheTransport.getUpdaterInfo()).protocolVersion;
+          } catch {
+            // An updater that cannot complete the read-only HELLO handshake is
+            // kept available for recovery, but never treated as compatible.
+          }
+          const compatibility = evaluateDeviceCompatibility({
+            appVersion: await currentAppVersion(),
+            updaterProtocol,
+          });
+          _setCompatibility(compatibility);
+          _setStatus(compatibility.status === "compatible" ? "updater" : "recovery-only");
           useDeviceSession.getState()._clearRuntimeProfileState();
           DeviceSessionManager.startPresencePolling(currentGeneration);
           return;
         }
 
+        let rawVersion: string | null = null;
         try {
-          const rawVersion = await kbheDevice.getFirmwareVersion();
+          rawVersion = await kbheDevice.getFirmwareVersion();
           if (currentGeneration === generation) {
             _setFirmwareVersion(rawVersion);
           }
@@ -303,7 +343,21 @@ export const DeviceSessionManager = {
           return;
         }
 
-        _setStatus("connected");
+        const compatibility = evaluateDeviceCompatibility({
+          appVersion: await currentAppVersion(),
+          firmwareVersion: rawVersion,
+        });
+        if (currentGeneration !== generation) {
+          return;
+        }
+        _setCompatibility(compatibility);
+        const runtimeStatus = runtimeSessionStatus(compatibility);
+        _setStatus(runtimeStatus);
+        if (runtimeStatus === "recovery-only") {
+          useDeviceSession.getState()._clearRuntimeProfileState();
+          DeviceSessionManager.startPresencePolling(currentGeneration);
+          return;
+        }
         void DeviceSessionManager.refreshRuntimeProfileState(currentGeneration);
         DeviceSessionManager.startPresencePolling(currentGeneration);
         void DeviceSessionManager.syncVolumeService();
@@ -469,7 +523,11 @@ export const DeviceSessionManager = {
       }
 
       const state = useDeviceSession.getState();
-      if (state.status !== "connected" && state.status !== "updater") {
+      if (
+        state.status !== "connected"
+        && state.status !== "updater"
+        && state.status !== "recovery-only"
+      ) {
         stopPresencePolling();
         return;
       }

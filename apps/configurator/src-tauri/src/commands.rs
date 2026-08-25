@@ -109,6 +109,17 @@ pub struct KbheKeyStatesSnapshot {
     distances_mm: Vec<f32>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KbheUpdaterInfo {
+    protocol_version: u16,
+    flags: u16,
+    app_base: u32,
+    app_max_size: u32,
+    write_align: u32,
+    installed_version: [u8; 3],
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KbheRgbBridgeDeviceInfo {
@@ -823,6 +834,42 @@ fn lock_rgb_bridge_operation() -> Result<MutexGuard<'static, ()>, String> {
 #[tauri::command]
 pub fn kbhe_list_devices() -> Result<Vec<KbheHidDeviceInfo>, String> {
     enumerate_kbhe_devices()
+}
+
+#[tauri::command]
+pub fn kbhe_get_updater_info(
+    state: State<'_, KbheTransportState>,
+) -> Result<KbheUpdaterInfo, String> {
+    ensure_transport_not_flashing()?;
+    let active = lock_active(&state)?;
+    let connection = active
+        .as_ref()
+        .ok_or_else(|| "no KBHE updater session is connected".to_string())?;
+    if connection.kind != KbheDeviceKind::Updater {
+        return Err("the active KBHE session is not an updater".to_string());
+    }
+
+    let response = updater_transact(
+        &connection.device,
+        UPDATER_CMD_HELLO,
+        1,
+        0,
+        &[],
+        2,
+        750,
+    )?;
+    if response.status != UPDATER_STATUS_OK {
+        return Err(updater_status_error("HELLO", response.status));
+    }
+    let hello = parse_updater_hello(&response.payload)?;
+    Ok(KbheUpdaterInfo {
+        protocol_version: hello.protocol_version,
+        flags: hello.flags,
+        app_base: hello.app_base,
+        app_max_size: hello.app_max_size,
+        write_align: hello.write_align,
+        installed_version: hello.installed_version,
+    })
 }
 
 #[tauri::command]
