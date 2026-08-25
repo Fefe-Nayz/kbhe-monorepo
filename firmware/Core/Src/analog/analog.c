@@ -3,6 +3,7 @@
 #include "analog/filter.h"
 #include "analog/lut.h"
 #include "analog/calibration.h"
+#include "analog/diagnostic_profile_policy.h"
 #include "analog/rest_estimator.h"
 #include "adc_capture.h"
 #include "diagnostics.h"
@@ -10,8 +11,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-
-#define ANALOG_PROFILE_DECIMATION 32u
 
 static AnalogConfig_t analog_config;
 
@@ -43,7 +42,7 @@ static volatile bool scan_fault_pending = false;
 
 static analog_task_monitor_t analog_task_monitor;
 static analog_rest_estimator_t analog_rest_estimator;
-static uint8_t analog_profile_counter = 0u;
+static analog_diagnostic_profile_sweep_t analog_profile_sweep;
 
 static inline bool analog_is_valid_physical_index(uint8_t index) {
     return index < NUM_ANALOG_INPUTS;
@@ -117,6 +116,7 @@ void analog_init(AnalogConfig_t* config) {
     }
 
     analog_rest_estimator_init(&analog_rest_estimator);
+    analog_diagnostic_profile_reset(&analog_profile_sweep);
 
     analog_task_monitor.raw_us = 0;
     analog_task_monitor.filter_us = 0;
@@ -133,37 +133,33 @@ void analog_init(AnalogConfig_t* config) {
 void analog_task() {
     const uint8_t* key_to_phys = LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX;
     bool diagnostics_active = diagnostics_is_perf_active();
-    bool collect_profile = diagnostics_active && (analog_profile_counter == 0u);
+    uint8_t profile_key = 0u;
     uint32_t raw_cycles = 0;
     uint32_t filter_cycles = 0;
     uint32_t calibration_cycles = 0;
     uint32_t lut_cycles = 0;
     uint32_t store_cycles = 0;
-    uint32_t key_sum_cycles = 0;
-    uint32_t key_min_cycles = UINT32_MAX;
-    uint32_t key_max_cycles = 0;
-    uint8_t key_max_index = 0;
+    uint32_t profiled_key_cycles = 0u;
     uint16_t nonzero_keys = 0;
 
     if (diagnostics_active) {
-        analog_profile_counter++;
-        if (analog_profile_counter >= ANALOG_PROFILE_DECIMATION) {
-            analog_profile_counter = 0u;
-        }
+        profile_key = analog_diagnostic_profile_take_key(&analog_profile_sweep,
+                                                         NUM_KEYS);
     } else {
-        analog_profile_counter = 0u;
+        analog_diagnostic_profile_reset(&analog_profile_sweep);
         memset(&analog_task_monitor, 0, sizeof(analog_task_monitor));
     }
 
     for (uint8_t key = 0; key < NUM_KEYS; key++) {
         uint32_t key_start_cycles = 0u;
+        bool measure_key = diagnostics_active && key == profile_key;
         uint8_t physical_key_index = key_to_phys[key];
         uint16_t raw_value = 0u;
         uint16_t filtered_value = 0u;
         uint16_t calibrated_value = 0u;
         uint16_t distance_value = 0u;
 
-        if (collect_profile) {
+        if (measure_key) {
             uint32_t step_start_cycles = DWT->CYCCNT;
             key_start_cycles = step_start_cycles;
             raw_value = analog_is_valid_physical_index(physical_key_index)
@@ -182,7 +178,7 @@ void analog_task() {
 
         logical_raw_values[key] = raw_value;
 
-        if (collect_profile) {
+        if (measure_key) {
             uint32_t step_start_cycles = DWT->CYCCNT;
             filtered_value = filter_compute_next_filtered_value(key, raw_value);
             filter_cycles += (DWT->CYCCNT - step_start_cycles);
@@ -213,36 +209,54 @@ void analog_task() {
                 calibration_get_normalized_distance(key, (int16_t)distance_value);
         }
 
-        if (!collect_profile) {
+        if (!measure_key) {
             continue;
         }
 
-        uint32_t key_cycles = DWT->CYCCNT - key_start_cycles;
-        key_sum_cycles += key_cycles;
-
-        if (key_cycles < key_min_cycles) {
-            key_min_cycles = key_cycles;
-        }
-
-        if (key_cycles >= key_max_cycles) {
-            key_max_cycles = key_cycles;
-            key_max_index = key;
-        }
+        profiled_key_cycles = DWT->CYCCNT - key_start_cycles;
     }
 
     analog_task_monitor.nonzero_keys = nonzero_keys;
 
-    if (collect_profile) {
-        analog_task_monitor.raw_us = (uint16_t)analog_cycles_to_us(raw_cycles);
-        analog_task_monitor.filter_us = (uint16_t)analog_cycles_to_us(filter_cycles);
-        analog_task_monitor.calibration_us = (uint16_t)analog_cycles_to_us(calibration_cycles);
-        analog_task_monitor.lut_us = (uint16_t)analog_cycles_to_us(lut_cycles);
-        analog_task_monitor.store_us = (uint16_t)analog_cycles_to_us(store_cycles);
-        analog_task_monitor.key_min_us =
-            (uint16_t)analog_cycles_to_us(key_min_cycles == UINT32_MAX ? 0u : key_min_cycles);
-        analog_task_monitor.key_max_us = (uint16_t)analog_cycles_to_us(key_max_cycles);
-        analog_task_monitor.key_avg_us = (uint16_t)analog_cycles_to_us(key_sum_cycles / NUM_KEYS);
-        analog_task_monitor.key_max_index = key_max_index;
+    if (diagnostics_active) {
+        analog_diagnostic_profile_sample_t sample = {
+            .raw_cycles = raw_cycles,
+            .filter_cycles = filter_cycles,
+            .calibration_cycles = calibration_cycles,
+            .lut_cycles = lut_cycles,
+            .store_cycles = store_cycles,
+            .key_cycles = profiled_key_cycles,
+            .key_index = profile_key,
+        };
+        analog_diagnostic_profile_snapshot_t profile = {0};
+
+        /* The cursor wraps after all logical keys have contributed exactly one
+         * sample. Publish the complete sweep atomically from the main loop;
+         * diagnostics retain the previous complete sweep while it refreshes. */
+        if (analog_diagnostic_profile_record(&analog_profile_sweep, NUM_KEYS,
+                                             &sample, &profile)) {
+            analog_task_monitor.raw_us =
+                (uint16_t)analog_cycles_to_us(profile.raw_cycles);
+            analog_task_monitor.filter_us =
+                (uint16_t)analog_cycles_to_us(profile.filter_cycles);
+            analog_task_monitor.calibration_us =
+                (uint16_t)analog_cycles_to_us(profile.calibration_cycles);
+            analog_task_monitor.lut_us =
+                (uint16_t)analog_cycles_to_us(profile.lut_cycles);
+            analog_task_monitor.store_us =
+                (uint16_t)analog_cycles_to_us(profile.store_cycles);
+            analog_task_monitor.key_min_us =
+                (uint16_t)analog_cycles_to_us(
+                    profile.key_min_cycles == UINT32_MAX
+                        ? 0u
+                        : profile.key_min_cycles);
+            analog_task_monitor.key_max_us =
+                (uint16_t)analog_cycles_to_us(profile.key_max_cycles);
+            analog_task_monitor.key_avg_us =
+                (uint16_t)analog_cycles_to_us(
+                    profile.key_sum_cycles / NUM_KEYS);
+            analog_task_monitor.key_max_index = profile.key_max_index;
+        }
     }
 
     if (!filter_is_initialized()) {

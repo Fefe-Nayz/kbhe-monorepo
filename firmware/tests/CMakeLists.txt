@@ -45,6 +45,16 @@ add_executable(analog_rest_estimator_test
 target_include_directories(analog_rest_estimator_test PRIVATE "${KBHE_CORE_INC}")
 add_test(NAME analog_rest_estimator_test COMMAND analog_rest_estimator_test)
 
+add_executable(analog_diagnostic_profile_policy_test
+  analog_diagnostic_profile_policy_test.c
+)
+target_include_directories(analog_diagnostic_profile_policy_test PRIVATE
+  "${KBHE_CORE_INC}"
+)
+add_test(NAME analog_diagnostic_profile_policy_test
+  COMMAND analog_diagnostic_profile_policy_test
+)
+
 add_executable(internal_sensor_sampler_test
   internal_sensor_sampler_test.c
   ../Core/Src/analog/internal_sensor_sampler.c

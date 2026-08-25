@@ -71,6 +71,16 @@ the datasheet bound.
 `flash_max_words_per_step` must remain at most one in the operational firmware
 and `runtime_erase_count` must remain zero.
 
+Detailed analog timing is deliberately amortized. While a diagnostic session
+is active, the firmware profiles one rotating logical key per scan and
+publishes `analog_*_us` only after a complete 82-scan sweep. The previous
+complete sweep remains visible while the next one is collected, and disabling
+diagnostics discards any partial sweep. This caps the profiler at 11 DWT reads
+per scan; the former all-key burst performed 902 DWT reads in one scan every 32
+scans and could itself increment `scan_deadline_miss_count`. Consequently, HIL
+acceptance must use firmware with the amortized profiler before attributing a
+deadline delta to USB, RGB or persistence workload.
+
 Hardware-in-the-loop testing must exercise saves and GC across voltage and
 temperature while checking both deadline metrics. If an absolute guarantee is
 mandatory, the safe policies are either to prohibit internal-Flash programming
