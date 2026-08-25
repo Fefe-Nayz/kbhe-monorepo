@@ -46,6 +46,12 @@ extern "C" {
 // Enable Device stack
 #define CFG_TUD_ENABLED 1
 
+/* Keep the DCD backlog finite and explicit. TinyUSB drains this queue in one
+ * tud_task() call; the main loop therefore services exactly one such window
+ * between ADC-priority checks instead of placing it before an already-finished
+ * scan. 16 is TinyUSB's pinned-version default and preserves USB throughput. */
+#define CFG_TUD_TASK_QUEUE_SZ 16
+
 // Endpoint 0 max packet size (64 pour High Speed)
 #define CFG_TUD_ENDPOINT0_SIZE 64
 

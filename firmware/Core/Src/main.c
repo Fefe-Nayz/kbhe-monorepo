@@ -27,6 +27,7 @@
 #include "analog/filter.h"
 #include "analog/calibration.h"
 #include "diagnostics.h"
+#include "realtime_scan_policy.h"
 
 #include "settings.h"
 #include "profile_document_store.h"
@@ -71,7 +72,6 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define KBHE_TIMING_PROFILE_DECIMATION 32u
-#define KBHE_SCAN_DEADLINE_US 125u
 #define MCU_LED_THERMAL_LIMIT_C 70
 #define MCU_LED_THERMAL_HYSTERESIS_C 3
 #define MCU_LED_THERMAL_BRIGHTNESS_MAX 96u
@@ -739,6 +739,7 @@ int main(void) {
   while (1) {
     bool processed_scan = false;
     bool profile_timing = false;
+    bool usb_serviced = false;
     uint32_t task_start_cycles = 0;
     uint32_t live_task_start_cycles = 0;
     uint32_t live_scan_cycle_us = 0;
@@ -764,14 +765,9 @@ int main(void) {
       }
     }
 
-    /* TinyUSB is part of the input path, not best-effort work.
-     * tud_hid_n_ready() clears only after tud_task() drains the endpoint's
-     * transfer-complete event. Service it before the scan block so queued HID
-     * snapshots can advance promptly on the 8 kHz interrupt endpoints. */
-    tud_task();
-
     // If a full ADC scan is complete, process keys and restart
-    if (analog_is_scan_complete()) {
+    if (kbhe_realtime_first_service(analog_is_scan_complete()) ==
+        KBHE_REALTIME_SERVICE_ADC) {
       uint32_t now = DWT->CYCCNT;
       live_scan_cycle_us = cycles_to_us(now - adc_full_cycle_start_cycles);
       {
@@ -827,8 +823,21 @@ int main(void) {
         task_socd_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
         action_engine_tick(HAL_GetTick());
+      } else {
+        trigger_task();
+        socd_task();
+        action_engine_tick(HAL_GetTick());
+      }
 
-        step_start_cycles = DWT->CYCCNT;
+      /* The immutable ADC snapshot has been consumed, the next DMA scan is
+       * already armed, and its actions are resolved. Drain endpoint completion
+       * events now so the HID tasks below can submit their next report in this
+       * same 125 us window instead of falling to an effective 4 kHz cadence. */
+      tud_task();
+      usb_serviced = true;
+
+      if (profile_timing) {
+        uint32_t step_start_cycles = DWT->CYCCNT;
         keyboard_hid_task();
         task_keyboard_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
 
@@ -842,9 +851,6 @@ int main(void) {
         xinput_usb_task();
         task_gamepad_us = cycles_to_us(DWT->CYCCNT - step_start_cycles);
       } else {
-        trigger_task();
-        socd_task();
-        action_engine_tick(HAL_GetTick());
         keyboard_hid_task();
         keyboard_nkro_hid_task();
         gamepad_hid_refresh_state();
@@ -864,20 +870,35 @@ int main(void) {
       }
     }
 
+    /* When no ADC snapshot was ready, USB is still serviced once this loop.
+     * tud_task() drains until empty and exposes no event-count budget; it cannot
+     * be preempted without patching TinyUSB. The explicit 16-event queue limits
+     * queued backlog, and the post-call ADC check suppresses every lower-
+     * priority service if a scan arrived meanwhile. Existing 125 us deadline
+     * telemetry characterizes the residual latency. */
+    if (!usb_serviced) {
+      tud_task();
+    }
+    bool best_effort_allowed =
+        kbhe_realtime_after_usb(analog_is_scan_complete()) ==
+        KBHE_REALTIME_SERVICE_BEST_EFFORT;
+
     /* Input has strict priority over the remaining best-effort control
      * work. Check the DMA completion flag between bounded services so a
      * host command burst can never build an unbounded queue in front of a
      * completed scan.  tud_task() is deliberately absent here: it is
      * serviced unconditionally above. */
-    if (!analog_is_scan_complete()) {
+    if (best_effort_allowed && !analog_is_scan_complete()) {
       raw_hid_task();
     }
     /* Consumer pulses are queued transactionally; mouse relative pulses are
      * queued while its button bitmap is resynchronised as state. Both tasks
      * are bounded and no-op when nothing changed. */
-    consumer_hid_task();
-    mouse_hid_task();
-    if (!analog_is_scan_complete()) {
+    if (best_effort_allowed && !analog_is_scan_complete()) {
+      consumer_hid_task();
+      mouse_hid_task();
+    }
+    if (best_effort_allowed && !analog_is_scan_complete()) {
       updater_app_task();
     }
 
@@ -885,7 +906,8 @@ int main(void) {
      * only after physical input, macros, and keyboard transports are quiet.
      * There is deliberately no timeout that can force a Flash stall back into
      * an active key path; a continuously held key simply defers persistence. */
-    if (persistence_step_pending && !analog_is_scan_complete() &&
+    if (best_effort_allowed && persistence_step_pending &&
+        !analog_is_scan_complete() &&
         trigger_is_input_idle(HAL_GetTick(),
                               KBHE_PERSISTENCE_INPUT_QUIET_MS) &&
         action_engine_is_idle() && keyboard_hid_is_transport_idle() &&
@@ -909,27 +931,29 @@ int main(void) {
     // quickly on the 82-key board that gating animation updates behind the
     // "no scan complete" branch effectively starves LED effects.
     uint32_t now_ms = HAL_GetTick();
-    if (!analog_is_scan_complete()) {
+    if (best_effort_allowed && !analog_is_scan_complete()) {
       mcu_sample_internal_sensors(now_ms);
     }
     uint32_t led_start_cycles = 0u;
     if (profile_timing) {
       led_start_cycles = DWT->CYCCNT;
     }
-    if (!analog_is_scan_complete()) {
+    if (best_effort_allowed && !analog_is_scan_complete()) {
       calibration_guided_tick(now_ms);
     }
     /* Polled quadrature decoder: a skipped poll can turn a valid Gray-code
      * edge into a two-bit jump, which discards the accumulated detent. It
      * early-exits when neither the A/B lines nor the button changed. */
-    rotary_encoder_task(now_ms);
-    if (!analog_is_scan_complete()) {
+    if (best_effort_allowed && !analog_is_scan_complete()) {
+      rotary_encoder_task(now_ms);
+    }
+    if (best_effort_allowed && !analog_is_scan_complete()) {
       led_matrix_effect_tick(now_ms);
     }
-    if (!analog_is_scan_complete()) {
+    if (best_effort_allowed && !analog_is_scan_complete()) {
       led_indicator_tick(now_ms);
     }
-    if (!analog_is_scan_complete()) {
+    if (best_effort_allowed && !analog_is_scan_complete()) {
       mcu_apply_led_thermal_protection();
     }
     if (profile_timing) {

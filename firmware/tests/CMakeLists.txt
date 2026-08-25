@@ -134,6 +134,10 @@ add_executable(transition_filter_test transition_filter_test.c)
 target_include_directories(transition_filter_test PRIVATE "${KBHE_CORE_INC}")
 add_test(NAME transition_filter_test COMMAND transition_filter_test)
 
+add_executable(realtime_scan_policy_test realtime_scan_policy_test.c)
+target_include_directories(realtime_scan_policy_test PRIVATE "${KBHE_CORE_INC}")
+add_test(NAME realtime_scan_policy_test COMMAND realtime_scan_policy_test)
+
 add_executable(socd_test
   socd_test.c
   ../Core/Src/trigger/socd.c
