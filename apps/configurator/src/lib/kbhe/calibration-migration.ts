@@ -381,7 +381,8 @@ function normalizeProfilesBackup(
     const completeSnapshot = normalizeCompleteProfileSnapshot(snapshot, profileIndex, serialNumber);
     if (
       !completeSnapshot
-      || JSON.stringify(completeSnapshot.options) !== JSON.stringify(globalOptions)
+      || completeSnapshot.options == null
+      || !profileOptionsEqual(completeSnapshot.options, globalOptions)
       || completeSnapshot.nkroEnabled !== globalsCandidate.nkroEnabled
     ) return null;
     names.push(name);
@@ -482,6 +483,24 @@ function calibrationsEqual(left: CalibrationSettings, right: CalibrationSettings
     && left.key_max_values.every((value, index) => value === right.key_max_values[index]);
 }
 
+function profileOptionsEqual(
+  left: NonNullable<FirmwareProfileSnapshot["options"]>,
+  right: NonNullable<FirmwareProfileSnapshot["options"]>,
+): boolean {
+  return left.keyboard_enabled === right.keyboard_enabled
+    && left.gamepad_enabled === right.gamepad_enabled
+    && left.raw_hid_echo === right.raw_hid_echo
+    && left.led_thermal_protection_enabled === right.led_thermal_protection_enabled;
+}
+
+function profileGlobalsEqual(
+  left: FirmwareProfilesMigrationBackup["globals"],
+  right: FirmwareProfilesMigrationBackup["globals"],
+): boolean {
+  return left.nkroEnabled === right.nkroEnabled
+    && profileOptionsEqual(left.options, right.options);
+}
+
 function snapshotSemantics(
   snapshot: FirmwareProfileSnapshot,
   sourceSnapshot: FirmwareProfileSnapshot,
@@ -518,7 +537,7 @@ function profilesEqual(
     left.usedMask !== right.usedMask
     || left.activeProfileIndex !== right.activeProfileIndex
     || left.defaultProfileIndex !== right.defaultProfileIndex
-    || JSON.stringify(left.globals) !== JSON.stringify(right.globals)
+    || !profileGlobalsEqual(left.globals, right.globals)
     || left.names.some((name, index) => name !== right.names[index])
   ) {
     return false;
@@ -568,7 +587,7 @@ async function captureProfilesBackup(
       options: completeSnapshot.options!,
       nkroEnabled: completeSnapshot.nkroEnabled!,
     };
-    if (globals && JSON.stringify(globals) !== JSON.stringify(snapshotGlobals)) {
+    if (globals && !profileGlobalsEqual(globals, snapshotGlobals)) {
       throw new Error(
         "SETTINGS_BACKUP_REQUIRED: global options changed while profiles were captured; updater migration was not started",
       );

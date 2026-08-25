@@ -343,6 +343,31 @@ describe("complete updater migration recovery", () => {
     expect(backup.profiles.snapshots[0]?.deviceId).toBe(firmwareDeviceId);
   });
 
+  test("accepts a persisted backup when the store reorders option keys", async () => {
+    const serial = "KBHE-STORE-ORDER";
+    const store = new MemoryStore();
+    const original = originalDevice(serial);
+    const backup = await captureUpdaterMigrationBackup(
+      serial,
+      original.device,
+      store,
+      original.profiles,
+    );
+    const options = backup.profiles.globals.options;
+
+    backup.profiles.globals.options = {
+      gamepad_enabled: options.gamepad_enabled,
+      keyboard_enabled: options.keyboard_enabled,
+      led_thermal_protection_enabled: options.led_thermal_protection_enabled,
+      raw_hid_echo: options.raw_hid_echo,
+    };
+    store.values.set(`calibration:${serial}`, structuredClone(backup));
+
+    const reloaded = await getUpdaterMigrationBackup(serial, store);
+    expect(hasCompleteProfileRecovery(reloaded)).toBeTrue();
+    expect(reloaded?.profiles.globals.options).toEqual(options);
+  });
+
   test("rejects a profile snapshot from a different physical keyboard", async () => {
     const usbSerial = "004800363133511631393834";
     const store = new MemoryStore();
