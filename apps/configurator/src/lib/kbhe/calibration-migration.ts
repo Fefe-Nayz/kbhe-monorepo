@@ -166,7 +166,42 @@ function normalizeCompleteProfileSnapshot(
   profileIndex: number,
   serialNumber: string,
 ): FirmwareProfileSnapshot | null {
-  const snapshot = parseFirmwareProfileSnapshot(value);
+  // Firmware predating the action-program extension reports no action
+  // capabilities. Some intermediate configurators represented the unsupported
+  // collections as [] rather than null; canonicalize those placeholders before
+  // applying the strict profile schema.
+  let candidate = value;
+  if (value && typeof value === "object") {
+    const raw = value as Partial<FirmwareProfileSnapshot>;
+    const capabilities = Array.isArray(raw.capabilities) ? raw.capabilities : [];
+    const supportsPrograms = capabilities.includes("action-programs-v1");
+    const supportsOverlays = capabilities.includes("state-overlays-v1");
+    if (!supportsPrograms || !supportsOverlays) {
+      const canonical = { ...raw } as Partial<FirmwareProfileSnapshot>;
+      if (!supportsPrograms) {
+        if (Array.isArray(canonical.actionPrograms) && canonical.actionPrograms.length === 0) {
+          canonical.actionPrograms = null;
+        }
+        if (Array.isArray(canonical.actionProgramNames) && canonical.actionProgramNames.length === 0) {
+          delete canonical.actionProgramNames;
+        }
+      }
+      if (!supportsOverlays) {
+        if (Array.isArray(canonical.actionOverlays) && canonical.actionOverlays.length === 0) {
+          canonical.actionOverlays = null;
+        }
+        if (Array.isArray(canonical.actionOverlayNames) && canonical.actionOverlayNames.length === 0) {
+          delete canonical.actionOverlayNames;
+        }
+      }
+      candidate = canonical;
+    }
+  }
+
+  const snapshot = parseFirmwareProfileSnapshot(candidate);
+  const capabilities = snapshot?.capabilities ?? [];
+  const supportsPrograms = capabilities.includes("action-programs-v1");
+  const supportsOverlays = capabilities.includes("state-overlays-v1");
   if (
     !snapshot
     || snapshot.schemaVersion !== 2
@@ -182,13 +217,20 @@ function normalizeCompleteProfileSnapshot(
     || typeof snapshot.options.led_thermal_protection_enabled !== "boolean"
     || snapshot.nkroEnabled == null
     || snapshot.advancedTickRate == null
-    || snapshot.actionPrograms == null
-    || snapshot.actionOverlays == null
-    || snapshot.actionStateBits == null
-    || snapshot.actionProgramNames == null
-    || snapshot.actionOverlayNames == null
-    || !snapshot.capabilities?.includes("action-programs-v1")
-    || !snapshot.capabilities.includes("state-overlays-v1")
+    || (supportsPrograms && (
+      snapshot.actionPrograms == null
+      || snapshot.actionProgramNames == null
+    ))
+    || (!supportsPrograms && snapshot.actionPrograms != null)
+    || (supportsOverlays && (
+      snapshot.actionOverlays == null
+      || snapshot.actionOverlayNames == null
+      || snapshot.actionStateBits == null
+    ))
+    || (!supportsOverlays && (
+      snapshot.actionOverlays != null
+      || snapshot.actionStateBits != null
+    ))
     || snapshot.led == null
     || snapshot.led.enabled == null
     || snapshot.led.brightness == null
@@ -340,13 +382,31 @@ function calibrationsEqual(left: CalibrationSettings, right: CalibrationSettings
     && left.key_max_values.every((value, index) => value === right.key_max_values[index]);
 }
 
-function snapshotSemantics(snapshot: FirmwareProfileSnapshot): unknown {
+function snapshotSemantics(
+  snapshot: FirmwareProfileSnapshot,
+  sourceSnapshot: FirmwareProfileSnapshot,
+): unknown {
   const semantic = { ...snapshot } as Record<string, unknown>;
   delete semantic.capturedAt;
   delete semantic.profileId;
   delete semantic.revision;
   delete semantic.options;
   delete semantic.nkroEnabled;
+  // Capabilities describe the firmware, not a persisted setting. A newer
+  // firmware may expose action programs after restoring a source profile that
+  // predates them. Compare action data only when the source could actually read
+  // and preserve that extension.
+  delete semantic.capabilities;
+  const sourceCapabilities = sourceSnapshot.capabilities ?? [];
+  if (!sourceCapabilities.includes("action-programs-v1")) {
+    delete semantic.actionPrograms;
+    delete semantic.actionProgramNames;
+  }
+  if (!sourceCapabilities.includes("state-overlays-v1")) {
+    delete semantic.actionOverlays;
+    delete semantic.actionOverlayNames;
+    delete semantic.actionStateBits;
+  }
   return semantic;
 }
 
@@ -366,7 +426,8 @@ function profilesEqual(
   return left.snapshots.every((snapshot, index) => {
     const other = right.snapshots[index];
     if (snapshot == null || other == null) return snapshot === other;
-    return JSON.stringify(snapshotSemantics(snapshot)) === JSON.stringify(snapshotSemantics(other));
+    return JSON.stringify(snapshotSemantics(snapshot, snapshot))
+      === JSON.stringify(snapshotSemantics(other, snapshot));
   });
 }
 

@@ -120,6 +120,26 @@ function profileSnapshot(profileIndex: number, serialNumber: string): FirmwarePr
   };
 }
 
+function legacyProfileSnapshot(
+  profileIndex: number,
+  serialNumber: string,
+  emptyActionCollections = false,
+): FirmwareProfileSnapshot {
+  const snapshot = profileSnapshot(profileIndex, serialNumber);
+  snapshot.capabilities = [];
+  snapshot.actionPrograms = emptyActionCollections ? [] : null;
+  snapshot.actionOverlays = emptyActionCollections ? [] : null;
+  snapshot.actionStateBits = null;
+  if (emptyActionCollections) {
+    snapshot.actionProgramNames = [];
+    snapshot.actionOverlayNames = [];
+  } else {
+    delete snapshot.actionProgramNames;
+    delete snapshot.actionOverlayNames;
+  }
+  return snapshot;
+}
+
 class MemoryStore implements CalibrationMigrationStore {
   readonly values = new Map<string, unknown>();
   failSave = false;
@@ -145,11 +165,33 @@ class MemoryProfileApi implements FirmwareProfileMigrationApi {
   async apply(snapshot: FirmwareProfileSnapshot, targetProfileIndex: number) {
     // Production intentionally strips globals from per-profile apply. The fake
     // restores them from its existing state so verification models live reads.
-    const previous = this.snapshots.get(targetProfileIndex);
+    // A migrated firmware also exposes default action storage even when the
+    // legacy source had no action-program capability at all.
+    const previous = this.snapshots.get(targetProfileIndex)
+      ?? profileSnapshot(targetProfileIndex, snapshot.deviceId!);
+    const sourceCapabilities = snapshot.capabilities ?? [];
+    const supportsPrograms = sourceCapabilities.includes("action-programs-v1");
+    const supportsOverlays = sourceCapabilities.includes("state-overlays-v1");
     this.snapshots.set(targetProfileIndex, {
       ...structuredClone(snapshot),
-      options: previous?.options ?? profileSnapshot(targetProfileIndex, snapshot.deviceId!).options,
-      nkroEnabled: previous?.nkroEnabled ?? true,
+      capabilities: supportsPrograms || supportsOverlays
+        ? structuredClone(sourceCapabilities)
+        : structuredClone(previous.capabilities),
+      actionPrograms: supportsPrograms
+        ? structuredClone(snapshot.actionPrograms)
+        : structuredClone(previous.actionPrograms),
+      actionProgramNames: supportsPrograms
+        ? structuredClone(snapshot.actionProgramNames)
+        : structuredClone(previous.actionProgramNames),
+      actionOverlays: supportsOverlays
+        ? structuredClone(snapshot.actionOverlays)
+        : structuredClone(previous.actionOverlays),
+      actionOverlayNames: supportsOverlays
+        ? structuredClone(snapshot.actionOverlayNames)
+        : structuredClone(previous.actionOverlayNames),
+      actionStateBits: supportsOverlays ? snapshot.actionStateBits : previous.actionStateBits,
+      options: previous.options,
+      nkroEnabled: previous.nkroEnabled,
     });
     this.applied.push(targetProfileIndex);
     return true;
@@ -254,6 +296,36 @@ describe("complete updater migration recovery", () => {
     expect(migrated.names).toEqual(["Main", null, "Game", null]);
     expect([migrated.activeProfileIndex, migrated.defaultProfileIndex]).toEqual([2, 0]);
     expect(migratedProfiles.applied).toEqual([0, 2]);
+    expect(await getUpdaterMigrationBackup(serial, store)).toBeNull();
+  });
+
+  test("preserves every legacy 2.0.4 field when action programs are unsupported", async () => {
+    const serial = "KBHE-LEGACY-ACTIONS";
+    const store = new MemoryStore();
+    const original = originalDevice(serial);
+    const slot0 = legacyProfileSnapshot(0, serial);
+    const slot2 = legacyProfileSnapshot(2, serial, true);
+    slot0.keySettings[0]!.hid_keycode = 77;
+    slot2.led!.brightness = 93;
+    original.profiles.snapshots.set(0, slot0);
+    original.profiles.snapshots.set(2, slot2);
+
+    const backup = await captureUpdaterMigrationBackup(
+      serial,
+      original.device,
+      store,
+      original.profiles,
+    );
+    expect(backup.profiles.snapshots[0]?.actionPrograms).toBeNull();
+    expect(backup.profiles.snapshots[2]?.actionPrograms).toBeNull();
+
+    const migrated = new MemoryDevice(calibration(100), 1, 0, 0, ["Default", null, null, null]);
+    const migratedProfiles = new MemoryProfileApi();
+    migratedProfiles.snapshots.set(0, profileSnapshot(0, serial));
+    expect(await restoreUpdaterMigrationBackup(serial, migrated, store, migratedProfiles)).toBeTrue();
+    expect(migratedProfiles.snapshots.get(0)?.keySettings[0]?.hid_keycode).toBe(77);
+    expect(migratedProfiles.snapshots.get(2)?.led?.brightness).toBe(93);
+    expect(migratedProfiles.snapshots.get(0)?.capabilities).toContain("action-programs-v1");
     expect(await getUpdaterMigrationBackup(serial, store)).toBeNull();
   });
 
