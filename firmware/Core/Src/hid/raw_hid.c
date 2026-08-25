@@ -30,6 +30,7 @@ static uint8_t tx_buffer[RAW_HID_BUFFER_SIZE];
 static uint8_t response_buffer[RAW_HID_BUFFER_SIZE];
 static bool response_pending = false;
 static volatile bool tx_in_flight = false;
+static volatile bool tx_retry_pending = false;
 static volatile bool tx_completed_since_task = false;
 
 void raw_hid_init(void) {
@@ -42,6 +43,7 @@ void raw_hid_init(void) {
   rx_invalid_size_count = 0u;
   response_pending = false;
   tx_in_flight = false;
+  tx_retry_pending = false;
   tx_completed_since_task = false;
   hid_protocol_init();
 }
@@ -100,14 +102,12 @@ uint16_t raw_hid_receive(uint8_t *buffer, uint16_t maxlen) {
   return received_len;
 }
 
-bool raw_hid_send(const uint8_t *data, uint16_t len) {
+static bool raw_hid_submit_tx_buffer(void) {
   bool queued = false;
 
-  if (data == NULL || len != RAW_HID_BUFFER_SIZE || tx_in_flight ||
-      !tud_hid_n_ready(RAW_HID_INSTANCE)) {
+  if (tx_in_flight || !tud_hid_n_ready(RAW_HID_INSTANCE)) {
     return false;
   }
-  memcpy(tx_buffer, data, sizeof(tx_buffer));
   /* Arm before handing the report to TinyUSB. A completion interrupt may run
    * as soon as the endpoint is started (including before this call returns),
    * and must never observe a false idle state for the submitted transfer. */
@@ -120,13 +120,43 @@ bool raw_hid_send(const uint8_t *data, uint16_t len) {
   return queued;
 }
 
+bool raw_hid_send(const uint8_t *data, uint16_t len) {
+  if (data == NULL || len != RAW_HID_BUFFER_SIZE || tx_in_flight ||
+      tx_retry_pending) {
+    return false;
+  }
+
+  memcpy(tx_buffer, data, sizeof(tx_buffer));
+  return raw_hid_submit_tx_buffer();
+}
+
 void raw_hid_on_report_complete(void) {
   if (!tx_in_flight) {
     return;
   }
   tx_in_flight = false;
+  tx_retry_pending = false;
   tx_completed_since_task = true;
   updater_app_notify_response_sent();
+}
+
+void raw_hid_on_report_failed(void) {
+  if (!tx_in_flight) {
+    return;
+  }
+
+  /* The command may already have mutated state. Retain the exact response and
+   * retry it without dequeuing or executing another request. */
+  tx_in_flight = false;
+  tx_retry_pending = true;
+}
+
+void raw_hid_on_umount(void) {
+  if (tx_in_flight) {
+    tx_in_flight = false;
+    tx_retry_pending = true;
+  }
+  tx_completed_since_task = false;
 }
 
 static void raw_hid_prepare_invalid_size_response(const uint8_t *request,
@@ -151,6 +181,13 @@ void raw_hid_task(void) {
   /* Stop-and-wait: a command is not dequeued until the previous response has
    * been accepted by TinyUSB and completed by the endpoint. */
   if (tx_in_flight) {
+    return;
+  }
+  if (tx_retry_pending) {
+    tx_retry_pending = false;
+    if (!raw_hid_submit_tx_buffer()) {
+      tx_retry_pending = true;
+    }
     return;
   }
   if (response_pending) {

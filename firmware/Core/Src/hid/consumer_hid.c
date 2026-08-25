@@ -39,14 +39,20 @@ static bool consumer_hid_queue_push(uint16_t usage_code) {
   return true;
 }
 
-static bool consumer_hid_queue_pop(uint16_t *usage_code) {
+static bool consumer_hid_queue_peek(uint16_t *usage_code) {
   if (usage_code == NULL || consumer_hid_queue_is_empty()) {
     return false;
   }
 
   *usage_code = report_queue[queue_head];
-  queue_head = (uint8_t)((queue_head + 1u) % CONSUMER_HID_QUEUE_CAPACITY);
   return true;
+}
+
+static void consumer_hid_queue_drop_head(void) {
+  if (consumer_hid_queue_is_empty()) {
+    return;
+  }
+  queue_head = (uint8_t)((queue_head + 1u) % CONSUMER_HID_QUEUE_CAPACITY);
 }
 
 void consumer_hid_init(void) {
@@ -71,17 +77,14 @@ static void consumer_hid_pump_queue(void) {
     return;
   }
 
-  if (!consumer_hid_queue_pop(&usage_code)) {
+  if (!consumer_hid_queue_peek(&usage_code)) {
     return;
   }
 
-  if (consumer_hid_send_report(usage_code)) {
-    report_in_flight = true;
-  } else {
-    queue_head =
-        (uint8_t)((queue_head + CONSUMER_HID_QUEUE_CAPACITY - 1u) %
-                  CONSUMER_HID_QUEUE_CAPACITY);
-    report_queue[queue_head] = usage_code;
+  /* Keep the queue head until TinyUSB confirms delivery. */
+  report_in_flight = true;
+  if (!consumer_hid_send_report(usage_code)) {
+    report_in_flight = false;
   }
 }
 
@@ -131,14 +134,24 @@ void consumer_hid_task(void) {
 }
 
 void consumer_hid_on_report_complete(void) {
+  if (!report_in_flight) {
+    return;
+  }
+  report_in_flight = false;
+  consumer_hid_queue_drop_head();
+  consumer_hid_pump_queue();
+}
+
+void consumer_hid_on_report_failed(void) {
+  if (!report_in_flight) {
+    return;
+  }
   report_in_flight = false;
   consumer_hid_pump_queue();
 }
 
 void consumer_hid_on_umount(void) {
-  /* An aborted transfer has no completion callback. Drop stale one-shot
-   * usages and unlock the endpoint state for the next enumeration. */
-  queue_head = 0u;
-  queue_tail = 0u;
+  /* The queue head is still the unacknowledged report. Preserve the complete
+   * usage/neutral transaction and retry it after enumeration. */
   report_in_flight = false;
 }

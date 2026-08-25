@@ -27,6 +27,18 @@ static bool test_fail_next_submit[TEST_HID_INSTANCE_COUNT];
 static uint32_t test_tick_ms = 0u;
 static captured_report_t captured_reports[TEST_REPORT_CAPACITY];
 static uint16_t captured_report_count = 0u;
+static uint8_t raw_complete_calls = 0u;
+static uint8_t raw_failed_calls = 0u;
+static uint8_t raw_umount_calls = 0u;
+static uint8_t consumer_complete_calls = 0u;
+static uint8_t consumer_failed_calls = 0u;
+static uint8_t consumer_umount_calls = 0u;
+static uint8_t mouse_complete_calls = 0u;
+static uint8_t mouse_failed_calls = 0u;
+static uint8_t mouse_umount_calls = 0u;
+static uint8_t gamepad_complete_calls = 0u;
+static uint8_t gamepad_failed_calls = 0u;
+static uint8_t gamepad_umount_calls = 0u;
 
 static bool capture_report(uint8_t instance, const void *report, uint16_t len) {
   captured_report_t *captured = NULL;
@@ -93,11 +105,18 @@ void raw_hid_on_receive(const uint8_t *data, uint16_t len) {
   (void)data;
   (void)len;
 }
-void raw_hid_on_report_complete(void) {}
-void consumer_hid_on_report_complete(void) {}
-void consumer_hid_on_umount(void) {}
-void mouse_hid_on_report_complete(void) {}
-void mouse_hid_on_umount(void) {}
+void raw_hid_on_report_complete(void) { raw_complete_calls++; }
+void raw_hid_on_report_failed(void) { raw_failed_calls++; }
+void raw_hid_on_umount(void) { raw_umount_calls++; }
+void consumer_hid_on_report_complete(void) { consumer_complete_calls++; }
+void consumer_hid_on_report_failed(void) { consumer_failed_calls++; }
+void consumer_hid_on_umount(void) { consumer_umount_calls++; }
+void mouse_hid_on_report_complete(void) { mouse_complete_calls++; }
+void mouse_hid_on_report_failed(void) { mouse_failed_calls++; }
+void mouse_hid_on_umount(void) { mouse_umount_calls++; }
+void gamepad_hid_on_report_complete(void) { gamepad_complete_calls++; }
+void gamepad_hid_on_report_failed(void) { gamepad_failed_calls++; }
+void gamepad_hid_on_umount(void) { gamepad_umount_calls++; }
 
 static void complete_report(uint8_t instance) {
   const captured_report_t *report = NULL;
@@ -462,6 +481,46 @@ static void test_nkro_fallback_drops_failed_non_neutral_head(void) {
   complete_report(HID_ITF_NKRO);
 }
 
+static void test_non_keyboard_lifecycle_callbacks_are_dispatched(void) {
+  static const uint8_t report[1] = {0u};
+  uint8_t raw_complete_before = raw_complete_calls;
+  uint8_t consumer_complete_before = consumer_complete_calls;
+  uint8_t mouse_complete_before = mouse_complete_calls;
+  uint8_t gamepad_complete_before = gamepad_complete_calls;
+  uint8_t raw_failed_before = raw_failed_calls;
+  uint8_t consumer_failed_before = consumer_failed_calls;
+  uint8_t mouse_failed_before = mouse_failed_calls;
+  uint8_t gamepad_failed_before = gamepad_failed_calls;
+  uint8_t raw_umount_before = raw_umount_calls;
+  uint8_t consumer_umount_before = consumer_umount_calls;
+  uint8_t mouse_umount_before = mouse_umount_calls;
+  uint8_t gamepad_umount_before = gamepad_umount_calls;
+
+  tud_hid_report_complete_cb(HID_ITF_RAW_HID, report, sizeof(report));
+  tud_hid_report_complete_cb(HID_ITF_CONSUMER, report, sizeof(report));
+  tud_hid_report_complete_cb(HID_ITF_MOUSE, report, sizeof(report));
+  tud_hid_report_complete_cb(HID_ITF_GAMEPAD, report, sizeof(report));
+  assert(raw_complete_calls == (uint8_t)(raw_complete_before + 1u));
+  assert(consumer_complete_calls == (uint8_t)(consumer_complete_before + 1u));
+  assert(mouse_complete_calls == (uint8_t)(mouse_complete_before + 1u));
+  assert(gamepad_complete_calls == (uint8_t)(gamepad_complete_before + 1u));
+
+  tud_hid_report_failed_cb(HID_ITF_RAW_HID, HID_REPORT_TYPE_INPUT, report, 0u);
+  tud_hid_report_failed_cb(HID_ITF_CONSUMER, HID_REPORT_TYPE_INPUT, report, 0u);
+  tud_hid_report_failed_cb(HID_ITF_MOUSE, HID_REPORT_TYPE_INPUT, report, 0u);
+  tud_hid_report_failed_cb(HID_ITF_GAMEPAD, HID_REPORT_TYPE_INPUT, report, 0u);
+  assert(raw_failed_calls == (uint8_t)(raw_failed_before + 1u));
+  assert(consumer_failed_calls == (uint8_t)(consumer_failed_before + 1u));
+  assert(mouse_failed_calls == (uint8_t)(mouse_failed_before + 1u));
+  assert(gamepad_failed_calls == (uint8_t)(gamepad_failed_before + 1u));
+
+  tud_umount_cb();
+  assert(raw_umount_calls == (uint8_t)(raw_umount_before + 1u));
+  assert(consumer_umount_calls == (uint8_t)(consumer_umount_before + 1u));
+  assert(mouse_umount_calls == (uint8_t)(mouse_umount_before + 1u));
+  assert(gamepad_umount_calls == (uint8_t)(gamepad_umount_before + 1u));
+}
+
 int main(void) {
   memset(test_ready, 0, sizeof(test_ready));
   memset(test_in_flight, 0, sizeof(test_in_flight));
@@ -480,5 +539,6 @@ int main(void) {
   test_nkro_overflow_finishes_with_desired_resync();
   test_nkro_unmount_resyncs_only_desired();
   test_nkro_fallback_drops_failed_non_neutral_head();
+  test_non_keyboard_lifecycle_callbacks_are_dispatched();
   return 0;
 }

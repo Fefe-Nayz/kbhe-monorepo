@@ -22,6 +22,7 @@ static uint8_t button_reference_counts[5] = {0};
 static uint8_t last_sent_buttons = 0u;
 static uint8_t state_report_buttons_in_flight = 0u;
 static bool report_in_flight = false;
+static bool pulse_report_in_flight = false;
 static bool state_report_in_flight = false;
 static bool button_resync_required = false;
 
@@ -41,14 +42,20 @@ static bool mouse_hid_pulse_queue_push(mouse_hid_report_t report) {
   return true;
 }
 
-static bool mouse_hid_pulse_queue_pop(mouse_hid_report_t *report) {
+static bool mouse_hid_pulse_queue_peek(mouse_hid_report_t *report) {
   if (report == NULL || mouse_hid_pulse_queue_is_empty()) {
     return false;
   }
 
   *report = pulse_queue[pulse_head];
-  pulse_head = (uint8_t)((pulse_head + 1u) % MOUSE_HID_PULSE_QUEUE_CAPACITY);
   return true;
+}
+
+static void mouse_hid_pulse_queue_drop_head(void) {
+  if (mouse_hid_pulse_queue_is_empty()) {
+    return;
+  }
+  pulse_head = (uint8_t)((pulse_head + 1u) % MOUSE_HID_PULSE_QUEUE_CAPACITY);
 }
 
 static bool mouse_hid_send_report(mouse_hid_report_t report) {
@@ -63,35 +70,34 @@ static void mouse_hid_pump_queue(void) {
     return;
   }
 
-  if (mouse_hid_pulse_queue_pop(&report)) {
+  if (mouse_hid_pulse_queue_peek(&report)) {
     /* Relative motion was queued, but button ownership is live state. Using
      * the enqueue-time mask can briefly release or resurrect a button while
      * the endpoint drains an older scroll pulse. */
     report.buttons = current_buttons;
-    if (mouse_hid_send_report(report)) {
-      report_in_flight = true;
-      /* Every mouse report, including relative pulses, publishes the button
-       * bitmap. Track that acknowledged state too: otherwise a button
-       * released while a scroll report is in flight can compare equal to the
-       * older `last_sent_buttons` value and never emit its compensating
-       * release, leaving the host button stuck. */
-      state_report_in_flight = true;
-      state_report_buttons_in_flight = report.buttons;
-    } else {
-      pulse_head =
-          (uint8_t)((pulse_head + MOUSE_HID_PULSE_QUEUE_CAPACITY - 1u) %
-                    MOUSE_HID_PULSE_QUEUE_CAPACITY);
-      pulse_queue[pulse_head] = report;
+    report_in_flight = true;
+    pulse_report_in_flight = true;
+    state_report_in_flight = true;
+    state_report_buttons_in_flight = report.buttons;
+    /* Every mouse report publishes the button bitmap, so acknowledge it only
+     * from the completion callback alongside the relative pulse. */
+    if (!mouse_hid_send_report(report)) {
+      report_in_flight = false;
+      pulse_report_in_flight = false;
+      state_report_in_flight = false;
     }
     return;
   }
 
   if (button_resync_required || current_buttons != last_sent_buttons) {
     report.buttons = current_buttons;
-    if (mouse_hid_send_report(report)) {
-      report_in_flight = true;
-      state_report_in_flight = true;
-      state_report_buttons_in_flight = current_buttons;
+    report_in_flight = true;
+    pulse_report_in_flight = false;
+    state_report_in_flight = true;
+    state_report_buttons_in_flight = current_buttons;
+    if (!mouse_hid_send_report(report)) {
+      report_in_flight = false;
+      state_report_in_flight = false;
     }
   }
 }
@@ -104,6 +110,7 @@ void mouse_hid_init(void) {
   last_sent_buttons = 0u;
   state_report_buttons_in_flight = 0u;
   report_in_flight = false;
+  pulse_report_in_flight = false;
   state_report_in_flight = false;
   button_resync_required = false;
 }
@@ -195,7 +202,14 @@ void mouse_hid_task(void) {
 }
 
 void mouse_hid_on_report_complete(void) {
+  if (!report_in_flight) {
+    return;
+  }
   report_in_flight = false;
+  if (pulse_report_in_flight) {
+    mouse_hid_pulse_queue_drop_head();
+    pulse_report_in_flight = false;
+  }
   if (state_report_in_flight) {
     last_sent_buttons = state_report_buttons_in_flight;
     state_report_in_flight = false;
@@ -204,14 +218,25 @@ void mouse_hid_on_report_complete(void) {
   mouse_hid_pump_queue();
 }
 
-void mouse_hid_on_umount(void) {
-  /* Relative pulses are stale after a disconnect, while button ownership is
-   * still meaningful if a key remains held. An aborted report will never get
-   * its completion callback, so explicitly unlock and force the desired
-   * button bitmap to be republished after enumeration. */
-  pulse_head = 0u;
-  pulse_tail = 0u;
+void mouse_hid_on_report_failed(void) {
+  if (!report_in_flight) {
+    return;
+  }
+
   report_in_flight = false;
+  if (!pulse_report_in_flight) {
+    button_resync_required = true;
+  }
+  pulse_report_in_flight = false;
+  state_report_in_flight = false;
+  mouse_hid_pump_queue();
+}
+
+void mouse_hid_on_umount(void) {
+  /* Keep an unacknowledged relative pulse at the queue head. Button ownership
+   * is live state and is always republished after enumeration. */
+  report_in_flight = false;
+  pulse_report_in_flight = false;
   state_report_in_flight = false;
   button_resync_required = true;
 }

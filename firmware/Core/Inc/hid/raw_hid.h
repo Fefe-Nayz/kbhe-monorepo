@@ -33,6 +33,10 @@ void raw_hid_on_receive(const uint8_t *data, uint16_t len);
 // Callback interne pour TinyUSB (à appeler dans tud_hid_report_complete_cb)
 void raw_hid_on_report_complete(void);
 
+// Recover an accepted report that failed or was aborted by a USB disconnect.
+void raw_hid_on_report_failed(void);
+void raw_hid_on_umount(void);
+
 // Monotonic transport diagnostics (reset by raw_hid_init).
 uint32_t raw_hid_get_rx_dropped_count(void);
 uint32_t raw_hid_get_invalid_size_count(void);

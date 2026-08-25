@@ -36,14 +36,20 @@ static uint8_t s_ep_out = 0u;
 static uint8_t s_ep_in = 0u;
 static uint8_t s_out_buffer[XINPUT_EP_SIZE];
 
-static xinput_report_t s_report = {
+static xinput_report_t s_desired_report = {
     .report_id = 0u,
     .report_size = sizeof(xinput_report_t),
 };
-static xinput_report_t s_previous_report = {
+static xinput_report_t s_in_flight_report = {
     .report_id = 0u,
     .report_size = sizeof(xinput_report_t),
 };
+static xinput_report_t s_acked_report = {
+    .report_id = 0u,
+    .report_size = sizeof(xinput_report_t),
+};
+static bool s_report_in_flight = false;
+static bool s_resync_required = true;
 
 static int16_t xinput_scale_axis(int8_t axis) {
   return (int16_t)((int16_t)axis * 258);
@@ -128,10 +134,14 @@ void xinput_usb_init(void) {
   s_ep_out = 0u;
   s_ep_in = 0u;
   memset(s_out_buffer, 0, sizeof(s_out_buffer));
-  memset(&s_report, 0, sizeof(s_report));
-  memset(&s_previous_report, 0, sizeof(s_previous_report));
-  s_report.report_size = sizeof(xinput_report_t);
-  s_previous_report.report_size = sizeof(xinput_report_t);
+  memset(&s_desired_report, 0, sizeof(s_desired_report));
+  memset(&s_in_flight_report, 0, sizeof(s_in_flight_report));
+  memset(&s_acked_report, 0, sizeof(s_acked_report));
+  s_desired_report.report_size = sizeof(xinput_report_t);
+  s_in_flight_report.report_size = sizeof(xinput_report_t);
+  s_acked_report.report_size = sizeof(xinput_report_t);
+  s_report_in_flight = false;
+  s_resync_required = true;
 }
 
 void xinput_usb_task(void) {
@@ -141,13 +151,19 @@ void xinput_usb_task(void) {
     return;
   }
 
-  xinput_build_report(source, &s_report);
+  xinput_build_report(source, &s_desired_report);
 
   if (s_ep_in == 0u || !tud_ready()) {
     return;
   }
 
-  if (memcmp(&s_report, &s_previous_report, sizeof(s_report)) == 0) {
+  if (s_report_in_flight) {
+    return;
+  }
+
+  if (!s_resync_required &&
+      memcmp(&s_desired_report, &s_acked_report,
+             sizeof(s_desired_report)) == 0) {
     return;
   }
 
@@ -155,9 +171,12 @@ void xinput_usb_task(void) {
     return;
   }
 
-  if (usbd_edpt_xfer(s_rhport, s_ep_in, (uint8_t *)&s_report,
-                     sizeof(s_report), false)) {
-    memcpy(&s_previous_report, &s_report, sizeof(s_report));
+  memcpy(&s_in_flight_report, &s_desired_report,
+         sizeof(s_in_flight_report));
+  s_report_in_flight = true;
+  if (!usbd_edpt_xfer(s_rhport, s_ep_in, (uint8_t *)&s_in_flight_report,
+                      sizeof(s_in_flight_report), false)) {
+    s_report_in_flight = false;
   }
 }
 
@@ -167,6 +186,8 @@ static void xinput_driver_reset(uint8_t rhport) {
   s_rhport = rhport;
   s_ep_out = 0u;
   s_ep_in = 0u;
+  s_report_in_flight = false;
+  s_resync_required = true;
 }
 
 static uint16_t xinput_driver_open(uint8_t rhport,
@@ -192,6 +213,8 @@ static uint16_t xinput_driver_open(uint8_t rhport,
             0u);
 
   s_rhport = rhport;
+  s_report_in_flight = false;
+  s_resync_required = true;
   if (s_ep_out != 0u) {
     (void)usbd_edpt_xfer(rhport, s_ep_out, s_out_buffer,
                          sizeof(s_out_buffer), false);
@@ -211,8 +234,18 @@ static bool xinput_driver_control_xfer_cb(
 static bool xinput_driver_xfer_cb(uint8_t rhport, uint8_t ep_addr,
                                   xfer_result_t result,
                                   uint32_t xferred_bytes) {
-  (void)result;
-  (void)xferred_bytes;
+  if (ep_addr == s_ep_in && s_ep_in != 0u) {
+    if (s_report_in_flight) {
+      if (result == XFER_RESULT_SUCCESS &&
+          xferred_bytes == sizeof(s_in_flight_report)) {
+        memcpy(&s_acked_report, &s_in_flight_report,
+               sizeof(s_acked_report));
+        s_resync_required = false;
+      }
+      s_report_in_flight = false;
+    }
+    return true;
+  }
 
   if (ep_addr == s_ep_out && s_ep_out != 0u) {
     (void)usbd_edpt_xfer(rhport, s_ep_out, s_out_buffer,

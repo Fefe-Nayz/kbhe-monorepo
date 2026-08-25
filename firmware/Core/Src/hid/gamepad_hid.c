@@ -57,7 +57,10 @@ typedef struct __attribute__((packed)) {
   uint8_t tail[4];
 } gamepad_hid_usb_report_t;
 
-static gamepad_hid_usb_report_t prev_gamepad_hid_report = {0};
+static gamepad_hid_usb_report_t acked_gamepad_hid_report = {0};
+static gamepad_hid_usb_report_t in_flight_gamepad_hid_report = {0};
+static bool gamepad_hid_report_in_flight = false;
+static bool gamepad_hid_resync_required = true;
 
 static inline uint8_t gamepad_max_u8(uint8_t a, uint8_t b) {
   return (a > b) ? a : b;
@@ -397,7 +400,10 @@ void gamepad_hid_init(void) {
   gamepad_rebuild_curve_lut();
   cached_gamepad = (settings_gamepad_t)SETTINGS_DEFAULT_GAMEPAD;
   gamepad_report = gamepad_neutral_report();
-  prev_gamepad_hid_report = gamepad_neutral_hid_report();
+  acked_gamepad_hid_report = gamepad_neutral_hid_report();
+  in_flight_gamepad_hid_report = gamepad_neutral_hid_report();
+  gamepad_hid_report_in_flight = false;
+  gamepad_hid_resync_required = true;
   gamepad_report_changed = false;
   gamepad_enabled = true;
   gamepad_hid_custom_clear();
@@ -583,7 +589,8 @@ bool gamepad_hid_send_report_if_changed(void) {
     return false;
   }
 
-  if (!gamepad_report_changed) {
+  if ((!gamepad_report_changed && !gamepad_hid_resync_required) ||
+      gamepad_hid_report_in_flight) {
     return false;
   }
 
@@ -593,21 +600,55 @@ bool gamepad_hid_send_report_if_changed(void) {
 
   gamepad_build_hid_report(&gamepad_report, &hid_report);
 
-  if (memcmp(&hid_report, &prev_gamepad_hid_report, sizeof(hid_report)) == 0) {
+  if (!gamepad_hid_resync_required &&
+      memcmp(&hid_report, &acked_gamepad_hid_report, sizeof(hid_report)) == 0) {
     gamepad_report_changed = false;
     return false;
   }
 
-  if (tud_hid_n_report(HID_ITF_GAMEPAD, 0, &hid_report, sizeof(hid_report))) {
-    memcpy(&prev_gamepad_hid_report, &hid_report, sizeof(hid_report));
-    gamepad_report_changed = false;
+  memcpy(&in_flight_gamepad_hid_report, &hid_report, sizeof(hid_report));
+  gamepad_hid_report_in_flight = true;
+  if (tud_hid_n_report(HID_ITF_GAMEPAD, 0, &in_flight_gamepad_hid_report,
+                       sizeof(in_flight_gamepad_hid_report))) {
     return true;
   }
 
+  gamepad_hid_report_in_flight = false;
   return false;
 }
 
 void gamepad_hid_task(void) { gamepad_hid_send_report_if_changed(); }
+
+void gamepad_hid_on_report_complete(void) {
+  gamepad_hid_usb_report_t desired = gamepad_neutral_hid_report();
+
+  if (!gamepad_hid_report_in_flight) {
+    return;
+  }
+
+  memcpy(&acked_gamepad_hid_report, &in_flight_gamepad_hid_report,
+         sizeof(acked_gamepad_hid_report));
+  gamepad_hid_report_in_flight = false;
+  gamepad_hid_resync_required = false;
+  gamepad_build_hid_report(&gamepad_report, &desired);
+  gamepad_report_changed =
+      memcmp(&desired, &acked_gamepad_hid_report, sizeof(desired)) != 0;
+}
+
+void gamepad_hid_on_report_failed(void) {
+  if (!gamepad_hid_report_in_flight) {
+    return;
+  }
+
+  gamepad_hid_report_in_flight = false;
+  gamepad_report_changed = true;
+}
+
+void gamepad_hid_on_umount(void) {
+  gamepad_hid_report_in_flight = false;
+  gamepad_hid_resync_required = true;
+  gamepad_report_changed = true;
+}
 
 const gamepad_report_t *gamepad_hid_get_report(void) { return &gamepad_report; }
 

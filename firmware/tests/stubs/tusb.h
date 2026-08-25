@@ -8,6 +8,9 @@ bool tud_hid_n_ready(uint8_t instance);
 bool tud_mounted(void);
 bool tud_hid_n_report(uint8_t instance, uint8_t report_id,
                       const void *report, uint16_t len);
+bool tud_hid_n_mouse_report(uint8_t instance, uint8_t report_id,
+                            uint8_t buttons, int8_t x, int8_t y,
+                            int8_t vertical, int8_t horizontal);
 
 #define HID_USAGE_CONSUMER_VOLUME_INCREMENT 0x00E9u
 #define HID_USAGE_CONSUMER_VOLUME_DECREMENT 0x00EAu

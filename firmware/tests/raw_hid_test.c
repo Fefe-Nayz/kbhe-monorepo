@@ -156,6 +156,51 @@ static void test_completion_during_submit_does_not_stick_endpoint(void) {
   assert(raw_hid_send(response, sizeof(response)));
 }
 
+static void test_failed_response_retries_without_reexecuting_command(void) {
+  uint8_t request[RAW_HID_BUFFER_SIZE] = {0};
+  request[0] = 0x51u;
+
+  reset_fixture();
+  raw_hid_on_receive(request, sizeof(request));
+  raw_hid_task();
+  raw_hid_task();
+  assert(report_calls == 1u);
+  assert(protocol_calls == 1u);
+
+  raw_hid_on_report_failed();
+  raw_hid_task();
+  assert(report_calls == 2u);
+  assert(protocol_calls == 1u);
+  assert(sent_report[0] == request[0]);
+
+  raw_hid_on_report_complete();
+  assert(updater_notifications == 1u);
+}
+
+static void test_active_unmount_retries_after_reconnect(void) {
+  uint8_t request[RAW_HID_BUFFER_SIZE] = {0};
+  request[0] = 0x52u;
+
+  reset_fixture();
+  raw_hid_on_receive(request, sizeof(request));
+  raw_hid_task();
+  raw_hid_task();
+  assert(report_calls == 1u);
+
+  endpoint_ready = false;
+  raw_hid_on_umount();
+  raw_hid_task();
+  assert(report_calls == 1u);
+
+  endpoint_ready = true;
+  raw_hid_task();
+  assert(report_calls == 2u);
+  assert(protocol_calls == 1u);
+  assert(sent_report[0] == request[0]);
+  raw_hid_on_report_complete();
+  assert(updater_notifications == 1u);
+}
+
 int main(void) {
   test_invalid_size_gets_deterministic_response();
   test_response_retries_without_reexecuting_command();
@@ -163,6 +208,8 @@ int main(void) {
   test_spsc_counters_wrap_without_losing_capacity();
   test_direct_send_owns_endpoint_until_completion();
   test_completion_during_submit_does_not_stick_endpoint();
+  test_failed_response_retries_without_reexecuting_command();
+  test_active_unmount_retries_after_reconnect();
   puts("raw_hid_test: ok");
   return 0;
 }

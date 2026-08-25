@@ -703,6 +703,9 @@ int main(void) {
   raw_hid_init();
   consumer_hid_init();
   mouse_hid_init();
+  gamepad_hid_init();
+  gamepad_hid_set_enabled(settings_is_gamepad_enabled());
+  gamepad_hid_reload_settings();
   xinput_usb_init();
   diagnostics_init();
   mcu_init_injected_sensors();

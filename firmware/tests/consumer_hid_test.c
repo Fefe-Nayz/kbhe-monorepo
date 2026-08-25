@@ -63,9 +63,51 @@ static void test_unmounted_usage_is_rejected(void) {
   assert(!consumer_hid_mute());
 }
 
+static void test_failed_usage_and_neutral_are_retried(void) {
+  reset_fixture();
+  ready = true;
+  assert(consumer_hid_volume_up());
+  assert(sent_count == 1u);
+  assert(sent_usages[0] == HID_USAGE_CONSUMER_VOLUME_INCREMENT);
+
+  consumer_hid_on_report_failed();
+  assert(sent_count == 2u);
+  assert(sent_usages[1] == HID_USAGE_CONSUMER_VOLUME_INCREMENT);
+
+  consumer_hid_on_report_complete();
+  assert(sent_count == 3u);
+  assert(sent_usages[2] == 0u);
+  consumer_hid_on_report_failed();
+  assert(sent_count == 4u);
+  assert(sent_usages[3] == 0u);
+  consumer_hid_on_report_complete();
+}
+
+static void test_active_unmount_preserves_transaction(void) {
+  reset_fixture();
+  ready = true;
+  assert(consumer_hid_play_pause());
+  assert(sent_count == 1u);
+
+  mounted = false;
+  consumer_hid_on_umount();
+  consumer_hid_task();
+  assert(sent_count == 1u);
+
+  mounted = true;
+  consumer_hid_task();
+  assert(sent_count == 2u);
+  assert(sent_usages[1] == HID_USAGE_CONSUMER_PLAY_PAUSE);
+  consumer_hid_on_report_complete();
+  assert(sent_count == 3u && sent_usages[2] == 0u);
+  consumer_hid_on_report_complete();
+}
+
 int main(void) {
   test_busy_endpoint_buffers_sixty_four_complete_taps();
   test_unmounted_usage_is_rejected();
+  test_failed_usage_and_neutral_are_retried();
+  test_active_unmount_preserves_transaction();
   puts("consumer_hid_test: ok");
   return 0;
 }

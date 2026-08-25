@@ -58,6 +58,33 @@ target_include_directories(consumer_hid_test BEFORE PRIVATE
 )
 add_test(NAME consumer_hid_test COMMAND consumer_hid_test)
 
+add_executable(mouse_hid_test
+  mouse_hid_test.c
+  ../Core/Src/hid/mouse_hid.c
+)
+target_include_directories(mouse_hid_test BEFORE PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/stubs"
+  "${KBHE_CORE_INC}"
+)
+add_test(NAME mouse_hid_test COMMAND mouse_hid_test)
+
+add_executable(gamepad_hid_transport_test
+  gamepad_hid_transport_test.c
+  ../Core/Src/hid/gamepad_hid.c
+)
+target_include_directories(gamepad_hid_transport_test BEFORE PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/stubs"
+  "${KBHE_CORE_INC}"
+)
+add_test(NAME gamepad_hid_transport_test COMMAND gamepad_hid_transport_test)
+
+add_executable(xinput_usb_test xinput_usb_test.c)
+target_include_directories(xinput_usb_test BEFORE PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/xinput_usb_stubs"
+  "${KBHE_CORE_INC}"
+)
+add_test(NAME xinput_usb_test COMMAND xinput_usb_test)
+
 add_executable(keyboard_hid_queue_test
   keyboard_hid_queue_test.c
   ../Core/Src/hid/keyboard_hid.c

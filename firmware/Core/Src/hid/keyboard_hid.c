@@ -6,6 +6,7 @@
 
 #include "hid/keyboard_hid.h"
 #include "hid/consumer_hid.h"
+#include "hid/gamepad_hid.h"
 #include "hid/mouse_hid.h"
 #include "hid/keyboard_nkro_hid.h"
 #include "led_indicator.h"
@@ -384,8 +385,10 @@ void tud_mount_cb(void) { led_matrix_set_usb_suspend_state(false); }
 void tud_umount_cb(void) {
   keyboard_hid_on_umount();
   keyboard_nkro_hid_on_umount();
+  raw_hid_on_umount();
   consumer_hid_on_umount();
   mouse_hid_on_umount();
+  gamepad_hid_on_umount();
   led_matrix_set_usb_suspend_state(false);
 }
 
@@ -502,6 +505,10 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
     mouse_hid_on_report_complete();
     break;
 
+  case HID_ITF_GAMEPAD:
+    gamepad_hid_on_report_complete();
+    break;
+
   default:
     break;
   }
@@ -525,6 +532,22 @@ void tud_hid_report_failed_cb(uint8_t instance,
 
   case HID_ITF_NKRO:
     keyboard_nkro_hid_on_report_failed();
+    break;
+
+  case HID_ITF_RAW_HID:
+    raw_hid_on_report_failed();
+    break;
+
+  case HID_ITF_CONSUMER:
+    consumer_hid_on_report_failed();
+    break;
+
+  case HID_ITF_MOUSE:
+    mouse_hid_on_report_failed();
+    break;
+
+  case HID_ITF_GAMEPAD:
+    gamepad_hid_on_report_failed();
     break;
 
   default:

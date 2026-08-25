@@ -2,6 +2,14 @@
 #define KBHE_HOST_USB_DESCRIPTORS_STUB_H_
 
 #define HID_EP_SIZE 64u
-#define HID_ITF_CONSUMER 2u
+
+enum {
+  HID_ITF_KEYBOARD = 0,
+  HID_ITF_RAW_HID = 1,
+  HID_ITF_NKRO = 2,
+  HID_ITF_CONSUMER = 3,
+  HID_ITF_MOUSE = 4,
+  HID_ITF_GAMEPAD = 5,
+};
 
 #endif

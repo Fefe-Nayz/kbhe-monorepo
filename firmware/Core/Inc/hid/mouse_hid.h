@@ -18,6 +18,7 @@ void mouse_hid_init(void);
 bool mouse_hid_is_ready(void);
 void mouse_hid_task(void);
 void mouse_hid_on_report_complete(void);
+void mouse_hid_on_report_failed(void);
 void mouse_hid_on_umount(void);
 void mouse_hid_button_press(uint8_t button_mask);
 void mouse_hid_button_release(uint8_t button_mask);
