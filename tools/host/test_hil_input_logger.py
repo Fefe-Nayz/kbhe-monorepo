@@ -182,6 +182,33 @@ class HILInputLoggerTest(unittest.TestCase):
             summary["latency"]["distance_to_logical_press"]["median_ms"], 0
         )
 
+    def test_summary_does_not_call_rounded_threshold_touch_a_loss(self) -> None:
+        # Distance is rounded to 0.01 mm for GET_KEY_STATES while the trigger
+        # compares the unrounded micrometre value.  A displayed 1.20 mm may
+        # still be just below the configured 1.20 mm threshold and cannot
+        # establish a missed trigger transition.
+        live = [
+            sample(0, 1000, 1000, 0.0, False),
+            sample(25, 1000, 1000, 1.20, False),
+            sample(50, 1000, 1000, 1.05, False),
+            sample(75, 1000, 1000, 0.0, False),
+        ]
+        summary = summarize_key(live, [], KEY_METADATA, {"noise_band": 8})
+        self.assertEqual(summary["transitions"]["distance_actuation_pulses"], 0)
+        self.assertEqual(
+            summary["suspected_losses"]["distance_pulses_lost_before_logical"],
+            0,
+        )
+        self.assertEqual(
+            summary["suspected_losses"][
+                "distance_press_edges_without_logical_edge"
+            ],
+            0,
+        )
+        self.assertEqual(
+            summary["configured_thresholds"]["observable_press_min_mm"], 1.21
+        )
+
     def test_metrics_reports_counter_deltas(self) -> None:
         summary = summarize_metrics(
             [

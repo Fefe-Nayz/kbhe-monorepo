@@ -20,6 +20,7 @@ from .protocol import KEY_COUNT
 
 ADC_CAPTURE_MAX_SAMPLES = 16_384
 ADC_CAPTURE_SAFE_WINDOW_S = 1.5
+DISTANCE_REPORT_QUANTUM_MM = 0.01
 
 # Must match LOGICAL_KEY_INDEX_TO_PHYSICAL_INDEX in analog.c.  The physical
 # array is mux-major with 11 ADC inputs per mux position.
@@ -362,8 +363,19 @@ def summarize_key(
     noise_band = int(filter_metadata.get("noise_band", 8))
 
     logical_press, logical_release = _boolean_edges(live, "logical_pressed")
+    # GET_KEY_STATES reports distance in rounded 0.01 mm units, whereas the
+    # trigger compares the unrounded micrometre value.  A reported value equal
+    # to the configured threshold is therefore ambiguous: 1.20 mm can mean an
+    # internal value from 1.195 through 1.204 mm.  Only values one reporting
+    # quantum beyond the threshold can prove that the trigger threshold was
+    # crossed.  This also avoids treating a one-frame, non-atomic threshold
+    # touch as a lost logical transition.
+    observable_press_mm = actuation_mm + DISTANCE_REPORT_QUANTUM_MM
+    observable_release_mm = max(
+        0.0, release_mm - DISTANCE_REPORT_QUANTUM_MM
+    )
     distance_press, distance_release = _threshold_edges(
-        live, "distance_mm", actuation_mm, release_mm
+        live, "distance_mm", observable_press_mm, observable_release_mm
     )
     period_ms = _median_sample_period_ms(live)
     high_rate_period_us = (
@@ -422,7 +434,7 @@ def summarize_key(
 
     logical_on_during_distance = 0
     distance_segments = _segments_above(
-        live, "distance_mm", 0.0, 1.0, actuation_mm
+        live, "distance_mm", 0.0, 1.0, observable_press_mm
     )
     distance_segments_lost = 0
     for segment in distance_segments:
@@ -468,6 +480,8 @@ def summarize_key(
         "configured_thresholds": {
             "actuation_mm": actuation_mm,
             "release_mm": release_mm,
+            "observable_press_min_mm": observable_press_mm,
+            "observable_release_max_mm": observable_release_mm,
             "rapid_trigger_enabled": bool(settings.get("rapid_trigger_enabled", False)),
             "rapid_trigger_press_mm": settings.get("rapid_trigger_press"),
             "rapid_trigger_release_mm": settings.get("rapid_trigger_release"),
