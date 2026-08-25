@@ -62,7 +62,7 @@ function Invoke-WslBuildCommand {
 
     $resolved = Resolve-WslBuildCommand -CommandName $Executable
     $wslArguments = [Collections.Generic.List[string]]::new()
-    foreach ($argument in @("-d", $WslDistribution, "--cd", $WorkingDirectory, "--")) {
+    foreach ($argument in @("-d", $WslDistribution, "--cd", $WorkingDirectory, "--exec")) {
         $wslArguments.Add($argument)
     }
     $environmentArguments = @(Get-WslEnvironmentArguments)
