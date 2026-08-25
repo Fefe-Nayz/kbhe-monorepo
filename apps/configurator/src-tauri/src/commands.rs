@@ -2986,10 +2986,9 @@ fn wait_for_updater_protocol(
     retries: u32,
 ) -> Result<(HidDevice, UpdaterHello), String> {
     let deadline = Instant::now() + Duration::from_millis(wait_timeout_ms);
-    let mut last_observation = "updater has not enumerated".to_string();
 
     loop {
-        match find_updater_device(expected_serial_number)? {
+        let last_observation = match find_updater_device(expected_serial_number)? {
             Some(info) => match open_device_by_path(&info.path) {
                 Ok(device) => {
                     verify_open_device_serial(&device, expected_serial_number)?;
@@ -3003,26 +3002,17 @@ fn wait_for_updater_protocol(
                         Ok(hello) if hello.protocol_version == expected_protocol => {
                             return Ok((device, hello));
                         }
-                        Ok(hello) => {
-                            last_observation = format!(
-                                "observed protocol 0x{:04X}, waiting for 0x{expected_protocol:04X}",
-                                hello.protocol_version
-                            );
-                        }
-                        Err(error) => {
-                            last_observation = format!("HELLO is not ready: {error}");
-                        }
+                        Ok(hello) => format!(
+                            "observed protocol 0x{:04X}, waiting for 0x{expected_protocol:04X}",
+                            hello.protocol_version
+                        ),
+                        Err(error) => format!("HELLO is not ready: {error}"),
                     }
                 }
-                Err(error) => {
-                    last_observation =
-                        format!("updater is enumerated but cannot be opened: {error}");
-                }
+                Err(error) => format!("updater is enumerated but cannot be opened: {error}"),
             },
-            None => {
-                last_observation = "updater is currently disconnected".to_string();
-            }
-        }
+            None => "updater is currently disconnected".to_string(),
+        };
 
         if Instant::now() >= deadline {
             return Err(format!(
