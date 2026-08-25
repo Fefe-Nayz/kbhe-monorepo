@@ -65,6 +65,7 @@ jobs:
           python tools/release/test_release_signing.py
           python tools/host/test_firmware_updater_selection.py
           python tools/host/test_device_protocol.py
+          python tools/host/test_hil_input_logger.py
 
       - name: Configure Release
         run: cmake --preset Release
