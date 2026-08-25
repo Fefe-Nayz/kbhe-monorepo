@@ -410,7 +410,10 @@ async function captureActionSnapshot(profileIndex: number): Promise<Pick<
       ? overlayResults as ActionOverlayBinding[]
       : null,
     actionOverlayNames: Array.from({ length: ACTION_OVERLAY_COUNT }, (_, index) => `Overlay ${index + 1}`),
-    actionStateBits: states?.bits ?? null,
+    // Session-only macro toggles must never become the next boot default when
+    // a profile is mirrored or copied. Legacy firmware has no separate field,
+    // so getActionStates() deliberately falls back to its runtime bits there.
+    actionStateBits: states?.initialBits ?? states?.bits ?? null,
   }
 }
 

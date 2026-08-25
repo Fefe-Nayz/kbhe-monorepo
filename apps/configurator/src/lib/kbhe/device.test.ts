@@ -602,14 +602,14 @@ describe("KBHEDevice settings durability", () => {
 });
 
 describe("KBHEDevice action capabilities", () => {
-  test("exposes ProfileDocument schema and atomic-commit capability bytes", async () => {
+  test("exposes ProfileDocument and runtime-state extension capability bytes", async () => {
     const transport = {
       flushInput: async () => 0,
       writeReport: async () => 65,
       readReport: async () => new Uint8Array(),
       sendCommand: async (command: number) => {
-        const response = new Uint8Array(12);
-        response.set([command, 0, 1, 4, 16, 32, 16, 8, 4, 16, 3, 1]);
+        const response = new Uint8Array(64);
+        response.set([command, 0, 1, 4, 16, 32, 16, 8, 4, 4, 3, 1, 0x03]);
         return response;
       },
     } as KbheTransport;
@@ -618,8 +618,86 @@ describe("KBHEDevice action capabilities", () => {
     expect(await device.getActionCapabilities()).toMatchObject({
       profileDocumentSchemaVersion: 3,
       atomicProfileDocumentCommit: true,
-      maxInstances: 16,
+      maxInstances: 4,
+      runtimeStateCommand: true,
+      extendedStateReport: true,
     });
+  });
+
+  test("decodes runtime/default bits and bounded queue telemetry separately", async () => {
+    const response = new Uint8Array(64);
+    response.set([
+      Command.GET_ACTION_STATES,
+      Status.OK,
+      0x05,
+      0x00,
+      2,
+      1,
+      0x02,
+      0x00,
+      3,
+      7,
+      16,
+      0x78,
+      0x56,
+      0x34,
+      0x12,
+    ]);
+    const transport = {
+      sendCommand: async () => response,
+    } as KbheTransport;
+    const device = new KBHEDevice(new KbheCommander(transport), transport);
+
+    expect(await device.getActionStates()).toEqual({
+      bits: 0x0005,
+      initialBits: 0x0002,
+      activeProfileIndex: 2,
+      metricsAvailable: true,
+      activeInstances: 3,
+      pendingTriggers: 7,
+      triggerQueueCapacity: 16,
+      droppedTriggers: 0x12345678,
+    });
+  });
+
+  test("falls back safely when old firmware only reports live state bits", async () => {
+    const response = new Uint8Array(64);
+    response.set([Command.GET_ACTION_STATES, Status.OK, 0x34, 0x12, 1]);
+    const transport = {
+      sendCommand: async () => response,
+    } as KbheTransport;
+    const device = new KBHEDevice(new KbheCommander(transport), transport);
+
+    expect(await device.getActionStates()).toEqual({
+      bits: 0x1234,
+      initialBits: 0x1234,
+      activeProfileIndex: 1,
+      metricsAvailable: false,
+      activeInstances: 0,
+      pendingTriggers: 0,
+      triggerQueueCapacity: 0,
+      droppedTriggers: 0,
+    });
+  });
+
+  test("uses the runtime-only command and verifies its echoed postcondition", async () => {
+    let capturedCommand = 0;
+    let capturedData: number[] = [];
+    const transport = {
+      sendCommand: async (command: number, data: ArrayLike<number>) => {
+        capturedCommand = command;
+        capturedData = Array.from(data);
+        return Uint8Array.from([command, Status.OK, 6, 1]);
+      },
+    } as KbheTransport;
+    const device = new KBHEDevice(new KbheCommander(transport), transport);
+
+    expect(await device.setActionRuntimeState(6, true)).toBeTrue();
+    expect(capturedCommand).toBe(Command.SET_ACTION_RUNTIME_STATE);
+    expect(capturedData).toEqual([2, 6, 1]);
+    capturedCommand = 0;
+    expect(await device.setActionRuntimeState(16, true)).toBeFalse();
+    expect(capturedCommand).toBe(0);
   });
 });
 

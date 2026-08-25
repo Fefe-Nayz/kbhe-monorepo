@@ -26,6 +26,10 @@ static uint32_t validate_program_calls;
 static uint32_t validate_profile_calls;
 static uint16_t runtime_state_bits;
 
+static uint16_t read_u16_le(const uint8_t *bytes) {
+  return (uint16_t)bytes[0] | (uint16_t)((uint16_t)bytes[1] << 8u);
+}
+
 static uint32_t read_u32_le(const uint8_t *bytes) {
   return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) |
          ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
@@ -238,9 +242,24 @@ bool action_engine_publish_validated_overlay_binding(
 }
 uint8_t action_engine_active_profile(void) { return 0u; }
 uint16_t action_engine_state_bits(void) { return runtime_state_bits; }
+uint16_t action_engine_initial_state_bits(void) {
+  return action_profile.initial_state_bits;
+}
+uint8_t action_engine_active_instance_count(void) { return 3u; }
+uint8_t action_engine_pending_trigger_count(void) { return 7u; }
+uint32_t action_engine_dropped_trigger_count(void) { return 0x12345678u; }
 bool action_engine_get_state(uint8_t state) {
   return state < ACTION_STATE_COUNT &&
          (runtime_state_bits & (uint16_t)(1u << state)) != 0u;
+}
+bool action_engine_set_runtime_state(uint8_t state, bool value) {
+  if (state >= ACTION_STATE_COUNT) return false;
+  if (value) {
+    runtime_state_bits |= (uint16_t)(1u << state);
+  } else {
+    runtime_state_bits &= (uint16_t)~(uint16_t)(1u << state);
+  }
+  return true;
 }
 bool action_engine_set_state(uint8_t state, bool value) {
   if (state >= ACTION_STATE_COUNT) return false;
@@ -269,6 +288,8 @@ static void reset_fixture(void) {
   validate_program_calls = 0u;
   validate_profile_calls = 0u;
   runtime_state_bits = 0u;
+  settings_revision = 0u;
+  action_revision = 0u;
 }
 
 static void test_deferred_program_apply_preserves_concurrent_mode_state(void) {
@@ -384,7 +405,64 @@ static void test_capabilities_report_bounded_runtime_instance_pool(void) {
   assert(response[1] == HID_RESP_OK);
   assert(response[4] == ACTION_PROGRAM_COUNT);
   assert(response[9] == ACTION_ENGINE_MAX_INSTANCES);
+  assert(response[12] == (ACTION_CAPABILITY_RUNTIME_STATE_COMMAND |
+                          ACTION_CAPABILITY_EXTENDED_STATE_REPORT));
   assert(ACTION_ENGINE_MAX_INSTANCES < ACTION_PROGRAM_COUNT);
+}
+
+static void test_extended_states_report_runtime_defaults_and_queue_health(void) {
+  uint8_t request[HID_PROTOCOL_PACKET_SIZE] = {0};
+  uint8_t response[HID_PROTOCOL_PACKET_SIZE] = {0};
+
+  reset_fixture();
+  runtime_state_bits = 0x0005u;
+  action_profile.initial_state_bits = 0x0002u;
+  request[0] = CMD_GET_ACTION_STATES;
+
+  assert(action_protocol_handle(request[0], request, response));
+  assert(response[1] == HID_RESP_OK);
+  assert(read_u16_le(&response[2]) == 0x0005u);
+  assert(response[4] == 0u);
+  assert(response[5] == ACTION_STATE_REPORT_VERSION);
+  assert(read_u16_le(&response[6]) == 0x0002u);
+  assert(response[8] == 3u);
+  assert(response[9] == 7u);
+  assert(response[10] == ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY);
+  assert(read_u32_le(&response[11]) == 0x12345678u);
+}
+
+static void test_runtime_state_command_does_not_change_profile_default(void) {
+  uint8_t request[HID_PROTOCOL_PACKET_SIZE] = {0};
+  uint8_t response[HID_PROTOCOL_PACKET_SIZE] = {0};
+
+  reset_fixture();
+  action_profile.initial_state_bits = (uint16_t)(1u << 4u);
+  runtime_state_bits = action_profile.initial_state_bits;
+  request[0] = CMD_SET_ACTION_RUNTIME_STATE;
+  request[1] = 2u;
+  request[2] = 4u;
+  request[3] = 0u;
+
+  assert(action_protocol_handle(request[0], request, response));
+  assert(response[1] == HID_RESP_OK);
+  assert(response[2] == 4u && response[3] == 0u);
+  assert(!action_engine_get_state(4u));
+  assert(action_profile.initial_state_bits == (uint16_t)(1u << 4u));
+  assert(action_revision == 0u);
+
+  request[0] = CMD_SET_ACTION_STATE;
+  request[2] = 5u;
+  request[3] = 1u;
+  assert(action_protocol_handle(request[0], request, response));
+  assert(response[1] == HID_RESP_OK);
+  assert(action_engine_get_state(5u));
+  assert((action_profile.initial_state_bits & (uint16_t)(1u << 5u)) != 0u);
+  assert(action_revision == 1u);
+
+  request[0] = CMD_SET_ACTION_RUNTIME_STATE;
+  request[3] = 2u;
+  assert(action_protocol_handle(request[0], request, response));
+  assert(response[1] == HID_RESP_INVALID_PARAM);
 }
 
 static void test_commit_retry_is_idempotent(void) {
@@ -433,6 +511,8 @@ static void test_rejects_declared_payload_beyond_report(void) {
 
 int main(void) {
   test_capabilities_report_bounded_runtime_instance_pool();
+  test_extended_states_report_runtime_defaults_and_queue_health();
+  test_runtime_state_command_does_not_change_profile_default();
   test_meta_reports_absent_and_committed_generation();
   test_commit_retry_is_idempotent();
   test_deferred_program_apply_preserves_concurrent_mode_state();

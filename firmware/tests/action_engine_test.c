@@ -329,6 +329,60 @@ static void test_reentrant_profile_next_and_set_roll_back_output(void) {
   run_reentrant_profile_switch(8u, 0xF024u, 2u); /* Profile Set 3 */
 }
 
+static void test_stale_held_trigger_cannot_cancel_new_profile_macro(void) {
+  action_program_t program = empty_program();
+  uint32_t old_token = 0u;
+  uint32_t new_token = 0u;
+
+  program.flags = ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE;
+  program.step_count = 2u;
+  program.steps[0].opcode = ACTION_OP_DELAY_MS;
+  program.steps[0].arg16 = 1000u;
+  program.steps[1].opcode = ACTION_OP_END;
+  assert(action_engine_set_program(0u, 10u, &program, false));
+  assert(action_engine_set_program(1u, 10u, &program, false));
+
+  assert(action_engine_activate_profile(0u));
+  assert(action_engine_trigger_program_tracked(10u, &old_token));
+  assert(old_token != 0u);
+  action_engine_tick(6100u);
+  assert(action_engine_active_instance_count() == 1u);
+
+  assert(action_engine_activate_profile(1u));
+  assert(action_engine_active_instance_count() == 0u);
+  assert(action_engine_trigger_program_tracked(10u, &new_token));
+  assert(new_token != 0u && new_token != old_token);
+  action_engine_tick(6200u);
+  assert(action_engine_active_instance_count() == 1u);
+
+  action_engine_release_program_trigger_tracked(10u, old_token);
+  action_engine_tick(6201u);
+  assert(action_engine_active_instance_count() == 1u);
+
+  action_engine_release_program_trigger_tracked(10u, new_token);
+  action_engine_tick(6202u);
+  assert(action_engine_active_instance_count() == 0u);
+  assert(action_engine_activate_profile(0u));
+}
+
+static void test_runtime_state_api_preserves_saved_default(void) {
+  const volatile uint32_t *revision = NULL;
+  uint32_t revision_before = 0u;
+
+  assert(action_engine_reset_profile(0u));
+  assert(action_engine_activate_profile(0u));
+  assert(action_engine_set_state(3u, true));
+  revision = action_engine_profile_revision_source(0u);
+  assert(revision != NULL);
+  revision_before = *revision;
+
+  assert(action_engine_set_runtime_state(3u, false));
+  assert(!action_engine_get_state(3u));
+  assert((action_engine_initial_state_bits() & (uint16_t)(1u << 3u)) != 0u);
+  assert(*revision == revision_before);
+  assert(!action_engine_set_runtime_state(ACTION_STATE_COUNT, true));
+}
+
 static void test_validation_rejects_unsafe_programs(void) {
   action_program_t program = empty_program();
   program.step_count = 1u;
@@ -589,6 +643,66 @@ static void test_trigger_fifo_reports_real_saturation(void) {
   assert(action_engine_pending_trigger_count() == 0u);
 }
 
+static void test_program_publication_discards_stale_queued_trigger(void) {
+  action_program_t delayed = empty_program();
+  action_program_t replacement = empty_program();
+
+  assert(action_engine_reset_profile(0u));
+  assert(action_engine_activate_profile(0u));
+  delayed.step_count = 2u;
+  delayed.steps[0].opcode = ACTION_OP_DELAY_MS;
+  delayed.steps[0].arg16 = 500u;
+  delayed.steps[1].opcode = ACTION_OP_END;
+  for (uint8_t slot = 0u; slot <= ACTION_ENGINE_MAX_INSTANCES; slot++) {
+    assert(action_engine_set_program(0u, slot, &delayed, false));
+  }
+
+  action_engine_cancel_all();
+  for (uint8_t slot = 0u; slot <= ACTION_ENGINE_MAX_INSTANCES; slot++) {
+    assert(action_engine_trigger_program(slot));
+  }
+  assert(action_engine_pending_trigger_count() == 1u);
+
+  replacement.step_count = 1u;
+  replacement.steps[0].opcode = ACTION_OP_END;
+  assert(action_engine_publish_validated_program(
+      0u, ACTION_ENGINE_MAX_INSTANCES, &replacement));
+  assert(action_engine_pending_trigger_count() == 0u);
+  action_engine_cancel_all();
+}
+
+static void test_stale_held_trigger_cannot_cancel_edited_macro(void) {
+  action_program_t program = empty_program();
+  uint32_t old_token = 0u;
+  uint32_t new_token = 0u;
+
+  assert(action_engine_reset_profile(0u));
+  assert(action_engine_activate_profile(0u));
+  program.flags = ACTION_PROGRAM_FLAG_CANCEL_ON_RELEASE;
+  program.step_count = 2u;
+  program.steps[0].opcode = ACTION_OP_DELAY_MS;
+  program.steps[0].arg16 = 1000u;
+  program.steps[1].opcode = ACTION_OP_END;
+  assert(action_engine_set_program(0u, 11u, &program, false));
+
+  assert(action_engine_trigger_program_tracked(11u, &old_token));
+  action_engine_tick(7000u);
+  assert(action_engine_active_instance_count() == 1u);
+  assert(action_engine_publish_validated_program(0u, 11u, &program));
+  assert(action_engine_active_instance_count() == 0u);
+
+  assert(action_engine_trigger_program_tracked(11u, &new_token));
+  assert(new_token != 0u && new_token != old_token);
+  action_engine_tick(7001u);
+  assert(action_engine_active_instance_count() == 1u);
+  action_engine_release_program_trigger_tracked(11u, old_token);
+  action_engine_tick(7002u);
+  assert(action_engine_active_instance_count() == 1u);
+  action_engine_release_program_trigger_tracked(11u, new_token);
+  action_engine_tick(7003u);
+  assert(action_engine_active_instance_count() == 0u);
+}
+
 static void test_tick_has_one_global_step_budget_and_rotates_fairly(void) {
   action_overlay_binding_t binding = {0};
 
@@ -763,11 +877,15 @@ int main(void) {
   test_tap_of_held_key_keeps_persistent_ownership();
   test_tap_capacity_matches_runtime_binding_limit();
   test_reentrant_profile_next_and_set_roll_back_output();
+  test_stale_held_trigger_cannot_cancel_new_profile_macro();
+  test_runtime_state_api_preserves_saved_default();
   test_validation_rejects_unsafe_programs();
   test_macro_call_graph_rejects_direct_and_mutual_cycles();
   test_macro_call_graph_enforces_runtime_instance_depth();
   test_fifth_trigger_waits_and_runs_in_fifo_order();
   test_trigger_fifo_reports_real_saturation();
+  test_program_publication_discards_stale_queued_trigger();
+  test_stale_held_trigger_cannot_cancel_edited_macro();
   test_tick_has_one_global_step_budget_and_rotates_fairly();
   test_trusted_publication_is_targeted();
   test_live_profile_revision_tracks_every_publication();

@@ -17,6 +17,11 @@
 #define CMD_SET_ACTION_STATE 0x9Au
 #define CMD_COMMIT_PROFILE_DOCUMENT 0x9Bu
 #define CMD_GET_PROFILE_DOCUMENT_META 0x9Cu
+#define CMD_SET_ACTION_RUNTIME_STATE 0x9Du
+
+#define ACTION_CAPABILITY_RUNTIME_STATE_COMMAND 0x01u
+#define ACTION_CAPABILITY_EXTENDED_STATE_REPORT 0x02u
+#define ACTION_STATE_REPORT_VERSION 1u
 
 /** Returns true when command_id belongs to the action protocol range. */
 bool action_protocol_handle(uint8_t command_id, const uint8_t *input,

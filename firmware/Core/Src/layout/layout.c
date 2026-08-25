@@ -61,6 +61,7 @@ typedef struct {
   uint16_t keycode;
   uint8_t route;
   uint8_t references;
+  uint32_t action_trigger_token;
 } layout_action_binding_t;
 
 static layout_action_binding_t
@@ -720,12 +721,6 @@ static void layout_handle_internal_press(uint16_t keycode) {
   uint8_t layer = layout_layer_from_keycode(keycode);
   uint8_t value = 0u;
 
-  if (layout_is_macro_keycode(keycode)) {
-    (void)action_engine_trigger_program(
-        (uint8_t)(keycode - CUSTOM_MACRO_1));
-    return;
-  }
-
   if (layout_is_momentary_layer_keycode(keycode)) {
     if (layer < SETTINGS_LAYER_COUNT && layer_hold_counts[layer] < 0xFFu) {
       layer_hold_counts[layer]++;
@@ -814,12 +809,6 @@ static void layout_handle_internal_press(uint16_t keycode) {
 
 static void layout_handle_internal_release(uint16_t keycode) {
   uint8_t layer = layout_layer_from_keycode(keycode);
-
-  if (layout_is_macro_keycode(keycode)) {
-    action_engine_release_program_trigger(
-        (uint8_t)(keycode - CUSTOM_MACRO_1));
-    return;
-  }
 
   if (!layout_is_momentary_layer_keycode(keycode)) {
     return;
@@ -957,9 +946,24 @@ static layout_action_binding_t *layout_allocate_action_binding(uint8_t source) {
   return NULL;
 }
 
-static void layout_dispatch_binding_press(const layout_action_binding_t *binding) {
+static void layout_dispatch_binding_press(layout_action_binding_t *binding) {
   if (binding->route == (uint8_t)LAYOUT_OUTPUT_INTERNAL) {
-    layout_handle_internal_press(binding->keycode);
+    if (layout_is_macro_keycode(binding->keycode)) {
+      uint32_t trigger_token = 0u;
+      (void)action_engine_trigger_program_tracked(
+          (uint8_t)(binding->keycode - CUSTOM_MACRO_1), &trigger_token);
+      if (binding->action_trigger_token == 0u) {
+        binding->action_trigger_token = trigger_token;
+      } else if (trigger_token != binding->action_trigger_token) {
+        /* The source was already held across a profile generation. It cannot
+         * own two generations through one binding record, so roll back this
+         * anomalous repeat instead of leaking a live trigger reference. */
+        action_engine_release_program_trigger_tracked(
+            (uint8_t)(binding->keycode - CUSTOM_MACRO_1), trigger_token);
+      }
+    } else {
+      layout_handle_internal_press(binding->keycode);
+    }
   } else {
     layout_dispatch_press(binding->keycode,
                           (layout_output_route_t)binding->route);
@@ -969,7 +973,13 @@ static void layout_dispatch_binding_press(const layout_action_binding_t *binding
 static void
 layout_dispatch_binding_release(const layout_action_binding_t *binding) {
   if (binding->route == (uint8_t)LAYOUT_OUTPUT_INTERNAL) {
-    layout_handle_internal_release(binding->keycode);
+    if (layout_is_macro_keycode(binding->keycode)) {
+      action_engine_release_program_trigger_tracked(
+          (uint8_t)(binding->keycode - CUSTOM_MACRO_1),
+          binding->action_trigger_token);
+    } else {
+      layout_handle_internal_release(binding->keycode);
+    }
   } else {
     layout_dispatch_release(binding->keycode,
                             (layout_output_route_t)binding->route);

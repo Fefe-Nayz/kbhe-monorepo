@@ -73,6 +73,8 @@ static bool command_get_capabilities(uint8_t *output) {
   output[9] = ACTION_ENGINE_MAX_INSTANCES;
   output[10] = PROFILE_DOCUMENT_SCHEMA_VERSION;
   output[11] = 1u; /* Atomic ProfileDocument commit supported. */
+  output[12] = ACTION_CAPABILITY_RUNTIME_STATE_COMMAND |
+               ACTION_CAPABILITY_EXTENDED_STATE_REPORT;
   return true;
 }
 
@@ -353,12 +355,30 @@ static bool command_get_states(uint8_t *output) {
   output[1] = HID_RESP_OK;
   write_u16_le(&output[2], action_engine_state_bits());
   output[4] = action_engine_active_profile();
+  output[5] = ACTION_STATE_REPORT_VERSION;
+  write_u16_le(&output[6], action_engine_initial_state_bits());
+  output[8] = action_engine_active_instance_count();
+  output[9] = action_engine_pending_trigger_count();
+  output[10] = ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY;
+  write_u32_le(&output[11], action_engine_dropped_trigger_count());
   return true;
 }
 
 static bool command_set_state(const uint8_t *input, uint8_t *output) {
-  if (!request_has(input, 2u) ||
+  if (!request_has(input, 2u) || input[3] > 1u ||
       !action_engine_set_state(input[2], input[3] != 0u)) {
+    output[1] = HID_RESP_INVALID_PARAM;
+    return true;
+  }
+  output[1] = HID_RESP_OK;
+  output[2] = input[2];
+  output[3] = action_engine_get_state(input[2]) ? 1u : 0u;
+  return true;
+}
+
+static bool command_set_runtime_state(const uint8_t *input, uint8_t *output) {
+  if (!request_has(input, 2u) || input[3] > 1u ||
+      !action_engine_set_runtime_state(input[2], input[3] != 0u)) {
     output[1] = HID_RESP_INVALID_PARAM;
     return true;
   }
@@ -427,7 +447,7 @@ static bool command_get_profile_document_meta(const uint8_t *input,
 bool action_protocol_handle(uint8_t command_id, const uint8_t *input,
                             uint8_t *output) {
   if (input == NULL || output == NULL || command_id < 0x90u ||
-      command_id > CMD_GET_PROFILE_DOCUMENT_META) {
+      command_id > CMD_SET_ACTION_RUNTIME_STATE) {
     return false;
   }
   response_init(output, command_id);
@@ -458,6 +478,8 @@ bool action_protocol_handle(uint8_t command_id, const uint8_t *input,
     return command_commit_profile_document(input, output);
   case CMD_GET_PROFILE_DOCUMENT_META:
     return command_get_profile_document_meta(input, output);
+  case CMD_SET_ACTION_RUNTIME_STATE:
+    return command_set_runtime_state(input, output);
   default:
     return false;
   }

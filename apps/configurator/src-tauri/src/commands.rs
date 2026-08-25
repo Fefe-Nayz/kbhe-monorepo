@@ -509,6 +509,8 @@ fn response_matches_request(command: u8, data: &[u8], response: &[u8]) -> bool {
         }
         // ProfileDocument metadata echoes the selected profile.
         0x9C => byte(data, 1) == byte(response, 2),
+        // Persistent and session-only mode writes echo state index and value.
+        0x9A | 0x9D => byte(data, 1) == byte(response, 2) && byte(data, 2) == byte(response, 3),
         _ => true,
     }
 }
@@ -2649,6 +2651,18 @@ mod transport_tests {
 
         assert!(response_matches_request(0x92, &request, &matching));
         assert!(!response_matches_request(0x92, &request, &stale));
+    }
+
+    #[test]
+    fn action_state_response_must_match_index_and_value() {
+        let request = [2, 6, 1];
+        let matching = [0x9D, 0, 6, 1];
+        let stale_index = [0x9D, 0, 5, 1];
+        let stale_value = [0x9D, 0, 6, 0];
+
+        assert!(response_matches_request(0x9D, &request, &matching));
+        assert!(!response_matches_request(0x9D, &request, &stale_index));
+        assert!(!response_matches_request(0x9D, &request, &stale_value));
     }
 
     #[test]

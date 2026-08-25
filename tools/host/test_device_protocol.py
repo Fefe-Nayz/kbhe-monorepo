@@ -32,9 +32,12 @@ class StubDevice(KBHEDevice):
     def __init__(self, responses: dict[int, bytes]):
         super().__init__()
         self._responses = responses
+        self.calls: list[tuple[int, list[int] | None, int]] = []
 
     def send_command(self, cmd_id, data=None, timeout_ms=100):
-        del data, timeout_ms
+        self.calls.append(
+            (int(cmd_id), list(data) if data is not None else None, timeout_ms)
+        )
         return self._responses.get(int(cmd_id))
 
 
@@ -140,6 +143,81 @@ class DeviceProtocolTest(unittest.TestCase):
 
         self.assertEqual(ts_commands, c_commands)
         self.assertEqual(python_commands, c_commands)
+
+    def test_extended_action_state_report_keeps_runtime_and_default_separate(self) -> None:
+        capabilities = bytearray(64)
+        capabilities[:13] = bytes(
+            (
+                Command.GET_ACTION_CAPABILITIES,
+                0,
+                1,
+                4,
+                16,
+                32,
+                16,
+                8,
+                4,
+                4,
+                3,
+                1,
+                0x03,
+            )
+        )
+        states = bytearray(64)
+        states[:15] = bytes(
+            (
+                Command.GET_ACTION_STATES,
+                0,
+                0x05,
+                0x00,
+                2,
+                1,
+                0x02,
+                0x00,
+                3,
+                7,
+                16,
+                0x78,
+                0x56,
+                0x34,
+                0x12,
+            )
+        )
+        device = StubDevice(
+            {
+                int(Command.GET_ACTION_CAPABILITIES): bytes(capabilities),
+                int(Command.GET_ACTION_STATES): bytes(states),
+            }
+        )
+
+        self.assertTrue(device.get_action_capabilities()["runtime_state_command"])
+        self.assertEqual(
+            device.get_action_states(),
+            {
+                "bits": 0x0005,
+                "initial_bits": 0x0002,
+                "active_profile_index": 2,
+                "metrics_available": True,
+                "active_instances": 3,
+                "pending_triggers": 7,
+                "trigger_queue_capacity": 16,
+                "dropped_triggers": 0x12345678,
+            },
+        )
+
+    def test_runtime_state_write_uses_non_persistent_command_and_checks_echo(self) -> None:
+        accepted = bytes((Command.SET_ACTION_RUNTIME_STATE, 0, 6, 1))
+        device = StubDevice(
+            {int(Command.SET_ACTION_RUNTIME_STATE): accepted}
+        )
+
+        self.assertTrue(device.set_action_runtime_state(6, True))
+        self.assertEqual(
+            device.calls[-1],
+            (int(Command.SET_ACTION_RUNTIME_STATE), [2, 6, 1], 100),
+        )
+        self.assertFalse(device.set_action_runtime_state(16, True))
+        self.assertEqual(len(device.calls), 1)
 
     def test_semver_identity_uses_patch_byte_before_serial(self) -> None:
         version = bytearray(64)

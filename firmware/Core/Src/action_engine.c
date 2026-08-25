@@ -39,6 +39,10 @@ static uint32_t dropped_trigger_count = 0u;
  * trigger ownership independently from execution lifetime: a program may
  * finish before its trigger is released, or fail to allocate an instance. */
 static uint8_t program_trigger_references[ACTION_PROGRAM_COUNT];
+/* Identifies the definition generation that owns each slot's current trigger
+ * references. Layout-held releases carry this token so a stale physical key
+ * cannot cancel a new execution after a profile switch or live macro edit. */
+static uint32_t program_trigger_generations[ACTION_PROGRAM_COUNT];
 static uint32_t next_execution_generation = 1u;
 static uint8_t active_profile_index = 0u;
 static uint8_t action_tick_cursor = 0u;
@@ -110,7 +114,7 @@ static void action_engine_configure_state_overlays(void) {
   action_engine_sync_state_overlays();
 }
 
-static bool action_engine_set_runtime_state(uint8_t state_index, bool value) {
+bool action_engine_set_runtime_state(uint8_t state_index, bool value) {
   uint16_t state_mask = 0u;
   if (state_index >= ACTION_STATE_COUNT) {
     return false;
@@ -151,6 +155,21 @@ static void action_trigger_queue_clear(void) {
   pending_trigger_head = 0u;
   pending_trigger_tail = 0u;
   pending_trigger_count = 0u;
+}
+
+static void action_engine_advance_program_trigger_generation(
+    uint8_t program_index) {
+  program_trigger_references[program_index] = 0u;
+  program_trigger_generations[program_index]++;
+  if (program_trigger_generations[program_index] == 0u) {
+    program_trigger_generations[program_index] = 1u;
+  }
+}
+
+static void action_engine_advance_all_trigger_generations(void) {
+  for (uint8_t i = 0u; i < ACTION_PROGRAM_COUNT; i++) {
+    action_engine_advance_program_trigger_generation(i);
+  }
 }
 
 static bool action_trigger_queue_push(uint8_t program_index) {
@@ -428,6 +447,9 @@ void action_engine_init(void) {
   action_trigger_queue_clear();
   memset(program_trigger_references, 0,
          sizeof(program_trigger_references));
+  for (uint8_t i = 0u; i < ACTION_PROGRAM_COUNT; i++) {
+    program_trigger_generations[i] = 1u;
+  }
   active_instance_count = 0u;
   dropped_trigger_count = 0u;
   next_execution_generation = 1u;
@@ -500,8 +522,7 @@ void action_engine_cancel_all(void) {
       action_instance_finish(&action_instances[i]);
     }
   }
-  memset(program_trigger_references, 0,
-         sizeof(program_trigger_references));
+  action_engine_advance_all_trigger_generations();
   action_trigger_queue_clear();
   action_tick_cursor = 0u;
 }
@@ -510,14 +531,15 @@ bool action_engine_activate_profile(uint8_t profile_index) {
   if (profile_index >= ACTION_PROFILE_COUNT) {
     return false;
   }
-  /* Finish old-profile execution, but preserve trigger ownership until the
-   * corresponding physical/nested releases arrive. Otherwise an old held
-   * macro key can later cancel a new-profile execution of the same slot. */
+  /* Finish old-profile execution, then invalidate its tracked trigger tokens.
+   * A physical key held across the switch will eventually release using its
+   * old token and therefore cannot cancel a new execution of the same slot. */
   for (uint8_t i = 0u; i < ACTION_ENGINE_MAX_INSTANCES; i++) {
     if (action_instances[i].active) {
       action_instance_finish(&action_instances[i]);
     }
   }
+  action_engine_advance_all_trigger_generations();
   action_trigger_queue_clear();
   led_matrix_clear_state_overlays();
   active_profile_index = profile_index;
@@ -529,11 +551,15 @@ bool action_engine_activate_profile(uint8_t profile_index) {
 
 uint8_t action_engine_active_profile(void) { return active_profile_index; }
 
-bool action_engine_trigger_program(uint8_t program_index) {
+bool action_engine_trigger_program_tracked(uint8_t program_index,
+                                           uint32_t *trigger_token_out) {
   const action_program_t *program = NULL;
   int8_t existing = -1;
   int8_t slot = -1;
 
+  if (trigger_token_out != NULL) {
+    *trigger_token_out = 0u;
+  }
   if (program_index >= ACTION_PROGRAM_COUNT) {
     return false;
   }
@@ -544,6 +570,9 @@ bool action_engine_trigger_program(uint8_t program_index) {
    * or cannot currently allocate. Its later release must not steal ownership
    * from another key that legitimately holds the same macro slot. */
   program_trigger_references[program_index]++;
+  if (trigger_token_out != NULL) {
+    *trigger_token_out = program_trigger_generations[program_index];
+  }
   program = &action_profiles[active_profile_index].programs[program_index];
   /* Programs are fully validated when loaded or published. Keep the physical
    * key/nested-macro hot path constant-time while retaining cheap corruption
@@ -574,6 +603,30 @@ bool action_engine_trigger_program(uint8_t program_index) {
   return true;
 }
 
+static void action_trigger_queue_remove_program(uint8_t program_index) {
+  uint8_t retained[ACTION_ENGINE_TRIGGER_QUEUE_CAPACITY] = {0};
+  uint8_t retained_count = 0u;
+  uint8_t original_count = pending_trigger_count;
+
+  for (uint8_t i = 0u; i < original_count; i++) {
+    uint8_t queued_program = 0u;
+    if (!action_trigger_queue_pop(&queued_program)) {
+      break;
+    }
+    if (queued_program != program_index) {
+      retained[retained_count++] = queued_program;
+    }
+  }
+  action_trigger_queue_clear();
+  for (uint8_t i = 0u; i < retained_count; i++) {
+    (void)action_trigger_queue_push(retained[i]);
+  }
+}
+
+bool action_engine_trigger_program(uint8_t program_index) {
+  return action_engine_trigger_program_tracked(program_index, NULL);
+}
+
 void action_engine_release_program_trigger(uint8_t program_index) {
   int8_t instance_index = -1;
   const action_program_t *program = NULL;
@@ -596,8 +649,21 @@ void action_engine_release_program_trigger(uint8_t program_index) {
   }
 }
 
+void action_engine_release_program_trigger_tracked(uint8_t program_index,
+                                                   uint32_t trigger_token) {
+  if (program_index >= ACTION_PROGRAM_COUNT || trigger_token == 0u ||
+      trigger_token != program_trigger_generations[program_index]) {
+    return;
+  }
+  action_engine_release_program_trigger(program_index);
+}
+
 uint8_t action_engine_pending_trigger_count(void) {
   return pending_trigger_count;
+}
+
+uint8_t action_engine_active_instance_count(void) {
+  return active_instance_count;
 }
 
 bool action_engine_is_idle(void) {
@@ -947,6 +1013,10 @@ bool action_engine_publish_validated_program(
     if (running >= 0) {
       action_instance_finish(&action_instances[(uint8_t)running]);
     }
+    /* An accepted press belongs to the definition that was live when it was
+     * queued. Do not let an edit make that old event execute new actions. */
+    action_trigger_queue_remove_program(program_index);
+    action_engine_advance_program_trigger_generation(program_index);
   }
   /* The caller owns proof that the complete snapshot (including its macro
    * graph) was validated. Publish only the durable slot so concurrent runtime
@@ -1026,13 +1096,14 @@ bool action_engine_set_profile(uint8_t profile_index,
     return false;
   }
   if (profile_index == active_profile_index) {
-    /* As with profile activation, keep trigger references balanced until
-     * their owners release even though the old execution is cancelled. */
+    /* As with profile activation, invalidate releases owned by the replaced
+     * runtime after cancelling its executions. */
     for (uint8_t i = 0u; i < ACTION_ENGINE_MAX_INSTANCES; i++) {
       if (action_instances[i].active) {
         action_instance_finish(&action_instances[i]);
       }
     }
+    action_engine_advance_all_trigger_generations();
     action_trigger_queue_clear();
     led_matrix_clear_state_overlays();
   }
@@ -1176,3 +1247,7 @@ bool action_engine_toggle_state(uint8_t state_index) {
 }
 
 uint16_t action_engine_state_bits(void) { return runtime_state_bits; }
+
+uint16_t action_engine_initial_state_bits(void) {
+  return action_profiles[active_profile_index].initial_state_bits;
+}

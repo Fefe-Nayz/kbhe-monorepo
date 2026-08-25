@@ -69,6 +69,8 @@ function actionCapabilities(maxInstances = ACTION_ENGINE_MAX_INSTANCES) {
     maxInstances,
     profileDocumentSchemaVersion: 2,
     atomicProfileDocumentCommit: true,
+    runtimeStateCommand: true,
+    extendedStateReport: true,
   };
 }
 

@@ -8,6 +8,9 @@ from .protocol import (
     ADVANCED_TICK_RATE_DEFAULT,
     ADVANCED_TICK_RATE_MAX,
     ADVANCED_TICK_RATE_MIN,
+    ACTION_CAPABILITY_EXTENDED_STATE_REPORT,
+    ACTION_CAPABILITY_RUNTIME_STATE_COMMAND,
+    ACTION_STATE_REPORT_VERSION,
     TRIGGER_CHATTER_GUARD_DEFAULT_MS,
     TRIGGER_CHATTER_GUARD_MAX_MS,
     CALIBRATION_VALUES_PER_CHUNK,
@@ -143,6 +146,15 @@ class KBHEDevice:
     @staticmethod
     def _unpack_u16(data, offset):
         return data[offset] | (data[offset + 1] << 8)
+
+    @staticmethod
+    def _unpack_u32(data, offset):
+        return (
+            data[offset]
+            | (data[offset + 1] << 8)
+            | (data[offset + 2] << 16)
+            | (data[offset + 3] << 24)
+        )
 
     @staticmethod
     def _chunk_count(total_count, start_index, chunk_size):
@@ -1557,6 +1569,69 @@ class KBHEDevice:
         data = [0, noise_band, alpha_min_denom, alpha_max_denom]
         resp = self.send_command(Command.SET_FILTER_PARAMS, data)
         return resp and len(resp) >= 2 and resp[1] == Status.OK
+
+    # --- On-device action/macro runtime ---
+
+    def get_action_capabilities(self):
+        """Return action-engine limits and optional protocol extensions."""
+        resp = self.send_command(Command.GET_ACTION_CAPABILITIES)
+        if not resp or len(resp) < 10 or resp[1] != Status.OK:
+            return None
+        flags = int(resp[12]) if len(resp) > 12 else 0
+        return {
+            "program_version": int(resp[2]),
+            "profile_count": int(resp[3]),
+            "program_count": int(resp[4]),
+            "max_steps": int(resp[5]),
+            "state_count": int(resp[6]),
+            "overlay_count": int(resp[7]),
+            "step_size": int(resp[8]),
+            "max_instances": int(resp[9]),
+            "profile_document_schema_version": int(resp[10]) if len(resp) > 10 else 0,
+            "atomic_profile_document_commit": len(resp) > 11 and resp[11] == 1,
+            "runtime_state_command": bool(
+                flags & ACTION_CAPABILITY_RUNTIME_STATE_COMMAND
+            ),
+            "extended_state_report": bool(
+                flags & ACTION_CAPABILITY_EXTENDED_STATE_REPORT
+            ),
+        }
+
+    def get_action_states(self):
+        """Read live/default mode bits plus bounded macro queue telemetry."""
+        resp = self.send_command(Command.GET_ACTION_STATES)
+        if not resp or len(resp) < 5 or resp[1] != Status.OK:
+            return None
+        bits = self._unpack_u16(resp, 2)
+        extended = len(resp) >= 15 and resp[5] == ACTION_STATE_REPORT_VERSION
+        return {
+            "bits": bits,
+            "initial_bits": self._unpack_u16(resp, 6) if extended else bits,
+            "active_profile_index": int(resp[4]),
+            "metrics_available": extended,
+            "active_instances": int(resp[8]) if extended else 0,
+            "pending_triggers": int(resp[9]) if extended else 0,
+            "trigger_queue_capacity": int(resp[10]) if extended else 0,
+            "dropped_triggers": self._unpack_u32(resp, 11) if extended else 0,
+        }
+
+    def set_action_runtime_state(self, state_index, value):
+        """Change one session-only mode bit without changing its saved default."""
+        state_index = int(state_index)
+        if state_index < 0 or state_index >= 16:
+            return False
+        expected = 1 if value else 0
+        resp = self.send_command(
+            Command.SET_ACTION_RUNTIME_STATE,
+            [2, state_index, expected],
+        )
+        return bool(
+            resp
+            and len(resp) >= 4
+            and resp[1] == Status.OK
+            and resp[2] == state_index
+            and resp[3] == expected
+        )
     
     # --- Debug Commands ---
     

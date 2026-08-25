@@ -60,6 +60,10 @@ import {
   ACTION_OVERLAY_MASK_BYTES,
   ACTION_PROGRAM_MAX_STEPS,
   ACTION_STEPS_PER_PACKET,
+  ACTION_CAPABILITY_EXTENDED_STATE_REPORT,
+  ACTION_CAPABILITY_RUNTIME_STATE_COMMAND,
+  ACTION_STATE_REPORT_VERSION,
+  ACTION_STATE_COUNT,
   actionOverlayBindingSchema,
   actionProgramHash,
   actionProgramSchema,
@@ -69,6 +73,7 @@ import {
   type ActionOverlayBinding,
   type ActionProgram,
   type ActionProgramMeta,
+  type ActionRuntimeState,
 } from "./action-program";
 
 /** Flash-backed action mutations can legitimately take longer than the generic RAW HID timeout. */
@@ -2672,6 +2677,7 @@ export class KBHEDevice {
     if (!response || response.length < 10 || response[1] !== Status.OK) {
       return null;
     }
+    const actionCapabilityFlags = response.length > 12 ? response[12] : 0;
     return {
       programVersion: response[2],
       profileCount: response[3],
@@ -2683,6 +2689,10 @@ export class KBHEDevice {
       maxInstances: response[9],
       profileDocumentSchemaVersion: response.length > 10 ? response[10] : 0,
       atomicProfileDocumentCommit: response.length > 11 && response[11] === 1,
+      runtimeStateCommand:
+        (actionCapabilityFlags & ACTION_CAPABILITY_RUNTIME_STATE_COMMAND) !== 0,
+      extendedStateReport:
+        (actionCapabilityFlags & ACTION_CAPABILITY_EXTENDED_STATE_REPORT) !== 0,
     };
   }
 
@@ -2924,20 +2934,57 @@ export class KBHEDevice {
     return current !== null && actionOverlayBindingsEqual(current, binding);
   }
 
-  async getActionStates(): Promise<{ bits: number; activeProfileIndex: number } | null> {
+  async getActionStates(): Promise<ActionRuntimeState | null> {
     const response = await this.sendCommand(Command.GET_ACTION_STATES);
     if (!response || response.length < 5 || response[1] !== Status.OK) {
       return null;
     }
-    return { bits: u16le(response, 2), activeProfileIndex: response[4] };
+    const bits = u16le(response, 2);
+    const extended = response.length >= 15 && response[5] === ACTION_STATE_REPORT_VERSION;
+    return {
+      bits,
+      initialBits: extended ? u16le(response, 6) : bits,
+      activeProfileIndex: response[4],
+      metricsAvailable: extended,
+      activeInstances: extended ? response[8] : 0,
+      pendingTriggers: extended ? response[9] : 0,
+      triggerQueueCapacity: extended ? response[10] : 0,
+      droppedTriggers: extended ? u32le(response, 11) : 0,
+    };
   }
 
   async setActionState(stateIndex: number, value: boolean): Promise<boolean> {
+    if (!Number.isInteger(stateIndex) || stateIndex < 0 || stateIndex >= ACTION_STATE_COUNT) {
+      return false;
+    }
     const response = await this.sendCommand(
       Command.SET_ACTION_STATE,
       [2, stateIndex & 0xff, value ? 1 : 0],
     );
-    return Boolean(response && response.length >= 4 && response[1] === Status.OK);
+    return Boolean(
+      response
+      && response.length >= 4
+      && response[1] === Status.OK
+      && response[2] === (stateIndex & 0xff)
+      && response[3] === (value ? 1 : 0),
+    );
+  }
+
+  async setActionRuntimeState(stateIndex: number, value: boolean): Promise<boolean> {
+    if (!Number.isInteger(stateIndex) || stateIndex < 0 || stateIndex >= ACTION_STATE_COUNT) {
+      return false;
+    }
+    const response = await this.sendCommand(
+      Command.SET_ACTION_RUNTIME_STATE,
+      [2, stateIndex & 0xff, value ? 1 : 0],
+    );
+    return Boolean(
+      response
+      && response.length >= 4
+      && response[1] === Status.OK
+      && response[2] === (stateIndex & 0xff)
+      && response[3] === (value ? 1 : 0),
+    );
   }
 
   async getProfileDocumentMeta(

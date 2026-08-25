@@ -25,15 +25,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useProfileStore } from "@/stores/profileStore";
 import { useDeviceSession } from "@/lib/kbhe/session";
 import { kbheDevice } from "@/lib/kbhe/device";
 import { queryKeys } from "@/lib/query/keys";
 import {
   patchActiveAppProfileActionOverlay,
   patchActiveAppProfileActionProgram,
-  patchActiveAppProfileActionState,
 } from "@/lib/kbhe/profile-snapshot-store";
 import { runProfileOperation } from "@/lib/kbhe/profile-operation-lock";
+import { actionProfileCacheScope } from "@/lib/kbhe/action-runtime";
 import {
   ACTION_OPCODE_LABELS,
   ACTION_ENGINE_MAX_INSTANCES,
@@ -155,6 +156,8 @@ export default function Macros() {
   const connected = useDeviceSession((state) => state.status === "connected");
   const ramOnlyMode = useDeviceSession((state) => Boolean(state.ramOnlyMode));
   const activeProfileIndex = useDeviceSession((state) => state.activeProfileIndex);
+  const runtimeSource = useProfileStore((state) => state.runtimeSource);
+  const activeAppProfileName = useProfileStore((state) => state.activeAppProfileName);
   const queryClient = useQueryClient();
   const [programIndex, setProgramIndex] = useState(0);
   const [overlayIndex, setOverlayIndex] = useState(0);
@@ -170,6 +173,23 @@ export default function Macros() {
   const [message, setMessage] = useState<string | null>(null);
 
   const profileIndex = activeProfileIndex ?? 0;
+  const actionProfileScope = actionProfileCacheScope(
+    runtimeSource,
+    profileIndex,
+    activeAppProfileName,
+  );
+  const programQueryKey = [
+    ...queryKeys.actions.program(programIndex),
+    actionProfileScope,
+  ] as const;
+  const overlayQueryKey = [
+    ...queryKeys.actions.overlay(overlayIndex),
+    actionProfileScope,
+  ] as const;
+  const statesQueryKey = [
+    ...queryKeys.actions.states(),
+    actionProfileScope,
+  ] as const;
 
   const capabilitiesQ = useQuery({
     queryKey: queryKeys.actions.capabilities(),
@@ -178,17 +198,17 @@ export default function Macros() {
     staleTime: 30_000,
   });
   const programQ = useQuery({
-    queryKey: queryKeys.actions.program(programIndex),
+    queryKey: programQueryKey,
     queryFn: () => kbheDevice.getActionProgram(profileIndex, programIndex),
     enabled: connected && capabilitiesQ.data != null,
   });
   const overlayQ = useQuery({
-    queryKey: queryKeys.actions.overlay(overlayIndex),
+    queryKey: overlayQueryKey,
     queryFn: () => kbheDevice.getActionOverlay(profileIndex, overlayIndex),
     enabled: connected && capabilitiesQ.data != null,
   });
   const statesQ = useQuery({
-    queryKey: queryKeys.actions.states(),
+    queryKey: statesQueryKey,
     queryFn: () => kbheDevice.getActionStates(),
     enabled: connected && capabilitiesQ.data != null,
     refetchInterval: connected ? 500 : false,
@@ -278,7 +298,7 @@ export default function Macros() {
         if (!ok) throw new Error("Device rejected the program or could not commit it");
         patchActiveAppProfileActionProgram(programIndex, validation.data);
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.actions.program(programIndex) });
+      await queryClient.invalidateQueries({ queryKey: programQueryKey });
       setMessage(
         ramOnlyMode
           ? `Macro ${programIndex + 1} applied to the temporary app profile.`
@@ -312,7 +332,7 @@ export default function Macros() {
         if (!ok) throw new Error("Device rejected the overlay or could not commit it");
         patchActiveAppProfileActionOverlay(overlayIndex, binding);
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.actions.overlay(overlayIndex) });
+      await queryClient.invalidateQueries({ queryKey: overlayQueryKey });
       setMessage(
         ramOnlyMode
           ? `Overlay ${overlayIndex + 1} applied to the temporary app profile.`
@@ -328,15 +348,18 @@ export default function Macros() {
 
   const setRuntimeState = async (stateIndex: number, value: boolean) => {
     if (stateWriteRef.current) return;
+    if (!capabilitiesQ.data?.runtimeStateCommand) {
+      setMessage("Update the keyboard firmware to test modes without changing their saved defaults.");
+      return;
+    }
     stateWriteRef.current = true;
     setStateWritePending(true);
     setMessage(null);
     try {
       await runProfileOperation(async () => {
-        if (!(await kbheDevice.setActionState(stateIndex, value))) {
+        if (!(await kbheDevice.setActionRuntimeState(stateIndex, value))) {
           throw new Error(`Device rejected mode ${stateIndex + 1}`);
         }
-        patchActiveAppProfileActionState(stateIndex, value);
       });
       await statesQ.refetch();
     } catch (error) {
@@ -827,6 +850,26 @@ export default function Macros() {
           description="Flip mode bits by hand to check conditionals and LED indicators without running a macro."
           icon={<IconToggleLeft />}
         >
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {statesQ.data?.metricsAvailable && (
+              <>
+                <Badge variant="outline">
+                  {statesQ.data.activeInstances}/{capabilitiesQ.data?.maxInstances ?? ACTION_ENGINE_MAX_INSTANCES} running
+                </Badge>
+                <Badge variant="outline">
+                  {statesQ.data.pendingTriggers}/{statesQ.data.triggerQueueCapacity} queued
+                </Badge>
+                <Badge variant={statesQ.data.droppedTriggers > 0 ? "destructive" : "outline"}>
+                  {statesQ.data.droppedTriggers} dropped
+                </Badge>
+              </>
+            )}
+            {capabilitiesQ.data && !capabilitiesQ.data.runtimeStateCommand && (
+              <span className="text-xs text-muted-foreground">
+                Firmware update required for safe, session-only mode testing.
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
             {Array.from({ length: ACTION_STATE_COUNT }, (_, stateIndex) => {
               const active = Boolean((statesQ.data?.bits ?? 0) & (1 << stateIndex));
@@ -836,7 +879,11 @@ export default function Macros() {
                   type="button"
                   aria-pressed={active}
                   onClick={() => void setRuntimeState(stateIndex, !active)}
-                  disabled={!connected || stateWritePending}
+                  disabled={
+                    !connected
+                    || stateWritePending
+                    || !capabilitiesQ.data?.runtimeStateCommand
+                  }
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",

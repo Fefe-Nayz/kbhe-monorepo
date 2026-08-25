@@ -100,8 +100,19 @@ uint8_t action_engine_active_profile(void);
 
 bool action_engine_trigger_program(uint8_t program_index);
 void action_engine_release_program_trigger(uint8_t program_index);
+/**
+ * Tracked variants used by layout sources that can remain held across a
+ * profile or program replacement. A token returned for an old definition is
+ * harmless when released after a newer definition uses the same macro slot.
+ */
+bool action_engine_trigger_program_tracked(uint8_t program_index,
+                                           uint32_t *trigger_token_out);
+void action_engine_release_program_trigger_tracked(uint8_t program_index,
+                                                   uint32_t trigger_token);
 /** Number of accepted triggers currently waiting for a runtime instance. */
 uint8_t action_engine_pending_trigger_count(void);
+/** Number of macro instances currently executing. */
+uint8_t action_engine_active_instance_count(void);
 /** True when no macro instance is running and no accepted trigger is queued. */
 bool action_engine_is_idle(void);
 /** Monotonic, saturating count of triggers rejected because the FIFO was full. */
@@ -158,9 +169,13 @@ bool action_engine_set_overlay_binding(uint8_t profile_index,
                                        bool persist);
 
 bool action_engine_get_state(uint8_t state_index);
+/** Change one session-only mode bit without modifying the profile default. */
+bool action_engine_set_runtime_state(uint8_t state_index, bool value);
+/** Change both the live bit and the profile's next-activation default. */
 bool action_engine_set_state(uint8_t state_index, bool value);
 bool action_engine_toggle_state(uint8_t state_index);
 uint16_t action_engine_state_bits(void);
+uint16_t action_engine_initial_state_bits(void);
 
 /** Persistence backend. Implemented by action_store.c. */
 bool action_store_load_profile(uint8_t profile_index,

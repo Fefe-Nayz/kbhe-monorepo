@@ -6,6 +6,9 @@ export const ACTION_PROGRAM_COUNT = 16;
 export const ACTION_PROGRAM_MAX_STEPS = 32;
 export const ACTION_STATE_COUNT = 16;
 export const ACTION_ENGINE_MAX_INSTANCES = 4;
+export const ACTION_CAPABILITY_RUNTIME_STATE_COMMAND = 0x01;
+export const ACTION_CAPABILITY_EXTENDED_STATE_REPORT = 0x02;
+export const ACTION_STATE_REPORT_VERSION = 1;
 export const ACTION_OVERLAY_COUNT = 8;
 export const ACTION_OVERLAY_MASK_BYTES = 11;
 export const ACTION_STEPS_PER_PACKET = 14;
@@ -211,6 +214,19 @@ export interface ActionCapabilities {
   maxInstances: number;
   profileDocumentSchemaVersion: number;
   atomicProfileDocumentCommit: boolean;
+  runtimeStateCommand: boolean;
+  extendedStateReport: boolean;
+}
+
+export interface ActionRuntimeState {
+  bits: number;
+  initialBits: number;
+  activeProfileIndex: number;
+  metricsAvailable: boolean;
+  activeInstances: number;
+  pendingTriggers: number;
+  triggerQueueCapacity: number;
+  droppedTriggers: number;
 }
 
 export interface ActionProgramMeta {

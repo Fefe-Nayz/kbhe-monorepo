@@ -725,7 +725,7 @@ Splash / Multi-splash:
 | GET_FILTER_PARAMS | 0x82 | aucun | status + noise_band + alpha_min_denom + alpha_max_denom |
 | SET_FILTER_PARAMS | 0x83 | noise_band + alpha_min_denom + alpha_max_denom | status + valeurs courantes |
 
-### 3.6 Programmes d'actions, macros et ProfileDocument (0x90..0x9C)
+### 3.6 Programmes d'actions, macros et ProfileDocument (0x90..0x9D)
 
 Les programmes et les reglages d'un profil sont publies ensemble dans un
 `ProfileDocument` atomique. Le schema courant vaut 3. Une reponse differee de
@@ -734,7 +734,7 @@ stop-and-wait pendant cette operation.
 
 | Commande | ID | Parametres requete | Reponse |
 |---|---:|---|---|
-| GET_ACTION_CAPABILITIES | 0x90 | aucun | version, profile_count, program_count, max_steps, state_count, overlay_count, step_size, max_instances, document_schema, atomic_commit |
+| GET_ACTION_CAPABILITIES | 0x90 | aucun | version, profile_count, program_count, max_steps, state_count, overlay_count, step_size, max_instances, document_schema, atomic_commit, action_flags |
 | GET_ACTION_PROGRAM_META | 0x91 | profile, slot | profile, slot, version, flags, step_count, validation, hash32 |
 | GET_ACTION_PROGRAM_CHUNK | 0x92 | profile, slot, start, count | profile, slot, start, count, steps |
 | BEGIN_SET_ACTION_PROGRAM | 0x93 | profile, slot, version, flags, step_count, hash32 | profile + slot |
@@ -743,10 +743,16 @@ stop-and-wait pendant cette operation.
 | ABORT_ACTION_PROGRAM | 0x96 | aucun | status |
 | GET_ACTION_OVERLAY | 0x97 | profile, overlay | profile, overlay, taille, binding |
 | SET_ACTION_OVERLAY | 0x98 | profile, overlay, taille, persist, binding | profile + overlay (differee si persist=1) |
-| GET_ACTION_STATES | 0x99 | aucun | state_bits u16 + active_profile |
+| GET_ACTION_STATES | 0x99 | aucun | state_bits u16 + active_profile + report_version + initial_state_bits u16 + active_instances + pending_triggers + queue_capacity + dropped_triggers u32 |
 | SET_ACTION_STATE | 0x9A | state_index, value | state_index + value |
 | COMMIT_PROFILE_DOCUMENT | 0x9B | profile + expected_generation u32 | profile + schema + new_generation u32 (differee) |
 | GET_PROFILE_DOCUMENT_META | 0x9C | profile | profile + schema + generation u32 |
+| SET_ACTION_RUNTIME_STATE | 0x9D | state_index, value | state_index + value |
+
+`action_flags` vaut actuellement bit 0 = `SET_ACTION_RUNTIME_STATE` supporte et
+bit 1 = rapport `GET_ACTION_STATES` etendu supporte. Le rapport etendu porte la
+version 1. Un hote doit conserver le decodage historique des cinq premiers
+octets lorsque cette version n'est pas annoncee.
 
 Un `action_step_t` fait 4 octets: `opcode`, `arg8`, `arg16` little-endian. Un
 programme contient au plus 32 etapes. Les opcodes v1 sont:
@@ -766,7 +772,7 @@ programme contient au plus 32 etapes. Les opcodes v1 sont:
 
 Les keycodes `0xF400..0xF40F` declenchent Macro 1..16. Le firmware valide le
 graphe complet et refuse toute recursion directe ou indirecte, ainsi que tout
-chemin d'imbrication depassant `max_instances` (16 actuellement). Les resultats
+chemin d'imbrication depassant `max_instances` (4 actuellement). Les resultats
 de validation 6 et 7 designent respectivement `MACRO_CYCLE` et `MACRO_DEPTH`.
 Le bitmap de reception doit couvrir toutes les etapes avant le commit; `hash32`
 est le FNV-1a du programme wire complet. Une generation attendue differente de
@@ -777,7 +783,9 @@ d'un document deja identique.
 et les overlays qui le suivent; ils ne changent ni `initial_state_bits` ni la
 revision persistante du profil. `SET_ACTION_STATE` configure a la fois l'etat
 runtime et la valeur initiale du profil, qui sera incluse au prochain commit du
-`ProfileDocument`.
+`ProfileDocument`. `SET_ACTION_RUNTIME_STATE` ne change que l'etat de la
+session et sert notamment aux tests interactifs du configurateur; il ne change
+ni `initial_state_bits` ni la revision persistante.
 
 Les 16 etats pilotent jusqu'a 8 overlays. Chaque binding contient une couleur,
 un masque de touches, priorite, opacite, mode de blend, temps fade-in/fade-out,
@@ -1075,7 +1083,7 @@ Le bootloader memorise la derniere requete complete.
   - 0x4D, 0x4E: reserves (anciens GET/SET_GAMEPAD_WITH_KB, supprimes)
 - LED: 0x60..0x7F
 - Filter: 0x80..0x83
-- Actions/macros/ProfileDocument: 0x90..0x9C
+- Actions/macros/ProfileDocument: 0x90..0x9D
 - Debug: 0xE0..0xE9
 - Echo: 0xFE
 - Updater: 0x01..0x07 sur PID 0x0003
