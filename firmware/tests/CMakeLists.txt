@@ -112,6 +112,16 @@ target_include_directories(xinput_usb_test BEFORE PRIVATE
 )
 add_test(NAME xinput_usb_test COMMAND xinput_usb_test)
 
+add_executable(usb_gamepad_identity_test
+  usb_gamepad_identity_test.c
+  ../Core/Src/usb_descriptors.c
+)
+target_include_directories(usb_gamepad_identity_test PRIVATE
+  "${KBHE_CORE_INC}"
+  "${CMAKE_CURRENT_LIST_DIR}/../lib/tinyusb/src"
+)
+add_test(NAME usb_gamepad_identity_test COMMAND usb_gamepad_identity_test)
+
 add_executable(keyboard_hid_queue_test
   keyboard_hid_queue_test.c
   ../Core/Src/hid/keyboard_hid.c
