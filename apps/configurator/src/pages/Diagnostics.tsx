@@ -76,6 +76,14 @@ const SERIES_COLORS = [
 const DATA_TYPES = ["raw", "filtered", "calibrated", "distance", "normalized"] as const;
 type DataType = (typeof DATA_TYPES)[number];
 
+type WaveformCaptureData = {
+  keyIndex: number;
+  durationMs: number;
+  overflowCount: number;
+  raw: number[];
+  filtered: number[];
+};
+
 const DATA_TYPE_LABELS: Record<DataType, string> = {
   raw: "Raw ADC",
   filtered: "Filtered ADC",
@@ -110,6 +118,36 @@ function pushTrend(history: number[], value: number, maxPoints = MCU_TREND_POINT
     next.splice(0, next.length - maxPoints);
   }
   return next;
+}
+
+function downloadWaveformCsv(capture: WaveformCaptureData) {
+  const sampleCount = capture.raw.length;
+  const stepMs = sampleCount > 1 ? capture.durationMs / (sampleCount - 1) : 0;
+  const rows = capture.raw.map((raw, sampleIndex) =>
+    [
+      sampleIndex,
+      capture.keyIndex,
+      capture.keyIndex + 1,
+      (sampleIndex * stepMs).toFixed(3),
+      raw,
+      capture.filtered[sampleIndex],
+    ].join(","),
+  );
+  const csv = [
+    "sample_index,key_index,key_number,time_ms_est,adc_raw,adc_filtered",
+    ...rows,
+  ].join("\n");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `waveform-key-${capture.keyIndex + 1}-${timestamp}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────
@@ -1348,45 +1386,78 @@ function SystemTab({ connected, active }: { connected: boolean; active: boolean 
     }
   };
 
-  // ── ADC capture ──
+  // ── Waveform capture ──
   const [captureKey, setCaptureKey] = useState(0);
   const [captureDuration, setCaptureDuration] = useState(500);
   const [captureStatus, setCaptureStatus] = useState<CaptureStatusT | null>(null);
-  const [captureData, setCaptureData] = useState<{ raw: number[]; filtered: number[] } | null>(null);
+  const [captureData, setCaptureData] = useState<WaveformCaptureData | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
 
   const startCapture = async () => {
     setCapturing(true);
     setCaptureData(null);
-    const st = await kbheDevice.adcCaptureStart(captureKey, captureDuration);
-    setCaptureStatus(st);
-    if (!st?.active) {
-      setCapturing(false);
-      return;
-    }
+    setCaptureError(null);
 
-    const poll = async () => {
-      const s = await kbheDevice.adcCaptureStatus();
-      setCaptureStatus(s);
-      if (s?.active) {
-        setTimeout(() => void poll(), 100);
-        return;
+    try {
+      let status = await kbheDevice.adcCaptureStart(captureKey, captureDuration);
+      if (!status) {
+        throw new Error("The keyboard did not respond when starting the waveform capture.");
       }
+      setCaptureStatus(status);
+      if (!status.active) {
+        throw new Error("The firmware did not start the waveform capture.");
+      }
+
+      while (status.active) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+        status = await kbheDevice.adcCaptureStatus();
+        if (!status) {
+          throw new Error("The keyboard stopped responding while capturing the waveform.");
+        }
+        setCaptureStatus(status);
+      }
+
       const raw: number[] = [];
       const filtered: number[] = [];
-      const total = s?.sample_count ?? 0;
-      let idx = 0;
-      while (idx < total) {
-        const chunk = await kbheDevice.adcCaptureRead(idx, 12);
-        if (!chunk || chunk.sample_count === 0) break;
+      const total = status.sample_count;
+      let nextIndex = 0;
+
+      if (total === 0) {
+        throw new Error("The waveform capture completed without any samples.");
+      }
+
+      while (nextIndex < total) {
+        const chunk = await kbheDevice.adcCaptureRead(nextIndex, 12);
+        if (!chunk) {
+          throw new Error(`Could not read waveform samples at index ${nextIndex}.`);
+        }
+        if (chunk.total_samples !== total || chunk.start_index !== nextIndex || chunk.sample_count === 0) {
+          throw new Error("The keyboard returned an incomplete waveform capture.");
+        }
+        if (
+          chunk.raw_samples.length !== chunk.sample_count
+          || chunk.filtered_samples.length !== chunk.sample_count
+        ) {
+          throw new Error("The keyboard returned malformed waveform samples.");
+        }
         raw.push(...chunk.raw_samples);
         filtered.push(...chunk.filtered_samples);
-        idx += chunk.sample_count;
+        nextIndex += chunk.sample_count;
       }
-      setCaptureData({ raw, filtered });
+
+      setCaptureData({
+        keyIndex: status.key_index,
+        durationMs: status.duration_ms,
+        overflowCount: status.overflow_count,
+        raw,
+        filtered,
+      });
+    } catch (error) {
+      setCaptureError(error instanceof Error ? error.message : "Waveform capture failed.");
+    } finally {
       setCapturing(false);
-    };
-    setTimeout(() => void poll(), 100);
+    }
   };
 
   // ── SOCD pairs ──
@@ -1733,23 +1804,41 @@ function SystemTab({ connected, active }: { connected: boolean; active: boolean 
                 min={1}
                 max={10000}
                 value={captureDuration}
-                onChange={(e) => setCaptureDuration(+e.target.value)}
+                onChange={(e) =>
+                  setCaptureDuration(Math.max(1, Math.min(10000, Number(e.target.value) || 1)))
+                }
                 className="h-8 w-28 font-mono text-xs"
               />
             </label>
             <span className="pb-1.5 text-xs text-muted-foreground">
               {KEY_LABELS[captureKey] ?? "—"}
             </span>
-            <Button
-              size="sm"
-              className="ml-auto"
-              disabled={capturing}
-              onClick={() => void startCapture()}
-            >
-              <IconPlayerPlay className="size-3.5" />
-              {capturing ? "Capturing…" : "Start capture"}
-            </Button>
+            <div className="ml-auto flex gap-2">
+              <Button
+                size="sm"
+                disabled={capturing}
+                onClick={() => void startCapture()}
+              >
+                <IconPlayerPlay className="size-3.5" />
+                {capturing ? "Capturing…" : "Start capture"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!captureData || captureData.raw.length === 0 || capturing}
+                onClick={() => captureData && downloadWaveformCsv(captureData)}
+              >
+                <IconDownload className="size-3.5" />
+                Download CSV
+              </Button>
+            </div>
           </div>
+
+          {captureError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {captureError}
+            </p>
+          ) : null}
 
           {captureStatus && (
             <div className="flex flex-col gap-2 rounded-lg border bg-surface-sunken px-3 py-2.5">
@@ -1776,6 +1865,12 @@ function SystemTab({ connected, active }: { connected: boolean; active: boolean 
               {captureStatus.active && <Progress value={50} className="h-1" />}
             </div>
           )}
+
+          {captureData?.overflowCount ? (
+            <p className="text-sm text-warning">
+              The capture overflowed {captureData.overflowCount} time{captureData.overflowCount === 1 ? "" : "s"}. Reduce the duration and try again.
+            </p>
+          ) : null}
 
           {captureData && captureData.raw.length > 0 ? (
             <div className="rounded-lg border bg-surface-sunken p-3">
